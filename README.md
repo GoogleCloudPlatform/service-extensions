@@ -1,3 +1,14 @@
+# TODO
+
+*   Code
+    *   Set up CI for repository
+    *   Write header API
+    *   Upstream testing changes, update ProxyWasm references
+*   API surface
+    *   Publish and document the latest ProxyWasm version (not vNEXT as above)
+*   Language support
+    *   Add Golang recipes: https://github.com/tetratelabs/proxy-wasm-go-sdk
+
 # Google Cloud Service Extensions Samples
 
 Recipes and code samples for
@@ -48,13 +59,6 @@ will grow over time. The current feature set includes:
     *   get_current_time_nanoseconds (frozen per stream)
     *   get_property ("plugin_root_id" only)
     *   get_buffer_status, get_buffer_bytes (PluginConfiguration only)
-
-# TODO
-
-*   API surface
-    *   Publish and document the latest ProxyWasm version (not vNEXT as above)
-*   Language support
-    *   Add Golang recipes: https://github.com/tetratelabs/proxy-wasm-go-sdk
 
 # License
 

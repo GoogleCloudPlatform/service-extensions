@@ -2,15 +2,15 @@
 #include "gtest/gtest.h"
 #include "include/proxy-wasm/exports.h"
 #include "include/proxy-wasm/wasm.h"
-#include "test_fixture.h"
+#include "samples/test_fixture.h"
 
 namespace service_extensions_samples {
 
 INSTANTIATE_TEST_SUITE_P(
     EnginesAndPlugins, HttpTest,
     ::testing::Combine(::testing::ValuesIn(proxy_wasm::getWasmEngines()),
-                       ::testing::Values("add_header/plugin_cpp.wasm",
-                                         "add_header/plugin_rust.wasm")));
+                       ::testing::Values("samples/add_header/plugin_cpp.wasm",
+                                         "samples/add_header/plugin_rust.wasm")));
 
 TEST_P(HttpTest, RunPlugin) {
   // Create VM + load plugin.
