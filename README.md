@@ -1,9 +1,10 @@
 # TODO
 
 *   Code
+    *   Write more plugin examples
     *   Set up CI for repository
-    *   Write header API
-    *   Upstream testing changes, update ProxyWasm references
+    *   Add license headers to code files
+    *   Upstream ProxyWasm changes, update ProxyWasm version
 *   API surface
     *   Publish and document the latest ProxyWasm version (not vNEXT as above)
 *   Language support
@@ -22,11 +23,12 @@ unit test that verifies both.
 The samples folder contains Samples & Recipes to use as a reference for your own
 or extend them to fit your particular use case.
 
-*   [Add HTTP request & response header](samples/add-http-header): Add an
-    example header on both the client request and cdn response
-*   [Overwrite HTTP request & response header](samples/add-http-header):
-    Overwrite a particular header value from the client and from the origin with
-    a new value
+*   [Log each Wasm call](samples/noop_logs): Don't change anything about the
+    traffic (noop plugin). Log each wasm invocation, including lifecycle
+    callbacks.
+*   [Add HTTP request & response headers](samples/add_header): Add a header on
+    both the client request and server response paths. Also check for existing
+    headers.
 
 # Feature set / ABI
 
@@ -37,6 +39,7 @@ Service Extensions currently support a subset of the ProxyWasm spec. Support
 will grow over time. The current feature set includes:
 
 *   Root context lifecycle callbacks
+    *   on_context_create
     *   on_vm_start
     *   on_configure
     *   on_done

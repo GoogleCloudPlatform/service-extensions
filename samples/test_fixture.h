@@ -44,7 +44,7 @@ class TestContext : public proxy_wasm::TestContext {
   proxy_wasm::BufferBase plugin_config_;
 };
 
-// TestStreamContext is a GCP-like ProxyWasm Stream context. It primarily
+// TestHttpContext is a GCP-like ProxyWasm Stream context. It primarily
 // implements HTTP methods usable by Wasm.
 //
 // The implementation is an incomplete test-only approximation of HTTP-compliant
@@ -54,9 +54,9 @@ class TestContext : public proxy_wasm::TestContext {
 // - restricted header checks
 // - empty value checks
 // - size checks
-class TestStreamContext : public TestContext {
+class TestHttpContext : public TestContext {
  public:
-  TestStreamContext(std::shared_ptr<proxy_wasm::PluginHandleBase> plugin_handle)
+  TestHttpContext(std::shared_ptr<proxy_wasm::PluginHandleBase> plugin_handle)
       : TestContext(plugin_handle->wasm().get(),
                     plugin_handle->wasm()
                         ->getRootContext(plugin_handle->plugin(),
@@ -65,7 +65,7 @@ class TestStreamContext : public TestContext {
                     plugin_handle) {
     this->onCreate();
   }
-  ~TestStreamContext() override {
+  ~TestHttpContext() override {
     this->onDone();    // calls wasm if VM not failed
     this->onDelete();  // calls wasm if VM not failed and create succeeded
   }
@@ -158,12 +158,19 @@ class HttpTest
   std::string engine() { return std::get<0>(GetParam()); }
   std::string path() { return std::get<1>(GetParam()); }
 
+ protected:
   // Load VM and plugin and set these into the handle_ variable.
   absl::Status CreatePlugin(const std::string& engine,
                             const std::string& wasm_path,
                             const std::string& plugin_config = "");
 
- protected:
+  TestContext* root() {
+    if (!handle_) return nullptr;
+    return static_cast<TestContext*>(
+        handle_->wasm()->getRootContext(handle_->plugin(),
+                                        /*allow_closed=*/false));
+  }
+
   std::shared_ptr<proxy_wasm::PluginHandleBase> handle_;
 
  private:

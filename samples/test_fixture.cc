@@ -11,13 +11,13 @@ proxy_wasm::BufferInterface* TestContext::getBuffer(
   return nullptr;
 }
 
-proxy_wasm::WasmResult TestStreamContext::getHeaderMapSize(
+proxy_wasm::WasmResult TestHttpContext::getHeaderMapSize(
     proxy_wasm::WasmHeaderMapType type, uint32_t* result) {
   if (type != phase_) return proxy_wasm::WasmResult::BadArgument;
   *result = result_.headers.size();
   return proxy_wasm::WasmResult::Ok;
 }
-proxy_wasm::WasmResult TestStreamContext::getHeaderMapValue(
+proxy_wasm::WasmResult TestHttpContext::getHeaderMapValue(
     proxy_wasm::WasmHeaderMapType type, std::string_view key,
     std::string_view* value) {
   if (type != phase_) return proxy_wasm::WasmResult::BadArgument;
@@ -28,7 +28,7 @@ proxy_wasm::WasmResult TestStreamContext::getHeaderMapValue(
   *value = it->second;
   return proxy_wasm::WasmResult::Ok;
 }
-proxy_wasm::WasmResult TestStreamContext::addHeaderMapValue(
+proxy_wasm::WasmResult TestHttpContext::addHeaderMapValue(
     proxy_wasm::WasmHeaderMapType type, std::string_view key,
     std::string_view value) {
   if (type != phase_) return proxy_wasm::WasmResult::BadArgument;
@@ -40,20 +40,20 @@ proxy_wasm::WasmResult TestStreamContext::addHeaderMapValue(
   }
   return proxy_wasm::WasmResult::Ok;
 }
-proxy_wasm::WasmResult TestStreamContext::replaceHeaderMapValue(
+proxy_wasm::WasmResult TestHttpContext::replaceHeaderMapValue(
     proxy_wasm::WasmHeaderMapType type, std::string_view key,
     std::string_view value) {
   if (type != phase_) return proxy_wasm::WasmResult::BadArgument;
   result_.headers[std::string(key)] = std::string(value);
   return proxy_wasm::WasmResult::Ok;
 }
-proxy_wasm::WasmResult TestStreamContext::removeHeaderMapValue(
+proxy_wasm::WasmResult TestHttpContext::removeHeaderMapValue(
     proxy_wasm::WasmHeaderMapType type, std::string_view key) {
   if (type != phase_) return proxy_wasm::WasmResult::BadArgument;
   result_.headers.erase(std::string(key));
   return proxy_wasm::WasmResult::Ok;
 }
-proxy_wasm::WasmResult TestStreamContext::getHeaderMapPairs(
+proxy_wasm::WasmResult TestHttpContext::getHeaderMapPairs(
     proxy_wasm::WasmHeaderMapType type, proxy_wasm::Pairs* result) {
   if (type != phase_) return proxy_wasm::WasmResult::BadArgument;
   for (const auto& [key, val] : result_.headers) {
@@ -61,7 +61,7 @@ proxy_wasm::WasmResult TestStreamContext::getHeaderMapPairs(
   }
   return proxy_wasm::WasmResult::Ok;
 }
-proxy_wasm::WasmResult TestStreamContext::setHeaderMapPairs(
+proxy_wasm::WasmResult TestHttpContext::setHeaderMapPairs(
     proxy_wasm::WasmHeaderMapType type, const proxy_wasm::Pairs& pairs) {
   if (type != phase_) return proxy_wasm::WasmResult::BadArgument;
   result_.headers.clear();
@@ -71,7 +71,7 @@ proxy_wasm::WasmResult TestStreamContext::setHeaderMapPairs(
   return proxy_wasm::WasmResult::Ok;
 }
 
-proxy_wasm::WasmResult TestStreamContext::sendLocalResponse(
+proxy_wasm::WasmResult TestHttpContext::sendLocalResponse(
     uint32_t response_code, std::string_view body_text,
     proxy_wasm::Pairs additional_headers, uint32_t grpc_status,
     std::string_view details) {
@@ -89,8 +89,8 @@ proxy_wasm::WasmResult TestStreamContext::sendLocalResponse(
   return proxy_wasm::WasmResult::Ok;
 }
 
-TestStreamContext::Result TestStreamContext::SendRequestHeaders(
-    TestStreamContext::Headers headers) {
+TestHttpContext::Result TestHttpContext::SendRequestHeaders(
+    TestHttpContext::Headers headers) {
   result_ = Result{.headers = std::move(headers)};
   phase_ = proxy_wasm::WasmHeaderMapType::RequestHeaders;
   result_.status =
@@ -98,8 +98,8 @@ TestStreamContext::Result TestStreamContext::SendRequestHeaders(
   phase_ = proxy_wasm::WasmHeaderMapType(-1);  // ideally 0 would mean unset
   return std::move(result_);
 }
-TestStreamContext::Result TestStreamContext::SendResponseHeaders(
-    TestStreamContext::Headers headers) {
+TestHttpContext::Result TestHttpContext::SendResponseHeaders(
+    TestHttpContext::Headers headers) {
   result_ = Result{.headers = std::move(headers)};
   phase_ = proxy_wasm::WasmHeaderMapType::ResponseHeaders;
   result_.status =

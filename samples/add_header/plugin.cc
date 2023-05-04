@@ -1,10 +1,8 @@
-#include <string_view>
-
 #include "proxy_wasm_intrinsics.h"
 
-class StreamContext : public Context {
+class MyHttpContext : public Context {
  public:
-  explicit StreamContext(uint32_t id, RootContext* root) : Context(id, root) {}
+  explicit MyHttpContext(uint32_t id, RootContext* root) : Context(id, root) {}
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
@@ -25,4 +23,4 @@ class StreamContext : public Context {
 };
 
 static RegisterContextFactory register_StaticContext(
-    CONTEXT_FACTORY(StreamContext), ROOT_FACTORY(RootContext));
+    CONTEXT_FACTORY(MyHttpContext), ROOT_FACTORY(RootContext));
