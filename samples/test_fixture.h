@@ -37,21 +37,23 @@ class TestContext : public proxy_wasm::TestContext {
 
   // --- BEGIN Wasm facing API ---
   proxy_wasm::BufferInterface* getBuffer(
-      proxy_wasm::WasmBufferType type) override {
-    // Provide plugin configuration only.
-    if (type == proxy_wasm::WasmBufferType::PluginConfiguration) {
-      return &plugin_config_;
-    }
-    return nullptr;
-  }
+      proxy_wasm::WasmBufferType type) override;
   // --- END Wasm facing API ---
 
  private:
   proxy_wasm::BufferBase plugin_config_;
 };
 
-// TestStreamContext is GCP-like ProxyWasm Stream context.
-// It primarily implements HTTP methods usable by Wasm.
+// TestStreamContext is a GCP-like ProxyWasm Stream context. It primarily
+// implements HTTP methods usable by Wasm.
+//
+// The implementation is an incomplete test-only approximation of HTTP-compliant
+// header handling. It's missing at least the following:
+// - case insensitivity
+// - cookie handling
+// - restricted header checks
+// - empty value checks
+// - size checks
 class TestStreamContext : public TestContext {
  public:
   TestStreamContext(std::shared_ptr<proxy_wasm::PluginHandleBase> plugin_handle)
@@ -69,10 +71,11 @@ class TestStreamContext : public TestContext {
   }
 
   // --- BEGIN Wasm facing API ---
-  /*
   proxy_wasm::WasmResult getHeaderMapSize(proxy_wasm::WasmHeaderMapType type,
                                           uint32_t* result) override;
-
+  proxy_wasm::WasmResult getHeaderMapValue(proxy_wasm::WasmHeaderMapType type,
+                                           std::string_view key,
+                                           std::string_view* value) override;
   proxy_wasm::WasmResult addHeaderMapValue(proxy_wasm::WasmHeaderMapType type,
                                            std::string_view key,
                                            std::string_view value) override;
@@ -81,21 +84,42 @@ class TestStreamContext : public TestContext {
       std::string_view value) override;
   proxy_wasm::WasmResult removeHeaderMapValue(
       proxy_wasm::WasmHeaderMapType type, std::string_view key) override;
-  proxy_wasm::WasmResult getHeaderMapValue(proxy_wasm::WasmHeaderMapType type,
-                                           std::string_view key,
-                                           std::string_view* value) override;
   proxy_wasm::WasmResult getHeaderMapPairs(proxy_wasm::WasmHeaderMapType type,
                                            proxy_wasm::Pairs* result) override;
   proxy_wasm::WasmResult setHeaderMapPairs(
       proxy_wasm::WasmHeaderMapType type,
       const proxy_wasm::Pairs& pairs) override;
+
   proxy_wasm::WasmResult sendLocalResponse(uint32_t response_code,
                                            std::string_view body_text,
                                            proxy_wasm::Pairs additional_headers,
                                            uint32_t grpc_status,
                                            std::string_view details) override;
-  */
   // --- END Wasm facing API ---
+
+  // Testing types. Optimized for ease of use not performance.
+  using Headers = std::map<std::string, std::string>;  // key-sorted map
+  struct Result {
+    // Filter status returned by handler.
+    proxy_wasm::FilterHeadersStatus status;
+    // Mutated headers, also used for local response.
+    Headers headers = {};
+    // Local response, sent to user via proxy.
+    uint32_t http_code = 0;
+    std::string body = "";
+    // Local response, sent to proxy.
+    uint32_t grpc_code = 0;
+    std::string details = "";
+  };
+
+  // Testing helpers. Use these instead of direct on*Headers methods.
+  Result SendRequestHeaders(Headers headers);
+  Result SendResponseHeaders(Headers headers);
+
+ private:
+  // State tracked during a headers call. Invalid otherwise.
+  proxy_wasm::WasmHeaderMapType phase_;
+  Result result_;
 };
 
 // TestWasm is a light wrapper enabling custom TestContext.
@@ -134,7 +158,7 @@ class HttpTest
   std::string engine() { return std::get<0>(GetParam()); }
   std::string path() { return std::get<1>(GetParam()); }
 
-  // Load a plugin into the vm_.
+  // Load VM and plugin and set these into the handle_ variable.
   absl::Status CreatePlugin(const std::string& engine,
                             const std::string& wasm_path,
                             const std::string& plugin_config = "");
