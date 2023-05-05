@@ -2,7 +2,7 @@
 #include "gtest/gtest.h"
 #include "include/proxy-wasm/exports.h"
 #include "include/proxy-wasm/wasm.h"
-#include "samples/test_fixture.h"
+#include "test/framework.h"
 
 using ::testing::ElementsAre;
 using ::testing::Pair;

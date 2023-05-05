@@ -18,6 +18,13 @@ Recipes and code samples for
 Each recipe has an example plugin written in Rust and C++, and an accompanying
 unit test that verifies both.
 
+In support of unit testing, this repo contains an `HttpTest` fixture with a
+`TestWasm` host implementation and `TestHttpContext` stream handler. These
+minimal implementations loosely match GCP Service Extension execution
+environment. The contexts implements the ABI / feature set described below
+(mainly HTTP headers and logging), but often in a simple way (behaviors may not
+match GCP exactly).
+
 # Samples & Recipes
 
 The samples folder contains Samples & Recipes to use as a reference for your own

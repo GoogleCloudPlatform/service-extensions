@@ -1,4 +1,4 @@
-#include "test_fixture.h"
+#include "test/framework.h"
 
 namespace service_extensions_samples {
 
@@ -115,7 +115,7 @@ absl::Status HttpTest::CreatePlugin(const std::string& engine,
   std::string wasm_module = ReadDataFile(wasm_path);
 
   // Create a VM and load the plugin.
-  auto vm = proxy_wasm::TestVm::MakeVm(engine);
+  auto vm = proxy_wasm::TestVm::makeVm(engine);
   auto wasm = std::make_shared<TestWasm>(std::move(vm));
   if (!wasm->load(wasm_module, /*allow_precompiled=*/false)) {
     absl::string_view err = "Failed to load Wasm code";
