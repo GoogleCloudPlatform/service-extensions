@@ -11,6 +11,15 @@ proxy_wasm::BufferInterface* TestContext::getBuffer(
   return nullptr;
 }
 
+uint64_t TestContext::getCurrentTimeNanoseconds() {
+  // Return some frozen timestamp.
+  return absl::ToUnixNanos(absl::UnixEpoch());
+}
+uint64_t TestContext::getMonotonicTimeNanoseconds() {
+  unimplemented();
+  return 0;
+}
+
 proxy_wasm::WasmResult TestHttpContext::getHeaderMapSize(
     proxy_wasm::WasmHeaderMapType type, uint32_t* result) {
   if (type != phase_) return proxy_wasm::WasmResult::BadArgument;

@@ -9,8 +9,8 @@ namespace service_extensions_samples {
 
 // TestContext is GCP-like ProxyWasm context (shared for VM + Root + Stream).
 //
-// NOTE: the base class implements log + get_current_time. This derived class
-// primarily implements plugin configuration.
+// NOTE: the base class implements logging. This derived class primarily
+// implements serving plugin configuration.
 class TestContext : public proxy_wasm::TestContext {
  public:
   // VM Context constructor.
@@ -38,6 +38,8 @@ class TestContext : public proxy_wasm::TestContext {
   // --- BEGIN Wasm facing API ---
   proxy_wasm::BufferInterface* getBuffer(
       proxy_wasm::WasmBufferType type) override;
+  uint64_t getCurrentTimeNanoseconds() override;
+  uint64_t getMonotonicTimeNanoseconds() override;
   // --- END Wasm facing API ---
 
  private:
