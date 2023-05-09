@@ -1,14 +1,3 @@
-# TODO
-
-*   Code
-    *   Write more plugin examples
-    *   Set up CI for repository
-    *   Add license headers to code files
-*   API surface
-    *   Publish and document the latest ProxyWasm version (not vNEXT as above)
-*   Language support
-    *   Add Golang recipes: https://github.com/tetratelabs/proxy-wasm-go-sdk
-
 # Google Cloud Service Extensions Samples
 
 Recipes and code samples for
@@ -17,17 +6,23 @@ Recipes and code samples for
 Each recipe has an example plugin written in Rust and C++, and an accompanying
 unit test that verifies both.
 
+# Testing
+
+Tests (and thus plugins) can be invoked as follows:
+
+`$ bazelisk test --test_output=all --define engine=v8 samples/...`
+
 In support of unit testing, this repo contains an `HttpTest` fixture with a
 `TestWasm` host implementation and `TestHttpContext` stream handler. These
 minimal implementations loosely match GCP Service Extension execution
-environment. The contexts implements the ABI / feature set described below
+environment. The contexts implement the ABI / feature set described below
 (mainly HTTP headers and logging), but often in a simple way (behaviors may not
 match GCP exactly).
 
 # Samples & Recipes
 
 The samples folder contains Samples & Recipes to use as a reference for your own
-or extend them to fit your particular use case.
+plugin. Extend them to fit your particular use case.
 
 *   [Log each Wasm call](samples/noop_logs): Don't change anything about the
     traffic (noop plugin). Log each wasm invocation, including lifecycle
@@ -85,3 +80,10 @@ For our code of conduct, see [Code of Conduct](/docs/CODE_OF_CONDUCT.md).
 # Contributing
 
 Contributions welcome! See the [Contributing Guide](/docs/CONTRIBUTING.md).
+
+# TODO
+
+*   Write more plugin examples
+*   Set up CI for repository
+*   Publish and document the latest ProxyWasm version (not vNEXT as above)
+*   Add Golang recipes: https://github.com/tetratelabs/proxy-wasm-go-sdk
