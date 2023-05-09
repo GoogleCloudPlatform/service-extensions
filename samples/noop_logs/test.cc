@@ -2,7 +2,7 @@
 #include "gtest/gtest.h"
 #include "include/proxy-wasm/exports.h"
 #include "include/proxy-wasm/wasm.h"
-#include "samples/test_fixture.h"
+#include "test/framework.h"
 
 using ::testing::ElementsAre;
 using ::testing::Pair;
@@ -27,16 +27,16 @@ TEST_P(HttpTest, RunPlugin) {
 
   {
     // Create stream context.
-    auto http_context = std::make_unique<TestHttpContext>(handle_);
-    EXPECT_TRUE(http_context->isLogged("http onCreate called"));
+    auto http_context = TestHttpContext(handle_);
+    EXPECT_TRUE(http_context.isLogged("http onCreate called"));
 
     // Send request. Expect header.
-    auto res1 = http_context->SendRequestHeaders({});
-    EXPECT_TRUE(http_context->isLogged("http onRequestHeaders called"));
+    auto res1 = http_context.SendRequestHeaders({});
+    EXPECT_TRUE(http_context.isLogged("http onRequestHeaders called"));
 
     // Send response. Expect nothing.
-    auto res2 = http_context->SendResponseHeaders({});
-    EXPECT_TRUE(http_context->isLogged("http onResponseHeaders called"));
+    auto res2 = http_context.SendResponseHeaders({});
+    EXPECT_TRUE(http_context.isLogged("http onResponseHeaders called"));
   }
   // Stream cleaned up.
   EXPECT_TRUE(TestContext::isGlobalLogged("http onDone called"));

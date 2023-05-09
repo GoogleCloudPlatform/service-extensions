@@ -1,4 +1,4 @@
-#include "test_fixture.h"
+#include "test/framework.h"
 
 namespace service_extensions_samples {
 
@@ -9,6 +9,15 @@ proxy_wasm::BufferInterface* TestContext::getBuffer(
     return &plugin_config_;
   }
   return nullptr;
+}
+
+uint64_t TestContext::getCurrentTimeNanoseconds() {
+  // Return some frozen timestamp.
+  return absl::ToUnixNanos(absl::UnixEpoch());
+}
+uint64_t TestContext::getMonotonicTimeNanoseconds() {
+  unimplemented();
+  return 0;
 }
 
 proxy_wasm::WasmResult TestHttpContext::getHeaderMapSize(
@@ -83,6 +92,7 @@ proxy_wasm::WasmResult TestHttpContext::sendLocalResponse(
   result_.body = body_text;
   result_.grpc_code = grpc_status;
   result_.details = details;
+  result_.headers.clear();
   for (const auto& [key, val] : additional_headers) {
     result_.headers[std::string(key)] = std::string(val);
   }
@@ -115,7 +125,7 @@ absl::Status HttpTest::CreatePlugin(const std::string& engine,
   std::string wasm_module = ReadDataFile(wasm_path);
 
   // Create a VM and load the plugin.
-  auto vm = proxy_wasm::TestVm::MakeVm(engine);
+  auto vm = proxy_wasm::TestVm::makeVm(engine);
   auto wasm = std::make_shared<TestWasm>(std::move(vm));
   if (!wasm->load(wasm_module, /*allow_precompiled=*/false)) {
     absl::string_view err = "Failed to load Wasm code";
