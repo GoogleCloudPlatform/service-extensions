@@ -92,6 +92,7 @@ proxy_wasm::WasmResult TestHttpContext::sendLocalResponse(
   result_.body = body_text;
   result_.grpc_code = grpc_status;
   result_.details = details;
+  result_.headers.clear();
   for (const auto& [key, val] : additional_headers) {
     result_.headers[std::string(key)] = std::string(val);
   }

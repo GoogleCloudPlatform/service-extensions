@@ -36,6 +36,9 @@ or extend them to fit your particular use case.
 *   [Add HTTP request & response headers](samples/add_header): Add a header on
     both the client request and server response paths. Also check for existing
     headers.
+*   [Plugin config with a list of tokens to deny](samples/config_denylist): Deny
+    a request whenever it contains a known bad token. Bad tokens are loaded at
+    plugin initialization time from plugin configuration.
 
 # Feature set / ABI
 
