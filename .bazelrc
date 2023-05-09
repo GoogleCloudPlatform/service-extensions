@@ -1,10 +1,6 @@
 # NOTE: this workspace Bazel config was copied from proxy-wasm-cpp-host.
 # Consider moving copts and linkopts into BUILD rules upstream.
 
-# TODO upstream the fixes!
-build --override_repository=proxy_wasm_cpp_host=/usr/local/google/home/mstevenson/git/proxy-wasm-cpp-host
-#build --override_repository=proxy_wasm_cpp_sdk=/usr/local/google/home/mstevenson/git/proxy-wasm-cpp-sdk
-
 # Pass CC, CXX and PATH from the environment.
 build --action_env=CC
 build --action_env=CXX

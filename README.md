@@ -4,7 +4,6 @@
     *   Write more plugin examples
     *   Set up CI for repository
     *   Add license headers to code files
-    *   Upstream ProxyWasm changes, update ProxyWasm version
 *   API surface
     *   Publish and document the latest ProxyWasm version (not vNEXT as above)
 *   Language support
