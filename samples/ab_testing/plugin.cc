@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// [START serviceextensions_ab_testing]
 #include <ctime>
 #include <string>
 
@@ -27,7 +28,8 @@ class MyHttpContext : public Context {
 
     const std::string default_file = "/file1.blah";
     const std::string experiment_file = "/file2.blah";
-    if (path.length() >= default_file.length() && std::equal(default_file.rbegin(), default_file.rend(), path.rbegin())) {
+    if (path.length() >= default_file.length() &&
+        std::equal(default_file.rbegin(), default_file.rend(), path.rbegin())) {
       bool serve_alternative_file = (rand() % 2 == 1);
       if (serve_alternative_file) {
         const std::string truncated_path = path.substr(0, path.length() - default_file.length());
@@ -41,3 +43,4 @@ class MyHttpContext : public Context {
 
 static RegisterContextFactory register_StaticContext(
     CONTEXT_FACTORY(MyHttpContext), ROOT_FACTORY(RootContext));
+// [END serviceextensions_ab_testing]

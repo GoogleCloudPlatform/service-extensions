@@ -30,7 +30,7 @@ INSTANTIATE_TEST_SUITE_P(
         ::testing::ValuesIn(proxy_wasm::getWasmEngines()),
         ::testing::Values("samples/ab_testing/plugin_cpp.wasm")));
 
-TEST_P(HttpTest, RunPlugin) {
+TEST_P(HttpTest, UnrelatedPathUnchanged) {
   // Create VM + load plugin.
   ASSERT_TRUE(CreatePlugin(engine(), path()).ok());
 
@@ -41,6 +41,16 @@ TEST_P(HttpTest, RunPlugin) {
   auto res1 = http_context.SendRequestHeaders({{":path", "example.com/123"}});
   EXPECT_EQ(res1.http_code, 0);
   EXPECT_THAT(res1.headers, ElementsAre(Pair(":path", "example.com/123")));
+
+  EXPECT_FALSE(handle_->wasm()->isFailed());
+}
+
+TEST_P(HttpTest, ExperimentPathExercised) {
+  // Create VM + load plugin.
+  ASSERT_TRUE(CreatePlugin(engine(), path()).ok());
+
+  // Create stream context.
+  auto http_context = TestHttpContext(handle_);
 
   // Send requests relevant to the experiment until both branches are exercised.
   bool file1_served = false;
