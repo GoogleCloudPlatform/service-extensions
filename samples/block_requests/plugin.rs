@@ -27,14 +27,11 @@ impl Context for MyHttpContext {}
 
 impl HttpContext for MyHttpContext {
     fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
-        let referer_value = self.get_http_request_header("Referer");
+        let referer_value = self.get_http_request_header("referer");
         if referer_value.unwrap_or_default() == "https://www.example.com/" {
             self.send_http_response(404, vec![], Some(b"Error - Not Found.\n"));
             return Action::Pause;
         }
-        return Action::Continue;      
-    }
-    fn on_http_response_headers(&mut self, _: usize, _: bool) -> Action {
         return Action::Continue;
     }
 }

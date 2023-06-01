@@ -21,17 +21,12 @@ class MyHttpContext : public Context {
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
-    const auto& referer = getRequestHeader("Referer");
+    const auto& referer = getRequestHeader("referer");
 
     if (referer && referer->view() == "https://www.example.com/") {
       sendLocalResponse(404, "", "Error - Not Found.\n", {});
       return FilterHeadersStatus::StopAllIterationAndWatermark;
     }
-    return FilterHeadersStatus::Continue;
-  }
-
-  FilterHeadersStatus onResponseHeaders(uint32_t headers,
-                                        bool end_of_stream) override {
     return FilterHeadersStatus::Continue;
   }
 };

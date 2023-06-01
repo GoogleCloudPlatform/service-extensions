@@ -30,30 +30,48 @@ INSTANTIATE_TEST_SUITE_P(
         ::testing::Values("samples/block_requests/plugin_cpp.wasm",
                           "samples/block_requests/plugin_rust.wasm")));
 
-TEST_P(HttpTest, RunPlugin) {
+TEST_P(HttpTest, RunPluginNoRefererHeader) {
   // Create VM + load plugin.
   ASSERT_TRUE(CreatePlugin(engine(), path()).ok());
 
   // Create stream context.
   auto http_context = TestHttpContext(handle_);
 
-  // Send request with no referer. Expect nothing.
   auto res1 = http_context.SendRequestHeaders({});
   EXPECT_EQ(res1.http_code, 0);
   EXPECT_THAT(res1.headers, ElementsAre());
 
-  // Send request with referer with a valid value.
-  auto res2 = http_context.SendRequestHeaders({{"Referer", "https://www.google.com/"}});
-  EXPECT_EQ(res2.http_code, 0);
-  EXPECT_THAT(res2.headers, ElementsAre(Pair("Referer", "https://www.google.com/")));
+  EXPECT_FALSE(handle_->wasm()->isFailed());
+}
 
-  // Send request with referer set to the forbidden value.
-  auto res3 = http_context.SendRequestHeaders({{"Referer", "https://www.example.com/"}});
+TEST_P(HttpTest, RunPluginRefererAllowed) {
+  // Create VM + load plugin.
+  ASSERT_TRUE(CreatePlugin(engine(), path()).ok());
+
+  // Create stream context.
+  auto http_context = TestHttpContext(handle_);
+
+  auto res2 = http_context.SendRequestHeaders({{"referer", "https://www.google.com/"}});
+  EXPECT_EQ(res2.http_code, 0);
+  EXPECT_THAT(res2.headers, ElementsAre(Pair("referer", "https://www.google.com/")));
+
+  EXPECT_FALSE(handle_->wasm()->isFailed());
+}
+
+TEST_P(HttpTest, RunPluginRefererNotAllowedRequestBlocked) {
+  // Create VM + load plugin.
+  ASSERT_TRUE(CreatePlugin(engine(), path()).ok());
+
+  // Create stream context.
+  auto http_context = TestHttpContext(handle_);
+
+  auto res3 = http_context.SendRequestHeaders({{"referer", "https://www.example.com/"}});
   EXPECT_EQ(res3.http_code, 404);
   EXPECT_EQ(res3.body, "Error - Not Found.\n");
   EXPECT_THAT(res3.headers, ElementsAre());
 
   EXPECT_FALSE(handle_->wasm()->isFailed());
 }
+
 
 }  // namespace service_extensions_samples
