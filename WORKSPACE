@@ -68,3 +68,7 @@ proxy_wasm_rust_sdk_repositories()
 
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
 proxy_wasm_rust_sdk_dependencies()
+
+# Fetch raze-generated Cargo crates
+load("//cargo:crates.bzl", "raze_fetch_remote_crates")
+raze_fetch_remote_crates()
