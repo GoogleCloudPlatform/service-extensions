@@ -6,18 +6,11 @@ Recipes and code samples for
 Each recipe has an example plugin written in Rust and C++, and an accompanying
 unit test that verifies both.
 
-# Testing
+# Quick start
 
-Tests (and thus plugins) can be invoked as follows:
+Build all plugins and run all plugin tests:
 
 `$ bazelisk test --test_output=all --define engine=v8 samples/...`
-
-In support of unit testing, this repo contains an `HttpTest` fixture with a
-`TestWasm` host implementation and `TestHttpContext` stream handler. These
-minimal implementations loosely match GCP Service Extension execution
-environment. The contexts implement the ABI / feature set described below
-(mainly HTTP headers and logging), but often in a simple way (behaviors may not
-match GCP exactly).
 
 # Samples & Recipes
 
@@ -66,6 +59,27 @@ will grow over time. The current feature set includes:
     *   get_current_time_nanoseconds (frozen per stream)
     *   get_property ("plugin_root_id" only)
     *   get_buffer_status, get_buffer_bytes (PluginConfiguration only)
+
+# Implementation details
+
+## Fixture
+
+In support of unit testing, this repo contains an `HttpTest` fixture with a
+`TestWasm` host implementation and `TestHttpContext` stream handler. These
+minimal implementations loosely match GCP Service Extension execution
+environment. The contexts implement the ABI / feature set described below
+(mainly HTTP headers and logging), but often in a simple way (behaviors may not
+match GCP exactly).
+
+## Rust and Cargo
+
+This project leverages cargo-raze to integrate Cargo with Bazel. In order to add
+new Rust library dependencies:
+
+*   Edit dependencies in Cargo.toml
+*   Install cargo-raze: `$ sudo cargo install cargo-raze`
+*   Regenerate BUILD rules: `$ sudo /root/.cargo/bin/cargo-raze`
+*   Reference libraries as `//cargo:<target>`
 
 # License
 
