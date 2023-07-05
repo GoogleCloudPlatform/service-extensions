@@ -26,6 +26,9 @@ plugin. Extend them to fit your particular use case.
 *   [Plugin config with a list of tokens to deny](samples/config_denylist): Deny
     a request whenever it contains a known bad token. Bad tokens are loaded at
     plugin initialization time from plugin configuration.
+*   [Log the value of a query parameter](samples/query_log): Emit a custom
+    variable to Cloud Logging. Demonstrate a standard way to parse query string
+    values from the request.
 
 # Feature set / ABI
 
