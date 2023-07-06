@@ -1,7 +1,5 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
-# Include cargo-raze to regenerate Cargo-specified dependencies
-# $ bazelisk run @cargo_raze//:raze -- --manifest-path=$(realpath Cargo.toml)
 http_archive(
     name = "cargo_raze",
     sha256 = "902d364ec87e7f2b349fa3c3215b301be8e5a4bb82408664ad3406fdda23b496",
