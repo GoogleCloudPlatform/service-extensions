@@ -80,8 +80,9 @@ This project leverages cargo-raze to integrate Cargo with Bazel. In order to add
 new Rust library dependencies:
 
 *   Edit dependencies in Cargo.toml
-*   Install cargo-raze: `$ sudo cargo install cargo-raze`
-*   Regenerate BUILD rules: `$ sudo /root/.cargo/bin/cargo-raze`
+*   Regenerate BUILD rules: `$ pushd cargo/raze; bazelisk run
+    @cargo_raze//:raze -- --generate-lockfile --manifest-path=$(realpath
+    ../../Cargo.toml); popd;`
 *   Reference libraries as `//cargo:<target>`
 
 # License
