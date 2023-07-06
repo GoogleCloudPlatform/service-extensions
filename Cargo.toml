@@ -19,8 +19,11 @@ strip = "debuginfo"
 
 
 # To regenerate Cargo Bazel rules based on the above:
-#  $ sudo cargo install cargo-raze
-#  $ sudo /root/.cargo/bin/cargo-raze
+#
+#  $ pushd cargo/raze
+#  $ bazelisk run @cargo_raze//:raze --
+#     --generate-lockfile --manifest-path=$(realpath ../../Cargo.toml)
+#  $ popd
 #
 # More docs: https://github.com/google/cargo-raze
 #
