@@ -36,7 +36,7 @@ http_archive(
     url = "https://github.com/proxy-wasm/proxy-wasm-rust-sdk/archive/v" + PROXY_WASM_RUST_COMMIT + ".tar.gz",
 )
 
-# rules_boost on Jun 29, 2023, boost @ 1.80.0
+# rules_boost on 2023-06-29, boost @ 1.80.0
 http_archive(
     name = "com_github_nelhage_rules_boost",
     url = "https://github.com/nelhage/rules_boost/archive/0598ab9aa992d6ad45088b480e1bf4526ef4ad04.tar.gz",

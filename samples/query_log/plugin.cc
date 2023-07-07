@@ -24,10 +24,11 @@ class MyHttpContext : public Context {
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
-    auto path = getRequestHeader(":path");
+    WasmDataPtr path = getRequestHeader(":path");
     if (path) {
       std::string token = "<missing>";
-      auto url = boost::urls::parse_uri_reference(path->view());
+      boost::system::result<boost::urls::url_view> url =
+          boost::urls::parse_uri_reference(path->view());
       if (url) {
         auto it = url->params().find("token");
         if (it != url->params().end()) {
