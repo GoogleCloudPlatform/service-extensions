@@ -50,7 +50,7 @@ TEST_P(HttpTest, RunPluginNoToken) {
   auto http_context = TestHttpContext(handle_);
 
   auto res = http_context.SendRequestHeaders(
-      {{":path", "http://example.com/foo?bar=baz&a=b"}});
+      {{":path", "/foo?bar=baz&a=b"}});
   EXPECT_TRUE(http_context.isLogged("token: <missing>"));
   EXPECT_EQ(res.http_code, 0);
   EXPECT_FALSE(handle_->wasm()->isFailed());
@@ -64,7 +64,7 @@ TEST_P(HttpTest, RunPluginLogToken) {
   auto http_context = TestHttpContext(handle_);
 
   auto res = http_context.SendRequestHeaders(
-      {{":path", "http://example.com/foo?bar=baz&token=so\%20special&a=b"}});
+      {{":path", "/foo?bar=baz&token=so\%20special&a=b"}});
   EXPECT_TRUE(http_context.isLogged("token: so special"));
   EXPECT_EQ(res.http_code, 0);
   EXPECT_FALSE(handle_->wasm()->isFailed());

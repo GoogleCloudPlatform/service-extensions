@@ -30,7 +30,10 @@ impl Context for MyHttpContext {}
 impl HttpContext for MyHttpContext {
     fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
         if let Some(path) = self.get_http_request_header(":path") {
-            let token: Option<String> = match Url::parse(&path) {
+            // Create dummy base/host to allow parsing relative paths.
+            let base = Url::parse("http://example.com").ok();
+            let options = Url::options().base_url(base.as_ref());
+            let token: Option<String> = match options.parse(&path) {
                 Err(_) => None,
                 Ok(url) => url.query_pairs().find_map(|(k, v)| {
                     if k == "token" {
