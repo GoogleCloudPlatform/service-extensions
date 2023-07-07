@@ -1,0 +1,38 @@
+[package]
+name = "service-extensions-samples"
+version = "0.0.0"
+
+[dependencies]
+log = "0.4"
+url = "2.4"
+
+# Mandatory for cargo-raze
+[lib]
+path = "fake_lib.rs"
+
+[profile.release]
+lto = true
+opt-level = 3
+codegen-units = 1
+panic = "abort"
+strip = "debuginfo"
+
+
+# To regenerate Cargo Bazel rules based on the above:
+#
+#  $ pushd cargo/raze
+#  $ bazelisk run @cargo_raze//:raze --
+#     --generate-lockfile --manifest-path=$(realpath ../../Cargo.toml)
+#  $ popd
+#
+# More docs: https://github.com/google/cargo-raze
+#
+[package.metadata.raze]
+workspace_path = "//cargo"
+package_aliases_dir = "cargo/"
+targets = [
+    "x86_64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+    "x86_64-unknown-linux-gnu",
+]
+genmode = "Remote"

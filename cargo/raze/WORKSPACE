@@ -1,0 +1,15 @@
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "cargo_raze",
+    sha256 = "902d364ec87e7f2b349fa3c3215b301be8e5a4bb82408664ad3406fdda23b496",
+    strip_prefix = "cargo-raze-0.16.1",
+    url = "https://github.com/google/cargo-raze/archive/v0.16.1.tar.gz",
+)
+
+load("@cargo_raze//:repositories.bzl", "cargo_raze_repositories")
+cargo_raze_repositories()
+
+load("@cargo_raze//:transitive_deps.bzl", "cargo_raze_transitive_deps")
+cargo_raze_transitive_deps()
+
