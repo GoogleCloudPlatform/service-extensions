@@ -31,7 +31,7 @@ INSTANTIATE_TEST_SUITE_P(
                           "samples/query_log/plugin_rust.wasm")));
 
 TEST_P(HttpTest, RunPluginNoPathHeader) {
-  // Create VM + load plugin.
+  // Create VM and load the plugin.
   ASSERT_TRUE(CreatePlugin(engine(), path()).ok());
 
   // Create stream context.
@@ -43,7 +43,7 @@ TEST_P(HttpTest, RunPluginNoPathHeader) {
 }
 
 TEST_P(HttpTest, RunPluginNoToken) {
-  // Create VM + load plugin.
+  // Create VM and load the plugin.
   ASSERT_TRUE(CreatePlugin(engine(), path()).ok());
 
   // Create stream context.
@@ -57,7 +57,7 @@ TEST_P(HttpTest, RunPluginNoToken) {
 }
 
 TEST_P(HttpTest, RunPluginLogToken) {
-  // Create VM + load plugin.
+  // Create VM and load the plugin.
   ASSERT_TRUE(CreatePlugin(engine(), path()).ok());
 
   // Create stream context.

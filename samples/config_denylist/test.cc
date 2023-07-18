@@ -31,7 +31,7 @@ INSTANTIATE_TEST_SUITE_P(
                           "samples/config_denylist/plugin_rust.wasm")));
 
 TEST_P(HttpTest, NoConfig) {
-  // Create VM + load plugin.
+  // Create VM and load the plugin.
   ASSERT_TRUE(CreatePlugin(engine(), path()).ok());
 
   // Create stream context.
@@ -50,7 +50,7 @@ bad-user
 evil-user
   )";
 
-  // Create VM + load plugin.
+  // Create VM and load the plugin.
   ASSERT_TRUE(CreatePlugin(engine(), path(), config).ok());
   EXPECT_TRUE(root()->isLogged("Config keys size 3"));
 
