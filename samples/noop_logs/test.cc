@@ -33,7 +33,7 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(HttpTest, RunPlugin) {
   // NOTE: This test should use mocks to verify logging order and counts.
 
-  // Create VM + load plugin.
+  // Create VM and load the plugin.
   ASSERT_TRUE(CreatePlugin(engine(), path()).ok());
   EXPECT_TRUE(root()->isLogged("root onCreate called"));
   EXPECT_TRUE(root()->isLogged("root onStart called"));

@@ -36,6 +36,16 @@ http_archive(
     url = "https://github.com/proxy-wasm/proxy-wasm-rust-sdk/archive/v" + PROXY_WASM_RUST_COMMIT + ".tar.gz",
 )
 
+# rules_boost on 2023-06-29, boost @ 1.80.0
+http_archive(
+    name = "com_github_nelhage_rules_boost",
+    url = "https://github.com/nelhage/rules_boost/archive/0598ab9aa992d6ad45088b480e1bf4526ef4ad04.tar.gz",
+    strip_prefix = "rules_boost-0598ab9aa992d6ad45088b480e1bf4526ef4ad04",
+    sha256 = "1404ffb9f3f7253927c97bc2e05ef6b4a2a5089b76d00cef0f6b7d5a678fad88",
+)
+load("@com_github_nelhage_rules_boost//:boost/boost.bzl", "boost_deps")
+boost_deps()
+
 # Upgrade googletest to v1.13.0 to support bazel 6.0.0
 # TODO merge upstream to proxy-wasm-cpp-host/bazel/repositories.bzl
 http_archive(

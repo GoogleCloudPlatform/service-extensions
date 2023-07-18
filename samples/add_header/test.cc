@@ -31,7 +31,7 @@ INSTANTIATE_TEST_SUITE_P(
                           "samples/add_header/plugin_rust.wasm")));
 
 TEST_P(HttpTest, RunPlugin) {
-  // Create VM + load plugin.
+  // Create VM and load the plugin.
   ASSERT_TRUE(CreatePlugin(engine(), path()).ok());
 
   // Create stream context.
