@@ -29,6 +29,9 @@ plugin. Extend them to fit your particular use case.
 *   [Log the value of a query parameter](samples/query_log): Emit a custom
     variable to Cloud Logging. Demonstrate a standard way to parse query string
     values from the request.
+*   [Rewrite the path using regex](samples/regex_rewrite): Remove a piece of the
+    URI using regex replacement. Demonstrate a standard way to use regular
+    expressions, compiling them at plugin initialization.
 
 # Feature set / ABI
 
