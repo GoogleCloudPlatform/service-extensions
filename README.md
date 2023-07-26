@@ -10,7 +10,7 @@ unit test that verifies both.
 
 Build all plugins and run all plugin tests:
 
-`$ bazelisk test --test_output=all --define engine=v8 samples/...`
+`$ bazelisk test --test_output=all //samples/...`
 
 # Samples & Recipes
 
