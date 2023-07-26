@@ -33,8 +33,6 @@ impl Context for MyRootContext {}
 
 impl RootContext for MyRootContext {
     fn on_configure(&mut self, _: usize) -> bool {
-        // TODO remove this example of mutating an Rc
-        //*Rc::get_mut(&mut self.path_match).unwrap() = Some(Regex::new(r"/foo-([^/]+)/").unwrap());
         self.path_match = Rc::new(Some(Regex::new(r"/foo-([^/]+)/").unwrap()));
         return true;
     }
@@ -58,8 +56,7 @@ impl Context for MyHttpContext {}
 impl HttpContext for MyHttpContext {
     fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
         if let Some(path) = self.get_http_request_header(":path") {
-            //let captures = self.path_match.captures(&path).unwrap();
-            let re: &Regex = &self.path_match.as_ref().as_ref().unwrap();
+            let re: &Regex = self.path_match.as_ref().as_ref().unwrap();
             let edit = re.replace(&path, "/$1/");
             if path.len() != edit.len() {
                 self.set_http_request_header(":path", Some(&edit));
