@@ -50,7 +50,7 @@ TEST_P(HttpTest, RunPlugin) {
 
     // Send response. Expect nothing.
     auto res2 = http_context.SendResponseHeaders({});
-    EXPECT_TRUE(http_context.isLogged("http onResponseHeaders called!"));
+    EXPECT_TRUE(http_context.isLogged("http onResponseHeaders called."));
   }
   // Stream cleaned up.
   EXPECT_TRUE(TestContext::isGlobalLogged("http onDone called"));
