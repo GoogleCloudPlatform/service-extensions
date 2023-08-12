@@ -15,25 +15,45 @@
 // [START serviceextensions_ab_testing]
 #include <ctime>
 #include <string>
+#include <string_view>
 
 #include "proxy_wasm_intrinsics.h"
 
 class MyHttpContext : public Context {
+ private:
+  static constexpr std::string_view DEFAULT_FILE_NAME = "/file1.blah";
+  static constexpr std::string_view EXPERIMENT_FILE_NAME = "/file2.blah";
+  static constexpr int CHANGE_FILE_PERCENT_PROBABILITY = 20;
+
+  static bool endsWith(std::string_view str, std::string_view suffix) {
+    if (str.length() < suffix.length()) {
+        return false;
+    }
+    return str.substr(str.length() - suffix.length()) == suffix;
+  }
  public:
   explicit MyHttpContext(uint32_t id, RootContext* root) : Context(id, root) {}
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
-    std::string path = getRequestHeader(":path")->toString();
+    if (!getRequestHeader(":path")) {
+      return FilterHeadersStatus::Continue;
+    }
+    std::string_view path = getRequestHeader(":path")->view();
 
-    const std::string default_file = "/file1.blah";
-    const std::string experiment_file = "/file2.blah";
-    if (path.length() >= default_file.length() &&
-        std::equal(default_file.rbegin(), default_file.rend(), path.rbegin())) {
-      bool serve_alternative_file = (rand() % 2 == 1);
-      if (serve_alternative_file) {
-        const std::string truncated_path = path.substr(0, path.length() - default_file.length());
-        replaceRequestHeader(":path", truncated_path + experiment_file);
+    if (endsWith(path, DEFAULT_FILE_NAME)) {
+      // Path ends with DEFAULT_FILE_NAME. Roll the dice and see if it should
+      // be replaced with the EXPERIMENT_FILE_NAME.
+      bool change_file = (rand() % 100 < CHANGE_FILE_PERCENT_PROBABILITY);
+      if (change_file) {
+        // Truncate DEFAULT_FILE_NAME from the existing path.
+        const std::string_view truncated_path = (
+          path.substr(0, path.length() - DEFAULT_FILE_NAME.length()));
+
+        replaceRequestHeader(
+          ":path",
+          std::string(truncated_path) + std::string(EXPERIMENT_FILE_NAME)
+        );
       }
     }
 
