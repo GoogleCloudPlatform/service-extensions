@@ -10,7 +10,7 @@ unit test that verifies both.
 
 Build all plugins and run all plugin tests:
 
-`$ bazelisk test --test_output=all --define engine=v8 samples/...`
+`$ bazelisk test --test_output=all //samples/...`
 
 # Samples & Recipes
 
@@ -29,6 +29,9 @@ plugin. Extend them to fit your particular use case.
 *   [Log the value of a query parameter](samples/query_log): Emit a custom
     variable to Cloud Logging. Demonstrate a standard way to parse query string
     values from the request.
+*   [Rewrite the path using regex](samples/regex_rewrite): Remove a piece of the
+    URI using regex replacement. Demonstrate a standard way to use regular
+    expressions, compiling them at plugin initialization.
 
 # Feature set / ABI
 

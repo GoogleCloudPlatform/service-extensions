@@ -13,6 +13,16 @@ def raze_fetch_remote_crates():
     """This function defines a collection of repos and should be called in a WORKSPACE file"""
     maybe(
         http_archive,
+        name = "raze__aho_corasick__1_0_2",
+        url = "https://crates.io/api/v1/crates/aho-corasick/1.0.2/download",
+        type = "tar.gz",
+        sha256 = "43f6cb1bf222025340178f382c426f13757b2960e89779dfcb319c32542a5a41",
+        strip_prefix = "aho-corasick-1.0.2",
+        build_file = Label("//cargo/remote:BUILD.aho-corasick-1.0.2.bazel"),
+    )
+
+    maybe(
+        http_archive,
         name = "raze__form_urlencoded__1_2_0",
         url = "https://crates.io/api/v1/crates/form_urlencoded/1.2.0/download",
         type = "tar.gz",
@@ -43,12 +53,52 @@ def raze_fetch_remote_crates():
 
     maybe(
         http_archive,
+        name = "raze__memchr__2_5_0",
+        url = "https://crates.io/api/v1/crates/memchr/2.5.0/download",
+        type = "tar.gz",
+        sha256 = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d",
+        strip_prefix = "memchr-2.5.0",
+        build_file = Label("//cargo/remote:BUILD.memchr-2.5.0.bazel"),
+    )
+
+    maybe(
+        http_archive,
         name = "raze__percent_encoding__2_3_0",
         url = "https://crates.io/api/v1/crates/percent-encoding/2.3.0/download",
         type = "tar.gz",
         sha256 = "9b2a4787296e9989611394c33f193f676704af1686e70b8f8033ab5ba9a35a94",
         strip_prefix = "percent-encoding-2.3.0",
         build_file = Label("//cargo/remote:BUILD.percent-encoding-2.3.0.bazel"),
+    )
+
+    maybe(
+        http_archive,
+        name = "raze__regex__1_9_1",
+        url = "https://crates.io/api/v1/crates/regex/1.9.1/download",
+        type = "tar.gz",
+        sha256 = "b2eae68fc220f7cf2532e4494aded17545fce192d59cd996e0fe7887f4ceb575",
+        strip_prefix = "regex-1.9.1",
+        build_file = Label("//cargo/remote:BUILD.regex-1.9.1.bazel"),
+    )
+
+    maybe(
+        http_archive,
+        name = "raze__regex_automata__0_3_3",
+        url = "https://crates.io/api/v1/crates/regex-automata/0.3.3/download",
+        type = "tar.gz",
+        sha256 = "39354c10dd07468c2e73926b23bb9c2caca74c5501e38a35da70406f1d923310",
+        strip_prefix = "regex-automata-0.3.3",
+        build_file = Label("//cargo/remote:BUILD.regex-automata-0.3.3.bazel"),
+    )
+
+    maybe(
+        http_archive,
+        name = "raze__regex_syntax__0_7_4",
+        url = "https://crates.io/api/v1/crates/regex-syntax/0.7.4/download",
+        type = "tar.gz",
+        sha256 = "e5ea92a5b6195c6ef2a0295ea818b312502c6fc94dde986c5553242e18fd4ce2",
+        strip_prefix = "regex-syntax-0.7.4",
+        build_file = Label("//cargo/remote:BUILD.regex-syntax-0.7.4.bazel"),
     )
 
     maybe(

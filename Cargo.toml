@@ -4,6 +4,7 @@ version = "0.0.0"
 
 [dependencies]
 log = "0.4"
+regex = "1.9"
 url = "2.4"
 
 # Mandatory for cargo-raze
