@@ -54,6 +54,14 @@ http_archive(
     url = "https://github.com/google/re2/archive/2023-07-01.tar.gz",
 )
 
+# Upgrade Abseil to work with latest Emscripten and STANDALONE_WASM
+http_archive(
+    name = "com_google_absl",  # 2023-04-06T14:42:25Z
+    sha256 = "a50452f02402262f9a61a8eedda60f76dda6b9538d36b34b55bce9f74a4d5ef8",
+    strip_prefix = "abseil-cpp-e73b9139ee9b853a4bd7812531442c138da09084",
+    urls = ["https://github.com/abseil/abseil-cpp/archive/e73b9139ee9b853a4bd7812531442c138da09084.zip"],
+)
+
 # Duplicate ProxyWasm WORKSPACE files (dependencies)
 # Consider adopting bzlmod for this: https://docs.bazel.build/versions/5.0.0/bzlmod.html
 

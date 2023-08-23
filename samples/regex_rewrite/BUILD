@@ -14,6 +14,7 @@ proxy_wasm_plugin_rust(
 
 # Blocked on emscripten update to fix Abseil/RE2 compatibility:
 # https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/pull/157
+# NOTE: Plugins can be built using that PR -- it's blocked on Envoy.
 #proxy_wasm_plugin_cpp(
 #    name = "plugin_cpp.wasm",
 #    srcs = ["plugin.cc"],
