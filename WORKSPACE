@@ -46,22 +46,6 @@ http_archive(
 load("@com_github_nelhage_rules_boost//:boost/boost.bzl", "boost_deps")
 boost_deps()
 
-# Upgrade Emscripten to pick up PR #19770 fixing #19753.
-http_archive(
-    name = "emsdk",
-    sha256 = "78f3ebcbc984c6cf5aa59c69bcc5af87f570fbe6d2b92fc3e16f71e0c56413b3",
-    strip_prefix = "emsdk-3.1.43/bazel",
-    url = "https://github.com/emscripten-core/emsdk/archive/3.1.43.tar.gz",
-)
-
-# Upgrade Abseil to work with latest Emscripten and STANDALONE_WASM
-http_archive(
-    name = "com_google_absl",  # 2023-04-06T14:42:25Z
-    sha256 = "a50452f02402262f9a61a8eedda60f76dda6b9538d36b34b55bce9f74a4d5ef8",
-    strip_prefix = "abseil-cpp-e73b9139ee9b853a4bd7812531442c138da09084",
-    urls = ["https://github.com/abseil/abseil-cpp/archive/e73b9139ee9b853a4bd7812531442c138da09084.zip"],
-)
-
 # Include Google RE2.
 http_archive(
     name = "com_google_re2",

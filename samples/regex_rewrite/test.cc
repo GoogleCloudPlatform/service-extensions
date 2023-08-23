@@ -25,10 +25,10 @@ namespace service_extensions_samples {
 
 INSTANTIATE_TEST_SUITE_P(
     EnginesAndPlugins, HttpTest,
-    ::testing::Combine(
-        ::testing::ValuesIn(proxy_wasm::getWasmEngines()),
-        ::testing::Values("samples/regex_rewrite/plugin_cpp.wasm",
-                          "samples/regex_rewrite/plugin_rust.wasm")));
+    ::testing::Combine(::testing::ValuesIn(proxy_wasm::getWasmEngines()),
+                       ::testing::Values(
+                           //"samples/regex_rewrite/plugin_cpp.wasm",
+                           "samples/regex_rewrite/plugin_rust.wasm")));
 
 TEST_P(HttpTest, NoMatch) {
   // Create VM and load the plugin.

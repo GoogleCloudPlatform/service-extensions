@@ -12,20 +12,22 @@ proxy_wasm_plugin_rust(
     ],
 )
 
-proxy_wasm_plugin_cpp(
-    name = "plugin_cpp.wasm",
-    srcs = ["plugin.cc"],
-    deps = [
-        "@com_google_re2//:re2",
-        "@proxy_wasm_cpp_sdk//contrib:contrib_lib",
-    ],
-)
+# Blocked on emscripten update to fix Abseil/RE2 compatibility:
+# https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/pull/157
+#proxy_wasm_plugin_cpp(
+#    name = "plugin_cpp.wasm",
+#    srcs = ["plugin.cc"],
+#    deps = [
+#        "@com_google_re2//:re2",
+#        "@proxy_wasm_cpp_sdk//contrib:contrib_lib",
+#    ],
+#)
 
 cc_test(
     name = "plugin_test",
     srcs = ["test.cc"],
     data = [
-        ":plugin_cpp.wasm",
+        #":plugin_cpp.wasm",
         ":plugin_rust.wasm",
     ],
     deps = [
