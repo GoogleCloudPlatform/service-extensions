@@ -15,6 +15,7 @@
 #include <unordered_set>
 
 #include "proxy_wasm_intrinsics.h"
+#include "absl/strings/str_cat.h"
 
 class MyRootContext : public RootContext {
  public:
@@ -39,7 +40,7 @@ class MyRootContext : public RootContext {
       }
       idx = nxt + 1;
     }
-    LOG_INFO("Config keys size " + std::to_string(tokens_.size()));
+    LOG_INFO(absl::StrCat("Config keys size ", tokens_.size()));
     return true;
   }
 
