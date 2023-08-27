@@ -36,19 +36,20 @@ class MyHttpContext : public Context {
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
-    if (!getRequestHeader(":path")) {
+    WasmDataPtr path_header = getRequestHeader(":path");
+    if (!path_header) {
       return FilterHeadersStatus::Continue;
     }
-    std::string_view path = getRequestHeader(":path")->view();
+    std::string_view path_view = path_header->view();
 
-    if (endsWith(path, DEFAULT_FILE_NAME)) {
+    if (endsWith(path_view, DEFAULT_FILE_NAME)) {
       // Path ends with DEFAULT_FILE_NAME. Roll the dice and see if it should
       // be replaced with the EXPERIMENT_FILE_NAME.
       bool change_file = (rand() % 100 < CHANGE_FILE_PERCENT_PROBABILITY);
       if (change_file) {
         // Truncate DEFAULT_FILE_NAME from the existing path.
         const std::string_view truncated_path = (
-          path.substr(0, path.length() - DEFAULT_FILE_NAME.length()));
+          path_view.substr(0, path_view.length() - DEFAULT_FILE_NAME.length()));
 
         replaceRequestHeader(
           ":path",
