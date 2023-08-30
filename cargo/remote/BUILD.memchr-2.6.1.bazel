@@ -32,11 +32,11 @@ licenses([
 # Generated Targets
 
 rust_library(
-    name = "aho_corasick",
+    name = "memchr",
     srcs = glob(["**/*.rs"]),
     crate_features = [
+        "alloc",
         "default",
-        "perf-literal",
         "std",
     ],
     crate_root = "src/lib.rs",
@@ -47,16 +47,11 @@ rust_library(
     ],
     tags = [
         "cargo-raze",
-        "crate-name=aho_corasick",
+        "crate-name=memchr",
         "manual",
     ],
-    version = "1.0.5",
+    version = "2.6.1",
     # buildifier: leave-alone
     deps = [
-<<<<<<< HEAD
-        "@raze__memchr__2_6_3//:memchr",
-=======
-        "@raze__memchr__2_6_1//:memchr",
->>>>>>> 2c53118 (Include corresponding Cargo generated changes.)
     ],
 )
