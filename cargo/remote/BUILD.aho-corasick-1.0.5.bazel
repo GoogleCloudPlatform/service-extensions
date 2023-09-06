@@ -50,9 +50,9 @@ rust_library(
         "crate-name=aho_corasick",
         "manual",
     ],
-    version = "1.0.2",
+    version = "1.0.5",
     # buildifier: leave-alone
     deps = [
-        "@raze__memchr__2_5_0//:memchr",
+        "@raze__memchr__2_6_3//:memchr",
     ],
 )

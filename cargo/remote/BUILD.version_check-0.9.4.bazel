@@ -31,36 +31,22 @@ licenses([
 
 # Generated Targets
 
-# Unsupported target "parse_url" with type "bench" omitted
-
 rust_library(
-    name = "url",
+    name = "version_check",
     srcs = glob(["**/*.rs"]),
-    crate_features = [
-        "default",
-    ],
     crate_root = "src/lib.rs",
     data = [],
-    edition = "2018",
+    edition = "2015",
     rustc_flags = [
         "--cap-lints=allow",
     ],
     tags = [
         "cargo-raze",
-        "crate-name=url",
+        "crate-name=version_check",
         "manual",
     ],
-    version = "2.4.0",
+    version = "0.9.4",
     # buildifier: leave-alone
     deps = [
-        "@raze__form_urlencoded__1_2_0//:form_urlencoded",
-        "@raze__idna__0_4_0//:idna",
-        "@raze__percent_encoding__2_3_0//:percent_encoding",
     ],
 )
-
-# Unsupported target "data" with type "test" omitted
-
-# Unsupported target "debugger_visualizer" with type "test" omitted
-
-# Unsupported target "unit" with type "test" omitted
