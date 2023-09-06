@@ -14,7 +14,16 @@ licenses([
 # Aliased targets
 alias(
     name = "log",
-    actual = "@raze__log__0_4_19//:log",
+    actual = "@raze__log__0_4_20//:log",
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+)
+
+alias(
+    name = "proxy_wasm",
+    actual = "@raze__proxy_wasm__0_2_1//:proxy_wasm",
     tags = [
         "cargo-raze",
         "manual",
@@ -23,7 +32,7 @@ alias(
 
 alias(
     name = "regex",
-    actual = "@raze__regex__1_9_1//:regex",
+    actual = "@raze__regex__1_9_5//:regex",
     tags = [
         "cargo-raze",
         "manual",
@@ -32,7 +41,7 @@ alias(
 
 alias(
     name = "url",
-    actual = "@raze__url__2_4_0//:url",
+    actual = "@raze__url__2_4_1//:url",
     tags = [
         "cargo-raze",
         "manual",

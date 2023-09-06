@@ -26,16 +26,6 @@ http_archive(
     url = "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/" + PROXY_WASM_CPP_COMMIT + ".tar.gz",
 )
 
-PROXY_WASM_RUST_COMMIT = "0.2.1"
-PROXY_WASM_RUST_SHA256 = "23f3f2d8c4c8069a2e72693b350d7442b7722d334f73169eea78804ff70cde20"
-
-http_archive(
-    name = "proxy_wasm_rust_sdk",
-    sha256 = PROXY_WASM_RUST_SHA256,
-    strip_prefix = "proxy-wasm-rust-sdk-" + PROXY_WASM_RUST_COMMIT,
-    url = "https://github.com/proxy-wasm/proxy-wasm-rust-sdk/archive/v" + PROXY_WASM_RUST_COMMIT + ".tar.gz",
-)
-
 # rules_boost on 2023-06-29, boost @ 1.80.0
 http_archive(
     name = "com_github_nelhage_rules_boost",
@@ -79,12 +69,6 @@ proxy_wasm_cpp_sdk_dependencies()
 
 load("@proxy_wasm_cpp_sdk//bazel:dependencies_extra.bzl", "proxy_wasm_cpp_sdk_dependencies_extra")
 proxy_wasm_cpp_sdk_dependencies_extra()
-
-load("@proxy_wasm_rust_sdk//bazel:repositories.bzl", "proxy_wasm_rust_sdk_repositories")
-proxy_wasm_rust_sdk_repositories()
-
-load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
-proxy_wasm_rust_sdk_dependencies()
 
 # Fetch raze-generated Cargo crates
 load("//cargo:crates.bzl", "raze_fetch_remote_crates")

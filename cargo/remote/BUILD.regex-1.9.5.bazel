@@ -31,13 +31,18 @@ licenses([
 
 # Generated Targets
 
-# Unsupported target "bench" with type "bench" omitted
-
 rust_library(
-    name = "regex_syntax",
+    name = "regex",
     srcs = glob(["**/*.rs"]),
     crate_features = [
         "default",
+        "perf",
+        "perf-backtrack",
+        "perf-cache",
+        "perf-dfa",
+        "perf-inline",
+        "perf-literal",
+        "perf-onepass",
         "std",
         "unicode",
         "unicode-age",
@@ -56,11 +61,17 @@ rust_library(
     ],
     tags = [
         "cargo-raze",
-        "crate-name=regex-syntax",
+        "crate-name=regex",
         "manual",
     ],
-    version = "0.7.4",
+    version = "1.9.5",
     # buildifier: leave-alone
     deps = [
+        "@raze__aho_corasick__1_0_5//:aho_corasick",
+        "@raze__memchr__2_6_3//:memchr",
+        "@raze__regex_automata__0_3_8//:regex_automata",
+        "@raze__regex_syntax__0_7_5//:regex_syntax",
     ],
 )
+
+# Unsupported target "integration" with type "test" omitted
