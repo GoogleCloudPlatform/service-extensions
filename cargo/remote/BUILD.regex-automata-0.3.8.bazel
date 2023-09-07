@@ -69,19 +69,11 @@ rust_library(
         "crate-name=regex-automata",
         "manual",
     ],
-<<<<<<<< HEAD:cargo/remote/BUILD.regex-automata-0.3.8.bazel
     version = "0.3.8",
     # buildifier: leave-alone
     deps = [
         "@raze__aho_corasick__1_0_5//:aho_corasick",
         "@raze__memchr__2_6_3//:memchr",
-========
-    version = "0.3.7",
-    # buildifier: leave-alone
-    deps = [
-        "@raze__aho_corasick__1_0_5//:aho_corasick",
-        "@raze__memchr__2_6_1//:memchr",
->>>>>>>> 2c53118 (Include corresponding Cargo generated changes.):cargo/remote/BUILD.regex-automata-0.3.7.bazel
         "@raze__regex_syntax__0_7_5//:regex_syntax",
     ],
 )

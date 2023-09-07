@@ -83,21 +83,12 @@ def raze_fetch_remote_crates():
 
     maybe(
         http_archive,
-<<<<<<< HEAD
         name = "raze__memchr__2_6_3",
         url = "https://crates.io/api/v1/crates/memchr/2.6.3/download",
         type = "tar.gz",
         sha256 = "8f232d6ef707e1956a43342693d2a31e72989554d58299d7a88738cc95b0d35c",
         strip_prefix = "memchr-2.6.3",
         build_file = Label("//cargo/remote:BUILD.memchr-2.6.3.bazel"),
-=======
-        name = "raze__memchr__2_6_1",
-        url = "https://crates.io/api/v1/crates/memchr/2.6.1/download",
-        type = "tar.gz",
-        sha256 = "f478948fd84d9f8e86967bf432640e46adfb5a4bd4f14ef7e864ab38220534ae",
-        strip_prefix = "memchr-2.6.1",
-        build_file = Label("//cargo/remote:BUILD.memchr-2.6.1.bazel"),
->>>>>>> 2c53118 (Include corresponding Cargo generated changes.)
     )
 
     maybe(
@@ -132,40 +123,22 @@ def raze_fetch_remote_crates():
 
     maybe(
         http_archive,
-<<<<<<< HEAD
         name = "raze__regex__1_9_5",
         url = "https://crates.io/api/v1/crates/regex/1.9.5/download",
         type = "tar.gz",
         sha256 = "697061221ea1b4a94a624f67d0ae2bfe4e22b8a17b6a192afb11046542cc8c47",
         strip_prefix = "regex-1.9.5",
         build_file = Label("//cargo/remote:BUILD.regex-1.9.5.bazel"),
-=======
-        name = "raze__regex__1_9_4",
-        url = "https://crates.io/api/v1/crates/regex/1.9.4/download",
-        type = "tar.gz",
-        sha256 = "12de2eff854e5fa4b1295edd650e227e9d8fb0c9e90b12e7f36d6a6811791a29",
-        strip_prefix = "regex-1.9.4",
-        build_file = Label("//cargo/remote:BUILD.regex-1.9.4.bazel"),
->>>>>>> 2c53118 (Include corresponding Cargo generated changes.)
     )
 
     maybe(
         http_archive,
-<<<<<<< HEAD
         name = "raze__regex_automata__0_3_8",
         url = "https://crates.io/api/v1/crates/regex-automata/0.3.8/download",
         type = "tar.gz",
         sha256 = "c2f401f4955220693b56f8ec66ee9c78abffd8d1c4f23dc41a23839eb88f0795",
         strip_prefix = "regex-automata-0.3.8",
         build_file = Label("//cargo/remote:BUILD.regex-automata-0.3.8.bazel"),
-=======
-        name = "raze__regex_automata__0_3_7",
-        url = "https://crates.io/api/v1/crates/regex-automata/0.3.7/download",
-        type = "tar.gz",
-        sha256 = "49530408a136e16e5b486e883fbb6ba058e8e4e8ae6621a77b048b314336e629",
-        strip_prefix = "regex-automata-0.3.7",
-        build_file = Label("//cargo/remote:BUILD.regex-automata-0.3.7.bazel"),
->>>>>>> 2c53118 (Include corresponding Cargo generated changes.)
     )
 
     maybe(

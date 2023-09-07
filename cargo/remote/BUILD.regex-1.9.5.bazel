@@ -64,21 +64,12 @@ rust_library(
         "crate-name=regex",
         "manual",
     ],
-<<<<<<<< HEAD:cargo/remote/BUILD.regex-1.9.5.bazel
     version = "1.9.5",
     # buildifier: leave-alone
     deps = [
         "@raze__aho_corasick__1_0_5//:aho_corasick",
         "@raze__memchr__2_6_3//:memchr",
         "@raze__regex_automata__0_3_8//:regex_automata",
-========
-    version = "1.9.4",
-    # buildifier: leave-alone
-    deps = [
-        "@raze__aho_corasick__1_0_5//:aho_corasick",
-        "@raze__memchr__2_6_1//:memchr",
-        "@raze__regex_automata__0_3_7//:regex_automata",
->>>>>>>> 2c53118 (Include corresponding Cargo generated changes.):cargo/remote/BUILD.regex-1.9.4.bazel
         "@raze__regex_syntax__0_7_5//:regex_syntax",
     ],
 )

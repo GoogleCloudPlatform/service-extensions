@@ -32,11 +32,7 @@ alias(
 
 alias(
     name = "regex",
-<<<<<<< HEAD
     actual = "@raze__regex__1_9_5//:regex",
-=======
-    actual = "@raze__regex__1_9_4//:regex",
->>>>>>> 2c53118 (Include corresponding Cargo generated changes.)
     tags = [
         "cargo-raze",
         "manual",
