@@ -4,15 +4,14 @@ version = "0.0.0"
 edition = "2018"
 
 [dependencies]
+proxy-wasm = "0.2.1"
 log = "0.4"
 regex = "1.9"
 url = "2.4"
-proxy-wasm = "0.2.1"
 
-# Mandatory for cargo-raze
 [lib]
-path = "fake_lib.rs"
 crate-type = ["cdylib"]
+path = "samples/.../plugin.rs"  # dummy value for Bazel
 
 [profile.release]
 lto = true
@@ -20,20 +19,3 @@ opt-level = 3
 codegen-units = 1
 panic = "abort"
 strip = "debuginfo"
-
-# To regenerate Cargo Bazel rules based on the above:
-#
-#  $ cargo-raze --generate-lockfile --manifest-path=Cargo.toml
-#
-# Reference libraries as `//cargo:<target>`
-# More docs: https://github.com/google/cargo-raze
-#
-[package.metadata.raze]
-workspace_path = "//cargo"
-package_aliases_dir = "cargo/"
-targets = [
-    #"wasm32-unknown-emscripten",
-    #"wasm32-unknown-unknown",
-    "wasm32-wasi",
-]
-genmode = "Remote"

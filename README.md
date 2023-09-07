@@ -79,15 +79,13 @@ match GCP exactly).
 
 ## Rust and Cargo
 
-This project leverages cargo-raze to integrate Cargo with Bazel. In order to add
-new Rust library dependencies:
+This project leverages
+[crate_universe](http://bazelbuild.github.io/rules_rust/crate_universe.html) to
+integrate Cargo with Bazel. In order to add new Rust library dependencies:
 
-*   Install Rust: https://www.rust-lang.org/tools/install
-*   Install cargo-raze: `$ cargo install cargo-raze`
 *   Edit dependencies in Cargo.toml
-*   Regenerate BUILD rules: `$ cargo-raze --generate-lockfile
-    --manifest-path=Cargo.toml`
-*   Reference libraries as `//cargo:<target>`
+*   Regenerate Bazel targets: `$ CARGO_BAZEL_REPIN=1 bazelisk build ...`
+*   Reference libraries as `@crate_index//:<target>`
 
 # License
 
