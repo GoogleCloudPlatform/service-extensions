@@ -19,8 +19,9 @@ load("@proxy_wasm_cpp_sdk//bazel:defs.bzl", "proxy_wasm_cc_binary")
 
 def proxy_wasm_plugin_rust(**kwargs):
     wasm_rust_binary(
+        wasi = True,
         rustc_flags = [
-            "-Copt-level=2",  # Optimize for binary size
+            "-Copt-level=3",  # Optimize for binary speed
             "-Cstrip=debuginfo",  # Strip debug info, but leave symbols
             "-Clto=yes",  # Link time optimization of the whole binary
         ],

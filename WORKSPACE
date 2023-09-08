@@ -70,6 +70,22 @@ proxy_wasm_cpp_sdk_dependencies()
 load("@proxy_wasm_cpp_sdk//bazel:dependencies_extra.bzl", "proxy_wasm_cpp_sdk_dependencies_extra")
 proxy_wasm_cpp_sdk_dependencies_extra()
 
-# Fetch raze-generated Cargo crates
-load("//cargo:crates.bzl", "raze_fetch_remote_crates")
-raze_fetch_remote_crates()
+# Cargo for Bazel via crate_universe:
+# http://bazelbuild.github.io/rules_rust/crate_universe.html
+load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
+crate_universe_dependencies(bootstrap = True)
+
+# Regenerate: $ CARGO_BAZEL_REPIN=1 bazelisk build //...
+load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
+crates_repository(
+    name = "crate_index",
+    cargo_lockfile = "//:Cargo.lock",
+    generator = "@cargo_bazel_bootstrap//:cargo-bazel",
+    lockfile = "//:Cargo.Bazel.lock",
+    manifests = ["//:Cargo.toml"],
+    supported_platform_triples = ["wasm32-wasi"],
+)
+
+# Reference: @crate_index//:proxy-wasm (etc)
+load("@crate_index//:defs.bzl", "crate_repositories")
+crate_repositories()

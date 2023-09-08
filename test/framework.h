@@ -56,6 +56,8 @@ class TestContext : public proxy_wasm::TestContext {
       proxy_wasm::WasmBufferType type) override;
   uint64_t getCurrentTimeNanoseconds() override;
   uint64_t getMonotonicTimeNanoseconds() override;
+  proxy_wasm::WasmResult log(uint32_t log_level,
+                             std::string_view message) override;
   // --- END Wasm facing API ---
 
  private:

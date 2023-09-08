@@ -6,8 +6,8 @@ proxy_wasm_plugin_rust(
     name = "plugin_rust.wasm",
     srcs = ["plugin.rs"],
     deps = [
-        "//cargo:proxy_wasm",
-        "//cargo:log",
+        "@crate_index//:log",
+        "@crate_index//:proxy-wasm",
     ],
 )
 
