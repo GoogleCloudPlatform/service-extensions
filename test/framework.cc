@@ -37,7 +37,7 @@ uint64_t TestContext::getMonotonicTimeNanoseconds() {
 }
 proxy_wasm::WasmResult TestContext::log(uint32_t log_level,
                                         std::string_view message) {
-#ifdef NDEBUG
+#ifdef PROXY_WASM_TEST_SKIP_LOGS
   // No logging in release mode (for benchmarks).
   return proxy_wasm::WasmResult::Ok;
 #else
@@ -172,7 +172,7 @@ CreateProxyWasmPlugin(const std::string& engine, const std::string& wasm_path,
 
   // Create a VM and load the plugin.
   auto vm = proxy_wasm::TestVm::makeVm(engine);
-#ifdef NDEBUG
+#ifdef PROXY_WASM_TEST_SKIP_LOGS
   // No tracing in release mode (for benchmarks).
   static_cast<proxy_wasm::TestIntegration*>(vm->integration().get())
       ->setLogLevel(proxy_wasm::LogLevel::critical);
