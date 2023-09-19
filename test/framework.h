@@ -15,7 +15,7 @@
  */
 
 #include "absl/status/status.h"
-#include "gmock/gmock.h"
+#include "absl/status/statusor.h"
 #include "gtest/gtest.h"
 #include "include/proxy-wasm/exports.h"
 #include "include/proxy-wasm/wasm.h"
@@ -166,6 +166,14 @@ class TestWasm : public proxy_wasm::WasmBase {
   }
 };
 
+// Helper to scan for .wasm files in the current directory.
+std::vector<std::string> FindPlugins();
+
+// Helper to initialize a VM + load a plugin.
+absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>>
+CreateProxyWasmPlugin(const std::string& engine, const std::string& wasm_path,
+                      const std::string& plugin_config = "");
+
 // HttpTest is the actual test fixture.
 // It is parameterized by a tuple of {engine, wasm-path}.
 class HttpTest
@@ -192,9 +200,29 @@ class HttpTest
   }
 
   std::shared_ptr<proxy_wasm::PluginHandleBase> handle_;
-
- private:
-  std::string ReadDataFile(const std::string& path);
 };
+
+// Helper to register a test fixture to run for all engines and plugins.
+// Consider adding a param printer function.
+#define REGISTER_TESTS(fixture)                                             \
+  INSTANTIATE_TEST_SUITE_P(                                                 \
+      Tests, fixture,                                                       \
+      ::testing::Combine(::testing::ValuesIn(proxy_wasm::getWasmEngines()), \
+                         ::testing::ValuesIn(FindPlugins())));
+
+// Helper to register a benchmark to run for all engines and plugins.
+// Consider adding Apply(cb) to allow callers to configure benchmarks.
+#define REGISTER_BENCH(fn)                                             \
+  struct Register_##fn {                                               \
+    Register_##fn() {                                                  \
+      for (auto& engine : proxy_wasm::getWasmEngines()) {              \
+        for (auto& plugin : FindPlugins()) {                           \
+          benchmark::RegisterBenchmark(                                \
+              absl::StrCat(#fn, "_", engine, "_", plugin), fn, engine, \
+              plugin);                                                 \
+        }                                                              \
+      }                                                                \
+    }                                                                  \
+  } register_##fn;
 
 }  // namespace service_extensions_samples

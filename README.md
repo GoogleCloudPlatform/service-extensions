@@ -12,6 +12,10 @@ Build all plugins and run all plugin tests:
 
 `$ bazelisk test --test_output=all //samples/...`
 
+Build and run benchmarks for a plugin:
+
+`$ bazelisk run --config=bench //samples/add_header:plugin_test`
+
 # Samples & Recipes
 
 The samples folder contains Samples & Recipes to use as a reference for your own

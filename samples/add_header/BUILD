@@ -1,4 +1,4 @@
-load("//:plugins.bzl", "proxy_wasm_plugin_cpp", "proxy_wasm_plugin_rust")
+load("//:plugins.bzl", "proxy_wasm_plugin_cpp", "proxy_wasm_plugin_rust", "proxy_wasm_test")
 
 licenses(["notice"])  # Apache 2
 
@@ -19,7 +19,7 @@ proxy_wasm_plugin_cpp(
     ],
 )
 
-cc_test(
+proxy_wasm_test(
     name = "plugin_test",
     srcs = ["test.cc"],
     data = [
@@ -30,7 +30,6 @@ cc_test(
         "//test:framework",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
-        "@com_google_googletest//:gtest_main",
         "@proxy_wasm_cpp_host//:base_lib",
         "@proxy_wasm_cpp_host//:v8_lib",
         "@proxy_wasm_cpp_host//test:utility_lib",

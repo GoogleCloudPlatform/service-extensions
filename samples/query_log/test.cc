@@ -23,12 +23,7 @@ using ::testing::Pair;
 
 namespace service_extensions_samples {
 
-INSTANTIATE_TEST_SUITE_P(
-    EnginesAndPlugins, HttpTest,
-    ::testing::Combine(
-        ::testing::ValuesIn(proxy_wasm::getWasmEngines()),
-        ::testing::Values("samples/query_log/plugin_cpp.wasm",
-                          "samples/query_log/plugin_rust.wasm")));
+REGISTER_TESTS(HttpTest);
 
 TEST_P(HttpTest, RunPluginNoPathHeader) {
   // Create VM and load the plugin.

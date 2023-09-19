@@ -16,6 +16,7 @@
 
 load("@proxy_wasm_cpp_host//bazel:wasm.bzl", "wasm_rust_binary")
 load("@proxy_wasm_cpp_sdk//bazel:defs.bzl", "proxy_wasm_cc_binary")
+load("@rules_cc//cc:defs.bzl", "cc_test")
 
 def proxy_wasm_plugin_rust(**kwargs):
     wasm_rust_binary(
@@ -30,5 +31,17 @@ def proxy_wasm_plugin_rust(**kwargs):
 
 def proxy_wasm_plugin_cpp(**kwargs):
     proxy_wasm_cc_binary(
+        **kwargs
+    )
+
+def proxy_wasm_test(deps = [], **kwargs):
+    cc_test(
+        deps = deps + [
+            "@com_google_benchmark//:benchmark",
+            "@com_google_googletest//:gtest",
+        ] + select({
+            "//:benchmarks": ["@com_google_benchmark//:benchmark_main"],
+            "//conditions:default": ["@com_google_googletest//:gtest_main"],
+        }),
         **kwargs
     )

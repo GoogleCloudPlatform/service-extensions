@@ -10,7 +10,7 @@ cc_library(
     deps = [
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
-        "@com_google_googletest//:gtest_main",
+        "@com_google_googletest//:gtest",
         "@proxy_wasm_cpp_host//:base_lib",
         "@proxy_wasm_cpp_host//test:utility_lib",
     ],

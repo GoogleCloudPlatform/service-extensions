@@ -26,6 +26,13 @@ http_archive(
     url = "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/" + PROXY_WASM_CPP_COMMIT + ".tar.gz",
 )
 
+http_archive(
+  name = "com_google_benchmark",
+  sha256 = "6bc180a57d23d4d9515519f92b0c83d61b05b5bab188961f36ac7b06b0d9e9ce",
+  urls = ["https://github.com/google/benchmark/archive/refs/tags/v1.8.3.tar.gz"],
+  strip_prefix = "benchmark-1.8.3",
+)
+
 # rules_boost on 2023-06-29, boost @ 1.80.0
 http_archive(
     name = "com_github_nelhage_rules_boost",
