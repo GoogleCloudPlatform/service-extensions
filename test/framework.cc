@@ -14,7 +14,7 @@
 
 #include "test/framework.h"
 
-#include <filesystem>
+#include <boost/dll/runtime_symbol_info.hpp>
 
 namespace service_extensions_samples {
 
@@ -156,7 +156,8 @@ std::string ReadDataFile(const std::string& path) {
 
 std::vector<std::string> FindPlugins() {
   std::vector<std::string> out;
-  for (const auto& entry : std::filesystem::recursive_directory_iterator(".")) {
+  for (const auto& entry : boost::filesystem::directory_iterator(
+           boost::dll::program_location().parent_path())) {
     if (entry.path().extension() == ".wasm") {
       out.push_back(entry.path().string());
     }
