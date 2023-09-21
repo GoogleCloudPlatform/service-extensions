@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "benchmark/benchmark.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "include/proxy-wasm/exports.h"
@@ -23,12 +24,7 @@ using ::testing::Pair;
 
 namespace service_extensions_samples {
 
-INSTANTIATE_TEST_SUITE_P(
-    EnginesAndPlugins, HttpTest,
-    ::testing::Combine(::testing::ValuesIn(proxy_wasm::getWasmEngines()),
-                       ::testing::Values(
-                           //"samples/regex_rewrite/plugin_cpp.wasm",
-                           "samples/regex_rewrite/plugin_rust.wasm")));
+REGISTER_TESTS(HttpTest);
 
 TEST_P(HttpTest, NoMatch) {
   // Create VM and load the plugin.
@@ -62,5 +58,18 @@ TEST_P(HttpTest, MatchAndReplace) {
 
   EXPECT_FALSE(handle_->wasm()->isFailed());
 }
+
+static void BM_MatchAndReplace(benchmark::State& state,
+                               const std::string& engine,
+                               const std::string& path) {
+  auto plugin = *CreateProxyWasmPlugin(engine, path);
+  auto http_context = TestHttpContext(plugin);
+  for (auto _ : state) {
+    // The response handler conditionally adds a header.
+    http_context.SendRequestHeaders(
+        {{":path", "/pre/foo-one/foo-two/post?a=b"}});
+  }
+}
+REGISTER_BENCH(BM_MatchAndReplace);
 
 }  // namespace service_extensions_samples

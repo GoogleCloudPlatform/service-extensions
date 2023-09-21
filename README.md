@@ -12,6 +12,10 @@ Build all plugins and run all plugin tests:
 
 `$ bazelisk test --test_output=all //samples/...`
 
+Build and run benchmarks for a plugin:
+
+`$ bazelisk run --config=bench //samples/add_header:plugin_test`
+
 # Samples & Recipes
 
 The samples folder contains Samples & Recipes to use as a reference for your own
@@ -36,7 +40,7 @@ plugin. Extend them to fit your particular use case.
 # Feature set / ABI
 
 Service Extensions are compiled against the ProxyWasm ABI, described here:
-https://github.com/proxy-wasm/spec/tree/master/abi-versions/vNEXT
+https://github.com/proxy-wasm/spec/tree/master
 
 Service Extensions currently support a subset of the ProxyWasm spec. Support
 will grow over time. The current feature set includes:
@@ -103,7 +107,5 @@ Contributions welcome! See the [Contributing Guide](/docs/CONTRIBUTING.md).
 
 # TODO
 
-*   Write more plugin examples
-*   Set up CI for repository
-*   Publish and document the latest ProxyWasm version (not vNEXT as above)
+*   Write more plugin samples
 *   Add Golang recipes: https://github.com/tetratelabs/proxy-wasm-go-sdk

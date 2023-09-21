@@ -23,12 +23,7 @@ using ::testing::Pair;
 
 namespace service_extensions_samples {
 
-INSTANTIATE_TEST_SUITE_P(
-    EnginesAndPlugins, HttpTest,
-    ::testing::Combine(
-        ::testing::ValuesIn(proxy_wasm::getWasmEngines()),
-        ::testing::Values("samples/noop_logs/plugin_cpp.wasm",
-                          "samples/noop_logs/plugin_rust.wasm")));
+REGISTER_TESTS(HttpTest);
 
 TEST_P(HttpTest, RunPlugin) {
   // NOTE: This test should use mocks to verify logging order and counts.

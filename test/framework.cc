@@ -14,6 +14,8 @@
 
 #include "test/framework.h"
 
+#include <boost/dll/runtime_symbol_info.hpp>
+
 namespace service_extensions_samples {
 
 proxy_wasm::BufferInterface* TestContext::getBuffer(
@@ -35,8 +37,13 @@ uint64_t TestContext::getMonotonicTimeNanoseconds() {
 }
 proxy_wasm::WasmResult TestContext::log(uint32_t log_level,
                                         std::string_view message) {
+#ifdef PROXY_WASM_TEST_SKIP_LOGS
+  // No logging in release mode (for benchmarks).
+  return proxy_wasm::WasmResult::Ok;
+#else
   std::cout << "LOG from testcontext: " << message << std::endl;
   return proxy_wasm::TestContext::log(log_level, message);
+#endif
 }
 
 proxy_wasm::WasmResult TestHttpContext::getHeaderMapSize(
@@ -137,14 +144,41 @@ TestHttpContext::Result TestHttpContext::SendResponseHeaders(
   return std::move(result_);
 }
 
-absl::Status HttpTest::CreatePlugin(const std::string& engine,
-                                    const std::string& wasm_path,
-                                    const std::string& plugin_config) {
+namespace {
+std::string ReadDataFile(const std::string& path) {
+  std::ifstream file(path, std::ios::binary);
+  EXPECT_FALSE(file.fail()) << "failed to open: " << path;
+  std::stringstream file_string_stream;
+  file_string_stream << file.rdbuf();
+  return file_string_stream.str();
+}
+}  // namespace
+
+std::vector<std::string> FindPlugins() {
+  std::vector<std::string> out;
+  for (const auto& entry : boost::filesystem::directory_iterator(
+           boost::dll::program_location().parent_path())) {
+    if (entry.path().extension() == ".wasm") {
+      out.push_back(entry.path().string());
+    }
+  }
+  return out;
+}
+
+absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>>
+CreateProxyWasmPlugin(const std::string& engine, const std::string& wasm_path,
+                      const std::string& plugin_config) {
   // Read the wasm source.
   std::string wasm_module = ReadDataFile(wasm_path);
 
   // Create a VM and load the plugin.
   auto vm = proxy_wasm::TestVm::makeVm(engine);
+#ifdef PROXY_WASM_TEST_SKIP_LOGS
+  // No tracing in release mode (for benchmarks).
+  static_cast<proxy_wasm::TestIntegration*>(vm->integration().get())
+      ->setLogLevel(proxy_wasm::LogLevel::critical);
+#endif
+
   auto wasm = std::make_shared<TestWasm>(std::move(vm));
   if (!wasm->load(wasm_module, /*allow_precompiled=*/false)) {
     absl::string_view err = "Failed to load Wasm code";
@@ -174,19 +208,20 @@ absl::Status HttpTest::CreatePlugin(const std::string& engine,
     return absl::FailedPreconditionError("Plugin.configure failed");
   }
 
-  // Store pointers in handle_ property.
-  handle_ = std::make_shared<proxy_wasm::PluginHandleBase>(
+  // Return plugin handle.
+  return std::make_shared<proxy_wasm::PluginHandleBase>(
       std::make_shared<proxy_wasm::WasmHandleBase>(wasm), plugin);
-
-  return absl::OkStatus();
 }
 
-std::string HttpTest::ReadDataFile(const std::string& path) {
-  std::ifstream file(path, std::ios::binary);
-  EXPECT_FALSE(file.fail()) << "failed to open: " << path;
-  std::stringstream file_string_stream;
-  file_string_stream << file.rdbuf();
-  return file_string_stream.str();
+absl::Status HttpTest::CreatePlugin(const std::string& engine,
+                                    const std::string& wasm_path,
+                                    const std::string& plugin_config) {
+  auto handle_or = CreateProxyWasmPlugin(engine, wasm_path, plugin_config);
+  if (!handle_or.ok()) {
+    return handle_or.status();
+  }
+  handle_ = *handle_or;
+  return absl::OkStatus();
 }
 
 }  // namespace service_extensions_samples
