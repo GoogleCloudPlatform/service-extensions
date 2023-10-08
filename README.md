@@ -36,6 +36,8 @@ plugin. Extend them to fit your particular use case.
 *   [Rewrite the path using regex](samples/regex_rewrite): Remove a piece of the
     URI using regex replacement. Demonstrate a standard way to use regular
     expressions, compiling them at plugin initialization.
+*   [Send an HTTP redirect](samples/http_redirect): Send an HTTP 301 Moved
+    Permanently response for requests with specific paths.
 
 # Feature set / ABI
 
