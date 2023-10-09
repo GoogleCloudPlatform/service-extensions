@@ -27,6 +27,8 @@ plugin. Extend them to fit your particular use case.
 *   [Add HTTP request & response headers](samples/add_header): Add a header on
     both the client request and server response paths. Also check for existing
     headers.
+*   [Block Request with Particular Header Value](samples/block_request): Deny
+    a request whenever it contains a paritcular header set to certain value.
 *   [Plugin config with a list of tokens to deny](samples/config_denylist): Deny
     a request whenever it contains a known bad token. Bad tokens are loaded at
     plugin initialization time from plugin configuration.
