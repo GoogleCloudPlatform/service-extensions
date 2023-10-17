@@ -47,6 +47,7 @@ jobs:
 
     - name: set cache name
       id: vars
+      working-directory: ./plugins
       # The cache tag consists of the following parts:
       # * bazel-cache- prefix
       # * matrix.name, which separates the cache for opt, tsan, and asan.
@@ -74,6 +75,7 @@ jobs:
 
     - name: bazel test
       shell: bash
+      working-directory: ./plugins
       run: >
         bazel test
         --verbose_failures
