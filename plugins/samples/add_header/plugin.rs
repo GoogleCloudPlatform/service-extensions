@@ -13,6 +13,7 @@
 // limitations under the License.
 
 // [START serviceextensions_add_header]
+// [START serviceextensions_plugins_add_header]
 use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
 
@@ -41,4 +42,5 @@ impl HttpContext for MyHttpContext {
         return Action::Continue;
     }
 }
+// [END serviceextensions_plugins_add_header]
 // [END serviceextensions_add_header]

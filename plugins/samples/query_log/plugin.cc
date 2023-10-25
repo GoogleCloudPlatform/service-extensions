@@ -13,6 +13,7 @@
 // limitations under the License.
 
 // [START serviceextensions_query_log]
+// [START serviceextensions_plugins_query_log]
 #include <boost/url/parse.hpp>
 #include <boost/url/url.hpp>
 
@@ -43,4 +44,5 @@ class MyHttpContext : public Context {
 
 static RegisterContextFactory register_StaticContext(
     CONTEXT_FACTORY(MyHttpContext), ROOT_FACTORY(RootContext));
+// [END serviceextensions_plugins_query_log]
 // [END serviceextensions_query_log]

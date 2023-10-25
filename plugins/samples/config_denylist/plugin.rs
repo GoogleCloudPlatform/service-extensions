@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [START serviceextensions_example_config_denylist]
+// [START serviceextensions_plugins_config_denylist]
 use log::*;
 use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
@@ -93,4 +93,4 @@ impl HttpContext for MyHttpContext {
         return Action::Continue;
     }
 }
-// [END serviceextensions_example_config_denylist]
+// [END serviceextensions_plugins_config_denylist]
