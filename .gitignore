@@ -1,1 +1,3 @@
 /bazel-*
+/callouts/python/env
+/callouts/python/env/**
