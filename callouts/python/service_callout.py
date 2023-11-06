@@ -16,7 +16,7 @@ SDK for service callout servers.
 
 Takes in gRPC requests and performs header and body transformations.
 Bundled with 
-Can be set up to use certificates.
+Can be set up to use ssl certificates.
 """
 from concurrent import futures
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -116,7 +116,7 @@ class CalloutServer(service_pb2_grpc.ExternalProcessorServicer):
     else:
       self.root_cert = root_cert
 
-  def start(self):
+  def run(self):
     if not self.serperate_health_check:
       health_server = HTTPServer(
           (self.health_check_ip, self.health_check_port),
@@ -198,4 +198,4 @@ class CalloutServer(service_pb2_grpc.ExternalProcessorServicer):
 
 if __name__ == "__main__":
   # Run the gRPC service
-  CalloutServer().start()
+  CalloutServer().run()
