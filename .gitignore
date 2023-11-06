@@ -1,3 +1,7 @@
 /bazel-*
 /callouts/python/env
 /callouts/python/env/**
+/callouts/python/__pycache__/**
+/callouts/python/__pycache__
+/callouts/python/.pytest_cache/**
+/callouts/python/.pytest_cache
