@@ -79,7 +79,7 @@ def setup_and_teardown() -> None:
   try:
     server = CalloutServerTest()
     # Start the server in a background thread
-    thread = threading.Thread(target=server.start)
+    thread = threading.Thread(target=server.run)
     thread.daemon = True
     thread.start()
     # Wait for the server to start
