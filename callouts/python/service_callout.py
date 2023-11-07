@@ -11,35 +11,45 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
-SDK for service callout servers.
+"""SDK for service callout servers.
 
+Provides a customizeable, out of the box, grpc server.
 Takes in gRPC requests and performs header and body transformations.
-Bundled with 
+Bundled with an optional health check server.
 Can be set up to use ssl certificates.
 """
 from concurrent import futures
 from http.server import BaseHTTPRequestHandler, HTTPServer
-
-from typing import Iterator, Iterable, AnyStr
+from typing import AnyStr, Iterable, Iterator
 
 import grpc
-
 from grpc import ServicerContext
-
 import service_pb2
 import service_pb2_grpc
 
 
-def add_header_mutation(add: list[tuple[str, str]] | None = None, remove: list[str] | None = None,
-                        clear_route_cache: bool = False) -> service_pb2.HeadersResponse:
+def add_header_mutation(
+    add: list[tuple[str, str]] | None = None,
+    remove: list[str] | None = None,
+    clear_route_cache: bool = False,
+) -> service_pb2.HeadersResponse:
+  """Generate a header response for incomming requests.
+
+  Args:
+    add: A list of tuples representing headers to add.
+    remove: List of header strings to remove from the request.
+    clear_route_cache: If true, will enable clear_route_cache on the response.
+
+  Returns: The constructed header response object.
+  """
   header_mutation = service_pb2.HeadersResponse()
   if add:
     header_mutation.response.header_mutation.set_headers.extend(
         [
             service_pb2.HeaderValueOption(
                 header=service_pb2.HeaderValue(
-                    key=k, raw_value=bytes(v, "utf-8"))
+                    key=k, raw_value=bytes(v, "utf-8")
+                )
             )
             for k, v in add
         ]
@@ -52,7 +62,21 @@ def add_header_mutation(add: list[tuple[str, str]] | None = None, remove: list[s
 
 
 def add_body_mutation(
-        body: str | None = None, clear_body: bool = False, clear_route_cache: bool = False) -> service_pb2.BodyResponse:
+    body: str | None = None,
+    clear_body: bool = False,
+    clear_route_cache: bool = False,
+) -> service_pb2.BodyResponse:
+  """Generate a body response for incomming requests.
+
+  Args:
+    body: Text of the body.
+    clear_body: If set to true, the modififcation will clear the previous body,
+      if left false, the text will be appended to the end of the of the previous
+      body.
+    clear_route_cache: If true, will enable clear_route_cache on the response.
+
+  Returns: The constructed body response object.
+  """
   body_mutation = service_pb2.BodyResponse()
   if body:
     body_mutation.response.body_mutation.body = bytes(body, "utf-8")
@@ -64,28 +88,52 @@ def add_body_mutation(
 
 
 class HealthCheckServer(BaseHTTPRequestHandler):
+  """Server for responding to health check pings."""
+
   def do_GET(self) -> None:
-    "Returns an empty page with 200 status code"
+    """Returns an empty page with 200 status code."""
     self.send_response(200)
     self.end_headers()
 
 
 class CalloutServer(service_pb2_grpc.ExternalProcessorServicer):
-  def __init__(self,
-               ip: str = "0.0.0.0",
-               port: int = 8443,
-               insecure_port: int = 8080,
-               health_check_ip: str = "0.0.0.0",
-               health_check_port: int = 8000,
-               serperate_health_check: bool = False,
-               cert: bytes | None = None,
-               cert_path: str = "../ssl_creds/localhost.crt",
-               cert_key: bytes | None = None,
-               cert_key_path: str = "../ssl_creds/localhost.key",
-               root_cert: bytes | None = None,
-               root_cert_path: str = "../ssl_creds/root.crt",
-               server_thread_count: int = 2):
+  """Server for capturing and responding to service callout requests.
 
+  Attributes:
+    ip: Address that the main, secure, grpc server will attempt to connect to.
+    port: Serving port of the main grpc service.
+    insecure_port: Port to serve non http2/ https traffic on.
+    health_check_ip: The health check serving address.
+    health_check_port: Serving port of the health check service.
+    server_thread_count: Threads allocated to the main grpc service.
+    serperate_health_check: If set to false, will not bring up a the health
+      check service.
+    cert: If speficied, certificate used to authenticate the main grpc service
+      for secure htps and http connections. If not specified will attempt to
+      load data from a file pointed to by the cert_path.
+    cert_path: Relative file path pointing to the main grpc certificate, cert.
+    cert_key: Public key of the grpc certificate.
+    cert_key_path: Relative file path pointing to the cert_key.
+    root_cert: Root certificate for the main grpc service.
+    root_cert_path: Relative file path pointing to the root_cert.
+  """
+
+  def __init__(
+      self,
+      ip: str = "0.0.0.0",
+      port: int = 8443,
+      insecure_port: int = 8080,
+      health_check_ip: str = "0.0.0.0",
+      health_check_port: int = 8000,
+      serperate_health_check: bool = False,
+      cert: bytes | None = None,
+      cert_path: str = "../ssl_creds/localhost.crt",
+      cert_key: bytes | None = None,
+      cert_key_path: str = "../ssl_creds/localhost.key",
+      root_cert: bytes | None = None,
+      root_cert_path: str = "../ssl_creds/root.crt",
+      server_thread_count: int = 2,
+  ):
     self.ip = ip
     self.port = port
     self.insecure_port = insecure_port
@@ -119,8 +167,7 @@ class CalloutServer(service_pb2_grpc.ExternalProcessorServicer):
   def run(self):
     if not self.serperate_health_check:
       health_server = HTTPServer(
-          (self.health_check_ip, self.health_check_port),
-          HealthCheckServer
+          (self.health_check_ip, self.health_check_port), HealthCheckServer
       )
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=self.server_thread_count)
@@ -129,8 +176,7 @@ class CalloutServer(service_pb2_grpc.ExternalProcessorServicer):
     server_credentials = grpc.ssl_server_credentials(
         private_key_certificate_chain_pairs=[(self.cert_key, self.cert)]
     )
-    server.add_secure_port("%s:%d" % (
-        self.ip, self.port), server_credentials)
+    server.add_secure_port("%s:%d" % (self.ip, self.port), server_credentials)
     server.add_insecure_port("%s:%d" % (self.ip, self.insecure_port))
     server.start()
     print(
@@ -152,7 +198,7 @@ class CalloutServer(service_pb2_grpc.ExternalProcessorServicer):
       request_iterator: Iterator[service_pb2.ProcessingRequest],
       context: ServicerContext,
   ) -> Iterator[service_pb2.ProcessingResponse]:
-    "Process the client request."
+    """Process the client request."""
     for request in request_iterator:
       if request.HasField("request_headers"):
         yield service_pb2.ProcessingResponse(
@@ -171,28 +217,28 @@ class CalloutServer(service_pb2_grpc.ExternalProcessorServicer):
             response_body=self.on_response_body(request, context)
         )
 
-  def on_request_headers(self,
-                         request: service_pb2.ProcessingRequest,
-                         context: ServicerContext) -> service_pb2.HeadersResponse:
-    "Process a modification on the request headers."
+  def on_request_headers(
+      self, request: service_pb2.ProcessingRequest, context: ServicerContext
+  ) -> service_pb2.HeadersResponse:
+    """Process incomming request headers."""
     return None
 
-  def on_response_headers(self,
-                          request: service_pb2.ProcessingRequest,
-                          context: ServicerContext) -> service_pb2.HeadersResponse:
-    "Process a modification on response headers."
+  def on_response_headers(
+      self, request: service_pb2.ProcessingRequest, context: ServicerContext
+  ) -> service_pb2.HeadersResponse:
+    """Process incomming response headers."""
     return None
 
-  def on_request_body(self,
-                      request: service_pb2.ProcessingRequest,
-                      context: ServicerContext) -> service_pb2.BodyResponse:
-    "Process a modification on the request body."
+  def on_request_body(
+      self, request: service_pb2.ProcessingRequest, context: ServicerContext
+  ) -> service_pb2.BodyResponse:
+    """Process an incomming response body."""
     return None
 
-  def on_response_body(self,
-                       request: service_pb2.ProcessingRequest,
-                       context: ServicerContext) -> service_pb2.BodyResponse:
-    "Process a modification on the response body."
+  def on_response_body(
+      self, request: service_pb2.ProcessingRequest, context: ServicerContext
+  ) -> service_pb2.BodyResponse:
+    """Process an incomming request body."""
     return None
 
 
