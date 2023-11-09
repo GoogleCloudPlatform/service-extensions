@@ -40,7 +40,7 @@ def get_requests_stream() -> service_pb2.ProcessingRequest:
 
 class CalloutServerTest(service_callout.CalloutServer):
   def on_request_headers(self,
-                         request: service_pb2.ProcessingRequest,
+                         headers: service_pb2.HttpHeaders,
                          context: ServicerContext) -> service_pb2.HeadersResponse:
     "Custom processor on request headers."
     return service_callout.add_header_mutation(
@@ -49,7 +49,7 @@ class CalloutServerTest(service_callout.CalloutServer):
     )
 
   def on_response_headers(self,
-                          request: service_pb2.ProcessingRequest,
+                          headers: service_pb2.HttpHeaders,
                           context: ServicerContext) -> service_pb2.HeadersResponse:
     "Custom processor on response headers."
     return service_callout.add_header_mutation(
@@ -58,13 +58,13 @@ class CalloutServerTest(service_callout.CalloutServer):
     )
 
   def on_request_body(self,
-                      request: service_pb2.ProcessingRequest,
+                      body: service_pb2.HttpBody,
                       context: ServicerContext) -> service_pb2.BodyResponse:
     "Custom processor on the request body."
     return service_callout.add_body_mutation(body="-added-body")
 
   def on_response_body(self,
-                       request: service_pb2.ProcessingRequest,
+                       body: service_pb2.HttpBody,
                        context: ServicerContext) -> service_pb2.BodyResponse:
     "Custom processor on the response body."
     return service_callout.add_body_mutation(

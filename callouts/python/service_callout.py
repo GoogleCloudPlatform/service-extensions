@@ -202,41 +202,41 @@ class CalloutServer(service_pb2_grpc.ExternalProcessorServicer):
     for request in request_iterator:
       if request.HasField("request_headers"):
         yield service_pb2.ProcessingResponse(
-            request_headers=self.on_request_headers(request, context)
+            request_headers=self.on_request_headers(request.request_headers, context)
         )
       if request.HasField("response_headers"):
         yield service_pb2.ProcessingResponse(
-            response_headers=self.on_response_headers(request, context)
+            response_headers=self.on_response_headers(request.response_headers, context)
         )
       if request.HasField("request_body"):
         yield service_pb2.ProcessingResponse(
-            request_body=self.on_request_body(request, context)
+            request_body=self.on_request_body(request.request_body, context)
         )
       if request.HasField("response_body"):
         yield service_pb2.ProcessingResponse(
-            response_body=self.on_response_body(request, context)
+            response_body=self.on_response_body(request.response_body, context)
         )
 
   def on_request_headers(
-      self, request: service_pb2.ProcessingRequest, context: ServicerContext
+      self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Process incomming request headers."""
     return None
 
   def on_response_headers(
-      self, request: service_pb2.ProcessingRequest, context: ServicerContext
+      self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Process incomming response headers."""
     return None
 
   def on_request_body(
-      self, request: service_pb2.ProcessingRequest, context: ServicerContext
+      self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
     """Process an incomming response body."""
     return None
 
   def on_response_body(
-      self, request: service_pb2.ProcessingRequest, context: ServicerContext
+      self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
     """Process an incomming request body."""
     return None
