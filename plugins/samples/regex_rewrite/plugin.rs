@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [START serviceextensions_regex_rewrite]
+// [START serviceextensions_plugin_regex_rewrite]
 use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
 use regex::Regex;
@@ -65,4 +65,4 @@ impl HttpContext for MyHttpContext {
         return Action::Continue;
     }
 }
-// [END serviceextensions_regex_rewrite]
+// [END serviceextensions_plugin_regex_rewrite]
