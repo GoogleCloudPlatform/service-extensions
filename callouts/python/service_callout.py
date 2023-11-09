@@ -40,7 +40,8 @@ def add_header_mutation(
     remove: List of header strings to remove from the request.
     clear_route_cache: If true, will enable clear_route_cache on the response.
 
-  Returns: The constructed header response object.
+  Returns:
+    The constructed header response object.
   """
   header_mutation = service_pb2.HeadersResponse()
   if add:
@@ -75,7 +76,8 @@ def add_body_mutation(
       body.
     clear_route_cache: If true, will enable clear_route_cache on the response.
 
-  Returns: The constructed body response object.
+  Returns:
+    The constructed body response object.
   """
   body_mutation = service_pb2.BodyResponse()
   if body:
@@ -220,25 +222,57 @@ class CalloutServer(service_pb2_grpc.ExternalProcessorServicer):
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
-    """Process incomming request headers."""
+    """Process incomming request headers.
+
+    Args:
+      headers: Request headers to process.
+      context: RPC context of the incomming request.
+
+    Returns:
+      Header modification object.
+    """
     return None
 
   def on_response_headers(
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
-    """Process incomming response headers."""
+    """Process incomming response headers.
+
+    Args:
+      headers: Response headers to process.
+      context: RPC context of the incomming request.
+
+    Returns:
+      Header modification object.
+    """
     return None
 
   def on_request_body(
       self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
-    """Process an incomming response body."""
+    """Process an incomming request body.
+
+    Args:
+      headers: Request body to process.
+      context: RPC context of the incomming request.
+
+    Returns:
+      Body modification object.
+    """
     return None
 
   def on_response_body(
       self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
-    """Process an incomming request body."""
+    """Process an incomming response body.
+
+    Args:
+      headers: Response body to process.
+      context: RPC context of the incomming request.
+
+    Returns:
+      Body modification object.
+    """
     return None
 
 
