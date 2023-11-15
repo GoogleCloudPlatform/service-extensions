@@ -5,3 +5,4 @@
 /callouts/python/__pycache__
 /callouts/python/.pytest_cache/**
 /callouts/python/.pytest_cache
+/.vscode/**
