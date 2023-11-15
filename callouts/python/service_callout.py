@@ -13,8 +13,8 @@
 # limitations under the License.
 """SDK for service callout servers.
 
-Provides a customizeable, out of the box, grpc server.
-Takes in gRPC requests and performs header and body transformations.
+Provides a customizeable, out of the box, service callout server.
+Takes in service callout requests and performs header and body transformations.
 Bundled with an optional health check server.
 Can be set up to use ssl certificates.
 """
@@ -33,7 +33,7 @@ def add_header_mutation(
     remove: list[str] | None = None,
     clear_route_cache: bool = False,
 ) -> service_pb2.HeadersResponse:
-  """Generate a header response for incomming requests.
+  """Generate a header response for incoming requests.
 
   Args:
     add: A list of tuples representing headers to add.
@@ -67,7 +67,7 @@ def add_body_mutation(
     clear_body: bool = False,
     clear_route_cache: bool = False,
 ) -> service_pb2.BodyResponse:
-  """Generate a body response for incomming requests.
+  """Generate a body response for incoming requests.
 
   Args:
     body: Text of the body.
@@ -102,9 +102,9 @@ class CalloutServer(service_pb2_grpc.ExternalProcessorServicer):
   """Server for capturing and responding to service callout requests.
 
   Attributes:
-    ip: Address that the main, secure, grpc server will attempt to connect to.
-    port: Serving port of the main grpc service.
-    insecure_port: Port to serve non http2/ https traffic on.
+    ip: Address that the main, server will attempt to connect to.
+    port: Serving port of the main service.
+    insecure_port: If using a grpc server, the port to serve non secure traffic on.
     health_check_ip: The health check serving address.
     health_check_port: Serving port of the health check service.
     server_thread_count: Threads allocated to the main grpc service.
@@ -222,11 +222,11 @@ class CalloutServer(service_pb2_grpc.ExternalProcessorServicer):
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
-    """Process incomming request headers.
+    """Process incoming request headers.
 
     Args:
       headers: Request headers to process.
-      context: RPC context of the incomming request.
+      context: RPC context of the incoming request.
 
     Returns:
       Header modification object.
@@ -236,11 +236,11 @@ class CalloutServer(service_pb2_grpc.ExternalProcessorServicer):
   def on_response_headers(
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
-    """Process incomming response headers.
+    """Process incoming response headers.
 
     Args:
       headers: Response headers to process.
-      context: RPC context of the incomming request.
+      context: RPC context of the incoming request.
 
     Returns:
       Header modification object.
@@ -250,11 +250,11 @@ class CalloutServer(service_pb2_grpc.ExternalProcessorServicer):
   def on_request_body(
       self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
-    """Process an incomming request body.
+    """Process an incoming request body.
 
     Args:
       headers: Request body to process.
-      context: RPC context of the incomming request.
+      context: RPC context of the incoming request.
 
     Returns:
       Body modification object.
@@ -264,11 +264,11 @@ class CalloutServer(service_pb2_grpc.ExternalProcessorServicer):
   def on_response_body(
       self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
-    """Process an incomming response body.
+    """Process an incoming response body.
 
     Args:
       headers: Response body to process.
-      context: RPC context of the incomming request.
+      context: RPC context of the incoming request.
 
     Returns:
       Body modification object.
