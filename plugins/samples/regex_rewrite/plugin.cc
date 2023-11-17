@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [START serviceextensions_regex_rewrite]
+// [START serviceextensions_plugin_regex_rewrite]
 #include "proxy_wasm_intrinsics.h"
 #include "re2/re2.h"
 
@@ -53,4 +53,4 @@ class MyHttpContext : public Context {
 
 static RegisterContextFactory register_StaticContext(
     CONTEXT_FACTORY(MyHttpContext), ROOT_FACTORY(MyRootContext));
-// [END serviceextensions_regex_rewrite]
+// [END serviceextensions_plugin_regex_rewrite]

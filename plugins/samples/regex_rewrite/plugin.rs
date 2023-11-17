@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [START serviceextensions_regex_rewrite]
+// [START serviceextensions_plugin_regex_rewrite]
 use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
 use regex::Regex;
@@ -21,25 +21,25 @@ use std::rc::Rc;
 proxy_wasm::main! {{
     proxy_wasm::set_log_level(LogLevel::Trace);
     proxy_wasm::set_root_context(|_| -> Box<dyn RootContext> {
-        Box::new(MyRootContext { path_match: Rc::new(None) })
+        Box::new(MyRootContext { path_match: None })
     });
 }}
 
 struct MyRootContext {
-    path_match: Rc<Option<Regex>>,
+    path_match: Option<Rc<Regex>>,
 }
 
 impl Context for MyRootContext {}
 
 impl RootContext for MyRootContext {
     fn on_configure(&mut self, _: usize) -> bool {
-        self.path_match = Rc::new(Some(Regex::new(r"/foo-([^/]+)/").unwrap()));
+        self.path_match = Some(Rc::new(Regex::new(r"/foo-([^/]+)/").unwrap()));
         return true;
     }
 
     fn create_http_context(&self, _: u32) -> Option<Box<dyn HttpContext>> {
         Some(Box::new(MyHttpContext {
-            path_match: self.path_match.clone(), // shallow copy, ref count only
+            path_match: self.path_match.as_ref().unwrap().clone(), // shallow copy, ref count only
         }))
     }
     fn get_type(&self) -> Option<ContextType> {
@@ -48,7 +48,7 @@ impl RootContext for MyRootContext {
 }
 
 struct MyHttpContext {
-    path_match: Rc<Option<Regex>>,
+    path_match: Rc<Regex>,
 }
 
 impl Context for MyHttpContext {}
@@ -56,8 +56,7 @@ impl Context for MyHttpContext {}
 impl HttpContext for MyHttpContext {
     fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
         if let Some(path) = self.get_http_request_header(":path") {
-            let re: &Regex = self.path_match.as_ref().as_ref().unwrap();
-            let edit = re.replace(&path, "/$1/");
+            let edit = self.path_match.replace(&path, "/$1/");
             if path.len() != edit.len() {
                 self.set_http_request_header(":path", Some(&edit));
             }
@@ -65,4 +64,4 @@ impl HttpContext for MyHttpContext {
         return Action::Continue;
     }
 }
-// [END serviceextensions_regex_rewrite]
+// [END serviceextensions_plugin_regex_rewrite]

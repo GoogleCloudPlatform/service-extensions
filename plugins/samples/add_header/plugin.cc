@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [START serviceextensions_add_header]
+// [START serviceextensions_plugin_add_header]
 #include "proxy_wasm_intrinsics.h"
 
 class MyHttpContext : public Context {
@@ -39,4 +39,4 @@ class MyHttpContext : public Context {
 
 static RegisterContextFactory register_StaticContext(
     CONTEXT_FACTORY(MyHttpContext), ROOT_FACTORY(RootContext));
-// [END serviceextensions_add_header]
+// [END serviceextensions_plugin_add_header]
