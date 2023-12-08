@@ -19,17 +19,17 @@ Bundled with an optional health check server.
 Can be set up to use ssl certificates.
 """
 
-from functools import partial
 from concurrent import futures
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer, HTTPServer
-from typing import AnyStr, Iterable, Iterator
-
+from functools import partial
+from http.server import BaseHTTPRequestHandler
+from http.server import HTTPServer
+from http.server import ThreadingHTTPServer
 import threading
-import grpc
-import typing
-from grpc._server import _Server
+from typing import Iterator
 
+import grpc
 from grpc import ServicerContext
+from grpc._server import _Server
 import service_pb2
 import service_pb2_grpc
 
@@ -51,16 +51,12 @@ def add_header_mutation(
   """
   header_mutation = service_pb2.HeadersResponse()
   if add:
-    header_mutation.response.header_mutation.set_headers.extend(
-        [
-            service_pb2.HeaderValueOption(
-                header=service_pb2.HeaderValue(
-                    key=k, raw_value=bytes(v, "utf-8")
-                )
-            )
-            for k, v in add
-        ]
-    )
+    header_mutation.response.header_mutation.set_headers.extend([
+        service_pb2.HeaderValueOption(
+            header=service_pb2.HeaderValue(key=k, raw_value=bytes(v, 'utf-8'))
+        )
+        for k, v in add
+    ])
   if remove is not None:
     header_mutation.response.header_mutation.remove_headers.extend(remove)
   if clear_route_cache:
@@ -87,7 +83,7 @@ def add_body_mutation(
   """
   body_mutation = service_pb2.BodyResponse()
   if body:
-    body_mutation.response.body_mutation.body = bytes(body, "utf-8")
+    body_mutation.response.body_mutation.body = bytes(body, 'utf-8')
   if clear_body:
     body_mutation.response.body_mutation.clear_body = True
   if clear_route_cache:
@@ -106,31 +102,34 @@ class HealthCheckService(BaseHTTPRequestHandler):
 
 class HTTPCalloutService(BaseHTTPRequestHandler):
   """HTTP based Callout server implementation.
+
   Untested example.
   """
 
   def __init__(self, processor, *args, **kwargs):
-    self.processor=processor
+    self.processor = processor
     super(BaseHTTPRequestHandler, self).__init__(*args, **kwargs)
 
   def do_GET(self) -> None:
-    self.send_response(501) # Unimplemented.
+    self.send_response(501)  # Unimplemented.
     self.end_headers()
 
   def do_POST(self) -> None:
     """Returns an empty page with 200 status code."""
     if 'content-length' in self.headers:
       content = self.rfile.read(int(self.headers.get('content-length')))
-      response = self.processor.Process(service_pb2.ProcessingRequest.FromString(content), None)
+      response = self.processor.Process(
+          service_pb2.ProcessingRequest.FromString(content), None
+      )
     self.send_response(200)
     self.end_headers()
+
 
 class GRPCCalloutService(service_pb2_grpc.ExternalProcessorServicer):
   """HTTP based Callout server implementation."""
 
   def __init__(self, processor, *args, **kwargs):
-    self.processor=processor
-    # super(service_pb2_grpc.ExternalProcessorServicer, self).__init__(*args, **kwargs)
+    self.processor = processor
 
   def Process(
       self,
@@ -140,13 +139,15 @@ class GRPCCalloutService(service_pb2_grpc.ExternalProcessorServicer):
     """Process the client request."""
     return self.processor.process(request_iterator, context)
 
-class CalloutServer():
-  """Wrapper Server for managing callout and health check servers and processing callout messages.
+
+class CalloutServer:
+  """Server wrapper for managing callout servers and processing callouts.
 
   Attributes:
     ip: Address that the main, server will attempt to connect to.
     port: Serving port of the main service.
-    insecure_port: If using a grpc server, the port to serve non secure traffic on.
+    insecure_port: If using a grpc server, the port to serve non secure traffic
+      on.
     health_check_ip: The health check serving address.
     health_check_port: Serving port of the health check service.
     server_thread_count: Threads allocated to the main grpc service.
@@ -161,7 +162,8 @@ class CalloutServer():
     root_cert: Root certificate for the main grpc service.
     root_cert_path: Relative file path pointing to the root_cert.
     use_grpc: Use grpc for the main callout service.
-    enable_insecure_port: Also listen for connections without certificates on the insecure port.
+    enable_insecure_port: Also listen for connections without certificates on
+      the insecure port.
   """
 
   def __init__(
@@ -180,9 +182,9 @@ class CalloutServer():
       use_grpc: bool = True,
       enable_insecure_port: bool = True,
   ):
-    self.setup = False
-    self.shutdown = False
-    self.closed = False
+    self._setup = False
+    self._shutdown = False
+    self._closed = False
 
     self.ip = ip
     self.port = port
@@ -211,17 +213,20 @@ class CalloutServer():
       self.cert_key = cert_key
 
   def _StartGRPCCalloutServer(self) -> grpc.Server:
+    """Setup and start a grpc callout server."""
     grpc_server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=self.server_thread_count)
     )
     service_pb2_grpc.add_ExternalProcessorServicer_to_server(
-      GRPCCalloutService(self), grpc_server)
+        GRPCCalloutService(self), grpc_server
+    )
     server_credentials = grpc.ssl_server_credentials(
-      private_key_certificate_chain_pairs=[(self.cert_key, self.cert)]
+        private_key_certificate_chain_pairs=[(self.cert_key, self.cert)]
     )
     grpc_server.add_secure_port(f'{self.ip}:{self.port}', server_credentials)
-    start_msg = ('GRPC callout server started, listening on '
-      f'{self.ip}:{self.port}')
+    start_msg = (
+        f'GRPC callout server started, listening on {self.ip}:{self.port}'
+    )
     if self.enable_insecure_port:
       grpc_server.add_insecure_port(f'{self.ip}:{self.insecure_port}')
       start_msg += f' and {self.ip}:{self.insecure_port}'
@@ -230,8 +235,10 @@ class CalloutServer():
     return grpc_server
 
   def _StartHTTPCalloutServer(self) -> ThreadingHTTPServer:
-    http_server = ThreadingHTTPServer((self.ip, self.port), 
-      partial(HTTPCalloutService, self))
+    """Setup and start a http callout server."""
+    http_server = ThreadingHTTPServer(
+        (self.ip, self.port), partial(HTTPCalloutService, self)
+    )
     server_thread = threading.Thread(target=http_server.serve_forever)
     server_thread.deamon = True
     server_thread.start()
@@ -241,66 +248,71 @@ class CalloutServer():
   def run(self):
     """Start all requested servers and listen for new connections; blocking."""
     if not self.serperate_health_check:
-      
-      self.health_check_server = HTTPServer(
-        (self.health_check_ip, self.health_check_port), HealthCheckService)
-    
-    if self.use_grpc:
-      self.grpc_server = self._StartGRPCCalloutServer()
-    else:
-      if (self.serperate_health_check):
-        self.http_server = HTTPServer((self.ip, self.port), 
-          partial(HTTPCalloutService, self))
-      else:
-        self.http_server = self._StartHTTPCalloutServer()
+      self._health_check_server = HTTPServer(
+          (self.health_check_ip, self.health_check_port), HealthCheckService
+      )
 
-    self.setup = True
+    if self.use_grpc:
+      self._grpc_server = self._StartGRPCCalloutServer()
+    else:
+      if self.serperate_health_check:
+        self._http_server = HTTPServer(
+            (self.ip, self.port), partial(HTTPCalloutService, self)
+        )
+      else:
+        self._http_server = self._StartHTTPCalloutServer()
+
+    self._setup = True
 
     try:
       # We chose the main serving thread based on what server configuration
       # was requested. Defaults to the health check thread. But will use
-      # the callout server thread if the it is a HTTP server and no health 
-      # check server is present. 
-      if (self.serperate_health_check):
-        if (self.use_grpc):
-          # If the only server requested is a grpc callout server, we loop 
+      # the callout server thread if the it is a HTTP server and no health
+      # check server is present.
+      if self.serperate_health_check:
+        if self.use_grpc:
+          # If the only server requested is a grpc callout server, we loop
           # this main thread while the server is running.
-          while not self.shutdown:
+          while not self._shutdown:
             pass
         else:
-          print(f'Starting HTTP callout server, listening on '
-            f'{self.ip}:{self.port}')
-          self.http_server.serve_forever()
+          print(
+              'Starting HTTP callout server, listening on '
+              f'{self.ip}:{self.port}'
+          )
+          self._http_server.serve_forever()
       else:
-        print('Starting health check server, listening on '
-          f'{self.health_check_ip}:{self.health_check_port}')
-        self.health_check_server.serve_forever()
+        print(
+            'Starting health check server, listening on '
+            f'{self.health_check_ip}:{self.health_check_port}'
+        )
+        self._health_check_server.serve_forever()
     except KeyboardInterrupt:
       print('Server interrupted')
     finally:
       if not self.serperate_health_check:
-        self.health_check_server.server_close()
-        self.health_check_server.shutdown()
+        self._health_check_server.server_close()
+        self._health_check_server.shutdown()
         print('Health check server stopped.')
       if self.use_grpc:
-        self.grpc_server.stop(grace=10).wait()
+        self._grpc_server.stop(grace=10).wait()
         print('GRPC server stopped.')
       else:
-        self.http_server.server_close()
-        self.http_server.shutdown()
+        self._http_server.server_close()
+        self._http_server.shutdown()
         print('HTTP server stopped.')
-      self.closed = True
-  
+      self._closed = True
+
   def close(self):
     """Tell the server to shutdown, ending all serving threads."""
-    if (self.serperate_health_check):
-      if (not self.use_grpc):
-        self.http_server.server_close()
-        self.http_server.shutdown()
+    if self.serperate_health_check:
+      if not self.use_grpc:
+        self._http_server.server_close()
+        self._http_server.shutdown()
     else:
-      self.health_check_server.server_close()
-      self.health_check_server.shutdown()
-    self.shutdown = True
+      self._health_check_server.server_close()
+      self._health_check_server.shutdown()
+    self._shutdown = True
 
   def process(
       self,
@@ -311,11 +323,15 @@ class CalloutServer():
     for request in request_iterator:
       if request.HasField('request_headers'):
         yield service_pb2.ProcessingResponse(
-            request_headers=self.on_request_headers(request.request_headers, context)
+            request_headers=self.on_request_headers(
+                request.request_headers, context
+            )
         )
       if request.HasField('response_headers'):
         yield service_pb2.ProcessingResponse(
-            response_headers=self.on_response_headers(request.response_headers, context)
+            response_headers=self.on_response_headers(
+                request.response_headers, context
+            )
         )
       if request.HasField('request_body'):
         yield service_pb2.ProcessingResponse(
@@ -382,8 +398,6 @@ class CalloutServer():
     """
     return None
 
-
-import time, datetime
 
 if __name__ == '__main__':
   # Run the gRPC service
