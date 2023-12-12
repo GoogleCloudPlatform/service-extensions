@@ -83,7 +83,7 @@ def setup_and_teardown() -> None:
     wait_till_server(lambda: server._setup)
     yield
     # Stop the server
-    server.close()
+    server.shutdown()
     thread.join(timeout=5)
   finally:
     del server
@@ -217,7 +217,7 @@ def test_custom_server_config() -> None:
       _MakeRequest(stub, request_headers=end_headers, async_mode=False)
 
     # Stop the server
-    server.close()
+    server.shutdown()
     thread.join(timeout=5)
   except urllib.error.URLError as ex:
     raise Exception('Failed to connect to the callout server.') from ex
@@ -250,7 +250,7 @@ def test_custom_server_no_health_check_no_insecure_port() -> None:
     test_server_1 = HTTPServer(('0.0.0.0', 8000), BaseHTTPRequestHandler)
     test_server_2 = HTTPServer(('0.0.0.0', 8080), BaseHTTPRequestHandler)
     # Stop the server
-    server.close()
+    server.shutdown()
     thread.join(timeout=5)
   except OSError as ex:
     raise Exception('Expected the health check address to be unbound.') from ex
