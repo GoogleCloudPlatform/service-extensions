@@ -17,13 +17,25 @@ from grpc import ServicerContext
 import service_callout
 import service_pb2
 
+
 class CalloutServerExample(service_callout.CalloutServer):
+  """Example callout server.
+
+  Provides standard responses for each of the possible callout interactions.
+  
+  For request header callouts we provide a mutation to add a header 
+  '{header-request: request}', remove a header 'foo', and to clear the 
+  route cache. On response header callouts, we respond with a mutation to add
+  the header '{header-response: response}'. On a request body callout we 
+  provide a mutation to append '-added-body' to the body. On response body
+  callouts we send a mutation to replace the body with 'new-body'.
+  """
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Custom processor on request headers."""
     return service_callout.add_header_mutation(
-        add=[('header-request', 'request')], remove=['foo']
+        add=[('header-request', 'request')], remove=['foo'], clear_route_cache=True
     )
 
   def on_response_headers(
@@ -31,7 +43,7 @@ class CalloutServerExample(service_callout.CalloutServer):
   ) -> service_pb2.HeadersResponse:
     """Custom processor on response headers."""
     return service_callout.add_header_mutation(
-        add=[('header-response', 'response')], clear_route_cache=True
+        add=[('header-response', 'response')]
     )
 
   def on_request_body(

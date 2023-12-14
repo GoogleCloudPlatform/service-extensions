@@ -1,6 +1,3 @@
-# Copyright 2023 Google, LLC.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
@@ -19,4 +16,4 @@ RUN pip install -r requirements.txt
 EXPOSE 8443
 EXPOSE 8080
 EXPOSE 8000
-CMD [ "/usr/bin/python3", "service_callout.py" ]
+CMD [ "/usr/bin/python3", "service_callout_example.py" ]
