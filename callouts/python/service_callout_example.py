@@ -21,8 +21,9 @@ import service_pb2
 class CalloutServerExample(service_callout.CalloutServer):
   """Example callout server.
 
-  Provides standard responses for each of the possible callout interactions.
-  
+  Provides a non-comprehensive set of responses for each of the possible 
+  callout interactions.
+
   For request header callouts we provide a mutation to add a header 
   '{header-request: request}', remove a header 'foo', and to clear the 
   route cache. On response header callouts, we respond with a mutation to add
@@ -35,7 +36,8 @@ class CalloutServerExample(service_callout.CalloutServer):
   ) -> service_pb2.HeadersResponse:
     """Custom processor on request headers."""
     return service_callout.add_header_mutation(
-        add=[('header-request', 'request')], remove=['foo'], clear_route_cache=True
+        add=[('header-request', 'request')], remove=['foo'], 
+        clear_route_cache=True
     )
 
   def on_response_headers(
