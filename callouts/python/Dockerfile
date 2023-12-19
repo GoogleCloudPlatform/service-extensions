@@ -8,12 +8,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-FROM marketplace.gcr.io/google/debian11
-WORKDIR /home/callouts/python
-COPY . ./
-RUN apt-get update && apt-get install -y python3-grpc-tools
-RUN pip install -r requirements.txt
+FROM marketplace.gcr.io/google/debian12
+RUN apt-get update && apt-get install -y python3-pip python3-grpc-tools
+WORKDIR /home/callouts
+COPY ./python ./python
+COPY ./ssl_creds ./ssl_creds
 EXPOSE 8443
 EXPOSE 8080
 EXPOSE 8000
-CMD [ "/usr/bin/python3", "service_callout_example.py" ]
+WORKDIR /home/callouts/python
+CMD [ "/usr/bin/python3", "./service_callout_example.py" ]

@@ -55,5 +55,21 @@ Tests can be run with:
 pytest test_server.py
 ```
 
+# Building Docker
+
+Since the Docker image requires certificates from `ssl_creds` we build our image from the parent directory. So, to build the docker image from this current directory; run:
+```
+cd ..
+docker build -f ./python/Dockerfile -t service-callout-example .
+```
+
+And to run the image:
+
+```
+docker run --network host -P service-callout-example
+```
+
+Using the `-P` flag tells the docker to connect the exposed ports to the local machine's ports. Additionally, setting `--network host` tells docker to connect the image to the `0.0.0.0` or `localhost` ip address. 
+
 # TODO
 - Split out the server into two files so that grpc packages are not needed when just using the HTTP version of the server.
