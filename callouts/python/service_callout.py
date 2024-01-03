@@ -340,8 +340,3 @@ class CalloutServer:
       Body modification object.
     """
     return None
-
-
-if __name__ == '__main__':
-  # Run the gRPC service
-  CalloutServer().run()
