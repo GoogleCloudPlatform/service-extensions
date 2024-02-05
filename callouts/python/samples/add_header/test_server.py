@@ -13,6 +13,9 @@
 # limitations under the License.
 from __future__ import print_function
 
+import sys
+sys.path.append('../../services/')
+
 import datetime
 from http.server import BaseHTTPRequestHandler
 from http.server import HTTPServer
@@ -50,19 +53,6 @@ class CalloutServerTest(service_callout.CalloutServer):
         add=[('hello', 'service-extensions')],
         remove=['foo'],
     )
-
-  def on_request_body(
-      self, body: service_pb2.HttpBody, context: ServicerContext
-  ) -> service_pb2.BodyResponse:
-    """Custom processor on the request body."""
-    return service_callout.add_body_mutation(body='-added-body')
-
-  def on_response_body(
-      self, body: service_pb2.HttpBody, context: ServicerContext
-  ) -> service_pb2.BodyResponse:
-    """Custom processor on the response body."""
-    return service_callout.add_body_mutation(body='new-body', clear_body=True)
-
 
 def wait_till_server(server_check, timeout=10):
   expiration = datetime.datetime.now() + datetime.timedelta(seconds=timeout)
@@ -113,21 +103,8 @@ class TestBasicServer(object):
       with grpc.insecure_channel(f'0.0.0.0:{server.insecure_port}') as channel:
         stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
-        body = service_pb2.HttpBody(end_of_stream=False)
         headers = service_pb2.HttpHeaders(end_of_stream=False)
         end_headers = service_pb2.HttpHeaders(end_of_stream=True)
-
-        value = _MakeRequest(stub, request_body=body, async_mode=False)
-        assert value.HasField('request_body')
-        assert value.request_body == service_callout.add_body_mutation(
-            body='-added-body'
-        )
-
-        value = _MakeRequest(stub, response_body=body, async_mode=False)
-        assert value.HasField('response_body')
-        assert value.response_body == service_callout.add_body_mutation(
-            body='new-body', clear_body=True
-        )
 
         value = _MakeRequest(stub, response_headers=headers, async_mode=False)
         assert value.HasField('response_headers')
@@ -162,7 +139,7 @@ class TestBasicServer(object):
   def test_basic_server_certs(self) -> None:
     """Check that the server can handle secure callouts with certs."""
     try:
-      with open('../ssl_creds/root.crt', 'rb') as file:
+      with open('../../../ssl_creds/root.crt', 'rb') as file:
         self.root_cert = file.read()
         file.close()
       creds = grpc.ssl_channel_credentials(self.root_cert)

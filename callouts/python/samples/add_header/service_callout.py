@@ -14,10 +14,13 @@
 """SDK for service callout servers.
 
 Provides a customizeable, out of the box, service callout server.
-Takes in service callout requests and performs header and body transformations.
+Takes in service callout requests and performs header.
 Bundled with an optional health check server.
 Can be set up to use ssl certificates.
 """
+
+import sys
+sys.path.append('../../services/')
 
 from concurrent import futures
 from http.server import BaseHTTPRequestHandler
@@ -26,7 +29,7 @@ from typing import Iterator
 
 import grpc
 from grpc import ServicerContext
-from grpc._server import _Server
+
 import service_pb2
 import service_pb2_grpc
 
@@ -59,34 +62,6 @@ def add_header_mutation(
   if clear_route_cache:
     header_mutation.response.clear_route_cache = True
   return header_mutation
-
-
-def add_body_mutation(
-    body: str | None = None,
-    clear_body: bool = False,
-    clear_route_cache: bool = False,
-) -> service_pb2.BodyResponse:
-  """Generate a body response for incoming requests.
-
-  Args:
-    body: Text of the body.
-    clear_body: If set to true, the modififcation will clear the previous body,
-      if left false, the text will be appended to the end of the of the previous
-      body.
-    clear_route_cache: If true, will enable clear_route_cache on the response.
-
-  Returns:
-    The constructed body response object.
-  """
-  body_mutation = service_pb2.BodyResponse()
-  if body:
-    body_mutation.response.body_mutation.body = bytes(body, 'utf-8')
-  if clear_body:
-    body_mutation.response.body_mutation.clear_body = True
-  if clear_route_cache:
-    body_mutation.response.clear_route_cache = True
-  return body_mutation
-
 
 class HealthCheckService(BaseHTTPRequestHandler):
   """Server for responding to health check pings."""
@@ -147,9 +122,9 @@ class CalloutServer:
       health_check_port: int = 8000,
       serperate_health_check: bool = False,
       cert: bytes | None = None,
-      cert_path: str = '../ssl_creds/localhost.crt',
+      cert_path: str = '../../../ssl_creds/localhost.crt',
       cert_key: bytes | None = None,
-      cert_key_path: str = '../ssl_creds/localhost.key',
+      cert_key_path: str = '../../../ssl_creds/localhost.key',
       server_thread_count: int = 2,
       enable_insecure_port: bool = True,
   ):
@@ -310,33 +285,5 @@ class CalloutServer:
 
     Returns:
       Header modification object.
-    """
-    return None
-
-  def on_request_body(
-      self, body: service_pb2.HttpBody, context: ServicerContext
-  ) -> service_pb2.BodyResponse:
-    """Process an incoming request body.
-
-    Args:
-      headers: Request body to process.
-      context: RPC context of the incoming request.
-
-    Returns:
-      Body modification object.
-    """
-    return None
-
-  def on_response_body(
-      self, body: service_pb2.HttpBody, context: ServicerContext
-  ) -> service_pb2.BodyResponse:
-    """Process an incoming response body.
-
-    Args:
-      headers: Response body to process.
-      context: RPC context of the incoming request.
-
-    Returns:
-      Body modification object.
     """
     return None
