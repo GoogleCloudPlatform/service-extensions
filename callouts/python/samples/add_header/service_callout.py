@@ -251,14 +251,6 @@ class CalloutServer:
                 request.response_headers, context
             )
         )
-      if request.HasField('request_body'):
-        yield service_pb2.ProcessingResponse(
-            request_body=self.on_request_body(request.request_body, context)
-        )
-      if request.HasField('response_body'):
-        yield service_pb2.ProcessingResponse(
-            response_body=self.on_response_body(request.response_body, context)
-        )
 
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
