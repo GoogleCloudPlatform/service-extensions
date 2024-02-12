@@ -23,6 +23,7 @@ class MyHttpContext : public Context {
                                        bool end_of_stream) override {
     // Always be a friendly proxy.
     addRequestHeader("Message", "hello");
+    replaceRequestHeader("Welcome", "warm");
     return FilterHeadersStatus::Continue;
   }
 
@@ -33,6 +34,8 @@ class MyHttpContext : public Context {
     if (msg && msg->view() == "foo") {
       addResponseHeader("Message", "bar");
     }
+    // Unconditionally remove a header.
+    removeResponseHeader("Welcome");
     return FilterHeadersStatus::Continue;
   }
 };

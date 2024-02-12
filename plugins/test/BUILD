@@ -8,6 +8,7 @@ cc_library(
     srcs = ["framework.cc"],
     hdrs = ["framework.h"],
     deps = [
+        "@boost//:algorithm",
         "@boost//:dll",
         "@boost//:filesystem",
         "@com_google_absl//absl/status",
