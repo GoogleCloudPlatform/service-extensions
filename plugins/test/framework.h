@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#pragma once
+
 #include <boost/filesystem/path.hpp>
 
 #include "absl/status/status.h"
@@ -60,7 +62,15 @@ class TestContext : public proxy_wasm::TestContext {
   uint64_t getMonotonicTimeNanoseconds() override;
   proxy_wasm::WasmResult log(uint32_t log_level,
                              std::string_view message) override;
-  // --- END Wasm facing API ---
+  // --- END   Wasm facing API ---
+
+  // --- BEGIN Testing facilities ---
+  // Unsafe access to logs. Not thread safe w.r.t. plugin execution.
+  const std::vector<std::string>& phase_logs() const { return phase_logs_; }
+  // --- END   Testing facilities ---
+
+ protected:
+  std::vector<std::string> phase_logs_;
 
  private:
   proxy_wasm::BufferBase plugin_config_;
@@ -87,9 +97,15 @@ class TestHttpContext : public TestContext {
                     plugin_handle) {
     this->onCreate();
   }
-  ~TestHttpContext() override {
-    this->onDone();    // calls wasm if VM not failed
-    this->onDelete();  // calls wasm if VM not failed and create succeeded
+  ~TestHttpContext() override { TearDown(); }
+
+  // Exposed so that tests can invoke handlers and verify side effects.
+  void TearDown() {
+    if (!torn_down_) {
+      this->onDone();    // calls wasm if VM not failed
+      this->onDelete();  // calls wasm if VM not failed and create succeeded
+      torn_down_ = true;
+    }
   }
 
   // --- BEGIN Wasm facing API ---
@@ -124,14 +140,14 @@ class TestHttpContext : public TestContext {
   struct Result {
     // Filter status returned by handler.
     proxy_wasm::FilterHeadersStatus status;
-    // Mutated headers, also used for local response.
+    // Mutated headers, also used for immediate response.
     Headers headers = {};
-    // Local response, sent to user via proxy.
-    uint32_t http_code = 0;
+    // Mutated body, also used for immediate response.
     std::string body = "";
-    // Local response, sent to proxy.
-    uint32_t grpc_code = 0;
-    std::string details = "";
+    // Immediate response parameters.
+    uint32_t http_code = 0;    // sent to user via proxy
+    uint32_t grpc_code = 0;    // sent to proxy
+    std::string details = "";  // sent to proxy
   };
 
   // Testing helpers. Use these instead of direct on*Headers methods.
@@ -139,6 +155,8 @@ class TestHttpContext : public TestContext {
   Result SendResponseHeaders(Headers headers);
 
  private:
+  // Ensure that we invoke teardown handlers just once.
+  bool torn_down_ = false;
   // State tracked during a headers call. Invalid otherwise.
   proxy_wasm::WasmHeaderMapType phase_;
   Result result_;
@@ -168,13 +186,27 @@ class TestWasm : public proxy_wasm::WasmBase {
   }
 };
 
+// Helper to read a file from disk.
+absl::StatusOr<std::string> ReadDataFile(const std::string& path);
+
 // Helper to scan for .wasm files next to the executing binary.
 std::vector<std::string> FindPlugins();
 
-// Helper to initialize a VM + load a plugin.
+// Helper to create a VM and load wasm.
+absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>> CreatePluginVm(
+    const std::string& engine, const std::string& wasm_bytes,
+    const std::string& plugin_config, proxy_wasm::LogLevel min_log_level);
+
+// Helper to initialize a plugin.
+absl::Status InitializePlugin(
+    const std::shared_ptr<proxy_wasm::PluginHandleBase>& handle);
+
+// Helper to create and initialize a plugin. Logging defaults to off.
 absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>>
-CreateProxyWasmPlugin(const std::string& engine, const std::string& wasm_path,
-                      const std::string& plugin_config = "");
+CreateProxyWasmPlugin(
+    const std::string& engine, const std::string& wasm_path,
+    const std::string& plugin_config = "",
+    proxy_wasm::LogLevel min_log_level = proxy_wasm::LogLevel::critical);
 
 // HttpTest is the actual test fixture.
 // It is parameterized by a tuple of {engine, wasm-path}.
@@ -190,9 +222,7 @@ class HttpTest
 
  protected:
   // Load VM and plugin and set these into the handle_ variable.
-  absl::Status CreatePlugin(const std::string& engine,
-                            const std::string& wasm_path,
-                            const std::string& plugin_config = "");
+  absl::Status CreatePlugin(const std::string& plugin_config = "");
 
   TestContext* root() {
     if (!handle_) return nullptr;

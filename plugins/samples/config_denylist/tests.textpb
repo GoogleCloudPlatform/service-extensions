@@ -1,0 +1,32 @@
+test {
+  name: "LoadsConfig"
+  plugin_init {
+    log { regex: ".*Config keys size 3" }
+  }
+}
+test {
+  name: "AllowsGoodToken"
+  request_headers {
+    input { header { key: "User-Token" value: "good-user" } }
+    result { has_header { key: "User-Token" value: "good-user" } }
+  }
+}
+test {
+  name: "DeniesBadToken"
+  request_headers {
+    input { header { key: "User-Token" value: "bad-user" } }
+    result {
+      immediate { http_status: 403 details: "" }
+      set_body: "Access forbidden.\n"
+    }
+  }
+}
+test {
+  name: "DeniesMissingToken"
+  request_headers {
+    result {
+      immediate { http_status: 403 details: "" }
+      set_body: "Access forbidden - token missing.\n"
+    }
+  }
+}

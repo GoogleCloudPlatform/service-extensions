@@ -1,0 +1,124 @@
+/*
+ * Copyright 2024 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+syntax = "proto3";
+
+package service_extensions_samples.pb;
+
+message Header {
+  string key = 1;
+  bytes value = 2;
+}
+
+message Input {
+  // Set of key-value headers. Includes pseudo-headers (e.g. :path).
+  // Reading header names is case-insensitive (TODO: fix issue #9).
+  repeated Header header = 1;
+
+  // HTTP BODY raw content.
+  // Consider supporting serialized HTTP headers using this field.
+  // For example: GET /my/path HTTP/1.1\r\nMyHeader: MyVal\r\n\r\n
+  bytes content = 2;
+}
+
+message Expectation {
+  // Headers expected in the output.
+  repeated Header has_header = 1;
+  // Headers expected to be missing. Values are ignored.
+  repeated Header no_header = 2;
+  // Body content accompanying an immediate response or invocation result.
+  optional bytes set_body = 3;
+
+  // Immediate response to the end user. No further invocations after this.
+  message Immediate {
+    // HTTP status code. Required.
+    optional uint32 http_status = 1;
+    // gRPC status code.
+    optional uint32 grpc_status = 2;
+    // Reason for immediate response. Used for error or debug logging.
+    optional string details = 3;
+  }
+  Immediate immediate = 4;
+
+  // Side effect: logging.
+  message Log {
+    // Invert match. Ensures a message is not emitted.
+    bool invert = 1;
+    oneof log_exp {
+      // Exact-match expectation.
+      string message = 2;
+      // Regex expectation (RE2 full-match).
+      string regex = 3;
+    }
+  }
+  repeated Log log = 5;
+}
+
+message Invocation {
+  // HTTP inputs.
+  Input input = 1;
+  // Expectations on plugin behavior (HTTP output and side effects).
+  Expectation result = 2;
+}
+
+// Tests to run for a single HTTP request/response.
+message Test {
+  // Unique name to identify test results.
+  string name = 1;
+  // Whether to run benchmarks, in addition to verifying any expectations.
+  bool benchmark = 2;
+
+  // Wasm invocations of various HTTP phases. If multiple phases are provided,
+  // they are executed in sequence on the same HttpContext. Each phase specifies
+  // its own expectations. If any phase results in an immediate response,
+  // further phases are not executed, and later expectations will fail.
+  Invocation request_headers = 3;
+  repeated Invocation request_body = 4;
+  Invocation response_headers = 5;
+  repeated Invocation response_body = 6;
+
+  // Expectations for plugin and stream lifecycle. Useful for testing side
+  // effects (e.g. logging); output expectations are ignored. Plugin teardown
+  // testing is not supported -- use tracing to verify its behaviors.
+  Expectation plugin_init = 7;
+  Expectation stream_init = 8;
+  Expectation stream_destroy = 9;
+}
+
+message Runtime {
+  // Path to compiled .wasm binary. Required.
+  string wasm_path = 1;
+  // Path to PluginConfiguration file.
+  string config_path = 2;
+  // Plugin min_log_level (tests assume 100% sampling).
+  // Enum maps to proxy_wasm::LogLevel enum.
+  enum LogLevel {
+    UNDEFINED = 0;
+    TRACE = 1;
+    DEBUG = 2;
+    INFO = 3;
+    WARN = 4;
+    ERROR = 5;
+    CRITICAL = 6;
+  }
+  LogLevel min_log_level = 3;
+}
+
+message TestSuite {
+  // Wasm plugin + runtime environment to test.
+  Runtime runtime = 1;
+  // Tests or benchmarks to run. Inputs and expectations.
+  repeated Test test = 2;
+}
