@@ -26,6 +26,45 @@
 
 namespace service_extensions_samples {
 
+// Helper class to support string/regex positive/negative matching.
+class StringMatcher {
+ public:
+  // Factory method. Creates a matcher or returns invalid argument status.
+  static absl::StatusOr<StringMatcher> Create(const pb::StringMatcher& expect) {
+    StringMatcher sm;
+    sm.invert_ = expect.invert();
+    if (expect.has_exact()) {
+      sm.exact_ = expect.exact();
+    } else if (expect.has_regex()) {
+      sm.re_ = std::make_unique<RE2>(expect.regex(), RE2::Quiet);
+      if (!sm.re_->ok()) {
+        return absl::InvalidArgumentError(
+            absl::StrCat("Bad regex: ", sm.re_->error()));
+      }
+    } else {
+      return absl::InvalidArgumentError(
+          "StringMatcher must specify 'exact' or 'regex' field.");
+    }
+    return sm;
+  }
+
+  // Check expectations against a list of strings.
+  bool Matches(const std::vector<std::string>& contents) {
+    for (const auto& msg : contents) {
+      bool match = re_ ? RE2::FullMatch(msg, *re_) : msg == exact_;
+      if (match) return !invert_;
+    }
+    return invert_;
+  };
+
+ private:
+  StringMatcher() = default;
+
+  bool invert_;
+  std::string exact_;
+  std::unique_ptr<RE2> re_ = nullptr;
+};
+
 void DynamicTest::TestBody() {
   // Set log level. Default to INFO. Disable in benchmarks.
   auto ll = env_.min_log_level();
@@ -44,7 +83,6 @@ void DynamicTest::TestBody() {
   // Load plugin config from disk, if configured.
   std::string plugin_config = "";
   if (!env_.config_path().empty()) {
-    // std::cout << "Loading config: " << env_.config_path() << std::endl;
     auto config = ReadDataFile(env_.config_path());
     ASSERT_TRUE(config.ok()) << config.status();
     plugin_config = *config;
@@ -106,8 +144,8 @@ void DynamicTest::CheckSideEffects(const std::string& phase,
                                    const pb::Expectation& expect,
                                    const TestContext& context) {
   // Check logging.
-  for (const auto& log : expect.log()) {
-    FindLog(phase, context, log);
+  for (const auto& match : expect.log()) {
+    FindString(phase, "log", match, context.phase_logs());
   }
 }
 
@@ -137,12 +175,8 @@ void DynamicTest::CheckPhaseResults(const std::string& phase,
     }
   }
   // Check body content.
-  if (expect.has_set_body()) {
-    if (result.body != expect.set_body()) {
-      ADD_FAILURE() << absl::Substitute(
-          "[$0]\nBody value is:\n$1\nExpected:\n$2", phase, result.body,
-          expect.set_body());
-    }
+  for (const auto& match : expect.body()) {
+    FindString(phase, "body", match, {result.body});
   }
   // Check immediate response.
   bool is_continue =
@@ -178,43 +212,27 @@ void DynamicTest::CheckPhaseResults(const std::string& phase,
                                       phase, result.details, imm.details());
   }
   // Check logging.
-  for (const auto& log : expect.log()) {
-    FindLog(phase, context, log);
+  for (const auto& match : expect.log()) {
+    FindString(phase, "log", match, context.phase_logs());
   }
 }
 
-void DynamicTest::FindLog(const std::string& phase, const TestContext& context,
-                          const pb::Expectation::Log& expect) {
-  // Define a matcher.
-  std::optional<RE2> re;
-  std::function<bool(const std::string&)> match;
-  if (expect.has_message()) {
-    match = [&](const std::string& log) { return log == expect.message(); };
-  } else if (expect.has_regex()) {
-    re.emplace(expect.regex(), RE2::Quiet);
-    if (!re->ok()) {
-      ADD_FAILURE() << absl::Substitute("[$0] Regex '$1' failed to compile: $2",
-                                        phase, expect.regex(), re->error());
-      return;
-    }
-    match = [&](const std::string& log) { return RE2::FullMatch(log, *re); };
+void DynamicTest::FindString(const std::string& phase, const std::string& type,
+                             const pb::StringMatcher& expect,
+                             const std::vector<std::string>& contents) {
+  auto matcher = StringMatcher::Create(expect);
+  if (!matcher.ok()) {
+    ADD_FAILURE() << absl::Substitute("[$0] $1", phase,
+                                      matcher.status().ToString());
+    return;
   }
-
-  // Define a helper to iterate and match emitted logs.
-  auto find = [&]() {
-    for (const auto& msg : context.phase_logs()) {
-      if (match(msg) && !expect.invert()) return true;
-    }
-    return expect.invert();
-  };
-
-  // Run test.
-  if (!find()) {
+  if (!matcher->Matches(contents)) {
     ADD_FAILURE() << absl::Substitute(
-        "[$0] Log $1: $2 '$3'", phase,
-        expect.invert() ? "found but not expected" : "expected but not found",
-        expect.has_regex() ? "regex match" : "exact text",
-        expect.has_regex() ? expect.regex() : expect.message());
+        "[$0] expected $1 of $2 $3: '$4', actual: '$5'", phase,
+        expect.invert() ? "absence" : "presence",
+        expect.has_regex() ? "regex" : "exact", type,
+        expect.has_regex() ? expect.regex() : expect.exact(),
+        absl::StrJoin(contents, ","));
   }
 }
 

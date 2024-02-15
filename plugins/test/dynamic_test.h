@@ -64,9 +64,10 @@ class DynamicTest : public DynamicFixture {
                          const TestContext& context,
                          const TestHttpContext::Result& result);
 
-  // Helper to match phase logging expectations to logging output.
-  void FindLog(const std::string& phase, const TestContext& context,
-               const pb::Expectation::Log& expect);
+  // Helper to match string expectations.
+  void FindString(const std::string& phase, const std::string& type,
+                  const pb::StringMatcher& expect,
+                  const std::vector<std::string>& contents);
 
   // Helper to generate Headers struct from proto.
   TestHttpContext::Headers GenHeaders(const pb::Input& input);

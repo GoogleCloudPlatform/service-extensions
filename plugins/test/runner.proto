@@ -17,6 +17,19 @@ syntax = "proto3";
 
 package service_extensions_samples.pb;
 
+// Generalized string matcher specification.
+message StringMatcher {
+  // Invert match, to uring absence.
+  bool invert = 1;
+  // Match a string exactly or by regex.
+  oneof matcher {
+    // Exact-match expectation.
+    bytes exact = 2;
+    // Regex expectation (RE2 full-match).
+    string regex = 3;
+  }
+}
+
 message Header {
   string key = 1;
   bytes value = 2;
@@ -38,8 +51,10 @@ message Expectation {
   repeated Header has_header = 1;
   // Headers expected to be missing. Values are ignored.
   repeated Header no_header = 2;
+  // NOTE: consider adding a generalized HeaderMatcher using 2 StringMatchers.
+
   // Body content accompanying an immediate response or invocation result.
-  optional bytes set_body = 3;
+  repeated StringMatcher body = 3;
 
   // Immediate response to the end user. No further invocations after this.
   message Immediate {
@@ -53,17 +68,7 @@ message Expectation {
   Immediate immediate = 4;
 
   // Side effect: logging.
-  message Log {
-    // Invert match. Ensures a message is not emitted.
-    bool invert = 1;
-    oneof log_exp {
-      // Exact-match expectation.
-      string message = 2;
-      // Regex expectation (RE2 full-match).
-      string regex = 3;
-    }
-  }
-  repeated Log log = 5;
+  repeated StringMatcher log = 5;
 }
 
 message Invocation {

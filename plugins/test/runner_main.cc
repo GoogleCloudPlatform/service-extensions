@@ -57,16 +57,6 @@ std::string AbslUnparseFlag(pb::Runtime::LogLevel ll) {
 
 absl::StatusOr<pb::TestSuite> ParseInputs(int argc, char** argv) {
   auto params = absl::ParseCommandLine(argc, argv);
-  /*
-  std::cout << "PARAMS " << params.size() << "\n";
-  for (char* p : params) {
-    std::cout << p << "\n";
-  }
-  std::cout << "ARGC " << argc << "\n";
-  for (int i = 0; i < argc; ++i) {
-    std::cout << argv[i] << "\n";
-  }
-  */
 
   // Parse test config.
   std::string cfg_path = absl::GetFlag(FLAGS_proto);
@@ -94,7 +84,9 @@ absl::StatusOr<pb::TestSuite> ParseInputs(int argc, char** argv) {
   if (pb::Runtime::LogLevel_IsValid(mll_override)) {
     tests.mutable_runtime()->set_min_log_level(mll_override);
   }
-  // std::cout << "Final config:\n" << tests.DebugString();
+  if (tests.runtime().min_log_level() == pb::Runtime::TRACE) {
+    std::cout << "TRACE from runner: final config:\n" << tests.DebugString();
+  }
   return tests;
 }
 

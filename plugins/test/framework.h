@@ -102,6 +102,7 @@ class TestHttpContext : public TestContext {
   // Exposed so that tests can invoke handlers and verify side effects.
   void TearDown() {
     if (!torn_down_) {
+      phase_logs_.clear();
       this->onDone();    // calls wasm if VM not failed
       this->onDelete();  // calls wasm if VM not failed and create succeeded
       torn_down_ = true;

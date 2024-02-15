@@ -26,9 +26,9 @@ test {
       header { key: "User-Token" value: "bad" }
     }
     result {
-      set_body: "Access Denied"
+      body { exact: "Access Denied" }
       immediate { http_status: 503 grpc_status: 10 details: "" }
-      log { message: "rejected token: 'bad'" }
+      log { exact: "rejected token: 'bad'" }
       log { regex: "[asd]" }
       log { regex: "[asd]" invert: true }
       log { regex: "[asd" }  # won't compile
