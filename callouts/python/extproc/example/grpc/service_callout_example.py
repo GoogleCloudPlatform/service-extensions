@@ -14,11 +14,11 @@
 # limitations under the License.
 
 from grpc import ServicerContext
-import service_callout
-import service_pb2
+from extproc.proto import service_pb2
+from extproc.service import callout_server
 
 
-class CalloutServerExample(service_callout.CalloutServer):
+class CalloutServerExample(callout_server.CalloutServer):
   """Example callout server.
 
   Provides a non-comprehensive set of responses for each of the possible 
@@ -35,7 +35,7 @@ class CalloutServerExample(service_callout.CalloutServer):
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Custom processor on request headers."""
-    return service_callout.add_header_mutation(
+    return callout_server.add_header_mutation(
         add=[('header-request', 'request')], remove=['foo'], 
         clear_route_cache=True
     )
@@ -44,7 +44,7 @@ class CalloutServerExample(service_callout.CalloutServer):
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Custom processor on response headers."""
-    return service_callout.add_header_mutation(
+    return callout_server.add_header_mutation(
         add=[('header-response', 'response')]
     )
 
@@ -52,15 +52,15 @@ class CalloutServerExample(service_callout.CalloutServer):
       self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
     """Custom processor on the request body."""
-    return service_callout.add_body_mutation(body='-added-body')
+    return callout_server.add_body_mutation(body='-added-body')
 
   def on_response_body(
       self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
     """Custom processor on the response body."""
-    return service_callout.add_body_mutation(body='new-body', clear_body=True)
+    return callout_server.add_body_mutation(body='new-body', clear_body=True)
 
 
 if __name__ == '__main__':
   # Run the gRPC service
-  CalloutServerExample().run()
+  CalloutServerExample(port=443, insecure_port=8080, health_check_port=80).run()

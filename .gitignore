@@ -10,3 +10,4 @@ plugins/bazel-*
 /callouts/java/dependency-reduced-pom.xml
 /callouts/java/target
 /callouts/java/target/**
+**/__pycache__

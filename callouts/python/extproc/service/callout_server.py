@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC.
+# Copyright 2024 Google LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,8 +27,8 @@ from typing import Iterator
 import grpc
 from grpc import ServicerContext
 from grpc._server import _Server
-import service_pb2
-import service_pb2_grpc
+from extproc.proto import service_pb2
+from extproc.proto import service_pb2_grpc
 
 
 def add_header_mutation(
@@ -147,9 +147,9 @@ class CalloutServer:
       health_check_port: int = 8000,
       serperate_health_check: bool = False,
       cert: bytes | None = None,
-      cert_path: str = '../ssl_creds/localhost.crt',
+      cert_path: str = './extproc/ssl_creds/localhost.crt',
       cert_key: bytes | None = None,
-      cert_key_path: str = '../ssl_creds/localhost.key',
+      cert_key_path: str = './extproc/ssl_creds/localhost.key',
       server_thread_count: int = 2,
       enable_insecure_port: bool = True,
   ):

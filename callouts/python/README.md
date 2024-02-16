@@ -40,10 +40,11 @@ sudo apt-get install python3-grpcio -y
 ```
 
 ## Running
-The server can then be started from the `callouts/python` directory or from the install location with:
+Example servers can be started from the `extproc/example/<...>` directories. 
+The `service_callout_example` server can be started with:
 
 ```
-python service_callout.py
+python -m extproc.example.grpc.service_callout_example
 ```
 
 The server will then run until interupted, for example, by inputing `Ctrl-C`. 
@@ -52,15 +53,14 @@ The server will then run until interupted, for example, by inputing `Ctrl-C`.
 
 Tests can be run with:
 ```
-pytest test_server.py
+pytest
 ```
 
 # Building Docker
 
-Since the Docker image requires certificates from `ssl_creds` we build our image from the parent directory. So, to build the docker image from this current directory; run:
+To build the example docker images call `docker build -f` with a path to the example Dockerfile from this directory:
 ```
-cd ..
-docker build -f ./python/Dockerfile -t service-callout-example .
+docker build -f ./extproc/example/grpc/Dockerfile -t service-callout-example-python .
 ```
 
 And to run the image:
@@ -69,7 +69,4 @@ And to run the image:
 docker run --network host -P service-callout-example
 ```
 
-Using the `-P` flag tells the docker to connect the exposed ports to the local machine's ports. Additionally, setting `--network host` tells docker to connect the image to the `0.0.0.0` or `localhost` ip address. 
-
-# TODO
-- Split out the server into two files so that grpc packages are not needed when just using the HTTP version of the server.
+Using the `-P` flag tells the docker to connect the exposed ports to the local machine's ports. Additionally, setting `--network host` tells docker to connect the image to the `0.0.0.0` or `localhost` ip address.
