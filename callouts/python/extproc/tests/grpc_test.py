@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC.
+# Copyright 2024 Google LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,21 +23,21 @@ import urllib.request
 import grpc
 from grpc import ServicerContext
 import pytest
-import service_callout
-import service_pb2
-import service_pb2_grpc
+from extproc.service import callout_server
+from extproc.proto import service_pb2
+from extproc.proto import service_pb2_grpc
 
 # Global server variable.
-server: service_callout.CalloutServer | None = None
+server: callout_server.CalloutServer | None = None
 
 
-class CalloutServerTest(service_callout.CalloutServer):
+class CalloutServerTest(callout_server.CalloutServer):
 
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Custom processor on request headers."""
-    return service_callout.add_header_mutation(
+    return callout_server.add_header_mutation(
         add=[('host', 'service-extensions.com'), (':path', '/')],
         clear_route_cache=True,
     )
@@ -46,7 +46,7 @@ class CalloutServerTest(service_callout.CalloutServer):
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Custom processor on response headers."""
-    return service_callout.add_header_mutation(
+    return callout_server.add_header_mutation(
         add=[('hello', 'service-extensions')],
         remove=['foo'],
     )
@@ -55,13 +55,13 @@ class CalloutServerTest(service_callout.CalloutServer):
       self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
     """Custom processor on the request body."""
-    return service_callout.add_body_mutation(body='-added-body')
+    return callout_server.add_body_mutation(body='-added-body')
 
   def on_response_body(
       self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
     """Custom processor on the response body."""
-    return service_callout.add_body_mutation(body='new-body', clear_body=True)
+    return callout_server.add_body_mutation(body='new-body', clear_body=True)
 
 
 def wait_till_server(server_check, timeout=10):
@@ -119,25 +119,25 @@ class TestBasicServer(object):
 
         value = _MakeRequest(stub, request_body=body, async_mode=False)
         assert value.HasField('request_body')
-        assert value.request_body == service_callout.add_body_mutation(
+        assert value.request_body == callout_server.add_body_mutation(
             body='-added-body'
         )
 
         value = _MakeRequest(stub, response_body=body, async_mode=False)
         assert value.HasField('response_body')
-        assert value.response_body == service_callout.add_body_mutation(
+        assert value.response_body == callout_server.add_body_mutation(
             body='new-body', clear_body=True
         )
 
         value = _MakeRequest(stub, response_headers=headers, async_mode=False)
         assert value.HasField('response_headers')
-        assert value.response_headers == service_callout.add_header_mutation(
+        assert value.response_headers == callout_server.add_header_mutation(
             add=[('hello', 'service-extensions')], remove=['foo']
         )
 
         value = _MakeRequest(stub, request_headers=headers, async_mode=False)
         assert value.HasField('request_headers')
-        assert value.request_headers == service_callout.add_header_mutation(
+        assert value.request_headers == callout_server.add_header_mutation(
             add=[('host', 'service-extensions.com'), (':path', '/')],
             clear_route_cache=True,
         )
@@ -162,7 +162,7 @@ class TestBasicServer(object):
   def test_basic_server_certs(self) -> None:
     """Check that the server can handle secure callouts with certs."""
     try:
-      with open('../ssl_creds/root.crt', 'rb') as file:
+      with open('./extproc/ssl_creds/root.crt', 'rb') as file:
         self.root_cert = file.read()
         file.close()
       creds = grpc.ssl_channel_credentials(self.root_cert)

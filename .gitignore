@@ -7,3 +7,4 @@
 /callouts/python/.pytest_cache
 /.vscode/**
 plugins/bazel-*
+**/__pycache__
