@@ -37,7 +37,7 @@ message Header {
 
 message Input {
   // Set of key-value headers. Includes pseudo-headers (e.g. :path).
-  // Reading header names is case-insensitive (TODO: fix issue #9).
+  // Looking up header names (keys) is case-insensitive.
   repeated Header header = 1;
 
   // HTTP BODY raw content.

@@ -1,14 +1,23 @@
 test {
   name: "AddsRequestHeader"
   request_headers {
-    result { has_header { key: "Message" value: "hello" } }
+    result {
+      has_header { key: "Message" value: "hello" }
+      has_header { key: "Welcome" value: "warm" }
+    }
   }
 }
 test {
-  name: "ExtendsRequestHeader"
+  name: "UpdatesRequestHeader"
   request_headers {
-    input { header { key: "Message" value: "hey" } }
-    result { has_header { key: "Message" value: "hey, hello" } }
+    input {
+      header { key: "Message" value: "hey" }
+      header { key: "Welcome" value: "cold" }
+    }
+    result {
+      has_header { key: "Message" value: "hey, hello" }
+      has_header { key: "Welcome" value: "warm" }
+    }
   }
 }
 test {
@@ -32,6 +41,14 @@ test {
   }
 }
 test {
+  name: "RemovesResponseHeader"
+  response_headers {
+    input { header { key: "Welcome" value: "any" } }
+    result { no_header { key: "Welcome" } }
+  }
+}
+# Behavior is independent of stream.
+test {
   name: "RequestAndResponse"
   request_headers {
     result { has_header { key: "Message" value: "hello" } }
@@ -39,5 +56,37 @@ test {
   response_headers {
     input { header { key: "Message" value: "foo" } }
     result { has_header { key: "Message" value: "foo, bar" } }
+  }
+}
+# Tests for header name case insensitivity.
+# NOTE: the test framework uses the same case-insensitive header map as the
+# wasm host context. This means a header key has the case used when it was
+# first created. It also means that we can't test casing in our expectations.
+# Here we are simply verifying that the wasm behavior is unaffected by case.
+test {
+  name: "CaseInsensitiveUpdates"
+  request_headers {
+    input {
+      header { key: "message" value: "hey" }
+      header { key: "welcome" value: "cold" }
+    }
+    result {
+      has_header { key: "message" value: "hey, hello" }
+      has_header { key: "welcome" value: "warm" }
+    }
+  }
+}
+test {
+  name: "CaseInsensitiveLookup"
+  response_headers {
+    input { header { key: "message" value: "foo" } }
+    result { has_header { key: "message" value: "foo, bar" } }
+  }
+}
+test {
+  name: "CaseInsensitiveRemoval"
+  response_headers {
+    input { header { key: "welcome" value: "any" } }
+    result { no_header { key: "welcome" } }
   }
 }

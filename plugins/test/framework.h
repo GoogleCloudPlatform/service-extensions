@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <boost/algorithm/string.hpp>
 #include <boost/filesystem/path.hpp>
 
 #include "absl/status/status.h"
@@ -81,7 +82,6 @@ class TestContext : public proxy_wasm::TestContext {
 //
 // The implementation is an incomplete test-only approximation of HTTP-compliant
 // header handling. It's missing at least the following:
-// - case insensitivity
 // - cookie handling
 // - restricted header checks
 // - empty value checks
@@ -136,8 +136,18 @@ class TestHttpContext : public TestContext {
                                            std::string_view details) override;
   // --- END Wasm facing API ---
 
-  // Testing types. Optimized for ease of use not performance.
-  using Headers = std::map<std::string, std::string>;  // key-sorted map
+  // Testing types. Optimized for ease of use, not performance.
+
+  // Case insensitive string comparator.
+  struct caseless_compare {
+    bool operator()(const std::string& a, const std::string& b) const {
+      return boost::ilexicographical_compare(a, b);
+    }
+  };
+
+  // Key-sorted header map with case-insensitive key comparison.
+  using Headers = std::map<std::string, std::string, caseless_compare>;
+
   struct Result {
     // Filter status returned by handler.
     proxy_wasm::FilterHeadersStatus status;
