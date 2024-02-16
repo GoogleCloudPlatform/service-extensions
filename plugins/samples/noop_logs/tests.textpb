@@ -1,0 +1,24 @@
+test {
+  name: "Logging"
+  # Plugin lifecycle tests.
+  plugin_init {
+    log { regex: ".*root onCreate called" }
+    log { regex: ".*root onStart called" }
+    log { regex: ".*root onConfigure called" }
+  }
+  # Stream lifecycle tests.
+  stream_init {
+    log { regex: ".*http onCreate called" }
+  }
+  stream_destroy {
+    log { regex: ".*http onDone called" }
+    log { regex: ".*http onDelete called" }
+  }
+  # Stream phase tests.
+  request_headers {
+    result { log { regex: ".*http onRequestHeaders called" } }
+  }
+  response_headers {
+    result { log { regex: ".*http onResponseHeaders called" } }
+  }
+}

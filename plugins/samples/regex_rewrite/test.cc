@@ -24,41 +24,6 @@ using ::testing::Pair;
 
 namespace service_extensions_samples {
 
-REGISTER_TESTS(HttpTest);
-
-TEST_P(HttpTest, NoMatch) {
-  // Create VM and load the plugin.
-  ASSERT_TRUE(CreatePlugin(engine(), path()).ok());
-
-  // Create stream context.
-  auto http_context = TestHttpContext(handle_);
-
-  // Expect no matches, so no changes.
-  auto res =
-      http_context.SendRequestHeaders({{":path", "/one/two?three=four"}});
-  EXPECT_EQ(res.http_code, 0);
-  EXPECT_THAT(res.headers, ElementsAre(Pair(":path", "/one/two?three=four")));
-
-  EXPECT_FALSE(handle_->wasm()->isFailed());
-}
-
-TEST_P(HttpTest, MatchAndReplace) {
-  // Create VM and load the plugin.
-  ASSERT_TRUE(CreatePlugin(engine(), path()).ok());
-
-  // Create stream context.
-  auto http_context = TestHttpContext(handle_);
-
-  // Expect the plugin to replace the first "foo-" path fragment.
-  auto res = http_context.SendRequestHeaders(
-      {{":path", "/pre/foo-one/foo-two/post?a=b"}});
-  EXPECT_EQ(res.http_code, 0);
-  EXPECT_THAT(res.headers,
-              ElementsAre(Pair(":path", "/pre/one/foo-two/post?a=b")));
-
-  EXPECT_FALSE(handle_->wasm()->isFailed());
-}
-
 static void BM_MatchAndReplace(benchmark::State& state,
                                const std::string& engine,
                                const std::string& path) {

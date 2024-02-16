@@ -34,7 +34,33 @@ def proxy_wasm_plugin_cpp(**kwargs):
         **kwargs
     )
 
-def proxy_wasm_test(deps = [], **kwargs):
+def proxy_wasm_tests(
+        name,
+        tests,
+        plugins = [],
+        config = None):
+    """Generates cc_test targets for each provided wasm plugin.
+
+    Args:
+      name: Base name for the test targets.
+      tests: TestSuite textproto config file that contains the tests to run.
+      plugins: List of plugins (wasm build targets) to run tests on.
+      config: Optional path to plugin config file.
+    """
+    for plugin in plugins:
+        cc_test(
+            name = "%s_%s" % (plugin.removeprefix(":").removesuffix(".wasm"), name),
+            args = [
+                "--proto=$(rootpath %s)" % tests,
+                "--plugin=$(rootpath %s)" % plugin,
+                "--config=$(rootpath %s)" % config if config else "",
+            ],
+            data = [tests, plugin] + ([config] if config else []),
+            deps = ["//test:runner_lib"],
+        )
+
+def proxy_wasm_cc_test(deps = [], **kwargs):
+    """Wraps cc_test to select benchmarks or unit tests based on build attributes."""
     cc_test(
         deps = deps + [
             "@com_google_benchmark//:benchmark",

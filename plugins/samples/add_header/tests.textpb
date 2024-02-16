@@ -1,0 +1,43 @@
+test {
+  name: "AddsRequestHeader"
+  request_headers {
+    result { has_header { key: "Message" value: "hello" } }
+  }
+}
+test {
+  name: "ExtendsRequestHeader"
+  request_headers {
+    input { header { key: "Message" value: "hey" } }
+    result { has_header { key: "Message" value: "hey, hello" } }
+  }
+}
+test {
+  name: "NoDefaultResponseHeader"
+  response_headers {
+    result { no_header { key: "Message" } }
+  }
+}
+test {
+  name: "LeavesResponseHeader"
+  response_headers {
+    input { header { key: "Message" value: "non-matching" } }
+    result { has_header { key: "Message" value: "non-matching" } }
+  }
+}
+test {
+  name: "ExtendsResponseHeader"
+  response_headers {
+    input { header { key: "Message" value: "foo" } }
+    result { has_header { key: "Message" value: "foo, bar" } }
+  }
+}
+test {
+  name: "RequestAndResponse"
+  request_headers {
+    result { has_header { key: "Message" value: "hello" } }
+  }
+  response_headers {
+    input { header { key: "Message" value: "foo" } }
+    result { has_header { key: "Message" value: "foo, bar" } }
+  }
+}
