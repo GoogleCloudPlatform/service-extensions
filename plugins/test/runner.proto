@@ -19,7 +19,7 @@ package service_extensions_samples.pb;
 
 // Generalized string matcher specification.
 message StringMatcher {
-  // Invert match, to uring absence.
+  // Invert match, to verify absence.
   bool invert = 1;
   // Match a string exactly or by regex.
   oneof matcher {
