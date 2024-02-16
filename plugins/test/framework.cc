@@ -37,13 +37,11 @@ uint64_t TestContext::getMonotonicTimeNanoseconds() {
 }
 proxy_wasm::WasmResult TestContext::log(uint32_t log_level,
                                         std::string_view message) {
-#ifdef PROXY_WASM_TEST_SKIP_LOGS
-  // No logging in release mode (for benchmarks).
-  return proxy_wasm::WasmResult::Ok;
-#else
-  std::cout << "LOG from testcontext: " << message << std::endl;
+  if (wasmVm()->cmpLogLevel(proxy_wasm::LogLevel::trace)) {
+    std::cout << "TRACE from testcontext: [log] " << message << std::endl;
+  }
+  phase_logs_.emplace_back(message);
   return proxy_wasm::TestContext::log(log_level, message);
-#endif
 }
 
 proxy_wasm::WasmResult TestHttpContext::getHeaderMapSize(
@@ -127,6 +125,7 @@ proxy_wasm::WasmResult TestHttpContext::sendLocalResponse(
 
 TestHttpContext::Result TestHttpContext::SendRequestHeaders(
     TestHttpContext::Headers headers) {
+  phase_logs_.clear();
   result_ = Result{.headers = std::move(headers)};
   phase_ = proxy_wasm::WasmHeaderMapType::RequestHeaders;
   result_.status =
@@ -136,6 +135,7 @@ TestHttpContext::Result TestHttpContext::SendRequestHeaders(
 }
 TestHttpContext::Result TestHttpContext::SendResponseHeaders(
     TestHttpContext::Headers headers) {
+  phase_logs_.clear();
   result_ = Result{.headers = std::move(headers)};
   phase_ = proxy_wasm::WasmHeaderMapType::ResponseHeaders;
   result_.status =
@@ -144,15 +144,16 @@ TestHttpContext::Result TestHttpContext::SendResponseHeaders(
   return std::move(result_);
 }
 
-namespace {
-std::string ReadDataFile(const std::string& path) {
+absl::StatusOr<std::string> ReadDataFile(const std::string& path) {
   std::ifstream file(path, std::ios::binary);
-  EXPECT_FALSE(file.fail()) << "failed to open: " << path;
+  if (file.fail()) {
+    return absl::NotFoundError(
+        absl::StrCat("failed to open: ", path, ", error: ", strerror(errno)));
+  }
   std::stringstream file_string_stream;
   file_string_stream << file.rdbuf();
   return file_string_stream.str();
 }
-}  // namespace
 
 std::vector<std::string> FindPlugins() {
   std::vector<std::string> out;
@@ -165,22 +166,18 @@ std::vector<std::string> FindPlugins() {
   return out;
 }
 
-absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>>
-CreateProxyWasmPlugin(const std::string& engine, const std::string& wasm_path,
-                      const std::string& plugin_config) {
-  // Read the wasm source.
-  std::string wasm_module = ReadDataFile(wasm_path);
+absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>> CreatePluginVm(
+    const std::string& engine, const std::string& wasm_bytes,
+    const std::string& plugin_config, proxy_wasm::LogLevel min_log_level) {
 
-  // Create a VM and load the plugin.
+  // Create a VM.
   auto vm = proxy_wasm::TestVm::makeVm(engine);
-#ifdef PROXY_WASM_TEST_SKIP_LOGS
-  // No tracing in release mode (for benchmarks).
   static_cast<proxy_wasm::TestIntegration*>(vm->integration().get())
-      ->setLogLevel(proxy_wasm::LogLevel::critical);
-#endif
+      ->setLogLevel(min_log_level);
 
+  // Load the plugin.
   auto wasm = std::make_shared<TestWasm>(std::move(vm));
-  if (!wasm->load(wasm_module, /*allow_precompiled=*/false)) {
+  if (!wasm->load(wasm_bytes, /*allow_precompiled=*/false)) {
     absl::string_view err = "Failed to load Wasm code";
     wasm->fail(proxy_wasm::FailState::UnableToInitializeCode, err);
     return absl::FailedPreconditionError(err);
@@ -197,26 +194,53 @@ CreateProxyWasmPlugin(const std::string& engine, const std::string& wasm_path,
       /*engine=*/wasm->wasm_vm()->getEngineName(), plugin_config,
       /*fail_open=*/false, /*key=*/"");
 
-  // Create root context, call onStart().
-  proxy_wasm::ContextBase* root_context = wasm->start(plugin);
-  if (root_context == nullptr) {
-    return absl::FailedPreconditionError("Plugin.start failed");
-  }
-
-  // On the root context, call onConfigure().
-  if (!wasm->configure(root_context, plugin)) {
-    return absl::FailedPreconditionError("Plugin.configure failed");
-  }
-
   // Return plugin handle.
   return std::make_shared<proxy_wasm::PluginHandleBase>(
       std::make_shared<proxy_wasm::WasmHandleBase>(wasm), plugin);
 }
 
-absl::Status HttpTest::CreatePlugin(const std::string& engine,
-                                    const std::string& wasm_path,
-                                    const std::string& plugin_config) {
-  auto handle_or = CreateProxyWasmPlugin(engine, wasm_path, plugin_config);
+absl::Status InitializePlugin(
+    const std::shared_ptr<proxy_wasm::PluginHandleBase>& handle) {
+  // Create root context, call onStart().
+  proxy_wasm::ContextBase* root_context =
+      handle->wasm()->start(handle->plugin());
+  if (root_context == nullptr) {
+    return absl::FailedPreconditionError("Plugin.start failed");
+  }
+
+  // On the root context, call onConfigure().
+  if (!handle->wasm()->configure(root_context, handle->plugin())) {
+    return absl::FailedPreconditionError("Plugin.configure failed");
+  }
+  return absl::OkStatus();
+}
+
+absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>>
+CreateProxyWasmPlugin(const std::string& engine, const std::string& wasm_path,
+                      const std::string& plugin_config,
+                      proxy_wasm::LogLevel min_log_level) {
+  // Read the wasm source.
+  auto wasm = ReadDataFile(wasm_path);
+  if (!wasm.ok()) {
+    return wasm.status();
+  }
+  // Create VM and load wasm.
+  auto handle = CreatePluginVm(engine, *wasm, plugin_config, min_log_level);
+  if (!handle.ok()) {
+    return handle.status();
+  }
+  // Initialize plugin.
+  auto init = InitializePlugin(*handle);
+  if (!init.ok()) {
+    return init;
+  }
+  return handle;
+}
+
+absl::Status HttpTest::CreatePlugin(const std::string& plugin_config) {
+  // Enable tracing for functional (unit) tests.
+  auto handle_or = CreateProxyWasmPlugin(engine(), path(), plugin_config,
+                                         proxy_wasm::LogLevel::trace);
   if (!handle_or.ok()) {
     return handle_or.status();
   }

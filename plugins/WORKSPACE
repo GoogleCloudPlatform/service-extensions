@@ -6,8 +6,8 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 # To override with local branches, pass `--override_repository=REPO=/local/path` to Bazel
 # or persist the option in `.bazelrc`.
 
-PROXY_WASM_HOST_COMMIT = "5574daf453888e50e7f5ef53e05ad425a0b7fb5c"  # 2023-05-09
-PROXY_WASM_HOST_SHA256 = "dd92ac24f3ce58aa15276f90c8a1ee727a867e158dd5bdd03d61cd2eabf21043"
+PROXY_WASM_HOST_COMMIT = "9be9637b5d595483ddba218eb09879818a5e0ffc"  # 2024-01-29
+PROXY_WASM_HOST_SHA256 = "030e9611bb103691c019e7e8726489ec033bcc18066c93f240b105042672df19"
 
 http_archive(
     name = "proxy_wasm_cpp_host",
@@ -91,6 +91,8 @@ crates_repository(
     lockfile = "//:Cargo.Bazel.lock",
     manifests = ["//:Cargo.toml"],
     supported_platform_triples = ["wasm32-wasi"],
+    # See https://github.com/GoogleCloudPlatform/service-extensions-samples/issues/31
+    generate_target_compatible_with = False,
 )
 
 # Reference: @crate_index//:proxy-wasm (etc)

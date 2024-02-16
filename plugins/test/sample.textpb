@@ -1,0 +1,37 @@
+runtime {
+  wasm_path: "/tmp/my-plugin.wasm"
+  #config_path: "/tmp/my-config-blob"
+  #min_log_level: WARN
+}
+# Simple success test, specifying input + modifications
+test {
+  name: "AuthSuccess"
+  request_headers {
+    input {
+      header { key: ":path" value: "/auth/foo" }
+      header { key: "User-Token" value: "good" }
+    }
+    result {
+      has_header { key: ":path" value: "/foo?user_id=abc" }
+      no_header { key: "User-Token" }
+    }
+  }
+}
+# Simple failure test, specifying input + error response + logging
+test {
+  name: "AuthFailure"
+  request_headers {
+    input {
+      header { key: ":path" value: "/auth/foo" }
+      header { key: "User-Token" value: "bad" }
+    }
+    result {
+      body { exact: "Access Denied" }
+      immediate { http_status: 503 grpc_status: 10 details: "" }
+      log { exact: "rejected token: 'bad'" }
+      log { regex: "[asd]" }
+      log { regex: "[asd]" invert: true }
+      log { regex: "[asd" }  # won't compile
+    }
+  }
+}

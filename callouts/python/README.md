@@ -66,7 +66,7 @@ docker build -f ./extproc/example/grpc/Dockerfile -t service-callout-example-pyt
 And to run the image:
 
 ```
-docker run --network host -P service-callout-example
+docker run --network host -P service-callout-example-python
 ```
 
 Using the `-P` flag tells the docker to connect the exposed ports to the local machine's ports. Additionally, setting `--network host` tells docker to connect the image to the `0.0.0.0` or `localhost` ip address.

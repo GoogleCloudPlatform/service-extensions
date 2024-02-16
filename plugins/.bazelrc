@@ -16,7 +16,7 @@ build:bench --define run_benchmarks=1
 build:bench --compilation_mode opt
 build:bench --dynamic_mode=off
 build:bench --copt -gmlt
-build:bench --copt -DPROXY_WASM_TEST_SKIP_LOGS=1
+build:bench --per_file_copt=external/boringssl/.*@-DBORINGSSL_UNSAFE_DETERMINISTIC_MODE=1
 
 # Use Clang compiler.
 build --action_env=BAZEL_COMPILER=clang

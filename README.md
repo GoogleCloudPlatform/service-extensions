@@ -41,8 +41,3 @@ For our code of conduct, see [Code of Conduct](/docs/CODE_OF_CONDUCT.md).
 # Contributing
 
 Contributions welcome! See the [Contributing Guide](/docs/CONTRIBUTING.md).
-
-# TODO
-
-*   Write more plugin samples
-*   Add Golang recipes: https://github.com/tetratelabs/proxy-wasm-go-sdk

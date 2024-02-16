@@ -29,6 +29,7 @@ impl HttpContext for MyHttpContext {
     fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
         // Always be a friendly proxy.
         self.add_http_request_header("Message", "hello");
+        self.set_http_request_header("Welcome", Some("warm"));
         return Action::Continue;
     }
 
@@ -38,6 +39,8 @@ impl HttpContext for MyHttpContext {
         if msg.unwrap_or_default() == "foo" {
             self.add_http_response_header("Message", "bar");
         }
+        // Unconditionally remove a header.
+        self.set_http_response_header("Welcome", None);
         return Action::Continue;
     }
 }
