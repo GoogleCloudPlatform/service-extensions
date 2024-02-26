@@ -1,9 +1,11 @@
 /bazel-*
 /callouts/python/env
 /callouts/python/env/**
-/callouts/python/__pycache__/**
-/callouts/python/__pycache__
-/callouts/python/.pytest_cache/**
-/callouts/python/.pytest_cache
+/callouts/python/samples/**/__pycache__/**
+/callouts/python/samples/**/__pycache__
+/callouts/python/samples/**/.pytest_cache/**
+/callouts/python/samples/**/.pytest_cache
+/callouts/python/services/**/__pycache__
 /.vscode/**
 plugins/bazel-*
+/.idea/**
