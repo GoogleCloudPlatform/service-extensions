@@ -16,5 +16,5 @@ COPY ./ssl_creds ./ssl_creds
 EXPOSE 8443
 EXPOSE 8080
 EXPOSE 8000
-WORKDIR /home/callouts/python/samples/update_header
+WORKDIR /home/callouts/python/samples/normalize_header
 CMD [ "/usr/bin/python3", "./service_callout_example.py" ]
