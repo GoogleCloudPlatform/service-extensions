@@ -10,11 +10,12 @@
 # limitations under the License.
 FROM marketplace.gcr.io/google/debian12
 RUN apt-get update && apt-get install -y python3-pip python3-grpc-tools
-WORKDIR /home/callouts
-COPY ./python ./python
-COPY ./ssl_creds ./ssl_creds
-EXPOSE 8443
-EXPOSE 8080
-EXPOSE 8000
 WORKDIR /home/callouts/python
-CMD [ "/usr/bin/python3", "./service_callout_example.py" ]
+COPY ./extproc/service ./extproc/service
+COPY ./extproc/proto ./extproc/proto
+COPY ./extproc/ssl_creds ./extproc/ssl_creds
+COPY ./extproc/example/grpc ./extproc/example/grpc
+EXPOSE 443
+EXPOSE 8080
+EXPOSE 80
+CMD [ "/usr/bin/python3", "-um", "extproc.example.grpc.service_callout_example" ]
