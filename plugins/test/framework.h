@@ -129,6 +129,8 @@ class TestHttpContext : public TestContext {
       proxy_wasm::WasmHeaderMapType type,
       const proxy_wasm::Pairs& pairs) override;
 
+  // Ignore failStream, avoid calling unimplemented closeStream.
+  void failStream(proxy_wasm::WasmStreamType) override {}
   proxy_wasm::WasmResult sendLocalResponse(uint32_t response_code,
                                            std::string_view body_text,
                                            proxy_wasm::Pairs additional_headers,
