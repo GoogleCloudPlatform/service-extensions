@@ -23,9 +23,9 @@ import urllib.request
 import grpc
 from grpc import ServicerContext
 import pytest
-from extproc.service import callout_server
-from extproc.proto import service_pb2
-from extproc.proto import service_pb2_grpc
+from callouts.python.extproc.service import callout_server
+from callouts.python.extproc.proto import service_pb2
+from callouts.python.extproc.proto import service_pb2_grpc
 
 # Global server variable.
 server: callout_server.CalloutServer | None = None
@@ -162,7 +162,7 @@ class TestBasicServer(object):
   def test_basic_server_certs(self) -> None:
     """Check that the server can handle secure callouts with certs."""
     try:
-      with open('./extproc/ssl_creds/root.crt', 'rb') as file:
+      with open('../ssl_creds/root.crt', 'rb') as file:
         self.root_cert = file.read()
         file.close()
       creds = grpc.ssl_channel_credentials(self.root_cert)

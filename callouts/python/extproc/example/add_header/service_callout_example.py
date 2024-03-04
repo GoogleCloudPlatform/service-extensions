@@ -48,4 +48,4 @@ class CalloutServerExample(callout_server.CalloutServer):
 
 if __name__ == '__main__':
   # Run the gRPC service
-  CalloutServerExample().run()
+  CalloutServerExample(port=443, insecure_port=8080, health_check_port=80).run()

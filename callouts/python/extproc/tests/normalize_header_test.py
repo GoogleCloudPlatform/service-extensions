@@ -13,12 +13,6 @@
 # limitations under the License.
 from __future__ import print_function
 
-import sys
-
-from callouts.python.extproc.service import callout_server
-
-sys.path.append('../../../../services/')
-
 import datetime
 from http.server import BaseHTTPRequestHandler
 from http.server import HTTPServer
@@ -29,9 +23,9 @@ import urllib.request
 import grpc
 from grpc import ServicerContext
 import pytest
-from extproc.service import callout_server
-from extproc.proto import service_pb2
-from extproc.proto import service_pb2_grpc
+from callouts.python.extproc.service import callout_server
+from callouts.python.extproc.proto import service_pb2
+from callouts.python.extproc.proto import service_pb2_grpc
 
 # Global server variable.
 server: callout_server.CalloutServer | None = None
