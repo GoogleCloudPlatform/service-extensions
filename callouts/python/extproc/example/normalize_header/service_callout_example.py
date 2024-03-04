@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC.
+# Copyright 2024 Google LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from grpc import ServicerContext
 from callouts.python.extproc.proto import service_pb2
 from callouts.python.extproc.service import callout_server
-
-from grpc import ServicerContext
 
 
 class CalloutServerExample(callout_server.CalloutServer):
@@ -24,11 +23,9 @@ class CalloutServerExample(callout_server.CalloutServer):
     Provides a non-comprehensive set of responses for each of the possible
     callout interactions.
 
-    For request header callouts we provide a mutation to update a header
-    '{header-request: request}', and to clear the route cache.
-
-    On response header callouts, we respond with a mutation to update
-    the header '{header-response: response}'.
+    For request header callouts we check the host header
+    and create a new HTTP header (client-device-type)
+    to shard requests based on device.
     """
 
     def on_request_headers(
