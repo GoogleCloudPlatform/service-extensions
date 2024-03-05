@@ -14,9 +14,9 @@ Build all plugins and run all plugin tests:
 
 `$ bazelisk test --test_output=all //samples/...`
 
-Build and run benchmarks for a plugin:
+When running benchmarks, be sure to add `--config=bench`:
 
-`$ bazelisk run --config=bench //samples/add_header:plugin_test`
+`$ bazelisk test --test_output=all --config=bench //samples/add_header/...`
 
 # Samples & Recipes
 
