@@ -28,9 +28,8 @@ from typing import Iterator
 import grpc
 from grpc import ServicerContext
 
-from callouts.python.extproc.proto import service_pb2
-from callouts.python.extproc.proto import service_pb2_grpc
-
+from extproc.proto import service_pb2
+from extproc.proto import service_pb2_grpc
 
 def add_header_mutation(
         add: list[tuple[str, str]] | None = None,
@@ -47,6 +46,7 @@ def add_header_mutation(
     Returns:
       The constructed header response object.
     """
+
     header_mutation = service_pb2.HeadersResponse()
     if add:
         header_mutation.response.header_mutation.set_headers.extend([
@@ -112,12 +112,12 @@ def normalize_header_mutation(
     Returns:
       The constructed header response object.
     """
-
     if update is None:
         update = []
 
     host_value = next((header.raw_value.decode('utf-8') for header in headers.headers.headers if header.key == 'host'),
                       None)
+
     if host_value:
         device_type = get_device_type(host_value)
         update.append(('client-device-type', device_type))
@@ -151,14 +151,15 @@ def add_body_mutation(
 
   Args:
     body: Text of the body.
-    clear_body: If set to true, the modififcation will clear the previous body,
-      if left false, the text will be appended to the end of the of the previous
+    clear_body: If set to true, the modification will clear the previous body,
+      if left false, the text will be appended to the end of the previous
       body.
     clear_route_cache: If true, will enable clear_route_cache on the response.
 
   Returns:
     The constructed body response object.
   """
+
     body_mutation = service_pb2.BodyResponse()
     if body:
         body_mutation.response.body_mutation.body = bytes(body, 'utf-8')

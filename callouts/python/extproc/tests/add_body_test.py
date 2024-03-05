@@ -14,9 +14,9 @@
 from __future__ import print_function
 
 
-from callouts.python.extproc.service import callout_server
-from callouts.python.extproc.proto import service_pb2
-from callouts.python.extproc.proto import service_pb2_grpc
+from extproc.service import callout_server
+from extproc.proto import service_pb2
+from extproc.proto import service_pb2_grpc
 
 import datetime
 from http.server import BaseHTTPRequestHandler
