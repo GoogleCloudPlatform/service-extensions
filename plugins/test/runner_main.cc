@@ -19,7 +19,6 @@
 // validates a configured set of expectations about output and side effects.
 //
 // TODO Future features
-// - Benchmarking incl. init plugin (root context) and stream (http context)
 // - YAML config input support (--yaml instead of --proto)
 // - Structured output (JSON) rather than stdout/stderr
 // - Publish test runner as Docker image
@@ -28,6 +27,7 @@
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
 #include "absl/strings/substitute.h"
+#include "benchmark/benchmark.h"
 #include "google/protobuf/text_format.h"
 #include "gtest/gtest.h"
 #include "re2/re2.h"
@@ -91,35 +91,66 @@ absl::StatusOr<pb::TestSuite> ParseInputs(int argc, char** argv) {
 }
 
 absl::Status RunTests(const pb::TestSuite& cfg) {
-  // Run functional tests.
+  // Register tests and benchmarks.
+  bool have_benchmarks = false;
   for (const auto& engine : proxy_wasm::getWasmEngines()) {
     for (const auto& test : cfg.test()) {
+      // Register functional tests.
       testing::RegisterTest(
-          absl::StrCat("HttpTest_", engine).c_str(), test.name().c_str(),
-          nullptr, nullptr, __FILE__, __LINE__,
+          absl::StrCat("Test_", engine).c_str(), test.name().c_str(), nullptr,
+          nullptr, __FILE__, __LINE__,
           // Important to use the fixture type as the return type here.
           [=]() -> DynamicFixture* {
             return new DynamicTest(engine, cfg.runtime(), test);
           });
+
+      // Register benchmarks.
+      if (test.benchmark()) {
+        // Benchmark lifecycle costs just once.
+        if (!have_benchmarks) {
+          have_benchmarks = true;
+          benchmark::RegisterBenchmark(
+              absl::Substitute("Bench_$0.PluginLifecycle", engine),
+              [=](benchmark::State& state) {
+                DynamicTest dt(engine, cfg.runtime(), test);
+                dt.BenchPluginLifecycle(state);
+              });
+          benchmark::RegisterBenchmark(
+              absl::Substitute("Bench_$0.StreamLifecycle", engine),
+              [=](benchmark::State& state) {
+                DynamicTest dt(engine, cfg.runtime(), test);
+                dt.BenchStreamLifecycle(state);
+              });
+        }
+        // Benchmark HTTP handlers for each opted-in test.
+        benchmark::RegisterBenchmark(
+            absl::Substitute("Bench_$0.$1", engine, test.name()),
+            [=](benchmark::State& state) {
+              DynamicTest dt(engine, cfg.runtime(), test);
+              dt.BenchHttpHandlers(state);
+            });
+      }
     }
   }
+
+  // Run functional tests.
   bool tests_ok = RUN_ALL_TESTS() == 0;
 
-  /*
   // Run performance benchmarks.
-  auto BM_test = [](benchmark::State& st, auto Inputs) {  };
-  benchmark::RegisterBenchmark(test_input.name(), BM_test, test_input);
-  benchmark::RunSpecifiedBenchmarks();
-  benchmark::Shutdown();
-  */
+  if (have_benchmarks) {
+    benchmark::RunSpecifiedBenchmarks();
+    benchmark::Shutdown();
+  }
 
-  return tests_ok ? absl::OkStatus() : absl::UnknownError("tests failed");
+  return tests_ok ? absl::OkStatus() : absl::AbortedError("tests failed");
 }
 
 absl::Status main(int argc, char** argv) {
+  // Initialize testing args.
   testing::InitGoogleTest(&argc, argv);
-  // TODO benchmark::Initialize(&argc, argv);
+  benchmark::Initialize(&argc, argv);
 
+  // Parse runner args.
   auto cfg = ParseInputs(argc, argv);
   if (!cfg.ok()) {
     return cfg.status();

@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "benchmark/benchmark.h"
 #include "gtest/gtest.h"
 #include "test/framework.h"
 #include "test/runner.pb.h"
@@ -25,9 +26,9 @@ namespace service_extensions_samples {
 // Fixture for DynamicTest. Currently does nothing, but kept separate because
 // this could share plugin lifecycle across individual tests.
 //
-// TODO consider an engine-parameterized fixture that owns plugin lifecycle
-// (see INSTANTIATE_TEST_SUITE_P). It's tricky because each fixture (engine)
-// needs its own class type.
+// TODO consider a fixture parameterized on engine + env that owns a VM. It
+// could load files from disk and call CreatePluginVm (once). It's tricky
+// because each fixture needs its own class type (see INSTANTIATE_TEST_SUITE_P).
 class DynamicFixture : public testing::Test {
  public:
   // static void SetUpTestSuite() { std::cout << "FIXTURE\n"; }
@@ -45,10 +46,22 @@ class DynamicTest : public DynamicFixture {
                        const pb::Test& cfg)
       : engine_(engine), env_(env), cfg_(cfg) {}
 
-  // Core test logic, driven by the proto test config.
+  // Unit test logic, driven by the proto test config.
   void TestBody() override;
 
+  // Benchmark functions.
+  // Plugin lifecycle: onStart, onConfigure, onDone.
+  void BenchPluginLifecycle(benchmark::State& state);
+  // Stream lifecycle: onCreate, onDone.
+  void BenchStreamLifecycle(benchmark::State& state);
+  // HTTP handlers: onRequest*, onResponse*
+  void BenchHttpHandlers(benchmark::State& state);
+
  private:
+  // Initialize VM + load wasm.
+  absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>> LoadWasm(
+      bool benchmark);
+
   // Helper to check for wasm engine failures.
   void CheckForFailures(
       const std::string& phase,
