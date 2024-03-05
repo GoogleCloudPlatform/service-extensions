@@ -13,8 +13,8 @@
 # limitations under the License.
 
 from grpc import ServicerContext
-from callouts.python.extproc.proto import service_pb2
-from callouts.python.extproc.service import callout_server
+from extproc.proto import service_pb2
+from extproc.service import callout_server
 
 
 class CalloutServerExample(callout_server.CalloutServer):
