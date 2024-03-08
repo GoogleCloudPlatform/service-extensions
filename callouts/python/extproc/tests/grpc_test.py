@@ -162,7 +162,7 @@ class TestBasicServer(object):
   def test_basic_server_certs(self) -> None:
     """Check that the server can handle secure callouts with certs."""
     try:
-      with open('../ssl_creds/root.crt', 'rb') as file:
+      with open('./extproc/ssl_creds/root.crt', 'rb') as file:
         self.root_cert = file.read()
         file.close()
       creds = grpc.ssl_channel_credentials(self.root_cert)
