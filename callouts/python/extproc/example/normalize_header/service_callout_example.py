@@ -18,26 +18,26 @@ from extproc.service import callout_server
 
 
 class CalloutServerExample(callout_server.CalloutServer):
-    """Example callout server.
+  """Example callout server.
 
-    Provides a non-comprehensive set of responses for each of the possible
-    callout interactions.
+  Provides a non-comprehensive set of responses for each of the possible
+  callout interactions.
 
-    For request header callouts we check the host header
-    and create a new HTTP header (client-device-type)
-    to shard requests based on device.
-    """
+  For request header callouts we check the host header
+  and create a new HTTP header (client-device-type)
+  to shard requests based on device.
+  """
 
-    def on_request_headers(
-            self, headers: service_pb2.HttpHeaders, context: ServicerContext
-    ) -> service_pb2.HeadersResponse:
-        """Custom processor on request headers."""
-        return callout_server.normalize_header_mutation(
-            headers=headers,
-            clear_route_cache=True
-        )
+  def on_request_headers(
+      self, headers: service_pb2.HttpHeaders, context: ServicerContext
+  ) -> service_pb2.HeadersResponse:
+    """Custom processor on request headers."""
+    return callout_server.normalize_header_mutation(
+      headers=headers,
+      clear_route_cache=True
+    )
 
 
 if __name__ == '__main__':
-    # Run the gRPC service
-    CalloutServerExample(port=443, insecure_port=8080, health_check_port=80).run()
+  # Run the gRPC service
+  CalloutServerExample(port=443, insecure_port=8080, health_check_port=80).run()

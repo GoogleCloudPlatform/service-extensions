@@ -18,28 +18,28 @@ from extproc.service import callout_server
 
 
 class CalloutServerExample(callout_server.CalloutServer):
-    """Example callout server.
+  """Example callout server.
 
-    Provides a non-comprehensive set of responses for each of the possible
-    callout interactions.
+  Provides a non-comprehensive set of responses for each of the possible
+  callout interactions.
 
-    On a request body callout we provide a mutation to append '-added-body' to the body. On response body
-    callouts we send a mutation to replace the body with 'new-body'.
-    """
+  On a request body callout we provide a mutation to append '-added-body' to the body. On response body
+  callouts we send a mutation to replace the body with 'new-body'.
+  """
 
-    def on_request_body(
-            self, body: service_pb2.HttpBody, context: ServicerContext
-    ) -> service_pb2.BodyResponse:
-        """Custom processor on the request body."""
-        return callout_server.add_body_mutation(body='-added-body')
+  def on_request_body(
+      self, body: service_pb2.HttpBody, context: ServicerContext
+  ) -> service_pb2.BodyResponse:
+    """Custom processor on the request body."""
+    return callout_server.add_body_mutation(body='-added-body')
 
-    def on_response_body(
-            self, body: service_pb2.HttpBody, context: ServicerContext
-    ) -> service_pb2.BodyResponse:
-        """Custom processor on the response body."""
-        return callout_server.add_body_mutation(body='new-body', clear_body=True)
+  def on_response_body(
+      self, body: service_pb2.HttpBody, context: ServicerContext
+  ) -> service_pb2.BodyResponse:
+    """Custom processor on the response body."""
+    return callout_server.add_body_mutation(body='new-body', clear_body=True)
 
 
 if __name__ == '__main__':
-    # Run the gRPC service
-    CalloutServerExample(port=443, insecure_port=8080, health_check_port=80).run()
+  # Run the gRPC service
+  CalloutServerExample(port=443, insecure_port=8080, health_check_port=80).run()

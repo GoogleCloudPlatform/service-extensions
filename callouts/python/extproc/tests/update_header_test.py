@@ -37,20 +37,21 @@ class CalloutServerTest(callout_server.CalloutServer):
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Custom processor on request headers."""
-    return callout_server.update_header_mutation(
-        headers=headers,
-        update=[('header-request', 'request')],
-        clear_route_cache=True
+    return callout_server.add_header_mutation(
+      add=[('header-request', 'request-new-value')],
+      append_action=2,  # OVERWRITE_IF_EXISTS_OR_ADD
+      clear_route_cache=True
     )
 
   def on_response_headers(
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Custom processor on response headers."""
-    return callout_server.update_header_mutation(
-        headers=headers,
-        update=[('header-response', 'response')]
+    return callout_server.add_header_mutation(
+      add=[('header-response', 'response-new-value')],
+      append_action=2  # OVERWRITE_IF_EXISTS_OR_ADD
     )
+
 
 def wait_till_server(server_check, timeout=10):
   expiration = datetime.datetime.now() + datetime.timedelta(seconds=timeout)
@@ -106,17 +107,17 @@ class TestBasicServer(object):
 
         value = _MakeRequest(stub, response_headers=headers, async_mode=False)
         assert value.HasField('response_headers')
-        assert value.response_headers == callout_server.update_header_mutation(
-            headers=headers,
-            update=[('hello', 'service-extensions')]
+        assert value.response_headers == callout_server.add_header_mutation(
+          add=[('header-response', 'response-new-value')],
+          append_action=2  # OVERWRITE_IF_EXISTS_OR_ADD
         )
 
         value = _MakeRequest(stub, request_headers=headers, async_mode=False)
         assert value.HasField('request_headers')
-        assert value.request_headers == callout_server.update_header_mutation(
-            headers=headers,
-            update=[('hello', 'service-extensions')],
-            clear_route_cache=True,
+        assert value.request_headers == callout_server.add_header_mutation(
+          add=[('header-request', 'request-new-value')],
+          append_action=2,  # OVERWRITE_IF_EXISTS_OR_ADD
+          clear_route_cache=True
         )
 
         _MakeRequest(stub, request_headers=end_headers, async_mode=False)
@@ -128,7 +129,7 @@ class TestBasicServer(object):
     """Test that the health check sub server returns the expected 200 code."""
     try:
       response = urllib.request.urlopen(
-          f'http://{server.health_check_ip}:{server.health_check_port}'
+        f'http://{server.health_check_ip}:{server.health_check_port}'
       )
       assert not response.read()
       assert response.getcode() == 200
@@ -144,10 +145,10 @@ class TestBasicServer(object):
         file.close()
       creds = grpc.ssl_channel_credentials(self.root_cert)
       options = (
-          (
-              'grpc.ssl_target_name_override',
-              'localhost',
-          ),
+        (
+          'grpc.ssl_target_name_override',
+          'localhost',
+        ),
       )
       with grpc.secure_channel(
           f'{server.ip}:{server.port}', creds, options=options
@@ -170,11 +171,11 @@ def test_custom_server_config() -> None:
     health_check_port = 8001
 
     server = CalloutServerTest(
-        ip=ip,
-        port=port,
-        insecure_port=insecure_port,
-        health_check_ip=health_check_ip,
-        health_check_port=health_check_port,
+      ip=ip,
+      port=port,
+      insecure_port=insecure_port,
+      health_check_ip=health_check_ip,
+      health_check_port=health_check_port,
     )
     # Start the server in a background thread
     thread = threading.Thread(target=server.run)
@@ -183,7 +184,7 @@ def test_custom_server_config() -> None:
     wait_till_server(lambda: server._setup)
 
     response = urllib.request.urlopen(
-        f'http://{health_check_ip}:{health_check_port}'
+      f'http://{health_check_ip}:{health_check_port}'
     )
     assert response.read() == b''
     assert response.getcode() == 200
@@ -215,7 +216,7 @@ def test_custom_server_no_health_check_no_insecure_port() -> None:
   test_server_2 = None
   try:
     server = CalloutServerTest(
-        serperate_health_check=True, enable_insecure_port=False
+      serperate_health_check=True, enable_insecure_port=False
     )
     # Start the server in a background thread
     thread = threading.Thread(target=server.run)

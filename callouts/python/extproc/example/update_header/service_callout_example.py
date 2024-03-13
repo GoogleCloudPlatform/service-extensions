@@ -33,9 +33,9 @@ class CalloutServerExample(callout_server.CalloutServer):
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Custom processor on request headers."""
-    return callout_server.update_header_mutation(
-        headers=headers,
-        update=[('header-request', 'request')],
+    return callout_server.add_header_mutation(
+        add=[('header-request', 'request-new-value')],
+        append_action=2,  #OVERWRITE_IF_EXISTS_OR_ADD
         clear_route_cache=True
     )
 
@@ -43,9 +43,9 @@ class CalloutServerExample(callout_server.CalloutServer):
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Custom processor on response headers."""
-    return callout_server.update_header_mutation(
-        headers=headers,
-        update=[('header-response', 'response')]
+    return callout_server.add_header_mutation(
+        add=[('header-response', 'response-new-value')],
+        append_action=2  #OVERWRITE_IF_EXISTS_OR_ADD
     )
 
 if __name__ == '__main__':

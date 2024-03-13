@@ -28,13 +28,14 @@ class CalloutServerExample(callout_server.CalloutServer):
   route cache. On response header callouts, we respond with a mutation to add
   the header '{header-response: response}'.
   """
+
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Custom processor on request headers."""
     return callout_server.add_header_mutation(
-        add=[('header-request', 'request')], remove=['foo'],
-        clear_route_cache=True
+      add=[('header-request', 'request')],
+      clear_route_cache=True
     )
 
   def on_response_headers(
@@ -42,8 +43,10 @@ class CalloutServerExample(callout_server.CalloutServer):
   ) -> service_pb2.HeadersResponse:
     """Custom processor on response headers."""
     return callout_server.add_header_mutation(
-        add=[('header-response', 'response')]
+      add=[('header-response', 'response')],
+      remove=['foo']
     )
+
 
 if __name__ == '__main__':
   # Run the gRPC service
