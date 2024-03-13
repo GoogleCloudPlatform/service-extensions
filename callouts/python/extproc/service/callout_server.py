@@ -43,7 +43,7 @@ def add_header_mutation(
     add: A list of tuples representing headers to add.
     remove: List of header strings to remove from the request.
     clear_route_cache: If true, will enable clear_route_cache on the response.
-
+    append_action: Supported actions types for header append action.
   Returns:
     The constructed header response object.
   """
@@ -72,7 +72,6 @@ def normalize_header_mutation(
   """Generate a header response for incoming requests.
   Args:
     headers: Current headers presented in the request
-    update: A list of tuples representing headers to update.
     clear_route_cache: If true, will enable clear_route_cache on the response.
   Returns:
     The constructed header response object.
