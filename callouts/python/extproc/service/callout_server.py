@@ -18,7 +18,6 @@ Takes in service callout requests and performs header and body transformations.
 Bundled with an optional health check server.
 Can be set up to use ssl certificates.
 """
-
 from concurrent import futures
 from http.server import BaseHTTPRequestHandler
 from http.server import HTTPServer
@@ -53,8 +52,8 @@ def add_header_mutation(
   if add:
     for k, v in add:
       header_value_option = service_pb2.HeaderValueOption(
-          header=service_pb2.HeaderValue(key=k, raw_value=bytes(v, 'utf-8'))
-        )
+        header=service_pb2.HeaderValue(key=k, raw_value=bytes(v, 'utf-8'))
+      )
       if append_action:
         header_value_option.append_action = append_action
       header_mutation.response.header_mutation.set_headers.append(header_value_option)
@@ -130,6 +129,38 @@ def get_device_type(host_value: str) -> str:
     return 'tablet'
   else:
     return 'desktop'
+
+
+def check_mock(request):
+  header_mock_check = next(
+    (header.raw_value for header in request.headers.headers if
+     header.key == 'mock'),
+    None)
+  if header_mock_check:
+    return True
+  return False
+
+
+def check_body_mock(request):
+  body_content = request.body.decode('utf-8')
+  body_check = "mock"
+  if body_check in body_content:
+    return True
+  return False
+
+
+def header_mock() -> service_pb2.HeadersResponse:
+  mock_response = service_pb2.HeadersResponse()
+  mock_header = service_pb2.HeaderValueOption(
+    header=service_pb2.HeaderValue(key="Mock-Response", raw_value=bytes("Mocked-Value", 'utf-8')))
+  mock_response.response.header_mutation.set_headers.append(mock_header)
+  return mock_response
+
+
+def body_mock() -> service_pb2.BodyResponse:
+  mock_response = service_pb2.BodyResponse()
+  mock_response.response.body_mutation.body = bytes("Mocked_Body", 'utf-8')
+  return mock_response
 
 
 class HealthCheckService(BaseHTTPRequestHandler):
@@ -307,22 +338,40 @@ class CalloutServer:
     """Process the client request."""
     for request in request_iterator:
       if request.HasField('request_headers'):
+        if check_mock(request.request_headers):
+          mock_response = header_mock()
+          yield service_pb2.ProcessingResponse(request_headers=mock_response)
+          return
+
         yield service_pb2.ProcessingResponse(
           request_headers=self.on_request_headers(
             request.request_headers, context
           )
         )
       if request.HasField('response_headers'):
+        if check_mock(request.response_headers):
+          mock_response = header_mock()
+          yield service_pb2.ProcessingResponse(response_headers=mock_response)
+          return
+
         yield service_pb2.ProcessingResponse(
           response_headers=self.on_response_headers(
             request.response_headers, context
           )
         )
       if request.HasField('request_body'):
+        if check_body_mock(request.request_body):
+          mock_response = body_mock()
+          yield service_pb2.ProcessingResponse(request_body=mock_response)
+          return
         yield service_pb2.ProcessingResponse(
           request_body=self.on_request_body(request.request_body, context)
         )
       if request.HasField('response_body'):
+        if check_body_mock(request.response_body):
+          mock_response = body_mock()
+          yield service_pb2.ProcessingResponse(response_body=mock_response)
+          return
         yield service_pb2.ProcessingResponse(
           response_body=self.on_response_body(request.response_body, context)
         )
