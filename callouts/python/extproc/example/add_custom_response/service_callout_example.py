@@ -23,8 +23,14 @@ class CalloutServerExample(callout_server.CalloutServer):
   Provides a non-comprehensive set of responses for each of the possible
   callout interactions.
 
-  On a request body callout we provide a mutation to append '-added-body' to the body. On response body
-  callouts we send a mutation to replace the body with 'new-body'.
+  On a request header callout we check if it contains a header called '{mock:}', if yes then it will
+  generate a mock response, otherwise it will follow the standard flow and add a header
+  '{header-request: request}'. On response header callouts, we respond with a mutation to add
+  the header '{header-response: response}'.
+
+  On a request body callout we check if it contains in the body 'mock', if yes then it will generate
+  a mock response, otherwise it will follow the standard flow and provide a mutation to append '-added-body'
+  to the body. On response body callouts we send a mutation to replace the body with 'new-body'.
   """
 
   def on_request_body(
