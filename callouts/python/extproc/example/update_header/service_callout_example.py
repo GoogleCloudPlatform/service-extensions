@@ -20,22 +20,22 @@ from extproc.service import callout_server
 class CalloutServerExample(callout_server.CalloutServer):
   """Example callout server.
 
-  Provides a non-comprehensive set of responses for each of the possible 
+  Provides a non-comprehensive set of responses for each of the possible
   callout interactions.
 
-  For request header callouts we provide a mutation to add a header 
-  '{header-request: request}', remove a header 'foo', and to clear the 
-  route cache. On response header callouts, we respond with a mutation to add
-  the header '{header-response: response}'. On a request body callout we 
-  provide a mutation to append '-added-body' to the body. On response body
-  callouts we send a mutation to replace the body with 'new-body'.
+  For request header callouts we provide a mutation to update a header
+  '{header-request: request}', and to clear the route cache.
+
+  On response header callouts, we respond with a mutation to update
+  the header '{header-response: response}'.
   """
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Custom processor on request headers."""
     return callout_server.add_header_mutation(
-        add=[('header-request', 'request')], remove=['foo'], 
+        add=[('header-request', 'request-new-value')],
+        append_action=2,  #OVERWRITE_IF_EXISTS_OR_ADD
         clear_route_cache=True
     )
 
@@ -44,21 +44,9 @@ class CalloutServerExample(callout_server.CalloutServer):
   ) -> service_pb2.HeadersResponse:
     """Custom processor on response headers."""
     return callout_server.add_header_mutation(
-        add=[('header-response', 'response')]
+        add=[('header-response', 'response-new-value')],
+        append_action=2  #OVERWRITE_IF_EXISTS_OR_ADD
     )
-
-  def on_request_body(
-      self, body: service_pb2.HttpBody, context: ServicerContext
-  ) -> service_pb2.BodyResponse:
-    """Custom processor on the request body."""
-    return callout_server.add_body_mutation(body='-added-body')
-
-  def on_response_body(
-      self, body: service_pb2.HttpBody, context: ServicerContext
-  ) -> service_pb2.BodyResponse:
-    """Custom processor on the response body."""
-    return callout_server.add_body_mutation(body='new-body', clear_body=True)
-
 
 if __name__ == '__main__':
   # Run the gRPC service
