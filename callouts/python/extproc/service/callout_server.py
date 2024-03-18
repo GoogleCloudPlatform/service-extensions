@@ -18,6 +18,8 @@ Takes in service callout requests and performs header and body transformations.
 Bundled with an optional health check server.
 Can be set up to use ssl certificates.
 """
+import logging
+
 from concurrent import futures
 from http.server import BaseHTTPRequestHandler
 from http.server import HTTPServer
@@ -28,7 +30,6 @@ from grpc import ServicerContext
 
 from extproc.proto import service_pb2
 from extproc.proto import service_pb2_grpc
-
 
 def add_header_mutation(
     add: list[tuple[str, str]] | None = None,
@@ -129,39 +130,6 @@ def get_device_type(host_value: str) -> str:
     return 'tablet'
   else:
     return 'desktop'
-
-
-def check_mock(request):
-  header_mock_check = next(
-    (header.raw_value for header in request.headers.headers if
-     header.key == 'mock'),
-    None)
-  if header_mock_check:
-    return True
-  return False
-
-
-def check_body_mock(request):
-  body_content = request.body.decode('utf-8')
-  body_check = "mock"
-  if body_check in body_content:
-    return True
-  return False
-
-
-def header_mock() -> service_pb2.HeadersResponse:
-  mock_response = service_pb2.HeadersResponse()
-  mock_header = service_pb2.HeaderValueOption(
-    header=service_pb2.HeaderValue(key="Mock-Response", raw_value=bytes("Mocked-Value", 'utf-8')))
-  mock_response.response.header_mutation.set_headers.append(mock_header)
-  return mock_response
-
-
-def body_mock() -> service_pb2.BodyResponse:
-  mock_response = service_pb2.BodyResponse()
-  mock_response.response.body_mutation.body = bytes("Mocked_Body", 'utf-8')
-  return mock_response
-
 
 class HealthCheckService(BaseHTTPRequestHandler):
   """Server for responding to health check pings."""
@@ -330,6 +298,64 @@ class CalloutServer:
       self._health_check_server.shutdown()
     self._shutdown = True
 
+  def header_mock_check(self, request):
+    header_mock_check = next(
+      (header.raw_value for header in request.headers.headers if
+       header.key == 'mock'),
+      None)
+    if header_mock_check:
+      return True
+    return False
+
+  def body_mock_check(self, request):
+    body_content = request.body.decode('utf-8')
+    body_check = "mock"
+    if body_check in body_content:
+      return True
+    return False
+
+  def generate_mock_response(self, mock_type):
+    """Generate mock response based on type ('header' or 'body')."""
+    if mock_type == 'header':
+      mock_response = service_pb2.HeadersResponse()
+      mock_header = service_pb2.HeaderValueOption(
+        header=service_pb2.HeaderValue(key="Mock-Response", raw_value=bytes("Mocked-Value", 'utf-8')))
+      mock_response.response.header_mutation.set_headers.append(mock_header)
+      return mock_response
+    elif mock_type == 'body':
+      mock_response = service_pb2.BodyResponse()
+      mock_response.response.body_mutation.body = bytes("Mocked-Body", 'utf-8')
+      return mock_response
+
+  def validate_request(self, request, request_type):
+    """Validate both header and body of the request."""
+    if request_type == 'header':
+      header_value_check = next(
+        (header.raw_value for header in request.request_headers.headers.headers if
+         header.key == 'header-check'),
+        None)
+
+      if header_value_check:
+        return False
+
+    elif request_type == 'body':
+      body_content = request.request_body.body.decode('utf-8')
+      body_check = "body-check"
+
+      if body_check in body_content:
+        return False
+
+    return True
+
+  def request_denied(
+      self,
+      context
+  ):
+
+    request_denied_msg = "Request content is invalid or not allowed"
+    logging.warning(request_denied_msg)
+    context.abort(grpc.StatusCode.PERMISSION_DENIED, request_denied_msg)
+
   def process(
       self,
       request_iterator: Iterator[service_pb2.ProcessingRequest],
@@ -338,8 +364,11 @@ class CalloutServer:
     """Process the client request."""
     for request in request_iterator:
       if request.HasField('request_headers'):
-        if check_mock(request.request_headers):
-          mock_response = header_mock()
+        if not self.validate_request(request, 'header'):
+          self.request_denied(context)
+
+        if self.header_mock_check(request.request_headers):
+          mock_response = self.generate_mock_response('header')
           yield service_pb2.ProcessingResponse(request_headers=mock_response)
           return
 
@@ -349,27 +378,30 @@ class CalloutServer:
           )
         )
       if request.HasField('response_headers'):
-        if check_mock(request.response_headers):
-          mock_response = header_mock()
+        if self.header_mock_check(request.response_headers):
+          mock_response = self.generate_mock_response('header')
           yield service_pb2.ProcessingResponse(response_headers=mock_response)
           return
-
         yield service_pb2.ProcessingResponse(
           response_headers=self.on_response_headers(
             request.response_headers, context
           )
         )
       if request.HasField('request_body'):
-        if check_body_mock(request.request_body):
-          mock_response = body_mock()
+        if not self.validate_request(request, 'body'):
+          self.request_denied(context)
+
+        if self.body_mock_check(request.request_body):
+          mock_response = self.generate_mock_response('body')
           yield service_pb2.ProcessingResponse(request_body=mock_response)
           return
+
         yield service_pb2.ProcessingResponse(
           request_body=self.on_request_body(request.request_body, context)
         )
       if request.HasField('response_body'):
-        if check_body_mock(request.response_body):
-          mock_response = body_mock()
+        if self.body_mock_check(request.response_body):
+          mock_response = self.generate_mock_response('body')
           yield service_pb2.ProcessingResponse(response_body=mock_response)
           return
         yield service_pb2.ProcessingResponse(
