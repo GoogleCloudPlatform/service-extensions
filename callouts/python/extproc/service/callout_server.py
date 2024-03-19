@@ -19,6 +19,8 @@ Bundled with an optional health check server.
 Can be set up to use ssl certificates.
 """
 
+import logging
+
 from concurrent import futures
 from http.server import BaseHTTPRequestHandler
 from http.server import HTTPServer
@@ -26,16 +28,18 @@ from typing import Iterator
 
 import grpc
 from grpc import ServicerContext
-
-from extproc.proto import service_pb2
-from extproc.proto import service_pb2_grpc
-
+from grpc._server import _Server
+from envoy.config.core.v3.base_pb2 import HeaderValueOption
+from envoy.config.core.v3.base_pb2 import HeaderValue
+from envoy.service.ext_proc.v3.external_processor_pb2_grpc import add_ExternalProcessorServicer_to_server
+from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
+from envoy.service.ext_proc.v3 import external_processor_pb2_grpc as service_pb2_grpc
 
 def add_header_mutation(
     add: list[tuple[str, str]] | None = None,
     remove: list[str] | None = None,
     clear_route_cache: bool = False,
-    append_action: service_pb2.HeaderValueOption.HeaderAppendAction = None,
+    append_action: HeaderValueOption.HeaderAppendAction = None,
 ) -> service_pb2.HeadersResponse:
   """Generate a header response for incoming requests.
 
@@ -47,13 +51,11 @@ def add_header_mutation(
   Returns:
     The constructed header response object.
   """
-
   header_mutation = service_pb2.HeadersResponse()
-
   if add:
     for k, v in add:
-      header_value_option = service_pb2.HeaderValueOption(
-          header=service_pb2.HeaderValue(key=k, raw_value=bytes(v, 'utf-8'))
+      header_value_option = HeaderValueOption(
+          header=HeaderValue(key=k, raw_value=bytes(v, 'utf-8'))
         )
       if append_action:
         header_value_option.append_action = append_action
@@ -108,10 +110,9 @@ Args:
     body.
   clear_route_cache: If true, will enable clear_route_cache on the response.
 
-Returns:
-  The constructed body response object.
-"""
-
+  Returns:
+    The constructed body response object.
+  """
   body_mutation = service_pb2.BodyResponse()
   if body:
     body_mutation.response.body_mutation.body = bytes(body, 'utf-8')
@@ -229,8 +230,8 @@ class CalloutServer:
     grpc_server = grpc.server(
       futures.ThreadPoolExecutor(max_workers=self.server_thread_count)
     )
-    service_pb2_grpc.add_ExternalProcessorServicer_to_server(
-      GRPCCalloutService(self), grpc_server
+    add_ExternalProcessorServicer_to_server(
+        GRPCCalloutService(self), grpc_server
     )
     server_credentials = grpc.ssl_server_credentials(
       private_key_certificate_chain_pairs=[(self.cert_key, self.cert)]
@@ -308,23 +309,23 @@ class CalloutServer:
     for request in request_iterator:
       if request.HasField('request_headers'):
         yield service_pb2.ProcessingResponse(
-          request_headers=self.on_request_headers(
-            request.request_headers, context
-          )
+            request_headers=self.on_request_headers(
+                request.request_headers, context
+            )
         )
       if request.HasField('response_headers'):
         yield service_pb2.ProcessingResponse(
-          response_headers=self.on_response_headers(
-            request.response_headers, context
-          )
+            response_headers=self.on_response_headers(
+                request.response_headers, context
+            )
         )
       if request.HasField('request_body'):
         yield service_pb2.ProcessingResponse(
-          request_body=self.on_request_body(request.request_body, context)
+            request_body=self.on_request_body(request.request_body, context)
         )
       if request.HasField('response_body'):
         yield service_pb2.ProcessingResponse(
-          response_body=self.on_response_body(request.response_body, context)
+            response_body=self.on_response_body(request.response_body, context)
         )
 
   def on_request_headers(
