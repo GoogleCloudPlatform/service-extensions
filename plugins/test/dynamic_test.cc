@@ -17,6 +17,7 @@
 #include "test/dynamic_test.h"
 
 #include "absl/strings/substitute.h"
+#include "benchmark/benchmark.h"
 #include "dynamic_test.h"
 #include "google/protobuf/text_format.h"
 #include "gtest/gtest.h"
@@ -65,52 +66,60 @@ class StringMatcher {
   std::unique_ptr<RE2> re_ = nullptr;
 };
 
-void DynamicTest::TestBody() {
+absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>>
+DynamicTest::LoadWasm(bool benchmark) {
   // Set log level. Default to INFO. Disable in benchmarks.
   auto ll = env_.min_log_level();
-  if (ll == pb::Runtime::UNDEFINED) {
-    ll = pb::Runtime::INFO;
+  if (ll == pb::Env::UNDEFINED) {
+    ll = pb::Env::INFO;
   }
-  if (false) {  // TODO disable logging in benchmark mode.
-    ll = pb::Runtime::CRITICAL;
+  if (benchmark) {
+    ll = pb::Env::CRITICAL;
   }
   auto min_log_level = proxy_wasm::LogLevel(ll - 1);  // enum conversion, yuck
 
   // Load wasm bytes.
   auto wasm = ReadDataFile(env_.wasm_path());
-  ASSERT_TRUE(wasm.ok()) << wasm.status();
+  if (!wasm.ok()) return wasm.status();
 
   // Load plugin config from disk, if configured.
   std::string plugin_config = "";
   if (!env_.config_path().empty()) {
     auto config = ReadDataFile(env_.config_path());
-    ASSERT_TRUE(config.ok()) << config.status();
+    if (!config.ok()) return config.status();
     plugin_config = *config;
   }
 
   // Create VM and load wasm.
-  auto handle = CreatePluginVm(engine_, *wasm, plugin_config, min_log_level);
-  ASSERT_TRUE(handle.ok()) << handle.status();
+  return CreatePluginVm(engine_, *wasm, plugin_config, min_log_level);
+}
+
+void DynamicTest::TestBody() {
+  // Initialize VM.
+  auto load_wasm = LoadWasm(/*benchmark=*/false);
+  ASSERT_TRUE(load_wasm.ok()) << load_wasm.status();
+  auto handle = *load_wasm;
 
   // Initialize plugin.
-  auto plugin_init = InitializePlugin(*handle);
+  auto plugin_init = InitializePlugin(handle);
   ASSERT_TRUE(plugin_init.ok()) << plugin_init;
   TestContext* root_context = static_cast<TestContext*>(
-      (*handle)->wasm()->getRootContext((*handle)->plugin(),
-                                        /*allow_closed=*/false));
-  CheckForFailures("plugin_init", *handle);
+      handle->wasm()->getRootContext(handle->plugin(),
+                                     /*allow_closed=*/false));
+  ASSERT_NE(root_context, nullptr);
+  CheckForFailures("plugin_init", handle);
   CheckSideEffects("plugin_init", cfg_.plugin_init(), *root_context);
 
-  // Create HTTP context.
-  auto stream = TestHttpContext(*handle);
-  CheckForFailures("stream_init", *handle);
+  // Initialize stream.
+  auto stream = TestHttpContext(handle);
+  CheckForFailures("stream_init", handle);
   CheckSideEffects("stream_init", cfg_.stream_init(), stream);
 
   // Exercise phase tests in sequence.
   if (cfg_.has_request_headers()) {
     const auto& invoke = cfg_.request_headers();
     auto res = stream.SendRequestHeaders(GenHeaders(invoke.input()));
-    CheckForFailures("request_headers", *handle);
+    CheckForFailures("request_headers", handle);
     CheckPhaseResults("request_headers", invoke.result(), stream, res);
   }
   if (cfg_.request_body_size() > 0) {
@@ -119,7 +128,7 @@ void DynamicTest::TestBody() {
   if (cfg_.has_response_headers()) {
     const auto& invoke = cfg_.response_headers();
     auto res = stream.SendResponseHeaders(GenHeaders(invoke.input()));
-    CheckForFailures("response_headers", *handle);
+    CheckForFailures("response_headers", handle);
     CheckPhaseResults("response_headers", invoke.result(), stream, res);
   }
   if (cfg_.response_body_size() > 0) {
@@ -128,8 +137,95 @@ void DynamicTest::TestBody() {
 
   // Tear down HTTP context.
   stream.TearDown();
-  CheckForFailures("stream_destroy", *handle);
+  CheckForFailures("stream_destroy", handle);
   CheckSideEffects("stream_destroy", cfg_.stream_destroy(), stream);
+}
+
+#define BM_RETURN_IF_ERROR(status)          \
+  if (!status.ok()) {                       \
+    state.SkipWithError(status.ToString()); \
+    return;                                 \
+  }
+#define BM_RETURN_IF_FAILED(handle)           \
+  if (handle && handle->wasm()->isFailed()) { \
+    state.SkipWithError("VM failed!");        \
+    return;                                   \
+  }
+
+void DynamicTest::BenchPluginLifecycle(benchmark::State& state) {
+  // Initialize VM.
+  auto load_wasm = LoadWasm(/*benchmark=*/true);
+  BM_RETURN_IF_ERROR(load_wasm.status());
+  auto handle = *load_wasm;
+
+  // Benchmark plugin initialization and teardown.
+  for (auto _ : state) {
+    // Create root context (start) and call configure on it.
+    auto plugin_init = InitializePlugin(handle);
+    BM_RETURN_IF_ERROR(plugin_init);
+    // Explicit shutdown; required to recreate root context in the next loop.
+    handle->wasm()->startShutdown(handle->plugin()->key());
+    BM_RETURN_IF_FAILED(handle);
+  }
+}
+
+void DynamicTest::BenchStreamLifecycle(benchmark::State& state) {
+  // Initialize VM.
+  auto load_wasm = LoadWasm(/*benchmark=*/true);
+  BM_RETURN_IF_ERROR(load_wasm.status());
+  auto handle = *load_wasm;
+
+  // Initialize plugin.
+  auto plugin_init = InitializePlugin(handle);
+  BM_RETURN_IF_ERROR(plugin_init);
+  BM_RETURN_IF_FAILED(handle);
+
+  // Benchmark stream initialization and teardown.
+  for (auto _ : state) {
+    auto stream = TestHttpContext(handle);
+    benchmark::DoNotOptimize(stream);
+    BM_RETURN_IF_FAILED(handle);
+  }
+}
+
+void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
+  // Initialize VM.
+  auto load_wasm = LoadWasm(/*benchmark=*/true);
+  BM_RETURN_IF_ERROR(load_wasm.status());
+  auto handle = *load_wasm;
+
+  // Initialize plugin.
+  auto plugin_init = InitializePlugin(handle);
+  BM_RETURN_IF_ERROR(plugin_init);
+  BM_RETURN_IF_FAILED(handle);
+
+  // Initialize stream.
+  auto stream = TestHttpContext(handle);
+  BM_RETURN_IF_FAILED(handle);
+
+  // Benchmark all configured HTTP handlers.
+  std::optional<TestHttpContext::Headers> request_headers;
+  if (cfg_.has_request_headers()) {
+    request_headers = GenHeaders(cfg_.request_headers().input());
+  }
+  std::optional<TestHttpContext::Headers> response_headers;
+  if (cfg_.has_response_headers()) {
+    response_headers = GenHeaders(cfg_.response_headers().input());
+  }
+  for (auto _ : state) {
+    if (request_headers) {
+      auto res = stream.SendRequestHeaders(*request_headers);
+      benchmark::DoNotOptimize(res);
+      BM_RETURN_IF_FAILED(handle);
+    }
+    // Future: send request BODY here.
+    if (response_headers) {
+      auto res = stream.SendResponseHeaders(*response_headers);
+      benchmark::DoNotOptimize(res);
+      BM_RETURN_IF_FAILED(handle);
+    }
+    // Future: send response BODY here.
+  }
 }
 
 void DynamicTest::CheckForFailures(
