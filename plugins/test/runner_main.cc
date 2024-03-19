@@ -38,20 +38,20 @@
 ABSL_FLAG(std::string, proto, "", "Path to test config. Required.");
 ABSL_FLAG(std::string, plugin, "", "Override path to plugin wasm.");
 ABSL_FLAG(std::string, config, "", "Override path to plugin config.");
-ABSL_FLAG(service_extensions_samples::pb::Runtime::LogLevel, min_log_level,
-          service_extensions_samples::pb::Runtime::UNDEFINED,
+ABSL_FLAG(service_extensions_samples::pb::Env::LogLevel, min_log_level,
+          service_extensions_samples::pb::Env::UNDEFINED,
           "Override min_log_level.");
 
 namespace service_extensions_samples {
 
 // Proto enum flag (de)serialization.
 namespace pb {
-bool AbslParseFlag(absl::string_view text, pb::Runtime::LogLevel* ll,
+bool AbslParseFlag(absl::string_view text, pb::Env::LogLevel* ll,
                    std::string* error) {
-  return Runtime::LogLevel_Parse(std::string(text), ll);
+  return Env::LogLevel_Parse(std::string(text), ll);
 }
-std::string AbslUnparseFlag(pb::Runtime::LogLevel ll) {
-  return Runtime_LogLevel_Name(ll);
+std::string AbslUnparseFlag(pb::Env::LogLevel ll) {
+  return Env_LogLevel_Name(ll);
 }
 }  // namespace pb
 
@@ -74,17 +74,17 @@ absl::StatusOr<pb::TestSuite> ParseInputs(int argc, char** argv) {
   // Apply flag overrides.
   std::string plugin_override = absl::GetFlag(FLAGS_plugin);
   std::string config_override = absl::GetFlag(FLAGS_config);
-  pb::Runtime::LogLevel mll_override = absl::GetFlag(FLAGS_min_log_level);
+  pb::Env::LogLevel mll_override = absl::GetFlag(FLAGS_min_log_level);
   if (!plugin_override.empty()) {
-    tests.mutable_runtime()->set_wasm_path(plugin_override);
+    tests.mutable_env()->set_wasm_path(plugin_override);
   }
   if (!config_override.empty()) {
-    tests.mutable_runtime()->set_config_path(config_override);
+    tests.mutable_env()->set_config_path(config_override);
   }
-  if (pb::Runtime::LogLevel_IsValid(mll_override)) {
-    tests.mutable_runtime()->set_min_log_level(mll_override);
+  if (pb::Env::LogLevel_IsValid(mll_override)) {
+    tests.mutable_env()->set_min_log_level(mll_override);
   }
-  if (tests.runtime().min_log_level() == pb::Runtime::TRACE) {
+  if (tests.env().min_log_level() == pb::Env::TRACE) {
     std::cout << "TRACE from runner: final config:\n" << tests.DebugString();
   }
   return tests;
@@ -101,7 +101,7 @@ absl::Status RunTests(const pb::TestSuite& cfg) {
           nullptr, __FILE__, __LINE__,
           // Important to use the fixture type as the return type here.
           [=]() -> DynamicFixture* {
-            return new DynamicTest(engine, cfg.runtime(), test);
+            return new DynamicTest(engine, cfg.env(), test);
           });
 
       // Register benchmarks.
@@ -112,13 +112,13 @@ absl::Status RunTests(const pb::TestSuite& cfg) {
           benchmark::RegisterBenchmark(
               absl::Substitute("Bench_$0.PluginLifecycle", engine),
               [=](benchmark::State& state) {
-                DynamicTest dt(engine, cfg.runtime(), test);
+                DynamicTest dt(engine, cfg.env(), test);
                 dt.BenchPluginLifecycle(state);
               });
           benchmark::RegisterBenchmark(
               absl::Substitute("Bench_$0.StreamLifecycle", engine),
               [=](benchmark::State& state) {
-                DynamicTest dt(engine, cfg.runtime(), test);
+                DynamicTest dt(engine, cfg.env(), test);
                 dt.BenchStreamLifecycle(state);
               });
         }
@@ -126,7 +126,7 @@ absl::Status RunTests(const pb::TestSuite& cfg) {
         benchmark::RegisterBenchmark(
             absl::Substitute("Bench_$0.$1", engine, test.name()),
             [=](benchmark::State& state) {
-              DynamicTest dt(engine, cfg.runtime(), test);
+              DynamicTest dt(engine, cfg.env(), test);
               dt.BenchHttpHandlers(state);
             });
       }

@@ -42,7 +42,7 @@ class DynamicFixture : public testing::Test {
 // and runtime may later be extracted into the fixture.
 class DynamicTest : public DynamicFixture {
  public:
-  explicit DynamicTest(const std::string& engine, const pb::Runtime& env,
+  explicit DynamicTest(const std::string& engine, const pb::Env& env,
                        const pb::Test& cfg)
       : engine_(engine), env_(env), cfg_(cfg) {}
 
@@ -86,7 +86,7 @@ class DynamicTest : public DynamicFixture {
   TestHttpContext::Headers GenHeaders(const pb::Input& input);
 
   std::string engine_;
-  pb::Runtime env_;
+  pb::Env env_;
   pb::Test cfg_;
 };
 

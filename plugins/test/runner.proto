@@ -102,7 +102,7 @@ message Test {
   Expectation stream_destroy = 9;
 }
 
-message Runtime {
+message Env {
   // Path to compiled .wasm binary. Required.
   string wasm_path = 1;
   // Path to PluginConfiguration file.
@@ -123,7 +123,7 @@ message Runtime {
 
 message TestSuite {
   // Wasm plugin + runtime environment to test.
-  Runtime runtime = 1;
+  Env env = 1;
   // Tests or benchmarks to run. Inputs and expectations.
   repeated Test test = 2;
 }

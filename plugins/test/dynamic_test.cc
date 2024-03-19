@@ -70,11 +70,11 @@ absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>>
 DynamicTest::LoadWasm(bool benchmark) {
   // Set log level. Default to INFO. Disable in benchmarks.
   auto ll = env_.min_log_level();
-  if (ll == pb::Runtime::UNDEFINED) {
-    ll = pb::Runtime::INFO;
+  if (ll == pb::Env::UNDEFINED) {
+    ll = pb::Env::INFO;
   }
   if (benchmark) {
-    ll = pb::Runtime::CRITICAL;
+    ll = pb::Env::CRITICAL;
   }
   auto min_log_level = proxy_wasm::LogLevel(ll - 1);  // enum conversion, yuck
 
@@ -106,6 +106,7 @@ void DynamicTest::TestBody() {
   TestContext* root_context = static_cast<TestContext*>(
       handle->wasm()->getRootContext(handle->plugin(),
                                      /*allow_closed=*/false));
+  ASSERT_NE(root_context, nullptr);
   CheckForFailures("plugin_init", handle);
   CheckSideEffects("plugin_init", cfg_.plugin_init(), *root_context);
 
