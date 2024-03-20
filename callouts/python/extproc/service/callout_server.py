@@ -28,7 +28,6 @@ from typing import Iterator
 
 import grpc
 from grpc import ServicerContext
-from grpc._server import _Server
 from envoy.config.core.v3.base_pb2 import HeaderValueOption
 from envoy.config.core.v3.base_pb2 import HeaderValue
 from envoy.service.ext_proc.v3.external_processor_pb2_grpc import add_ExternalProcessorServicer_to_server
