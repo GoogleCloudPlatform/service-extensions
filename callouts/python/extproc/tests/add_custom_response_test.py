@@ -24,8 +24,10 @@ import grpc
 from grpc import ServicerContext
 import pytest
 from extproc.service import callout_server
-from extproc.proto import service_pb2
-from extproc.proto import service_pb2_grpc
+from envoy.config.core.v3.base_pb2 import HeaderMap
+from envoy.config.core.v3.base_pb2 import HeaderValue
+from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
+from envoy.service.ext_proc.v3 import external_processor_pb2_grpc as  service_pb2_grpc
 
 # Global server variable.
 server: callout_server.CalloutServer | None = None
@@ -266,8 +268,8 @@ def test_mock_request_header_handling() -> None:
       stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
       # Construct the HeaderMap
-      header_map = service_pb2.HeaderMap()
-      header_value = service_pb2.HeaderValue(key="mock", raw_value=b"true")
+      header_map = HeaderMap()
+      header_value = HeaderValue(key="mock", raw_value=b"true")
       header_map.headers.extend([header_value])
 
       # Construct HttpHeaders with the HeaderMap
@@ -290,8 +292,8 @@ def test_mock_response_header_handling() -> None:
       stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
       # Construct the HeaderMap
-      header_map = service_pb2.HeaderMap()
-      header_value = service_pb2.HeaderValue(key="mock", raw_value=b"true")
+      header_map = HeaderMap()
+      header_value = HeaderValue(key="mock", raw_value=b"true")
       header_map.headers.extend([header_value])
 
       # Construct HttpHeaders with the HeaderMap

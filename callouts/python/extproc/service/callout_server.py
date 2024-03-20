@@ -28,8 +28,8 @@ from typing import Iterator
 
 import grpc
 from grpc import ServicerContext
-from envoy.config.core.v3.base_pb2 import HeaderValueOption
 from envoy.config.core.v3.base_pb2 import HeaderValue
+from envoy.config.core.v3.base_pb2 import HeaderValueOption
 from envoy.service.ext_proc.v3.external_processor_pb2_grpc import add_ExternalProcessorServicer_to_server
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from envoy.service.ext_proc.v3 import external_processor_pb2_grpc as service_pb2_grpc
@@ -53,8 +53,8 @@ def add_header_mutation(
   header_mutation = service_pb2.HeadersResponse()
   if add:
     for k, v in add:
-      header_value_option = service_pb2.HeaderValueOption(
-          header=service_pb2.HeaderValue(key=k, raw_value=bytes(v, 'utf-8'))
+      header_value_option = HeaderValueOption(
+          header=HeaderValue(key=k, raw_value=bytes(v, 'utf-8'))
         )
       if append_action:
         header_value_option.append_action = append_action
@@ -318,8 +318,8 @@ class CalloutServer:
     """Generate mock response based on type ('header' or 'body')."""
     if mock_type == 'header':
       mock_response = service_pb2.HeadersResponse()
-      mock_header = service_pb2.HeaderValueOption(
-        header=service_pb2.HeaderValue(key="Mock-Response", raw_value=bytes("Mocked-Value", 'utf-8')))
+      mock_header = HeaderValueOption(
+        header=HeaderValue(key="Mock-Response", raw_value=bytes("Mocked-Value", 'utf-8')))
       mock_response.response.header_mutation.set_headers.append(mock_header)
       return mock_response
     elif mock_type == 'body':
