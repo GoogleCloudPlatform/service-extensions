@@ -12,7 +12,7 @@ Built off of [envoy](https://github.com/envoyproxy/envoy)
 
 # Quick start 
 
-This server requires the `grpcio` and `grpcio-tools` python packages as well as the protobuf generator tool [buf](https://buf.build/docs/installation).
+The minimal operation of this server requires the `grpcio` python package as well as the protobuf generator tool [buf](https://buf.build/docs/introduction).
 
 
 The prefered method of installation is through a virtual enviornment, `venv`. To set up the virtual enviornment run:
@@ -38,13 +38,13 @@ pip install -r requirements-test.txt
 
 The proto library files are generated with `buf` using: 
 
-```bash
+```
 buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api --path envoy/service/ext_proc/v3/external_processor.proto --include-imports
 ```
 
-The proto files are installed as a local package:
+The proto files are then installed as a local package:
 
-```bash
+```
 python -m pip install ./protodef
 ```
 
@@ -97,7 +97,7 @@ Installing the `protodef` package to your system outside of a `venv` could cause
 
 Alternatively, rather than installing through pip, the proto code can be placed in the root of this project and imported directly.
 
-```bash
+```
 buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api --path envoy/service/ext_proc/v3/external_processor.proto --include-imports -o .
 ```
 
@@ -110,19 +110,27 @@ pytest
 
 # Building Docker
 
-To build an example docker image call `docker build -f <path> -t <image> .` 
+Because there is a lot of shared setup between images, docker files are built in two steps.
+First we build the shared image:
+
+```
+docker build -f ./extproc/example/common/Dockerfile -t service-callout-common-python .
+```
+
+Then to build an example docker image, call `docker build -f <path> -t <image> .` 
 where `<path>` is the path to the Dockerfile within the desired example submodule, 
-and `<image>` is the desired docker image name:
-For example, you can build the example grpc server image `service-callout-example-python` with:
+and `<image>` is the desired docker image name.
+
+For example, to build the example grpc server with image name `service-callout-example-python` run:
 ```
 docker build -f ./extproc/example/grpc/Dockerfile -t service-callout-example-python .
 ```
 
-You can then run the image with:
+Run the image with:
 
 ```
 docker run --network host -P service-callout-example-python
 ```
 
-Using the `-P` flag tells the docker to connect the exposed ports to the local machine's ports. 
-Additionally, setting `--network host` tells docker to connect the image to the `0.0.0.0` or `localhost` ip address.
+In this example, using the `-P` flag tells docker to connect the exposed ports to the local machine's ports. 
+Setting `--network host` tells docker to connect the image to the `0.0.0.0` or `localhost` ip address.

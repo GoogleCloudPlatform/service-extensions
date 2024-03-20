@@ -8,23 +8,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-FROM bufbuild/buf as BUF
-FROM marketplace.gcr.io/google/debian12
-RUN apt-get update && apt-get install -y git python3-pip python3-grpc-tools
+FROM service-callout-common-python
 
-WORKDIR /home/callouts/python
+# Copy over example specific files.
+COPY extproc/example/grpc/*.py ./
 
-# Build proto from envoy git using buf and install it as a python package.
-COPY --from=BUF /usr/local/bin /usr/local/bin
-COPY ./buf.gen.yaml ./buf.gen.yaml
-COPY ./protodef/setup.py ./protodef/setup.py
-RUN buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api --path envoy/service/ext_proc/v3/external_processor.proto --include-imports
-RUN pip install ./protodef --break-system-packages --root-user-action=ignore
-
-COPY ./extproc/service ./extproc/service
-COPY ./extproc/ssl_creds ./extproc/ssl_creds
-COPY ./extproc/example/grpc ./extproc/example/grpc
+# Set up communication ports.
 EXPOSE 443
 EXPOSE 8080
 EXPOSE 80
-CMD [ "/usr/bin/python3", "-um", "extproc.example.grpc.service_callout_example" ]
+
+# Start the service.
+CMD [ "/usr/bin/python3", "-um", "service_callout_example" ]
