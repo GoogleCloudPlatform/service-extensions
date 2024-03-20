@@ -9,15 +9,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build the proto libraries from envoy git using buf.
+# Build the proto libraries from the envoy git repo using buf.
 FROM bufbuild/buf as BUF
 RUN apk add git
 COPY ./buf.gen.yaml ./buf.gen.yaml
 RUN buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api --path envoy/service/ext_proc/v3/external_processor.proto --include-imports
 
 # Build the callout service. 
-FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y python3-grpcio --no-install-recommends --no-install-suggests
+FROM marketplace.gcr.io/google/debian12
+
+# Install pip for package management.
+RUN apt-get update && apt-get install -y python3-pip --no-install-recommends --no-install-suggests
+
+# Use pip to install requirements.
+COPY ./requirements.txt .
+RUN pip install -r requirements.txt --break-system-packages --root-user-action=ignore
 
 WORKDIR /home/callouts/python
 
