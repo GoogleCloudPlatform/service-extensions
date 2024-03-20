@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from grpc import ServicerContext
-from extproc.proto import service_pb2
+from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from extproc.service import callout_server
 
 

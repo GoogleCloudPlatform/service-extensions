@@ -24,8 +24,15 @@ import grpc
 from grpc import ServicerContext
 import pytest
 from extproc.service import callout_server
-from extproc.proto import service_pb2
-from extproc.proto import service_pb2_grpc
+from envoy.config.core.v3.base_pb2 import HeaderValueOption
+from envoy.config.core.v3.base_pb2 import HeaderValue
+from envoy.service.ext_proc.v3.external_processor_pb2 import HeadersResponse
+from envoy.service.ext_proc.v3.external_processor_pb2 import BodyResponse
+from envoy.service.ext_proc.v3.external_processor_pb2 import ProcessingResponse
+from envoy.service.ext_proc.v3.external_processor_pb2 import ProcessingRequest
+from envoy.service.ext_proc.v3.external_processor_pb2 import HttpHeaders
+from envoy.service.ext_proc.v3.external_processor_pb2 import HttpBody
+from envoy.service.ext_proc.v3.external_processor_pb2_grpc import ExternalProcessorStub
 
 # Global server variable.
 server: callout_server.CalloutServer | None = None
@@ -34,8 +41,8 @@ server: callout_server.CalloutServer | None = None
 class CalloutServerTest(callout_server.CalloutServer):
 
   def on_request_headers(
-      self, headers: service_pb2.HttpHeaders, context: ServicerContext
-  ) -> service_pb2.HeadersResponse:
+      self, headers: HttpHeaders, context: ServicerContext
+  ) -> HeadersResponse:
     """Custom processor on request headers."""
     return callout_server.add_header_mutation(
         add=[('host', 'service-extensions.com'), (':path', '/')],
@@ -43,8 +50,8 @@ class CalloutServerTest(callout_server.CalloutServer):
     )
 
   def on_response_headers(
-      self, headers: service_pb2.HttpHeaders, context: ServicerContext
-  ) -> service_pb2.HeadersResponse:
+      self, headers: HttpHeaders, context: ServicerContext
+  ) -> HeadersResponse:
     """Custom processor on response headers."""
     return callout_server.add_header_mutation(
         add=[('hello', 'service-extensions')],
@@ -52,14 +59,14 @@ class CalloutServerTest(callout_server.CalloutServer):
     )
 
   def on_request_body(
-      self, body: service_pb2.HttpBody, context: ServicerContext
-  ) -> service_pb2.BodyResponse:
+      self, body: HttpBody, context: ServicerContext
+  ) -> BodyResponse:
     """Custom processor on the request body."""
     return callout_server.add_body_mutation(body='-added-body')
 
   def on_response_body(
-      self, body: service_pb2.HttpBody, context: ServicerContext
-  ) -> service_pb2.BodyResponse:
+      self, body: HttpBody, context: ServicerContext
+  ) -> BodyResponse:
     """Custom processor on the response body."""
     return callout_server.add_body_mutation(body='new-body', clear_body=True)
 
@@ -90,8 +97,8 @@ def setup_and_teardown() -> None:
 
 
 def _MakeRequest(
-    stub: service_pb2_grpc.ExternalProcessorStub, **kwargs
-) -> service_pb2.ProcessingResponse:
+    stub: ExternalProcessorStub, **kwargs
+) -> ProcessingResponse:
   """Make a request to the server.
 
   Args:
@@ -100,7 +107,7 @@ def _MakeRequest(
 
   Returns: The response returned from the server.
   """
-  request_iter = iter([service_pb2.ProcessingRequest(**kwargs)])
+  request_iter = iter([ProcessingRequest(**kwargs)])
   return next(stub.Process(request_iter), None)
 
 
@@ -111,11 +118,11 @@ class TestBasicServer(object):
     """Test the request and response functionality of the server."""
     try:
       with grpc.insecure_channel(f'0.0.0.0:{server.insecure_port}') as channel:
-        stub = service_pb2_grpc.ExternalProcessorStub(channel)
+        stub = ExternalProcessorStub(channel)
 
-        body = service_pb2.HttpBody(end_of_stream=False)
-        headers = service_pb2.HttpHeaders(end_of_stream=False)
-        end_headers = service_pb2.HttpHeaders(end_of_stream=True)
+        body = HttpBody(end_of_stream=False)
+        headers = HttpHeaders(end_of_stream=False)
+        end_headers = HttpHeaders(end_of_stream=True)
 
         value = _MakeRequest(stub, request_body=body, async_mode=False)
         assert value.HasField('request_body')
@@ -175,8 +182,8 @@ class TestBasicServer(object):
       with grpc.secure_channel(
           f'{server.ip}:{server.port}', creds, options=options
       ) as channel:
-        stub = service_pb2_grpc.ExternalProcessorStub(channel)
-        end_headers = service_pb2.HttpHeaders(end_of_stream=True)
+        stub = ExternalProcessorStub(channel)
+        end_headers = HttpHeaders(end_of_stream=True)
         _MakeRequest(stub, request_headers=end_headers, async_mode=False)
     except urllib.error.URLError as ex:
       raise Exception('Setup Error: Server not ready!') from ex
@@ -212,8 +219,8 @@ def test_custom_server_config() -> None:
     assert response.getcode() == 200
 
     with grpc.insecure_channel(f'{ip}:{insecure_port}') as channel:
-      stub = service_pb2_grpc.ExternalProcessorStub(channel)
-      end_headers = service_pb2.HttpHeaders(end_of_stream=True)
+      stub = ExternalProcessorStub(channel)
+      end_headers = HttpHeaders(end_of_stream=True)
       _MakeRequest(stub, request_headers=end_headers, async_mode=False)
 
     # Stop the server

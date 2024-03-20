@@ -5,6 +5,11 @@
 /callouts/python/__pycache__
 /callouts/python/.pytest_cache/**
 /callouts/python/.pytest_cache
+/callouts/python/protodef/**/
+/callouts/python/envoy/**
+/callouts/python/upda/**
+/callouts/python/validate/**
+/callouts/python/xds/**
 /.vscode/**
 /.idea/**
 plugins/bazel-*

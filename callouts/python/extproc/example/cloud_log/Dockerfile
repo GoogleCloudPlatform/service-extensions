@@ -8,15 +8,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-FROM marketplace.gcr.io/google/debian12
-RUN apt-get update && apt-get install -y python3-pip python3-grpc-tools
-RUN pip install google-cloud-logging --break-system-packages
-WORKDIR /home/callouts/python
-COPY ./extproc/service ./extproc/service
-COPY ./extproc/proto ./extproc/proto
-COPY ./extproc/ssl_creds ./extproc/ssl_creds
-COPY ./extproc/example/cloud_log ./extproc/example/cloud_log
+FROM service-callout-common-python
+
+# Copy over example specific files.
+COPY extproc/example/grpc/*.py ./
+
+# Set up communication ports.
 EXPOSE 443
 EXPOSE 8080
 EXPOSE 80
-CMD [ "/usr/bin/python3", "-um", "extproc.example.cloud_log.service_callout_example" ]
+
+# Start the service.
+CMD [ "/usr/bin/python3", "-um", "service_callout_example" ]

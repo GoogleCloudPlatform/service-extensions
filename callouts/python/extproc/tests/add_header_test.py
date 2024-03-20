@@ -25,8 +25,8 @@ from grpc import ServicerContext
 import pytest
 
 from extproc.service import callout_server
-from extproc.proto import service_pb2
-from extproc.proto import service_pb2_grpc
+from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
+from envoy.service.ext_proc.v3 import external_processor_pb2_grpc as  service_pb2_grpc
 
 # Global server variable.
 server: callout_server.CalloutServer | None = None
