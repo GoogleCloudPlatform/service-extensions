@@ -28,108 +28,9 @@ from typing import Iterator
 
 import grpc
 from grpc import ServicerContext
-from envoy.config.core.v3.base_pb2 import HeaderValue
-from envoy.config.core.v3.base_pb2 import HeaderValueOption
 from envoy.service.ext_proc.v3.external_processor_pb2_grpc import add_ExternalProcessorServicer_to_server
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from envoy.service.ext_proc.v3 import external_processor_pb2_grpc as service_pb2_grpc
-
-def add_header_mutation(
-    add: list[tuple[str, str]] | None = None,
-    remove: list[str] | None = None,
-    clear_route_cache: bool = False,
-    append_action: HeaderValueOption.HeaderAppendAction = None,
-) -> service_pb2.HeadersResponse:
-  """Generate a header response for incoming requests.
-
-  Args:
-    add: A list of tuples representing headers to add.
-    remove: List of header strings to remove from the request.
-    clear_route_cache: If true, will enable clear_route_cache on the response.
-    append_action: Supported actions types for header append action.
-  Returns:
-    The constructed header response object.
-  """
-  header_mutation = service_pb2.HeadersResponse()
-  if add:
-    for k, v in add:
-      header_value_option = HeaderValueOption(
-          header=HeaderValue(key=k, raw_value=bytes(v, 'utf-8'))
-        )
-      if append_action:
-        header_value_option.append_action = append_action
-      header_mutation.response.header_mutation.set_headers.append(header_value_option)
-  if remove is not None:
-    header_mutation.response.header_mutation.remove_headers.extend(remove)
-  if clear_route_cache:
-    header_mutation.response.clear_route_cache = True
-  return header_mutation
-
-
-def normalize_header_mutation(
-    headers: service_pb2.HttpHeaders,
-    clear_route_cache: bool = False,
-) -> service_pb2.HeadersResponse:
-  """Generate a header response for incoming requests.
-  Args:
-    headers: Current headers presented in the request
-    clear_route_cache: If true, will enable clear_route_cache on the response.
-  Returns:
-    The constructed header response object.
-  """
-
-  host_value = next((header.raw_value.decode('utf-8') for header in headers.headers.headers if header.key == 'host'),
-                    None)
-
-  header_mutation = service_pb2.HeadersResponse()
-
-  if host_value:
-    device_type = get_device_type(host_value)
-    header_mutation = add_header_mutation(
-      add=[('client-device-type', device_type)],
-      clear_route_cache=clear_route_cache
-    )
-
-  if clear_route_cache:
-    header_mutation.response.clear_route_cache = True
-  return header_mutation
-
-
-def add_body_mutation(
-    body: str | None = None,
-    clear_body: bool = False,
-    clear_route_cache: bool = False,
-) -> service_pb2.BodyResponse:
-  """Generate a body response for incoming requests.
-
-Args:
-  body: Text of the body.
-  clear_body: If set to true, the modification will clear the previous body,
-    if left false, the text will be appended to the end of the previous
-    body.
-  clear_route_cache: If true, will enable clear_route_cache on the response.
-
-  Returns:
-    The constructed body response object.
-  """
-  body_mutation = service_pb2.BodyResponse()
-  if body:
-    body_mutation.response.body_mutation.body = bytes(body, 'utf-8')
-  if clear_body:
-    body_mutation.response.body_mutation.clear_body = True
-  if clear_route_cache:
-    body_mutation.response.clear_route_cache = True
-  return body_mutation
-
-
-def get_device_type(host_value: str) -> str:
-  # Simple logic to determine device type based on user agent
-  if 'm.example.com' in host_value:
-    return 'mobile'
-  elif 't.example.com' in host_value:
-    return 'tablet'
-  else:
-    return 'desktop'
 
 class HealthCheckService(BaseHTTPRequestHandler):
   """Server for responding to health check pings."""
@@ -242,7 +143,7 @@ class CalloutServer:
       grpc_server.add_insecure_port(f'{self.ip}:{self.insecure_port}')
       start_msg += f' and {self.ip}:{self.insecure_port}'
     grpc_server.start()
-    print(start_msg)
+    logging.info(start_msg)
     return grpc_server
 
   def run(self):
@@ -252,7 +153,7 @@ class CalloutServer:
     try:
       self._LoopServer()
     except KeyboardInterrupt:
-      print('Server interrupted')
+      logging.info('Server interrupted')
     finally:
       self._StopServers()
       self._closed = True
@@ -270,10 +171,10 @@ class CalloutServer:
     if not self.serperate_health_check:
       self._health_check_server.server_close()
       self._health_check_server.shutdown()
-      print('Health check server stopped.')
+      logging.info('Health check server stopped.')
 
     self._callout_server.stop(grace=10).wait()
-    print('GRPC server stopped.')
+    logging.info('GRPC server stopped.')
 
   def _LoopServer(self):
     """Loop server forever, calling shutdown will cause the server to stop."""
@@ -286,10 +187,8 @@ class CalloutServer:
       while not self._shutdown:
         pass
     else:
-      print(
-        'Starting health check server, listening on '
-        f'{self.health_check_ip}:{self.health_check_port}'
-      )
+      logging.info('Starting health check server, listening on %s:%s',
+                   self.health_check_ip, self.health_check_port)
       self._health_check_server.serve_forever()
 
   def shutdown(self):
@@ -297,64 +196,6 @@ class CalloutServer:
     if not self.serperate_health_check:
       self._health_check_server.shutdown()
     self._shutdown = True
-
-  def header_mock_check(self, request):
-    header_mock_check = next(
-      (header.raw_value for header in request.headers.headers if
-       header.key == 'mock'),
-      None)
-    if header_mock_check:
-      return True
-    return False
-
-  def body_mock_check(self, request):
-    body_content = request.body.decode('utf-8')
-    body_check = "mock"
-    if body_check in body_content:
-      return True
-    return False
-
-  def generate_mock_response(self, mock_type):
-    """Generate mock response based on type ('header' or 'body')."""
-    if mock_type == 'header':
-      mock_response = service_pb2.HeadersResponse()
-      mock_header = HeaderValueOption(
-        header=HeaderValue(key="Mock-Response", raw_value=bytes("Mocked-Value", 'utf-8')))
-      mock_response.response.header_mutation.set_headers.append(mock_header)
-      return mock_response
-    elif mock_type == 'body':
-      mock_response = service_pb2.BodyResponse()
-      mock_response.response.body_mutation.body = bytes("Mocked-Body", 'utf-8')
-      return mock_response
-
-  def validate_request(self, request, request_type):
-    """Validate both header and body of the request."""
-    if request_type == 'header':
-      header_value_check = next(
-        (header.raw_value for header in request.request_headers.headers.headers if
-         header.key == 'header-check'),
-        None)
-
-      if header_value_check:
-        return False
-
-    elif request_type == 'body':
-      body_content = request.request_body.body.decode('utf-8')
-      body_check = "body-check"
-
-      if body_check in body_content:
-        return False
-
-    return True
-
-  def request_denied(
-      self,
-      context
-  ):
-
-    request_denied_msg = "Request content is invalid or not allowed"
-    logging.warning(request_denied_msg)
-    context.abort(grpc.StatusCode.PERMISSION_DENIED, request_denied_msg)
 
   def process(
       self,
@@ -364,53 +205,31 @@ class CalloutServer:
     """Process the client request."""
     for request in request_iterator:
       if request.HasField('request_headers'):
-        if not self.validate_request(request, 'header'):
-          self.request_denied(context)
-
-        if self.header_mock_check(request.request_headers):
-          mock_response = self.generate_mock_response('header')
-          yield service_pb2.ProcessingResponse(request_headers=mock_response)
-          return
-
         yield service_pb2.ProcessingResponse(
             request_headers=self.on_request_headers(
                 request.request_headers, context
             )
         )
       if request.HasField('response_headers'):
-        if self.header_mock_check(request.response_headers):
-          mock_response = self.generate_mock_response('header')
-          yield service_pb2.ProcessingResponse(response_headers=mock_response)
-          return
         yield service_pb2.ProcessingResponse(
             response_headers=self.on_response_headers(
                 request.response_headers, context
             )
         )
       if request.HasField('request_body'):
-        if not self.validate_request(request, 'body'):
-          self.request_denied(context)
-
-        if self.body_mock_check(request.request_body):
-          mock_response = self.generate_mock_response('body')
-          yield service_pb2.ProcessingResponse(request_body=mock_response)
-          return
-
         yield service_pb2.ProcessingResponse(
             request_body=self.on_request_body(request.request_body, context)
         )
       if request.HasField('response_body'):
-        if self.body_mock_check(request.response_body):
-          mock_response = self.generate_mock_response('body')
-          yield service_pb2.ProcessingResponse(response_body=mock_response)
-          return
         yield service_pb2.ProcessingResponse(
             response_body=self.on_response_body(request.response_body, context)
         )
 
   def on_request_headers(
-      self, headers: service_pb2.HttpHeaders, context: ServicerContext
-  ) -> service_pb2.HeadersResponse:
+      self,
+      headers: service_pb2.HttpHeaders,  # pylint: disable=unused-argument
+      context: ServicerContext  # pylint: disable=unused-argument
+  ) -> None | service_pb2.HeadersResponse:
     """Process incoming request headers.
 
     Args:
@@ -423,8 +242,10 @@ class CalloutServer:
     return None
 
   def on_response_headers(
-      self, headers: service_pb2.HttpHeaders, context: ServicerContext
-  ) -> service_pb2.HeadersResponse:
+      self,
+      headers: service_pb2.HttpHeaders,  # pylint: disable=unused-argument
+      context: ServicerContext  # pylint: disable=unused-argument
+  ) -> None | service_pb2.HeadersResponse:
     """Process incoming response headers.
 
     Args:
@@ -437,8 +258,10 @@ class CalloutServer:
     return None
 
   def on_request_body(
-      self, body: service_pb2.HttpBody, context: ServicerContext
-  ) -> service_pb2.BodyResponse:
+      self,
+      body: service_pb2.HttpBody,  # pylint: disable=unused-argument
+      context: ServicerContext  # pylint: disable=unused-argument
+  ) -> None | service_pb2.BodyResponse:
     """Process an incoming request body.
 
 Args:
@@ -451,8 +274,10 @@ Returns:
     return None
 
   def on_response_body(
-      self, body: service_pb2.HttpBody, context: ServicerContext
-  ) -> service_pb2.BodyResponse:
+      self,
+      body: service_pb2.HttpBody,  # pylint: disable=unused-argument
+      context: ServicerContext  # pylint: disable=unused-argument
+  ) -> None | service_pb2.BodyResponse:
     """Process an incoming response body.
 
 Args:

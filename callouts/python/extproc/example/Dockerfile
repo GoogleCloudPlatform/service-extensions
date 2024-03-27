@@ -9,6 +9,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 # Build the proto libraries from the envoy git repo using buf.
 FROM bufbuild/buf as BUF
 RUN apk add git
@@ -16,7 +17,7 @@ COPY ./buf.gen.yaml ./buf.gen.yaml
 RUN buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api --path envoy/service/ext_proc/v3/external_processor.proto --include-imports
 
 # Build the callout service. 
-FROM marketplace.gcr.io/google/debian12
+FROM marketplace.gcr.io/google/debian12 as service-callout-common-python
 
 # Install pip for package management.
 RUN apt-get update && apt-get install -y python3-pip --no-install-recommends --no-install-suggests
@@ -33,3 +34,23 @@ COPY --from=BUF ./protodef .
 # Setup the service callout files.
 COPY ./extproc/service ./extproc/service
 COPY ./extproc/ssl_creds ./extproc/ssl_creds
+
+FROM service-callout-common-python
+# Path of the example scripts to copy.
+ARG copy_path
+# The pyhton module to run. 
+ARG run_module
+
+# Copy over example specific files.
+COPY $copy_path ./
+
+# Set up communication ports.
+EXPOSE 443
+EXPOSE 8080
+EXPOSE 80
+
+# Apply the module setting to the local enviorment.
+ENV run_module ${run_module}
+
+# Start the service.
+CMD /usr/bin/python3 -um ${run_module}

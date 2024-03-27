@@ -24,6 +24,7 @@ import grpc
 from grpc import ServicerContext
 import pytest
 from extproc.service import callout_server
+from extproc.service import callout_tools
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from envoy.service.ext_proc.v3 import external_processor_pb2_grpc as  service_pb2_grpc
 
@@ -37,7 +38,7 @@ class CalloutServerTest(callout_server.CalloutServer):
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Custom processor on request headers."""
-    return callout_server.add_header_mutation(
+    return callout_tools.add_header_mutation(
       add=[('header-request', 'request-new-value')],
       append_action=2,  # OVERWRITE_IF_EXISTS_OR_ADD
       clear_route_cache=True
@@ -47,7 +48,7 @@ class CalloutServerTest(callout_server.CalloutServer):
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Custom processor on response headers."""
-    return callout_server.add_header_mutation(
+    return callout_tools.add_header_mutation(
       add=[('header-response', 'response-new-value')],
       append_action=2  # OVERWRITE_IF_EXISTS_OR_ADD
     )
@@ -107,14 +108,14 @@ class TestBasicServer(object):
 
         value = _MakeRequest(stub, response_headers=headers, async_mode=False)
         assert value.HasField('response_headers')
-        assert value.response_headers == callout_server.add_header_mutation(
+        assert value.response_headers == callout_tools.add_header_mutation(
           add=[('header-response', 'response-new-value')],
           append_action=2  # OVERWRITE_IF_EXISTS_OR_ADD
         )
 
         value = _MakeRequest(stub, request_headers=headers, async_mode=False)
         assert value.HasField('request_headers')
-        assert value.request_headers == callout_server.add_header_mutation(
+        assert value.request_headers == callout_tools.add_header_mutation(
           add=[('header-request', 'request-new-value')],
           append_action=2,  # OVERWRITE_IF_EXISTS_OR_ADD
           clear_route_cache=True
