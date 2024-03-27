@@ -15,6 +15,7 @@
 from grpc import ServicerContext
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from extproc.service import callout_server
+from extproc.service import callout_tools
 
 
 class CalloutServerExample(callout_server.CalloutServer):
@@ -33,7 +34,7 @@ class CalloutServerExample(callout_server.CalloutServer):
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Custom processor on request headers."""
-    return callout_server.add_header_mutation(
+    return callout_tools.add_header_mutation(
       add=[('header-request', 'request')],
       clear_route_cache=True
     )
@@ -42,7 +43,7 @@ class CalloutServerExample(callout_server.CalloutServer):
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Custom processor on response headers."""
-    return callout_server.add_header_mutation(
+    return callout_tools.add_header_mutation(
       add=[('header-response', 'response')],
       remove=['foo']
     )
