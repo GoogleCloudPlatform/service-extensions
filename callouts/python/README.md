@@ -55,6 +55,10 @@ python -m extproc.example.grpc.service_callout_example
 
 The server will then run until interupted, for example, by inputing `Ctrl-C`. 
 
+# Examples
+
+Examples for various styles of callout server are located under [extproc/example/](./extproc/example/).
+
 # Developing Callouts
 
 This repository provides the following files to be extended to fit the needs of the user:
@@ -90,9 +94,9 @@ There are a few callback methods in `CalloutServer` provided for developers to o
 * on_request_body: Process request body.
 * on_response_body: Process response body.
 
-These functions correspond to the `oneof` required field in a [ProcessingRequest](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingrequest) and required response fields of a [ProcessingResponse](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingresponse)
+These functions correspond to the `oneof` required field in a [ProcessingRequest](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingrequest) and required response field of a [ProcessingResponse](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingresponse).
 
-When a given type of data is recived the corresponding function is called on the server. To hook into that call we override the method in `BasicCalloutServer`
+When a given type of data is recived the corresponding function is called on this server. To hook into that call, override the method, for example in `BasicCalloutServer`:
 ``` python
 class BasicCalloutServer(CalloutServer):
     def on_response_headers(
@@ -110,19 +114,19 @@ from envoy.service.ext_proc.v3.external_processor_pb2 import HttpHeaders
 See [Using the proto files](#using-the-proto-files) for more details.
 
 Each of the callback methods provides the given data type as an input parameter and expect the corresponding response to be returned.
-For example for `on_response_headers`:
+For example `on_response_headers`:
 * `headers`: `response_headers` data from [ProcessingRequest](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingrequest).
-* `context`: is the grpc data.
-* `returns`: `response_headers` data from [ProcessingResponse](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingresponse).
+* `context`: associated grpc data.
+* `return`: `response_headers` data from [ProcessingResponse](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingresponse).
 
 There are methods specified under [extproc/service/callout_tools.py](extproc/service/callout_tools.py) that will help in creating a response to the request.
-So we import those with:
+Import those with:
 
 ``` python 
 from extproc.service.callout_tools import add_header_mutation
 ```
 
-With the callout from before we can add the `foo:bar` header mutation on incomming `reponse_headers` requests
+With the callout from before we can add the `foo:bar` header mutation on incomming `reponse_headers` requests:
 
 ``` python
 class BasicCalloutServer(CalloutServer):
@@ -154,12 +158,18 @@ if __name__ == '__main__':
   logging.basicConfig(level=logging.INFO)
   BasicCalloutServer().run()
 ```
-Saving to file `server.py` the callout server can be run from the local machine with: 
+Saving to file `server.py` the callout server can be run with: 
+
+```
+python -m server
+```
 
 
 
+## Additional Details
 
-###
+[CalloutServer](extproc/service/callout_server.py) has many options to customize the security information as well as port settings.
+The default `CalloutServer` listens on port `8443` for grpc traffic, `8000` for health checks and `8080` for insecure traffic. Please see the `CalloutServer` docstring for more information.
 
 
 ## Using the proto files
