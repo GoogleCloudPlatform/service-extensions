@@ -2,13 +2,8 @@
 __Copyrights and Licences__
 
 Files using Copyright 2023 Google LLC & Apache License Version 2.0:
-* service_callout.py contains service callout server code
-* test_server.py contains code to test the service_callout.py
-
-Built off of [envoy](https://github.com/envoyproxy/envoy)
- * [External Processor Reference](https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/filters/http/ext_proc/v3/ext_proc.proto#envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-externalprocessor)
- * [Docs](https://www.envoyproxy.io/docs/envoy/latest)
- * [API](https://www.envoyproxy.io/docs/envoy/latest/api/api)
+* [service_callout.py](./extproc/service/callout_server.py) 
+* [callout_tools.py](./extproc/service/callout_tools.py) 
 
 # Quick start 
 
@@ -62,6 +57,111 @@ The server will then run until interupted, for example, by inputing `Ctrl-C`.
 
 # Developing Callouts
 
+This repository provides the following files to be extended to fit the needs of the user:
+
+* [extproc/service/callout_server.py](extproc/service/callout_server.py) Baseline service callout server.
+* [extproc/service/callout_tools.py](extproc/service/callout_tools.py) Common functions used in many callout server codepaths.
+
+## Making a new server
+
+Create a new python script `server.py` and import the `CalloutServer` class from [extproc/service/callout_server.py](extproc/service/callout_server.py)
+``` python
+from extproc.service.callout_server import CalloutServer
+```
+
+Just from importing the server class we can make the server run by creating a new instance and calling the blocking function `run`
+:
+
+``` python
+if __name__ == '__main__':
+  CalloutServer().run()
+```
+
+Calling the server like this wont do much besides respond to health checks though, in order for the server to respond to requests we need to create a custom class extending `CalloutServer`.
+
+Make a class extending `CalloutServer`.
+``` python
+class BasicCalloutServer(CalloutServer):
+```
+
+There are a few callback methods in `CalloutServer` provided for developers to override:
+* on_request_headers: Process request headers.
+* on_response_headers: Process response headers.
+* on_request_body: Process request body.
+* on_response_body: Process response body.
+
+These functions correspond to the `oneof` required field in a [ProcessingRequest](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingrequest) and required response fields of a [ProcessingResponse](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingresponse)
+
+When a given type of data is recived the corresponding function is called on the server. To hook into that call we override the method in `BasicCalloutServer`
+``` python
+class BasicCalloutServer(CalloutServer):
+    def on_response_headers(
+      self, headers: HttpHeaders,
+      context: ServicerContext) -> HeadersResponse:
+    ...
+```
+A few things to note here, we are stongly typing our variables with the expected types. This requires the following imports:
+
+```python
+from grpc import ServicerContext
+from envoy.service.ext_proc.v3.external_processor_pb2 import HeadersResponse
+from envoy.service.ext_proc.v3.external_processor_pb2 import HttpHeaders
+```
+See [Using the proto files](#using-the-proto-files) for more details.
+
+Each of the callback methods provides the given data type as an input parameter and expect the corresponding response to be returned.
+For example for `on_response_headers`:
+* `headers`: `response_headers` data from [ProcessingRequest](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingrequest).
+* `context`: is the grpc data.
+* `returns`: `response_headers` data from [ProcessingResponse](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingresponse).
+
+There are methods specified under [extproc/service/callout_tools.py](extproc/service/callout_tools.py) that will help in creating a response to the request.
+So we import those with:
+
+``` python 
+from extproc.service.callout_tools import add_header_mutation
+```
+
+With the callout from before we can add the `foo:bar` header mutation on incomming `reponse_headers` requests
+
+``` python
+class BasicCalloutServer(CalloutServer):
+    def on_response_headers(
+      self, headers: HttpHeaders,
+      context: ServicerContext) -> HeadersResponse:
+        return add_header_mutation(add=[('foo', 'bar')])
+```
+
+`add_header_mutation` also has parameters for removing (`remove`) and cache clearing (`clear_route_cache`). See [extproc/service/callout_tools.py](extproc/service/callout_tools.py).
+
+The callout server uses the `logging` module. By default this means that nothing is logged to the terminal on standard use. We reccomend setting the logging level to info so that normal server opertation is visible.
+
+All together that is:
+``` python
+import logging
+from grpc import ServicerContext
+from envoy.service.ext_proc.v3.external_processor_pb2 import HeadersResponse
+from envoy.service.ext_proc.v3.external_processor_pb2 import HttpHeaders
+from extproc.service.callout_server import CalloutServer
+
+class BasicCalloutServer(CalloutServer):
+  def on_response_headers(
+    self, headers: HttpHeaders,
+    context: ServicerContext) -> HeadersResponse:
+    return add_header_mutation(add=[('foo', 'bar')])
+
+if __name__ == '__main__':
+  logging.basicConfig(level=logging.INFO)
+  BasicCalloutServer().run()
+```
+Saving to file `server.py` the callout server can be run from the local machine with: 
+
+
+
+
+###
+
+
 ## Using the proto files
 The python classes can be imported using the relative [envoy/api](https://github.com/envoyproxy/envoy/tree/main/api) path:
 
@@ -98,7 +198,8 @@ Installing the `protodef` package to your system outside of a `venv` could cause
 Alternatively, rather than installing through pip, the proto code can be placed in the root of this project and imported directly.
 
 ```
-buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api --path envoy/service/ext_proc/v3/external_processor.proto --include-imports -o .
+buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api --path envoy/service/ext_proc/v3/external_processor.proto --include-imports -o out
+mv ./out/protodef/* .
 ```
 
 # Tests
@@ -108,29 +209,43 @@ Tests can be run with:
 pytest
 ```
 
-# Building Docker
+# Docker
 
-Because there is a lot of shared setup between images, docker files are built in two steps.
-First we build the shared image:
+## Quickstart
 
-```
-docker build -f ./extproc/example/common/Dockerfile -t service-callout-common-python .
-```
+The basic docker image contains arguments for pointing to and running python modules. For example to build [extproc/example/basic_callout_server.py](extproc/example/basic_callout_server.py) into a run-able docker image:
 
-Then to build an example docker image, call `docker build -f <path> -t <image> .` 
-where `<path>` is the path to the Dockerfile within the desired example submodule, 
-and `<image>` is the desired docker image name.
-
-For example, to build the example grpc server with image name `service-callout-example-python` run:
-```
-docker build -f ./extproc/example/grpc/Dockerfile -t service-callout-example-python .
+``` bash
+docker build -f ./extproc/example/Dockerfile -t service-callout-example-python --build-arg copy_path=extproc/example/basic_callout_server.py --build-arg run_module=basic_callout_server .
 ```
 
-Run the image with:
+### --build-arg:
+* `copy_path`: Path of python files required on the docker image.
+* `run_module`: The module to run on startup.
 
-```
-docker run --network host -P service-callout-example-python
+This image will copy `extproc/example/basic_callout_server.py` to the base directory and runs it as `basic_callout_server`.
+
+The image can then be run with:
+
+``` bash
+docker run -P -it service-callout-example-python:latest
 ```
 
 In this example, using the `-P` flag tells docker to connect the exposed ports to the local machine's ports. 
 Setting `--network host` tells docker to connect the image to the `0.0.0.0` or `localhost` ip address.
+
+## Docker Images
+
+### Building the base image
+Because there is a lot of shared setup between images, docker files are built in two steps.
+To just build the base image:
+```
+docker build -f ./extproc/example/common/Dockerfile --target service-callout-common-python -t service-callout-common-python .
+```
+
+### Using the base image
+
+A custom docker file can be made by pointing to the common image
+```docker
+FROM service-callout-common-python
+```
