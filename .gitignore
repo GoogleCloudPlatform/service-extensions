@@ -1,5 +1,6 @@
 /bazel-*
 /callouts/python/env
+/callouts/python/p12
 /callouts/python/env/**
 /callouts/python/__pycache__/**
 /callouts/python/__pycache__
@@ -14,3 +15,4 @@
 /.idea/**
 plugins/bazel-*
 **/__pycache__
+.vscode
