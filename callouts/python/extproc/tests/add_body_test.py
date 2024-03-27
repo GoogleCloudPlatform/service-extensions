@@ -12,11 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import print_function
-
-from extproc.service import callout_server
-from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
-from envoy.service.ext_proc.v3 import external_processor_pb2_grpc as  service_pb2_grpc
-
 import datetime
 from http.server import BaseHTTPRequestHandler
 from http.server import HTTPServer
@@ -24,9 +19,14 @@ import threading
 import time
 import urllib.request
 
+from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
+from envoy.service.ext_proc.v3 import external_processor_pb2_grpc as service_pb2_grpc
 import grpc
 from grpc import ServicerContext
 import pytest
+
+from extproc.service import callout_server
+from extproc.service import callout_tools
 
 # Global server variable.
 server: callout_server.CalloutServer | None = None
@@ -38,13 +38,13 @@ class CalloutServerTest(callout_server.CalloutServer):
       self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
     """Custom processor on the request body."""
-    return callout_server.add_body_mutation(body='-added-body')
+    return callout_tools.add_body_mutation(body='-added-body')
 
   def on_response_body(
       self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
     """Custom processor on the response body."""
-    return callout_server.add_body_mutation(body='new-body', clear_body=True)
+    return callout_tools.add_body_mutation(body='new-body', clear_body=True)
 
 
 def wait_till_server(server_check, timeout=10):
@@ -101,13 +101,13 @@ class TestBasicServer(object):
 
         value = _MakeRequest(stub, request_body=body, async_mode=False)
         assert value.HasField('request_body')
-        assert value.request_body == callout_server.add_body_mutation(
+        assert value.request_body == callout_tools.add_body_mutation(
           body='-added-body'
         )
 
         value = _MakeRequest(stub, response_body=body, async_mode=False)
         assert value.HasField('response_body')
-        assert value.response_body == callout_server.add_body_mutation(
+        assert value.response_body == callout_tools.add_body_mutation(
           body='new-body', clear_body=True
         )
 
