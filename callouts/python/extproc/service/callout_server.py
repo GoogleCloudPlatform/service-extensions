@@ -32,6 +32,7 @@ from envoy.service.ext_proc.v3.external_processor_pb2_grpc import add_ExternalPr
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from envoy.service.ext_proc.v3 import external_processor_pb2_grpc as service_pb2_grpc
 
+
 class HealthCheckService(BaseHTTPRequestHandler):
   """Server for responding to health check pings."""
 
@@ -127,18 +128,14 @@ class CalloutServer:
   def _StartCalloutServer(self) -> grpc.Server:
     """Setup and start a grpc callout server."""
     grpc_server = grpc.server(
-      futures.ThreadPoolExecutor(max_workers=self.server_thread_count)
-    )
-    add_ExternalProcessorServicer_to_server(
-        GRPCCalloutService(self), grpc_server
-    )
+        futures.ThreadPoolExecutor(max_workers=self.server_thread_count))
+    add_ExternalProcessorServicer_to_server(GRPCCalloutService(self),
+                                            grpc_server)
     server_credentials = grpc.ssl_server_credentials(
-      private_key_certificate_chain_pairs=[(self.cert_key, self.cert)]
-    )
+        private_key_certificate_chain_pairs=[(self.cert_key, self.cert)])
     grpc_server.add_secure_port(f'{self.ip}:{self.port}', server_credentials)
     start_msg = (
-      f'GRPC callout server started, listening on {self.ip}:{self.port}'
-    )
+        f'GRPC callout server started, listening on {self.ip}:{self.port}')
     if self.enable_insecure_port:
       grpc_server.add_insecure_port(f'{self.ip}:{self.insecure_port}')
       start_msg += f' and {self.ip}:{self.insecure_port}'
@@ -162,8 +159,7 @@ class CalloutServer:
     """Start the requested servers."""
     if not self.serperate_health_check:
       self._health_check_server = HTTPServer(
-        (self.health_check_ip, self.health_check_port), HealthCheckService
-      )
+          (self.health_check_ip, self.health_check_port), HealthCheckService)
     self._callout_server = self._StartCalloutServer()
 
   def _StopServers(self):
@@ -206,24 +202,18 @@ class CalloutServer:
     for request in request_iterator:
       if request.HasField('request_headers'):
         yield service_pb2.ProcessingResponse(
-            request_headers=self.on_request_headers(
-                request.request_headers, context
-            )
-        )
+            request_headers=self.on_request_headers(request.request_headers,
+                                                    context))
       if request.HasField('response_headers'):
         yield service_pb2.ProcessingResponse(
-            response_headers=self.on_response_headers(
-                request.response_headers, context
-            )
-        )
+            response_headers=self.on_response_headers(request.response_headers,
+                                                      context))
       if request.HasField('request_body'):
         yield service_pb2.ProcessingResponse(
-            request_body=self.on_request_body(request.request_body, context)
-        )
+            request_body=self.on_request_body(request.request_body, context))
       if request.HasField('response_body'):
         yield service_pb2.ProcessingResponse(
-            response_body=self.on_response_body(request.response_body, context)
-        )
+            response_body=self.on_response_body(request.response_body, context))
 
   def on_request_headers(
       self,

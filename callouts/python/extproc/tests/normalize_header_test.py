@@ -26,7 +26,7 @@ import pytest
 from extproc.service import callout_server
 from extproc.service import callout_tools
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
-from envoy.service.ext_proc.v3 import external_processor_pb2_grpc as  service_pb2_grpc
+from envoy.service.ext_proc.v3 import external_processor_pb2_grpc as service_pb2_grpc
 
 # Global server variable.
 server: callout_server.CalloutServer | None = None
@@ -35,13 +35,11 @@ server: callout_server.CalloutServer | None = None
 class CalloutServerTest(callout_server.CalloutServer):
 
   def on_request_headers(
-      self, headers: service_pb2.HttpHeaders, context: ServicerContext
-  ) -> service_pb2.HeadersResponse:
+      self, headers: service_pb2.HttpHeaders,
+      context: ServicerContext) -> service_pb2.HeadersResponse:
     """Custom processor on request headers."""
-    return callout_tools.normalize_header_mutation(
-      headers=headers,
-      clear_route_cache=True
-    )
+    return callout_tools.normalize_header_mutation(headers=headers,
+                                                   clear_route_cache=True)
 
 
 def wait_till_server(server_check, timeout=10):
@@ -69,9 +67,8 @@ def setup_and_teardown() -> None:
     del server
 
 
-def _MakeRequest(
-    stub: service_pb2_grpc.ExternalProcessorStub, **kwargs
-) -> service_pb2.ProcessingResponse:
+def _MakeRequest(stub: service_pb2_grpc.ExternalProcessorStub,
+                 **kwargs) -> service_pb2.ProcessingResponse:
   """Make a request to the server.
 
   Args:
@@ -99,8 +96,8 @@ class TestBasicServer(object):
         value = _MakeRequest(stub, request_headers=headers, async_mode=False)
         assert value.HasField('request_headers')
         assert value.request_headers == callout_tools.normalize_header_mutation(
-          headers=headers,
-          clear_route_cache=True,
+            headers=headers,
+            clear_route_cache=True,
         )
 
         _MakeRequest(stub, request_headers=end_headers, async_mode=False)
@@ -112,8 +109,7 @@ class TestBasicServer(object):
     """Test that the health check sub server returns the expected 200 code."""
     try:
       response = urllib.request.urlopen(
-        f'http://{server.health_check_ip}:{server.health_check_port}'
-      )
+          f'http://{server.health_check_ip}:{server.health_check_port}')
       assert not response.read()
       assert response.getcode() == 200
     except urllib.error.URLError as ex:
@@ -127,15 +123,13 @@ class TestBasicServer(object):
         self.root_cert = file.read()
         file.close()
       creds = grpc.ssl_channel_credentials(self.root_cert)
-      options = (
-        (
+      options = ((
           'grpc.ssl_target_name_override',
           'localhost',
-        ),
-      )
-      with grpc.secure_channel(
-          f'{server.ip}:{server.port}', creds, options=options
-      ) as channel:
+      ),)
+      with grpc.secure_channel(f'{server.ip}:{server.port}',
+                               creds,
+                               options=options) as channel:
         stub = service_pb2_grpc.ExternalProcessorStub(channel)
         end_headers = service_pb2.HttpHeaders(end_of_stream=True)
         _MakeRequest(stub, request_headers=end_headers, async_mode=False)
@@ -154,11 +148,11 @@ def test_custom_server_config() -> None:
     health_check_port = 8001
 
     server = CalloutServerTest(
-      ip=ip,
-      port=port,
-      insecure_port=insecure_port,
-      health_check_ip=health_check_ip,
-      health_check_port=health_check_port,
+        ip=ip,
+        port=port,
+        insecure_port=insecure_port,
+        health_check_ip=health_check_ip,
+        health_check_port=health_check_port,
     )
     # Start the server in a background thread
     thread = threading.Thread(target=server.run)
@@ -167,8 +161,7 @@ def test_custom_server_config() -> None:
     wait_till_server(lambda: server._setup)
 
     response = urllib.request.urlopen(
-      f'http://{health_check_ip}:{health_check_port}'
-    )
+        f'http://{health_check_ip}:{health_check_port}')
     assert response.read() == b''
     assert response.getcode() == 200
 
@@ -198,9 +191,8 @@ def test_custom_server_no_health_check_no_insecure_port() -> None:
   test_server_1 = None
   test_server_2 = None
   try:
-    server = CalloutServerTest(
-      serperate_health_check=True, enable_insecure_port=False
-    )
+    server = CalloutServerTest(serperate_health_check=True,
+                               enable_insecure_port=False)
     # Start the server in a background thread
     thread = threading.Thread(target=server.run)
     thread.daemon = True

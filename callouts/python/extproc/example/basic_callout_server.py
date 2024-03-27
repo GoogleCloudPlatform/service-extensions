@@ -40,16 +40,14 @@ class BasicCalloutServer(CalloutServer):
   def on_request_headers(self, headers: HttpHeaders,
                          context: ServicerContext) -> HeadersResponse:
     """Custom processor on request headers."""
-    return add_header_mutation(add=[('header-request', 'request')
-                                                 ],
-                                             remove=['foo'],
-                                             clear_route_cache=True)
+    return add_header_mutation(add=[('header-request', 'request')],
+                               remove=['foo'],
+                               clear_route_cache=True)
 
   def on_response_headers(self, headers: HttpHeaders,
                           context: ServicerContext) -> HeadersResponse:
     """Custom processor on response headers."""
-    return add_header_mutation(add=[('header-response',
-                                                   'response')])
+    return add_header_mutation(add=[('header-response', 'response')])
 
   def on_request_body(self, body: HttpBody,
                       context: ServicerContext) -> BodyResponse:

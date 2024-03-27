@@ -22,13 +22,13 @@ import grpc
 import pytest
 
 from extproc.example.add_custom_response.service_callout_example import (
-  CalloutServerExample as CalloutServerTest,
-)
+    CalloutServerExample as CalloutServerTest,)
 from extproc.service import callout_server
 from extproc.tests.basic_grpc_test import _make_request, _wait_till_server
 
 # Global server variable.
 server: callout_server.CalloutServer | None = None
+
 
 @pytest.fixture(scope='class')
 def setup_and_teardown():
@@ -48,6 +48,7 @@ def setup_and_teardown():
   finally:
     del server
 
+
 @pytest.mark.usefixtures('setup_and_teardown')
 def test_mock_request_header_handling() -> None:
   with grpc.insecure_channel(f'0.0.0.0:{server.insecure_port}') as channel:
@@ -60,13 +61,13 @@ def test_mock_request_header_handling() -> None:
 
     # Construct HttpHeaders with the HeaderMap
     mock_headers = service_pb2.HttpHeaders(headers=header_map,
-                                            end_of_stream=True)
+                                           end_of_stream=True)
 
     response = _make_request(stub, request_headers=mock_headers)
 
     assert response.HasField('request_headers')
     assert any(header.header.key == "Mock-Response" for header in
-                response.request_headers.response.header_mutation.set_headers)
+               response.request_headers.response.header_mutation.set_headers)
 
 
 @pytest.mark.usefixtures('setup_and_teardown')
@@ -81,17 +82,18 @@ def test_mock_response_header_handling() -> None:
 
     # Construct HttpHeaders with the HeaderMap
     mock_headers = service_pb2.HttpHeaders(headers=header_map,
-                                            end_of_stream=True)
+                                           end_of_stream=True)
 
     response = _make_request(stub, response_headers=mock_headers)
 
     assert response.HasField('response_headers')
     assert any(header.header.key == "Mock-Response" for header in
-                response.response_headers.response.header_mutation.set_headers)
+               response.response_headers.response.header_mutation.set_headers)
+
 
 @pytest.mark.usefixtures('setup_and_teardown')
 def test_mock_request_body_handling() -> None:
-  
+
   with grpc.insecure_channel(f'0.0.0.0:{server.insecure_port}') as channel:
     stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
@@ -104,7 +106,7 @@ def test_mock_request_body_handling() -> None:
 
 @pytest.mark.usefixtures('setup_and_teardown')
 def test_mock_response_body_handling() -> None:
-  
+
   with grpc.insecure_channel(f'0.0.0.0:{server.insecure_port}') as channel:
     stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
@@ -126,7 +128,8 @@ def test_header_validation_failure() -> None:
     header_map.headers.extend([header_value])
 
     # Construct HttpHeaders with the HeaderMap
-    request_headers = service_pb2.HttpHeaders(headers=header_map, end_of_stream=True)
+    request_headers = service_pb2.HttpHeaders(headers=header_map,
+                                              end_of_stream=True)
 
     # Use request_headers in the request
     with pytest.raises(grpc.RpcError) as e:
