@@ -201,9 +201,16 @@ class CalloutServer:
     """Process the client request."""
     for request in request_iterator:
       if request.HasField('request_headers'):
-        yield service_pb2.ProcessingResponse(
-            request_headers=self.on_request_headers(request.request_headers,
-                                                    context))
+        response = self.on_request_headers(request.request_headers, context)
+
+        if isinstance(response, service_pb2.ImmediateResponse):
+          yield service_pb2.ProcessingResponse(
+            immediate_response=response
+          )
+        elif isinstance(response, service_pb2.HeadersResponse):
+          yield service_pb2.ProcessingResponse(
+            request_headers=response
+          )
       if request.HasField('response_headers'):
         yield service_pb2.ProcessingResponse(
             response_headers=self.on_response_headers(request.response_headers,
