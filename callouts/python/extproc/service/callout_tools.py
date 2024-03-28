@@ -5,6 +5,7 @@ import logging
 import grpc
 from envoy.config.core.v3.base_pb2 import HeaderValue
 from envoy.config.core.v3.base_pb2 import HeaderValueOption
+from envoy.type.v3.http_status_pb2 import HttpStatus
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 
 
@@ -111,3 +112,25 @@ def deny_request(context, msg: str | None = None):
   msg = msg or "Request content is invalid or not allowed"
   logging.warning(msg)
   context.abort(grpc.StatusCode.PERMISSION_DENIED, msg)
+
+def header_immediate_response(
+  status: HttpStatus,
+  headers: list[tuple[str, str]] | None = None,
+  append_action: HeaderValueOption.HeaderAppendAction = None,
+) -> service_pb2.ImmediateResponse:
+  """Returns an ImmediateResponse for a header request"""
+  immediate_response = service_pb2.ImmediateResponse()
+  immediate_response.status.code = status
+
+  if headers:
+    header_mutation = service_pb2.HeaderMutation()
+    for k, v in headers:
+      header_value_option = HeaderValueOption(
+        header=HeaderValue(key=k, raw_value=bytes(v, 'utf-8'))
+      )
+      if append_action:
+        header_value_option.append_action = append_action
+      header_mutation.set_headers.append(header_value_option)
+
+    immediate_response.headers.CopyFrom(header_mutation)
+  return immediate_response
