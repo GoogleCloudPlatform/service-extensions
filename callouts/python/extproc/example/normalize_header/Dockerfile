@@ -15,7 +15,6 @@ COPY extproc/example/normalize_header/*.py ./
 
 # Set up communication ports.
 EXPOSE 443
-EXPOSE 8080
 EXPOSE 80
 
 # Start the service.
