@@ -5,6 +5,12 @@ Files using Copyright 2023 Google LLC & Apache License Version 2.0:
 * [service_callout.py](./extproc/service/callout_server.py) 
 * [callout_tools.py](./extproc/service/callout_tools.py) 
 
+# Requirements
+
+* Python 3.11+
+* [buf](https://buf.build/docs/introduction)
+* [requirements.txt](./requirements.txt) 
+
 # Quick start 
 
 The minimal operation of this server requires the `grpcio` python package as well as the protobuf generator tool [buf](https://buf.build/docs/introduction).
