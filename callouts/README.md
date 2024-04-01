@@ -9,9 +9,7 @@ Built off of [envoy](https://github.com/envoyproxy/envoy)
 
 # Introduction
 
-[Service Extensions](https://cloud.google.com/service-extensions/docs) are external services that are called out to within the filter chain of a load balancer and provide information on requests before reaching backends.
+[Callout-based Service Extensions](https://cloud.google.com/service-extensions/docs/overview) let you use Cloud Load Balancing to make gRPC calls to user-managed services during data processing. You write callout extensions against Envoy's external processing gRPC API. Callout extensions run as general-purpose gRPC servers on user-managed compute VMs and Google Kubernetes Engine Pods on Google Cloud, multicloud, or on-premises environments.
 
-This repository contains software development kits that provide a baseline to start up external services.
+This repository contains SDKs that will simplify your extension development.
  * [Python](./python/README.md)
-
-The development kits are meant to be used as standalone servers where a main library class can be imported and extended to fit a custom callout purpose.
