@@ -27,9 +27,9 @@ def validate_request_header(request_headers):
                    if header.key == 'header-check'), None)
 
 
-def validate_response_body(request_body):
+def validate_body(body):
   """Validate body of the request."""
-  return not "body-check" in request_body.body.decode('utf-8')
+  return "body-check" not in body.body.decode('utf-8')
 
 
 def generate_mock_header_response():
@@ -57,7 +57,7 @@ def header_mock_check(http_headers: service_pb2.HttpHeaders):
 
 def body_mock_check(http_body: service_pb2.HttpBody):
   """Check for the "mock" string in the request body"""
-  return not "mock" in http_body.body.decode('utf-8')
+  return "mock" in http_body.body.decode('utf-8')
 
 
 class CalloutServerExample(callout_server.CalloutServer):
@@ -77,18 +77,18 @@ class CalloutServerExample(callout_server.CalloutServer):
   """
 
   def on_request_body(self, body: service_pb2.HttpBody,
-                      context: ServicerContext) -> service_pb2.BodyResponse:
+                      context: ServicerContext):
     """Custom processor on the request body."""
-    if validate_response_body(body):
+    if validate_body(body):
       callout_tools.deny_request(context)
     if body_mock_check(body):
       return generate_mock_body_response()
     return callout_tools.add_body_mutation(body='-added-body')
 
   def on_response_body(self, body: service_pb2.HttpBody,
-                       context: ServicerContext) -> service_pb2.BodyResponse:
+                       context: ServicerContext):
     """Custom processor on the response body."""
-    if validate_response_body(body):
+    if validate_body(body):
       callout_tools.deny_request(context)
     if body_mock_check(body):
       return generate_mock_body_response()
@@ -96,7 +96,7 @@ class CalloutServerExample(callout_server.CalloutServer):
 
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders,
-      context: ServicerContext) -> service_pb2.HeadersResponse:
+      context: ServicerContext):
     """Custom processor on request headers."""
     if validate_request_header(headers):
       callout_tools.deny_request(context)
@@ -109,7 +109,7 @@ class CalloutServerExample(callout_server.CalloutServer):
 
   def on_response_headers(
       self, headers: service_pb2.HttpHeaders,
-      context: ServicerContext) -> service_pb2.HeadersResponse:
+      context: ServicerContext):
     """Custom processor on response headers."""
     if validate_request_header(headers):
       callout_tools.deny_request(context)
@@ -118,6 +118,7 @@ class CalloutServerExample(callout_server.CalloutServer):
     return callout_tools.add_header_mutation(add=[('header-response',
                                                    'response')])
 
+
 if __name__ == '__main__':
   # Run the gRPC service
-  CalloutServerExample(port=443, insecure_port=8080, health_check_port=80).run()
+  CalloutServerExample().run()

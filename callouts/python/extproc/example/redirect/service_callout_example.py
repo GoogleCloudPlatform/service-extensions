@@ -17,6 +17,7 @@ from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from extproc.service import callout_server
 from extproc.service import callout_tools
 
+
 class CalloutServerExample(callout_server.CalloutServer):
   """Example callout server.
 
@@ -28,14 +29,14 @@ class CalloutServerExample(callout_server.CalloutServer):
   """
 
   def on_request_headers(
-      self, headers: service_pb2.HttpHeaders, context: ServicerContext
-  ) -> service_pb2.ImmediateResponse:
+      self, headers: service_pb2.HttpHeaders,
+      context: ServicerContext) -> service_pb2.ImmediateResponse:
     """Custom processor on request headers."""
     return callout_tools.header_immediate_response(
-      status=301,
-      headers=[('Location', 'http://service-extensions.com/redirect')]
-    )
+        code=301,
+        headers=[('Location', 'http://service-extensions.com/redirect')])
+
 
 if __name__ == '__main__':
   # Run the gRPC service
-  CalloutServerExample(port=443, insecure_port=8080, health_check_port=80).run()
+  CalloutServerExample().run()

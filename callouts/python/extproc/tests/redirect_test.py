@@ -12,46 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import print_function
-import threading
-
 from envoy.config.core.v3.base_pb2 import HeaderMap
 from envoy.config.core.v3.base_pb2 import HeaderValue
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from envoy.service.ext_proc.v3 import external_processor_pb2_grpc as service_pb2_grpc
-import grpc
 import pytest
 
 from extproc.example.redirect.service_callout_example import (
-  CalloutServerExample as CalloutServerTest,
-)
-from extproc.service import callout_server
+    CalloutServerExample as CalloutServerTest,)
 from extproc.service.callout_tools import header_immediate_response
-from extproc.tests.basic_grpc_test import _make_request, _wait_till_server
+from extproc.tests.basic_grpc_test import (
+    setup_server,
+    get_insecure_channel,
+    insecure_kwargs,
+    make_request,
+)
 
-# Global server variable.
-server: callout_server.CalloutServer | None = None
+# Import the setup server test fixture.
+_ = setup_server
+_local_test_args = {"kwargs": insecure_kwargs, "test_class": CalloutServerTest}
 
-@pytest.fixture(scope='class')
-def setup_and_teardown():
-  global server
-  try:
-    server = CalloutServerTest()
-    # Start the server in a background thread
-    thread = threading.Thread(target=server.run)
-    thread.daemon = True
-    thread.start()
-    # Wait for the server to start
-    _wait_till_server(lambda: server and server._setup)
-    yield
-    # Stop the server
-    server.shutdown()
-    thread.join(timeout=5)
-  finally:
-    del server
 
-@pytest.mark.usefixtures('setup_and_teardown')
-def test_header_immediate_response() -> None:
-  with grpc.insecure_channel(f'0.0.0.0:{server.insecure_port}') as channel:
+@pytest.mark.parametrize('server', [_local_test_args], indirect=True)
+def test_header_immediate_response(server: CalloutServerTest) -> None:
+  with get_insecure_channel(server) as channel:
     stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
     # Construct the HeaderMap
@@ -60,13 +44,11 @@ def test_header_immediate_response() -> None:
     header_map.headers.extend([header_value])
 
     # Construct HttpHeaders with the HeaderMap
-    headers = service_pb2.HttpHeaders(headers=header_map,
-                                            end_of_stream=True)
+    headers = service_pb2.HttpHeaders(headers=header_map, end_of_stream=True)
 
-    response = _make_request(stub, request_headers=headers)
+    response = make_request(stub, request_headers=headers)
 
     assert response.HasField('immediate_response')
     assert response.immediate_response == header_immediate_response(
-      status=301,
-      headers=[('Location', 'http://service-extensions.com/redirect')])
-
+        code=301,
+        headers=[('Location', 'http://service-extensions.com/redirect')])

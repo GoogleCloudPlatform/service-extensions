@@ -63,4 +63,4 @@ class BasicCalloutServer(CalloutServer):
 if __name__ == '__main__':
   # Run the gRPC service
   logging.basicConfig(level=logging.DEBUG)
-  BasicCalloutServer(port=443, insecure_port=8080, health_check_port=80).run()
+  BasicCalloutServer().run()

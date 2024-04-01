@@ -1,21 +1,26 @@
 """Library of commonly used methods within a callout server."""
 
-import typing
 import logging
-import grpc
+import typing
+from typing import Union
+
 from envoy.config.core.v3.base_pb2 import HeaderValue
 from envoy.config.core.v3.base_pb2 import HeaderValueOption
-from envoy.type.v3.http_status_pb2 import HttpStatus
-from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
+from envoy.service.ext_proc.v3.external_processor_pb2 import HeaderMutation
+from envoy.service.ext_proc.v3.external_processor_pb2 import HttpHeaders
+from envoy.service.ext_proc.v3.external_processor_pb2 import BodyResponse
+from envoy.service.ext_proc.v3.external_processor_pb2 import HeadersResponse
+from envoy.service.ext_proc.v3.external_processor_pb2 import ImmediateResponse
+from envoy.type.v3.http_status_pb2 import StatusCode
+import grpc
 
 
 def add_header_mutation(
     add: list[tuple[str, str]] | None = None,
     remove: list[str] | None = None,
     clear_route_cache: bool = False,
-    append_action: typing.Union[HeaderValueOption.HeaderAppendAction,
-                                None] = None,
-) -> service_pb2.HeadersResponse:
+    append_action: typing.Optional[HeaderValueOption.HeaderAppendAction] = None,
+) -> HeadersResponse:
   """Generate a header response for incoming requests.
 
   Args:
@@ -26,7 +31,7 @@ def add_header_mutation(
   Returns:
     The constructed header response object.
   """
-  header_mutation = service_pb2.HeadersResponse()
+  header_mutation = HeadersResponse()
   if add:
     for k, v in add:
       header_value_option = HeaderValueOption(
@@ -43,9 +48,9 @@ def add_header_mutation(
 
 
 def normalize_header_mutation(
-    headers: service_pb2.HttpHeaders,
+    headers: HttpHeaders,
     clear_route_cache: bool = False,
-) -> service_pb2.HeadersResponse:
+) -> HeadersResponse:
   """Generate a header response for incoming requests.
   Args:
     headers: Current headers presented in the request
@@ -58,7 +63,7 @@ def normalize_header_mutation(
                      for header in headers.headers.headers
                      if header.key == 'host'), None)
 
-  header_mutation = service_pb2.HeadersResponse()
+  header_mutation = HeadersResponse()
 
   if host_value:
     device_type = get_device_type(host_value)
@@ -75,7 +80,7 @@ def add_body_mutation(
     body: str | None = None,
     clear_body: bool = False,
     clear_route_cache: bool = False,
-) -> service_pb2.BodyResponse:
+) -> BodyResponse:
   """Generate a body response for incoming requests.
 
 Args:
@@ -88,7 +93,7 @@ Args:
   Returns:
     The constructed body response object.
   """
-  body_mutation = service_pb2.BodyResponse()
+  body_mutation = BodyResponse()
   if body:
     body_mutation.response.body_mutation.body = bytes(body, 'utf-8')
   if clear_body:
@@ -113,21 +118,21 @@ def deny_request(context, msg: str | None = None):
   logging.warning(msg)
   context.abort(grpc.StatusCode.PERMISSION_DENIED, msg)
 
+
 def header_immediate_response(
-  status: HttpStatus,
-  headers: list[tuple[str, str]] | None = None,
-  append_action: HeaderValueOption.HeaderAppendAction = None,
-) -> service_pb2.ImmediateResponse:
+    code: StatusCode,
+    headers: list[tuple[str, str]] | None = None,
+    append_action: Union[HeaderValueOption.HeaderAppendAction, None] = None,
+) -> ImmediateResponse:
   """Returns an ImmediateResponse for a header request"""
-  immediate_response = service_pb2.ImmediateResponse()
-  immediate_response.status.code = status
+  immediate_response = ImmediateResponse()
+  immediate_response.status.code = code
 
   if headers:
-    header_mutation = service_pb2.HeaderMutation()
+    header_mutation = HeaderMutation()
     for k, v in headers:
       header_value_option = HeaderValueOption(
-        header=HeaderValue(key=k, raw_value=bytes(v, 'utf-8'))
-      )
+          header=HeaderValue(key=k, raw_value=bytes(v, 'utf-8')))
       if append_action:
         header_value_option.append_action = append_action
       header_mutation.set_headers.append(header_value_option)

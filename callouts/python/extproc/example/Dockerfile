@@ -46,7 +46,6 @@ COPY $copy_path ./
 
 # Set up communication ports.
 EXPOSE 443
-EXPOSE 8080
 EXPOSE 80
 
 # Apply the module setting to the local enviorment.
