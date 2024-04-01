@@ -240,13 +240,13 @@ class CalloutServer:
   ) -> None | BodyResponse | ImmediateResponse:
     """Process an incoming request body.
 
-Args:
-  headers: Request body to process.
-  context: RPC context of the incoming request.
+    Args:
+      headers: Request body to process.
+      context: RPC context of the incoming request.
 
-Returns:
-  Optional body modification object.
-"""
+    Returns:
+      Optional body modification object.
+    """
     return None
 
   def on_response_body(
@@ -256,13 +256,13 @@ Returns:
   ) -> None | BodyResponse:
     """Process an incoming response body.
 
-Args:
-  headers: Response body to process.
-  context: RPC context of the incoming request.
+    Args:
+      headers: Response body to process.
+      context: RPC context of the incoming request.
 
-Returns:
-  Optional body modification object.
-"""
+    Returns:
+      Optional body modification object.
+    """
     return None
 
 
