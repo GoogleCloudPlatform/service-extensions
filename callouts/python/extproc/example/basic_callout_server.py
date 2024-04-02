@@ -13,11 +13,11 @@
 # limitations under the License.
 
 import logging
-from grpc import ServicerContext
-from envoy.service.ext_proc.v3.external_processor_pb2 import HeadersResponse
-from envoy.service.ext_proc.v3.external_processor_pb2 import BodyResponse
-from envoy.service.ext_proc.v3.external_processor_pb2 import HttpHeaders
+
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpBody
+from envoy.service.ext_proc.v3.external_processor_pb2 import HttpHeaders
+from envoy.service.ext_proc.v3.external_processor_pb2 import BodyResponse
+from envoy.service.ext_proc.v3.external_processor_pb2 import HeadersResponse
 from extproc.service.callout_server import CalloutServer
 from extproc.service.callout_tools import add_header_mutation
 from extproc.service.callout_tools import add_body_mutation
@@ -26,43 +26,40 @@ from extproc.service.callout_tools import add_body_mutation
 class BasicCalloutServer(CalloutServer):
   """Example callout server.
 
-  Provides a non-comprehensive set of responses for each of the possible 
-  callout interactions.
-
-  For request header callouts we provide a mutation to add a header 
-  '{header-request: request}', remove a header 'foo', and to clear the 
-  route cache. On response header callouts, we respond with a mutation to add
-  the header '{header-response: response}'. On a request body callout we 
-  provide a mutation to append '-added-body' to the body. On response body
-  callouts we send a mutation to replace the body with 'new-body'.
+  Provides a non-comprehensive set of responses for each of the callout events.
   """
 
-  def on_request_headers(self, headers: HttpHeaders,
-                         context: ServicerContext) -> HeadersResponse:
+  def on_request_headers(self, headers: HttpHeaders, _) -> HeadersResponse:
     """Custom processor on request headers."""
-    return add_header_mutation(add=[('header-request', 'request')
-                                                 ],
-                                             remove=['foo'],
-                                             clear_route_cache=True)
+    logging.debug("Recived request headers callout: %s", headers)
+    return add_header_mutation(
+        add=[
+            # Change the host to 'service-extensions.com'.
+            (':host', 'service-extensions.com'),
+            # Change the destination path to '/'.
+            (':path', '/'),
+            ('header-request', 'request')
+        ],
+        remove=['foo'],
+        clear_route_cache=True)
 
-  def on_response_headers(self, headers: HttpHeaders,
-                          context: ServicerContext) -> HeadersResponse:
+  def on_response_headers(self, headers: HttpHeaders, _) -> HeadersResponse:
     """Custom processor on response headers."""
-    return add_header_mutation(add=[('header-response',
-                                                   'response')])
+    logging.debug("Recived response headers callout: %s", headers)
+    return add_header_mutation(add=[('hello', 'service-extensions')])
 
-  def on_request_body(self, body: HttpBody,
-                      context: ServicerContext) -> BodyResponse:
+  def on_request_body(self, body: HttpBody, _) -> BodyResponse:
     """Custom processor on the request body."""
+    logging.debug("Recived request body callout: %s", body)
     return add_body_mutation(body='-added-body')
 
-  def on_response_body(self, body: HttpBody,
-                       context: ServicerContext) -> BodyResponse:
+  def on_response_body(self, body: HttpBody, _) -> BodyResponse:
     """Custom processor on the response body."""
+    logging.debug("Recived response body callout: %s", body)
     return add_body_mutation(body='new-body', clear_body=True)
 
 
 if __name__ == '__main__':
   # Run the gRPC service
   logging.basicConfig(level=logging.DEBUG)
-  BasicCalloutServer(port=443, insecure_port=8080, health_check_port=80).run()
+  BasicCalloutServer(insecure_address=('0.0.0.0', 8080)).run()

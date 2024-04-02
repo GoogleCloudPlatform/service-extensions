@@ -5,6 +5,12 @@ Files using Copyright 2023 Google LLC & Apache License Version 2.0:
 * [service_callout.py](./extproc/service/callout_server.py) 
 * [callout_tools.py](./extproc/service/callout_tools.py) 
 
+# Requirements
+
+* Python 3.11+
+* [buf](https://buf.build/docs/introduction)
+* [requirements.txt](./requirements.txt) 
+
 # Quick start 
 
 The minimal operation of this Python-based ext_proc server requires the `grpcio` python package as well as the protobuf generator tool [buf](https://buf.build/docs/introduction).
@@ -250,7 +256,7 @@ Setting `--network host` tells docker to connect the image to the `0.0.0.0` or `
 Because there is a lot of shared setup between images, docker files are built in two steps.
 To just build the base image:
 ```
-docker build -f ./extproc/example/common/Dockerfile --target service-callout-common-python -t service-callout-common-python .
+docker build -f ./extproc/example/Dockerfile --target service-callout-common-python -t service-callout-common-python .
 ```
 
 ### Using the base image
