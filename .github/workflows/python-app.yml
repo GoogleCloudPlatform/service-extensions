@@ -29,15 +29,15 @@ jobs:
       with:
         python-version: "3.11"
     - name: Install dependencies
+      working-directory: ./callouts/python
       run: |
         python -m pip install --upgrade pip
         pip install flake8 pytest
-        cd callouts/python
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         if [ -f requirements0-test.txt ]; then pip install -r requirements-test.txt; fi
     - name: Generate protodefs
+      working-directory: ./callouts/python
       run: |
-        cd callouts/python
         buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api --path envoy/service/ext_proc/v3/external_processor.proto --include-imports
         python -m pip install ./protodef
     #- name: Lint with flake8
@@ -47,6 +47,6 @@ jobs:
     #    # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
     #    flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
+      working-directory: ./callouts/python
       run: |
-        cd callouts/python
         pytest
