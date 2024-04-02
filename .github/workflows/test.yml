@@ -12,15 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Test
+name: Plugins
 
 on:
   pull_request:
     branches:
     - main
+    paths:
+    - plugins/**
   push:
     branches:
     - main
+    paths:
+    - plugins/**
   schedule:
     # GitHub removes infrequently accessed caches. Run once a week to keep the cache from going stale.
     - cron: '0 0 * * 1'
