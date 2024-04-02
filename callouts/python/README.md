@@ -13,7 +13,7 @@ Files using Copyright 2023 Google LLC & Apache License Version 2.0:
 
 # Quick start 
 
-The minimal operation of this server requires the `grpcio` python package as well as the protobuf generator tool [buf](https://buf.build/docs/introduction).
+The minimal operation of this Python-based ext_proc server requires the `grpcio` python package as well as the protobuf generator tool [buf](https://buf.build/docs/introduction).
 
 
 The prefered method of installation is through a virtual enviornment, `venv`. To set up the virtual enviornment run:
