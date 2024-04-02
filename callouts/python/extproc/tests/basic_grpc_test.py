@@ -108,9 +108,10 @@ def setup_server(request) -> Iterator[CalloutServer]:
   Yields:
       Iterator[CalloutServer]: The server to test with.
   """
-  kwargs: Mapping[str, Any] = default_kwargs | request.param['kwargs']
+  params: dict = request.param or {'kwargs': {}, 'test_class': None}
+  kwargs: Mapping[str, Any] = default_kwargs | params['kwargs']
   # Either use the provided class or create a server using the default CalloutServer class.
-  server = (request.param['test_class'] or CalloutServer)(**kwargs)
+  server = (params['test_class'] or CalloutServer)(**kwargs)
   try:
     thread = _start_server(server)
     yield server
