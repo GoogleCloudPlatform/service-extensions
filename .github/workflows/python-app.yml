@@ -6,8 +6,12 @@ name: Callouts Python SDK
 on:
   push:
     branches: [ "main" ]
+    paths:
+    - callouts/python/**
   pull_request:
     branches: [ "main" ]
+    paths:
+    - callouts/python/**
 
 permissions:
   contents: read
