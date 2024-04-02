@@ -51,4 +51,4 @@ class CalloutServerExample(callout_server.CalloutServer):
 
 if __name__ == '__main__':
   # Run the gRPC service
-  CalloutServerExample().run()
+  CalloutServerExample(insecure_address=('0.0.0.0', 8080)).run()

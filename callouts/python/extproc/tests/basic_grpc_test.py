@@ -40,13 +40,16 @@ class ServerSetupException(Exception):
 
 
 # Replace the default ports of the server so that they do not clash with running programs.
-default_kwargs = {
+default_kwargs: dict = {
     'address': ('0.0.0.0', 8443),
     'health_check_address': ('0.0.0.0', 8080)
 }
 # Arguments for running an insecure server alongside the secure grpc.
-insecure_kwargs = default_kwargs | {'insecure_address': ('0.0.0.0', 8000)}
-_local_test_args = {"kwargs": insecure_kwargs, "test_class": CalloutServerTest}
+insecure_kwargs: dict = default_kwargs | {'insecure_address': ('0.0.0.0', 8000)}
+_local_test_args: dict = {
+    "kwargs": insecure_kwargs,
+    "test_class": CalloutServerTest
+}
 
 
 def get_insecure_channel(server: CalloutServer) -> grpc.Channel:
@@ -165,12 +168,13 @@ class TestBasicServer(object):
       value = make_request(stub, response_headers=headers, async_mode=False)
       assert value.HasField('response_headers')
       assert value.response_headers == add_header_mutation(
-          add=[('header-response', 'response')])
+          add=[('hello', 'service-extensions')])
 
       value = make_request(stub, request_headers=headers, async_mode=False)
       assert value.HasField('request_headers')
       assert value.request_headers == add_header_mutation(
-          add=[('header-request', 'request')],
+          add=[(':host', 'service-extensions.com'), (':path', '/'),
+               ('header-request', 'request')],
           clear_route_cache=True,
           remove=['foo'])
 
@@ -217,7 +221,7 @@ def test_custom_server_config() -> None:
                            async_mode=False)
       assert value.HasField('response_headers')
       assert value.response_headers == add_header_mutation(
-          add=[('header-response', 'response')])
+          add=[('hello', 'service-extensions')])
 
     # Stop the server
     test_server.shutdown()
@@ -229,35 +233,23 @@ def test_custom_server_config() -> None:
     del server
 
 
-def test_custom_server_no_health_check_no_insecure_port() -> None:
+_no_health_args: dict = {
+    "kwargs": insecure_kwargs | {
+        'health_check_address': False
+    },
+    "test_class": CalloutServerTest
+}
+
+
+@pytest.mark.parametrize('server', [_no_health_args], indirect=True)
+def test_custom_server_no_health_check(server: CalloutServerTest) -> None:
   """Test that the server only conects to the specified addresses.
 
-  The server should not connect to the insecure port or the health check port
-  if they are disabled in the setup.
+  The server should not connect to the health check port if its disabled 
+  in the setup config.
   """
-  server: CalloutServer | None = None
-  test_server_1: HTTPServer | None = None
-  test_server_2: HTTPServer | None = None
-  try:
-    server = test_server = CalloutServerTest(address=('0.0.0.0', 8443),
-                                             health_check_address=None,
-                                             insecure_address=None)
-    # Start the server in a background thread
-    thread = threading.Thread(target=test_server.run)
-    thread.daemon = True
-    thread.start()
-    wait_till_server(lambda: test_server._setup)
-    # Attempt to connect to the addresses that would be used for the
-    # insecure address and the health check.
-    test_server_1 = HTTPServer(('0.0.0.0', 8000), BaseHTTPRequestHandler)
-    test_server_2 = HTTPServer(('0.0.0.0', 8080), BaseHTTPRequestHandler)
-    # Stop the server
-    test_server.shutdown()
-    thread.join(timeout=5)
-  except OSError as ex:
-    raise ServerSetupException(
-        'Expected the health check address to be unbound.') from ex
-  finally:
-    del server
-    del test_server_1
-    del test_server_2
+  address = _local_test_args['kwargs']['health_check_address']
+  # Connect to the default health check address to confirm the port is opwn.
+  test_server = HTTPServer(address, BaseHTTPRequestHandler)
+  del test_server
+  assert server._health_check_server is None

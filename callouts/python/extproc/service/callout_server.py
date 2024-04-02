@@ -23,7 +23,7 @@ from concurrent import futures
 from http.server import BaseHTTPRequestHandler
 from http.server import HTTPServer
 import logging
-from typing import Iterator
+from typing import Iterator, Literal
 
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpBody
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpHeaders
@@ -66,9 +66,10 @@ class CalloutServer:
 
   Attributes:
     address: Address that the main secure server will attempt to connect to.
-    health_check_address: The health check serving address.
-    insecure_address: If specified, the server will also listen on this 
-      non-authenticated address.
+    health_check_address: The health check serving address. If False
+      no health check server will be started.
+    insecure_address: If specified, the server will also listen on this, 
+      non-authenticated, address.
     cert: If speficied, certificate used to authenticate the main grpc service
       for secure htps and http connections. If unspecified will attempt to
       load data from a file pointed to by the cert_path.
@@ -81,8 +82,8 @@ class CalloutServer:
 
   def __init__(
       self,
-      address: tuple[str, int] = ('0.0.0.0', 443),
-      health_check_address: tuple[str, int] | None = ('0.0.0.0', 80),
+      address: tuple[str, int] | None = None,
+      health_check_address: tuple[str, int] | Literal[False] | None = None,
       insecure_address: tuple[str, int] | None = None,
       cert: bytes | None = None,
       cert_path: str = './extproc/ssl_creds/localhost.crt',
@@ -97,9 +98,11 @@ class CalloutServer:
     self._health_check_server: HTTPServer | None = None
     self._callout_server: grpc.Server | None = None
 
-    self.address: tuple[str, int] = address
+    self.address: tuple[str, int] = address or ('0.0.0.0', 443)
     self.insecure_address: tuple[str, int] | None = insecure_address
-    self.health_check_address: tuple[str, int] | None = health_check_address
+    self.health_check_address: tuple[str, int] | None = None
+    if health_check_address is not False:
+      self.health_check_address = (health_check_address or ('0.0.0.0', 80))
     self.server_thread_count = server_thread_count
     # Read cert data.
     if not cert:
@@ -133,6 +136,8 @@ class CalloutServer:
     if self.health_check_address:
       self._health_check_server = HTTPServer(self.health_check_address,
                                              HealthCheckService)
+      logging.info('Health check server bound to %s.',
+                   addr_to_str(self.health_check_address))
     self._callout_server = _GRPCCalloutService.start_callout_service(self)
 
   def _stop_servers(self):
@@ -151,9 +156,8 @@ class CalloutServer:
 
     # We chose the main serving thread based on what server configuration
     # was requested. Defaults to the health check thread.
-    if self._health_check_server and self.health_check_address:
-      logging.info('Starting health check server, listening on %s:%d',
-                   self.health_check_address[0], self.health_check_address[1])
+    if self._health_check_server:
+      logging.info("Health check server started.")
       self._health_check_server.serve_forever()
     else:
       # If the only server requested is a grpc callout server, we loop
@@ -283,11 +287,12 @@ class _GRPCCalloutService(ExternalProcessorServicer):
         private_key_certificate_chain_pairs=[(server.cert_key, server.cert)])
     address_str = addr_to_str(server.address)
     grpc_server.add_secure_port(address_str, server_credentials)
-    start_msg = f'GRPC callout server started, listening on {address_str}'
+    start_msg = f'GRPC callout server started, listening on {address_str}.'
 
     if server.insecure_address:
-      grpc_server.add_insecure_port(addr_to_str(server.insecure_address))
-      start_msg += f' and {server.insecure_address}'
+      insecure_str = addr_to_str(server.insecure_address)
+      grpc_server.add_insecure_port(insecure_str)
+      start_msg += f' (secure) and {insecure_str} (insecure)'
 
     grpc_server.start()
     logging.info(start_msg)
