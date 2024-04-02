@@ -256,7 +256,7 @@ Setting `--network host` tells docker to connect the image to the `0.0.0.0` or `
 Because there is a lot of shared setup between images, docker files are built in two steps.
 To just build the base image:
 ```
-docker build -f ./extproc/example/common/Dockerfile --target service-callout-common-python -t service-callout-common-python .
+docker build -f ./extproc/example/Dockerfile --target service-callout-common-python -t service-callout-common-python .
 ```
 
 ### Using the base image
