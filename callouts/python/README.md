@@ -95,10 +95,10 @@ class BasicCalloutServer(CalloutServer):
 ```
 
 There are a few callback methods in `CalloutServer` provided for developers to override:
-* on_request_headers: Process request headers.
-* on_response_headers: Process response headers.
-* on_request_body: Process request body.
-* on_response_body: Process response body.
+* `on_request_headers`: Process request headers.
+* `on_response_headers`: Process response headers.
+* `on_request_body`: Process request body.
+* `on_response_body`: Process response body.
 
 These functions correspond to the `oneof` required field in a [ProcessingRequest](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingrequest) and required response field of a [ProcessingResponse](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingresponse).
 
@@ -119,7 +119,7 @@ from envoy.service.ext_proc.v3.external_processor_pb2 import HttpHeaders
 ```
 See [Using the proto files](#using-the-proto-files) for more details.
 
-Each of the callback methods provides the given data type as an input parameter and expect the corresponding response to be returned.
+Each of the callback methods provides the given data type as an input parameter and expect the corresponding response to be returned. 
 For example `on_response_headers`:
 * `headers`: `response_headers` data from [ProcessingRequest](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingrequest).
 * `context`: associated grpc data.
@@ -144,7 +144,7 @@ class BasicCalloutServer(CalloutServer):
 
 `add_header_mutation` also has parameters for removing (`remove`) and cache clearing (`clear_route_cache`). See [extproc/service/callout_tools.py](extproc/service/callout_tools.py).
 
-The callout server uses the `logging` module. By default this means that nothing is logged to the terminal on standard use. We reccomend setting the logging level to info so that normal server opertation is visible.
+The callout server uses the `logging` module. By default this means that nothing is logged to the terminal on standard use. We reccomend setting the logging level to `INFO` so that normal server opertation is visible.
 
 All together that is:
 ``` python
@@ -176,6 +176,8 @@ python -m server
 
 [CalloutServer](extproc/service/callout_server.py) has many options to customize the security information as well as port settings.
 The default `CalloutServer` listens on port `8443` for grpc traffic, `8000` for health checks and `8080` for insecure traffic. Please see the `CalloutServer` docstring for more information.
+
+The `on_request_headers` and `on_request_body` methods also accept [`ImmediateResponse`](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#envoy-v3-api-field-service-ext-proc-v3-processingresponse-immediate-response) values as a return value.
 
 
 ## Using the proto files
