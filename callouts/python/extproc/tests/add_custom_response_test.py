@@ -13,329 +13,121 @@
 # limitations under the License.
 from __future__ import print_function
 
-import datetime
-from http.server import BaseHTTPRequestHandler
-from http.server import HTTPServer
-import threading
-import time
-import urllib.request
-
-import grpc
-from grpc import ServicerContext
-import pytest
-from extproc.service import callout_server
 from envoy.config.core.v3.base_pb2 import HeaderMap
 from envoy.config.core.v3.base_pb2 import HeaderValue
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
-from envoy.service.ext_proc.v3 import external_processor_pb2_grpc as  service_pb2_grpc
+from envoy.service.ext_proc.v3 import external_processor_pb2_grpc as service_pb2_grpc
+import grpc
+import pytest
 
-# Global server variable.
-server: callout_server.CalloutServer | None = None
-
-
-class CalloutServerTest(callout_server.CalloutServer):
-
-  def on_request_body(
-      self, body: service_pb2.HttpBody, context: ServicerContext
-  ) -> service_pb2.BodyResponse:
-    """Custom processor on the request body."""
-    return callout_server.add_body_mutation(body='-added-body')
-
-  def on_response_body(
-      self, body: service_pb2.HttpBody, context: ServicerContext
-  ) -> service_pb2.BodyResponse:
-    """Custom processor on the response body."""
-    return callout_server.add_body_mutation(body='new-body', clear_body=False)
-
-  def on_request_headers(
-      self, headers: service_pb2.HttpHeaders, context: ServicerContext
-  ) -> service_pb2.HeadersResponse:
-    """Custom processor on request headers."""
-    return callout_server.add_header_mutation(
-      add=[('header-request', 'request')], remove=['foo'],
-      clear_route_cache=True
-    )
-
-  def on_response_headers(
-      self, headers: service_pb2.HttpHeaders, context: ServicerContext
-  ) -> service_pb2.HeadersResponse:
-    """Custom processor on response headers."""
-    return callout_server.add_header_mutation(
-      add=[('header-response', 'response')]
-    )
+from extproc.example.add_custom_response.service_callout_example import (
+    CalloutServerExample as CalloutServerTest)
+from extproc.tests.basic_grpc_test import (
+    make_request,
+    setup_server,
+    get_insecure_channel,
+    insecure_kwargs,
+)
 
 
-def wait_till_server(server_check, timeout=10):
-  expiration = datetime.datetime.now() + datetime.timedelta(seconds=timeout)
-  while not server_check() and datetime.datetime.now() < expiration:
-    time.sleep(1)
+# Import the setup server test fixture.
+_ = setup_server
+_local_test_args = {"kwargs": insecure_kwargs, "test_class": CalloutServerTest}
 
 
-@pytest.fixture(scope='class')
-def setup_and_teardown() -> None:
-  global server
-  try:
-    server = CalloutServerTest()
-    # Start the server in a background thread
-    thread = threading.Thread(target=server.run)
-    thread.daemon = True
-    thread.start()
-    # Wait for the server to start
-    wait_till_server(lambda: server._setup)
-    yield
-    # Stop the server
-    server.shutdown()
-    thread.join(timeout=5)
-  finally:
-    del server
+@pytest.mark.parametrize('server', [_local_test_args], indirect=True)
+def test_mock_request_header_handling(server: CalloutServerTest) -> None:
+  with get_insecure_channel(server) as channel:
+    stub = service_pb2_grpc.ExternalProcessorStub(channel)
+
+    # Construct the HeaderMap
+    header_map = HeaderMap()
+    header_value = HeaderValue(key="header-check", raw_value=b"true")
+    header_map.headers.extend([header_value])
+
+    # Construct HttpHeaders with the HeaderMap
+    mock_headers = service_pb2.HttpHeaders(headers=header_map,
+                                           end_of_stream=True)
+
+    response = make_request(stub, request_headers=mock_headers)
+
+    assert response.HasField('request_headers')
+    assert any(header.header.key == "Mock-Response" for header in
+               response.request_headers.response.header_mutation.set_headers)
 
 
-def _MakeRequest(
-    stub: service_pb2_grpc.ExternalProcessorStub, **kwargs
-) -> service_pb2.ProcessingResponse:
-  """Make a request to the server.
+@pytest.mark.parametrize('server', [_local_test_args], indirect=True)
+def test_mock_response_header_handling(server: CalloutServerTest) -> None:
+  with get_insecure_channel(server) as channel:
+    stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
-  Args:
-    stub: The server stub.
-    **kwargs: Parameters to input into the ProcessingRequest.
+    # Construct the HeaderMap
+    header_map = HeaderMap()
+    header_value = HeaderValue(key="header-check", raw_value=b"true")
+    header_map.headers.extend([header_value])
 
-  Returns: The response returned from the server.
-  """
-  request_iter = iter([service_pb2.ProcessingRequest(**kwargs)])
-  return next(stub.Process(request_iter), None)
+    # Construct HttpHeaders with the HeaderMap
+    mock_headers = service_pb2.HttpHeaders(headers=header_map,
+                                           end_of_stream=True)
 
+    response = make_request(stub, response_headers=mock_headers)
 
-class TestBasicServer(object):
-
-  @pytest.mark.usefixtures('setup_and_teardown')
-  def test_basic_server_capabilites(self) -> None:
-    """Test the request and response functionality of the server."""
-    try:
-      with grpc.insecure_channel(f'0.0.0.0:{server.insecure_port}') as channel:
-        stub = service_pb2_grpc.ExternalProcessorStub(channel)
-
-        body = service_pb2.HttpBody(end_of_stream=False)
-        headers = service_pb2.HttpHeaders(end_of_stream=False)
-        end_headers = service_pb2.HttpHeaders(end_of_stream=True)
-
-        value = _MakeRequest(stub, request_body=body, async_mode=False)
-        assert value.HasField('request_body')
-        assert value.request_body == callout_server.add_body_mutation(
-          body='-added-body'
-        )
-
-        value = _MakeRequest(stub, response_body=body, async_mode=False)
-        assert value.HasField('response_body')
-        assert value.response_body == callout_server.add_body_mutation(
-          body='new-body', clear_body=False
-        )
-
-        value = _MakeRequest(stub, response_headers=headers, async_mode=False)
-        assert value.HasField('response_headers')
-        assert value.response_headers == callout_server.add_header_mutation(
-          add=[('header-response', 'response')]
-        )
-
-        value = _MakeRequest(stub, request_headers=headers, async_mode=False)
-        assert value.HasField('request_headers')
-        assert value.request_headers == callout_server.add_header_mutation(
-          add=[('header-request', 'request')], remove=['foo'],
-          clear_route_cache=True
-        )
-
-        _MakeRequest(stub, request_headers=end_headers, async_mode=False)
-    except grpc._channel._MultiThreadedRendezvous as ex:
-      raise Exception('Setup Error: Server not ready!') from ex
-
-  @pytest.mark.usefixtures('setup_and_teardown')
-  def test_basic_server_health_check(self) -> None:
-    """Test that the health check sub server returns the expected 200 code."""
-    try:
-      response = urllib.request.urlopen(
-        f'http://{server.health_check_ip}:{server.health_check_port}'
-      )
-      assert not response.read()
-      assert response.getcode() == 200
-    except urllib.error.URLError as ex:
-      raise Exception('Setup Error: Server not ready!') from ex
-
-  @pytest.mark.usefixtures('setup_and_teardown')
-  def test_basic_server_certs(self) -> None:
-    """Check that the server can handle secure callouts with certs."""
-    try:
-      with open('./extproc/ssl_creds/root.crt', 'rb') as file:
-        self.root_cert = file.read()
-        file.close()
-      creds = grpc.ssl_channel_credentials(self.root_cert)
-      options = (
-        (
-          'grpc.ssl_target_name_override',
-          'localhost',
-        ),
-      )
-      with grpc.secure_channel(
-          f'{server.ip}:{server.port}', creds, options=options
-      ) as channel:
-        stub = service_pb2_grpc.ExternalProcessorStub(channel)
-        end_headers = service_pb2.HttpHeaders(end_of_stream=True)
-        _MakeRequest(stub, request_headers=end_headers, async_mode=False)
-    except urllib.error.URLError as ex:
-      raise Exception('Setup Error: Server not ready!') from ex
+    assert response.HasField('response_headers')
+    assert any(header.header.key == "Mock-Response" for header in
+               response.response_headers.response.header_mutation.set_headers)
 
 
-def test_custom_server_config() -> None:
-  """Test that port customization connects correctly."""
-  global server
-  try:
-    ip = '0.0.0.0'
-    port = 8444
-    insecure_port = 8081
-    health_check_ip = '0.0.0.0'
-    health_check_port = 8001
+@pytest.mark.parametrize('server', [_local_test_args], indirect=True)
+def test_mock_request_body_handling(server: CalloutServerTest) -> None:
+  with get_insecure_channel(server) as channel:
+    stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
-    server = CalloutServerTest(
-      ip=ip,
-      port=port,
-      insecure_port=insecure_port,
-      health_check_ip=health_check_ip,
-      health_check_port=health_check_port,
-    )
-    # Start the server in a background thread
-    thread = threading.Thread(target=server.run)
-    thread.daemon = True
-    thread.start()
-    wait_till_server(lambda: server._setup)
+    mock_body = service_pb2.HttpBody(body=b"body-check-mock")
+    response = make_request(stub, request_body=mock_body)
 
-    response = urllib.request.urlopen(
-      f'http://{health_check_ip}:{health_check_port}'
-    )
-    assert response.read() == b''
-    assert response.getcode() == 200
-
-    with grpc.insecure_channel(f'{ip}:{insecure_port}') as channel:
-      stub = service_pb2_grpc.ExternalProcessorStub(channel)
-      end_headers = service_pb2.HttpHeaders(end_of_stream=True)
-      _MakeRequest(stub, request_headers=end_headers, async_mode=False)
-
-    # Stop the server
-    server.shutdown()
-    thread.join(timeout=5)
-  except urllib.error.URLError as ex:
-    raise Exception('Failed to connect to the callout server.') from ex
-  except grpc._channel._MultiThreadedRendezvous as ex:
-    raise Exception('Setup Error: Server not ready!') from ex
-  finally:
-    del server
+    assert response.HasField('request_body')
+    assert response.request_body.response.body_mutation.body == b"Mocked-Body"
 
 
-def test_custom_server_no_health_check_no_insecure_port() -> None:
-  """Test that the server only conects to the specified addresses.
+@pytest.mark.parametrize('server', [_local_test_args], indirect=True)
+def test_mock_response_body_handling(server: CalloutServerTest) -> None:
+  with get_insecure_channel(server) as channel:
+    stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
-  The server should not connect to the insecure port or the health check port
-  if they are disabled in the setup.
-  """
-  global server
-  test_server_1 = None
-  test_server_2 = None
-  try:
-    server = CalloutServerTest(
-      serperate_health_check=True, enable_insecure_port=False
-    )
-    # Start the server in a background thread
-    thread = threading.Thread(target=server.run)
-    thread.daemon = True
-    thread.start()
-    wait_till_server(lambda: server._setup)
-    # Attempt to connect to the addresses that would be used for the
-    # insecure address and the health check.
-    test_server_1 = HTTPServer(('0.0.0.0', 8000), BaseHTTPRequestHandler)
-    test_server_2 = HTTPServer(('0.0.0.0', 8080), BaseHTTPRequestHandler)
-    # Stop the server
-    server.shutdown()
-    thread.join(timeout=5)
-  except OSError as ex:
-    raise Exception('Expected the health check address to be unbound.') from ex
-  finally:
-    del server
-    del test_server_1
-    del test_server_2
+    mock_body = service_pb2.HttpBody(body=b"body-check-mock")
+    response = make_request(stub, response_body=mock_body)
+
+    assert response.HasField('response_body')
+    assert response.response_body.response.body_mutation.body == b"Mocked-Body"
 
 
-@pytest.mark.usefixtures('setup_and_teardown')
-def test_mock_request_header_handling() -> None:
-  try:
-    with grpc.insecure_channel(f'0.0.0.0:{server.insecure_port}') as channel:
-      stub = service_pb2_grpc.ExternalProcessorStub(channel)
+@pytest.mark.parametrize('server', [_local_test_args], indirect=True)
+def test_header_validation_failure(server: CalloutServerTest) -> None:
+  with get_insecure_channel(server) as channel:
+    stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
-      # Construct the HeaderMap
-      header_map = HeaderMap()
-      header_value = HeaderValue(key="mock", raw_value=b"true")
-      header_map.headers.extend([header_value])
+    # Construct the HeaderMap
+    header_map = HeaderMap()
+    header_value = HeaderValue(key="header-check", raw_value=b"")
+    header_map.headers.extend([header_value])
 
-      # Construct HttpHeaders with the HeaderMap
-      mock_headers = service_pb2.HttpHeaders(headers=header_map, end_of_stream=True)
+    # Construct HttpHeaders with the HeaderMap
+    request_headers = service_pb2.HttpHeaders(headers=header_map,
+                                              end_of_stream=True)
 
-      response = _MakeRequest(stub, request_headers=mock_headers)
-
-      assert response.HasField('request_headers')
-      assert any(
-        header.header.key == "Mock-Response" for header in
-        response.request_headers.response.header_mutation.set_headers)
-  except grpc._channel._MultiThreadedRendezvous as ex:
-    raise Exception('Setup Error: Server not ready!') from ex
+    # Use request_headers in the request
+    with pytest.raises(grpc.RpcError) as e:
+      make_request(stub, request_headers=request_headers)
+    assert e.value.code() == grpc.StatusCode.PERMISSION_DENIED
 
 
-@pytest.mark.usefixtures('setup_and_teardown')
-def test_mock_response_header_handling() -> None:
-  try:
-    with grpc.insecure_channel(f'0.0.0.0:{server.insecure_port}') as channel:
-      stub = service_pb2_grpc.ExternalProcessorStub(channel)
+@pytest.mark.parametrize('server', [_local_test_args], indirect=True)
+def test_body_validation_failure(server: CalloutServerTest) -> None:
+  with get_insecure_channel(server) as channel:
+    stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
-      # Construct the HeaderMap
-      header_map = HeaderMap()
-      header_value = HeaderValue(key="mock", raw_value=b"true")
-      header_map.headers.extend([header_value])
+    request_body = service_pb2.HttpBody(body=b"bad-body")
 
-      # Construct HttpHeaders with the HeaderMap
-      mock_headers = service_pb2.HttpHeaders(headers=header_map, end_of_stream=True)
-
-      response = _MakeRequest(stub, response_headers=mock_headers)
-
-      assert response.HasField('response_headers')
-      assert any(
-        header.header.key == "Mock-Response" for header in
-        response.response_headers.response.header_mutation.set_headers)
-  except grpc._channel._MultiThreadedRendezvous as ex:
-    raise Exception('Setup Error: Server not ready!') from ex
-
-
-@pytest.mark.usefixtures('setup_and_teardown')
-def test_mock_request_body_handling() -> None:
-  try:
-    with grpc.insecure_channel(f'0.0.0.0:{server.insecure_port}') as channel:
-      stub = service_pb2_grpc.ExternalProcessorStub(channel)
-
-      mock_body = service_pb2.HttpBody(body=b"mock")
-      response = _MakeRequest(stub, request_body=mock_body)
-
-      assert response.HasField('request_body')
-      assert response.request_body.response.body_mutation.body == b"Mocked-Body"
-
-  except grpc._channel._MultiThreadedRendezvous as ex:
-    raise Exception('Setup Error: Server not ready!') from ex
-
-
-@pytest.mark.usefixtures('setup_and_teardown')
-def test_mock_response_body_handling() -> None:
-  try:
-    with grpc.insecure_channel(f'0.0.0.0:{server.insecure_port}') as channel:
-      stub = service_pb2_grpc.ExternalProcessorStub(channel)
-
-      mock_body = service_pb2.HttpBody(body=b"mock")
-      response = _MakeRequest(stub, response_body=mock_body)
-
-      assert response.HasField('response_body')
-      assert response.response_body.response.body_mutation.body == b"Mocked-Body"
-
-  except grpc._channel._MultiThreadedRendezvous as ex:
-    raise Exception('Setup Error: Server not ready!') from ex
+    with pytest.raises(grpc.RpcError) as e:
+      make_request(stub, request_body=request_body)
+    assert e.value.code() == grpc.StatusCode.PERMISSION_DENIED

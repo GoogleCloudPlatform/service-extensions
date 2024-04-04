@@ -12,39 +12,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import print_function
-
-from extproc.service import callout_tools
+from __future__ import annotations
+from envoy.config.core.v3.base_pb2 import HeaderMap
+from envoy.config.core.v3.base_pb2 import HeaderValue
+from envoy.type.v3.http_status_pb2 import StatusCode
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from envoy.service.ext_proc.v3 import external_processor_pb2_grpc as service_pb2_grpc
 import pytest
+import typing
 
-from extproc.example.normalize_header.service_callout_example import (
-    CalloutServerExample as CalloutServerTest)
+from extproc.example.redirect.service_callout_example import (
+    CalloutServerExample as CalloutServerTest,)
+from extproc.service.callout_tools import header_immediate_response
 from extproc.tests.basic_grpc_test import (
-    make_request,
     setup_server,
-    insecure_kwargs,
     get_insecure_channel,
+    insecure_kwargs,
+    make_request,
 )
 
 # Import the setup server test fixture.
 _ = setup_server
 _local_test_args = {"kwargs": insecure_kwargs, "test_class": CalloutServerTest}
 
+
 @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
-def test_normalize_header(server: CalloutServerTest) -> None:
-  """Test the request and response functionality of the server."""
+def test_header_immediate_response(server: CalloutServerTest) -> None:
   with get_insecure_channel(server) as channel:
     stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
-    headers = service_pb2.HttpHeaders(end_of_stream=False)
-    end_headers = service_pb2.HttpHeaders(end_of_stream=True)
+    # Construct the HeaderMap
+    header_map = HeaderMap()
+    header_value = HeaderValue(key="header", raw_value=b"value")
+    header_map.headers.extend([header_value])
 
-    value = make_request(stub, request_headers=headers, async_mode=False)
-    assert value.HasField('request_headers')
-    assert value.request_headers == callout_tools.normalize_header_mutation(
-        headers=headers,
-        clear_route_cache=True,
-    )
+    # Construct HttpHeaders with the HeaderMap
+    headers = service_pb2.HttpHeaders(headers=header_map, end_of_stream=True)
 
-    make_request(stub, request_headers=end_headers, async_mode=False)
+    response = make_request(stub, request_headers=headers)
+
+    assert response.HasField('immediate_response')
+    assert response.immediate_response == header_immediate_response(
+        code=typing.cast(StatusCode, 301),
+        headers=[('Location', 'http://service-extensions.com/redirect')])

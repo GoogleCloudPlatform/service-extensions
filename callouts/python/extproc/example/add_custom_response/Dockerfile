@@ -15,8 +15,8 @@ COPY extproc/example/grpc/*.py ./
 
 # Set up communication ports.
 EXPOSE 443
-EXPOSE 8080
 EXPOSE 80
+EXPOSE 8080
 
 # Start the service.
 CMD [ "/usr/bin/python3", "-um", "service_callout_example" ]

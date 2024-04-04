@@ -11,12 +11,12 @@
 FROM service-callout-common-python
 
 # Copy over example specific files.
-COPY extproc/example/grpc/*.py ./
+COPY extproc/example/redirect/*.py ./
 
 # Set up communication ports.
 EXPOSE 443
-EXPOSE 8080
 EXPOSE 80
+EXPOSE 8080
 
 # Start the service.
 CMD [ "/usr/bin/python3", "-um", "service_callout_example" ]

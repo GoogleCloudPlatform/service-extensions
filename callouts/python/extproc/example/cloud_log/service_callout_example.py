@@ -17,6 +17,7 @@ import google.cloud.logging
 from grpc import ServicerContext
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from extproc.service import callout_server
+from extproc.service import callout_tools
 
 
 class CalloutServerExample(callout_server.CalloutServer):
@@ -40,7 +41,7 @@ class CalloutServerExample(callout_server.CalloutServer):
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Custom processor on request headers."""
-    return callout_server.add_header_mutation(
+    return callout_tools.add_header_mutation(
       add=[('header-request', 'request')],
       clear_route_cache=True
     )
@@ -49,7 +50,7 @@ class CalloutServerExample(callout_server.CalloutServer):
       self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
     """Custom processor on the request body."""
-    return callout_server.add_body_mutation(body='-added-body')
+    return callout_tools.add_body_mutation(body='-added-body')
 
 if __name__ == '__main__':
   """Sets up Google Cloud Logging for the cloud_log example"""
@@ -57,4 +58,4 @@ if __name__ == '__main__':
   client.setup_logging()
 
   # Run the gRPC service
-  CalloutServerExample(port=443, insecure_port=8080, health_check_port=80).run()
+  CalloutServerExample(insecure_address=('0.0.0.0', 8080)).run()
