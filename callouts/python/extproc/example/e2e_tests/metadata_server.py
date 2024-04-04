@@ -12,13 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import logging
-from typing import Iterator
+from typing import Iterator, Literal
 import grpc
 from grpc import ServicerContext
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from envoy.service.ext_proc.v3.external_processor_pb2 import ProcessingRequest, ProcessingResponse
 from extproc.service import callout_server
+from extproc.service import callout_tools
 from google.protobuf.wrappers_pb2 import StringValue
 from google.protobuf import any_pb2
 
@@ -39,18 +41,22 @@ def check_metadata(request: service_pb2.ProcessingRequest):
     if 'fr' in feild_data.fields:
       fr_data = feild_data.fields['fr']
       break
-  
+
   if fr_data is None:
     logging.info('No "fr" metadata.')
     return False
-    
+
   logging.info('Contains "fr" key: %s', fr_data)
   return fr_data.HasField('string_value') and fr_data.string_value != ''
 
 
+default_headers = [('service-callout-response-intercept', 'intercepted'),
+                   ('x-used-deltas-gfe3', ''), ('x-used-staging-gfe3', ''),
+                   ('x-ext-proc', '')]
+
+
 class CalloutServerExample(callout_server.CalloutServer):
-  """Example callout server.
-  """
+  """Example callout server."""
 
   def process(self, request_iterator: Iterator[ProcessingRequest],
               context: ServicerContext) -> Iterator[ProcessingResponse]:
@@ -58,15 +64,24 @@ class CalloutServerExample(callout_server.CalloutServer):
     for request in request_iterator:
       logging.info('Received request %s.', request)
       if request.HasField('response_body'):
-        yield ProcessingResponse(response_body=callout_server.add_body_mutation('e2e-test'))
+        yield ProcessingResponse(
+            response_body=callout_tools.add_body_mutation('e2e-test'))
         return
       if not check_metadata(request):
-        context.abort(grpc.StatusCode.PERMISSION_DENIED, 'No metadata found.')
-      yield ProcessingResponse(response_headers=callout_server.add_header_mutation(add=[('metadata','found')]))
+        yield ProcessingResponse(
+            response_headers=callout_tools.add_header_mutation(
+                default_headers),)
+      yield ProcessingResponse(
+          response_headers=callout_tools.add_header_mutation(
+              add=[('metadata', 'found')] + default_headers),)
 
 
 if __name__ == '__main__':
-  # Run the gRPC service
+  # Setup command line args.
+  args = callout_tools.add_command_line_args().parse_args()
+
+  # Set the debug level.
   logging.basicConfig(level=logging.DEBUG)
-  logging.info('Starting e2e_test server v6.')
-  CalloutServerExample(port=443, insecure_port=8080, health_check_port=80).run()
+  logging.info('Starting e2e_test server v7.')
+  # Run the gRPC service.
+  CalloutServerExample(**vars(args)).run()
