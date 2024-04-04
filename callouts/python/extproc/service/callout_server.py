@@ -23,6 +23,8 @@ from concurrent import futures
 from http.server import BaseHTTPRequestHandler
 from http.server import HTTPServer
 import logging
+import ssl
+from ssl import SSLContext
 from typing import Iterator, Literal
 
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpBody
@@ -73,10 +75,10 @@ class CalloutServer:
     cert: If speficied, certificate used to authenticate the main grpc service
       for secure htps and http connections. If unspecified will attempt to
       load data from a file pointed to by the cert_path.
-    cert_path: Relative file path pointing to the main grpc certificate, cert.
-    cert_key: If speficied, public key of the grpc certificate. If unspecified
-      will attempt to load data from a file pointed to by the cert_key_path.
-    cert_key_path: Relative file path pointing to the cert_key.
+    cert_path: Relative file path pointing to the main services certificate,
+      also used for the health check, if specified.
+    cert_key_path: Relative file path pointing to the public key of the 
+      grpc certificate.
     server_thread_count: Threads allocated to the main grpc service.
   """
 
@@ -84,10 +86,9 @@ class CalloutServer:
       self,
       address: tuple[str, int] | None = None,
       health_check_address: tuple[str, int] | Literal[False] | None = None,
+      secure_health_check: bool = False,
       insecure_address: tuple[str, int] | None = None,
-      cert: bytes | None = None,
       cert_path: str = './extproc/ssl_creds/localhost.crt',
-      cert_key: bytes | None = None,
       cert_key_path: str = './extproc/ssl_creds/localhost.key',
       server_thread_count: int = 2,
   ):
@@ -104,20 +105,16 @@ class CalloutServer:
     if health_check_address is not False:
       self.health_check_address = (health_check_address or ('0.0.0.0', 80))
     self.server_thread_count = server_thread_count
+    self.secure_health_check = secure_health_check
     # Read cert data.
-    if not cert:
-      with open(cert_path, 'rb') as file:
-        self.cert = file.read()
-        file.close()
-    else:
-      self.cert = cert
-
-    if not cert_key:
-      with open(cert_key_path, 'rb') as file:
-        self.cert_key = file.read()
-        file.close()
-    else:
-      self.cert_key = cert_key
+    self.cert_path = cert_path
+    with open(cert_path, 'rb') as file:
+      self.cert = file.read()
+      file.close()
+    self.cert_key_path = cert_key_path
+    with open(cert_key_path, 'rb') as file:
+      self.cert_key = file.read()
+      file.close()
 
   def run(self):
     """Start all requested servers and listen for new connections; blocking."""
@@ -136,8 +133,18 @@ class CalloutServer:
     if self.health_check_address:
       self._health_check_server = HTTPServer(self.health_check_address,
                                              HealthCheckService)
-      logging.info('Health check server bound to %s.',
+      protocol = 'HTTP'
+      if self.secure_health_check:
+        protocol = 'HTTPS'
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ssl_context.load_cert_chain(certfile=self.cert_path,
+                                    keyfile=self.cert_key_path)
+        self._health_check_server.socket = ssl_context.wrap_socket(
+            sock=self._health_check_server.socket,)
+
+      logging.info('%s health check server bound to %s.', protocol,
                    addr_to_str(self.health_check_address))
+
     self._callout_server = _GRPCCalloutService.start_callout_service(self)
 
   def _stop_servers(self):

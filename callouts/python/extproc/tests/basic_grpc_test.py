@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import print_function
+
 import datetime
 from http.server import BaseHTTPRequestHandler
 from http.server import HTTPServer
@@ -20,6 +21,7 @@ import time
 from typing import Iterator, Callable, Any, Mapping
 import urllib.error
 import urllib.request
+import ssl
 
 from envoy.service.ext_proc.v3.external_processor_pb2 import ProcessingResponse
 from envoy.service.ext_proc.v3.external_processor_pb2 import ProcessingRequest
@@ -190,6 +192,28 @@ class TestBasicServer(object):
         f'http://{addr_to_str(server.health_check_address)}')
     assert not response.read()
     assert response.getcode() == 200
+
+
+_secure_test_args: dict = {
+    "kwargs": insecure_kwargs | {
+        'secure_health_check': True
+    },
+    "test_class": CalloutServerTest
+}
+
+
+@pytest.mark.parametrize('server', [_secure_test_args], indirect=True)
+def test_https_health_check(server: CalloutServerTest) -> None:
+  """Test that the health check sub server returns the expected 200 code."""
+  assert server.health_check_address is not None
+  ssl_context = ssl.create_default_context()
+  ssl_context.check_hostname = False
+  ssl_context.verify_mode = ssl.CERT_NONE
+  response = urllib.request.urlopen(
+      f'https://{addr_to_str(server.health_check_address)}',
+      context=ssl_context)
+  assert not response.read()
+  assert response.getcode() == 200
 
 
 def test_custom_server_config() -> None:
