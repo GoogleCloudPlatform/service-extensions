@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+import argparse
 
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpBody
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpHeaders
@@ -60,6 +61,13 @@ class BasicCalloutServer(CalloutServer):
 
 
 if __name__ == '__main__':
-  # Run the gRPC service
+  # Useful command line args.
+  parser = argparse.ArgumentParser()
+  parser.add_argument('--secure_health_check',
+                      action="store_true",
+                      help="Run a HTTPS health check rather than an HTTP one.")
+  args = parser.parse_args()
+  # Set the debug level.
   logging.basicConfig(level=logging.DEBUG)
-  BasicCalloutServer(insecure_address=('0.0.0.0', 8080)).run()
+  # Run the gRPC service.
+  BasicCalloutServer(secure_health_check=args.secure_health_check).run()

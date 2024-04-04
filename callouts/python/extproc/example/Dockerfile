@@ -54,4 +54,4 @@ EXPOSE 8080
 ENV run_module ${run_module}
 
 # Start the service.
-CMD /usr/bin/python3 -um ${run_module}
+ENTRYPOINT /usr/bin/python3 -um ${run_module} "$@"
