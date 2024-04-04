@@ -67,10 +67,17 @@ class CalloutServer:
 
   Attributes:
     address: Address that the main secure server will attempt to connect to.
-    health_check_address: The health check serving address. If False
-      no health check server will be started.
+    port: If specified, overides the port of the address.
+      If no address is set, defaults to default_ip.
+    health_check_address: The health check serving address.
+    health_check_port: If set, overides the port of the health_check_address.
+      If no address is set, defaults to default_ip.
+    combined_health_check: If True, does not create seperate health check server. 
     insecure_address: If specified, the server will also listen on this, 
       non-authenticated, address.
+    insecure_port: If set, overides the port of the insecure_address.
+      If no address is set, defaults to default_ip.
+    default_ip: If left None, defaults to '0.0.0.0'. 
     cert: If speficied, certificate used to authenticate the main grpc service
       for secure htps and http connections. If unspecified will attempt to
       load data from a file pointed to by the cert_path.
@@ -84,9 +91,14 @@ class CalloutServer:
   def __init__(
       self,
       address: tuple[str, int] | None = None,
-      health_check_address: tuple[str, int] | Literal[False] | None = None,
+      port: int | None = None,
+      health_check_address: tuple[str, int] | None = None,
+      health_check_port: int | None = None,
+      combined_health_check: bool = False,
       secure_health_check: bool = False,
       insecure_address: tuple[str, int] | None = None,
+      insecure_port: int | None = None,
+      default_ip: str | None = None,
       cert_path: str = './extproc/ssl_creds/localhost.crt',
       cert_key_path: str = './extproc/ssl_creds/localhost.key',
       server_thread_count: int = 2,
@@ -97,12 +109,24 @@ class CalloutServer:
 
     self._health_check_server: HTTPServer | None = None
     self._callout_server: grpc.Server | None = None
+    
+    default_ip = default_ip or '0.0.0.0'
 
-    self.address: tuple[str, int] = address or ('0.0.0.0', 443)
+    self.address: tuple[str, int] = address or (default_ip, 443)
+    if port:
+      self.address = (self.address[0], port)
+
     self.insecure_address: tuple[str, int] | None = insecure_address
+    if insecure_port:
+      ip = self.insecure_address[0] if self.insecure_address else default_ip
+      self.insecure_address = (ip, insecure_port)
+
     self.health_check_address: tuple[str, int] | None = None
-    if health_check_address is not False:
-      self.health_check_address = (health_check_address or ('0.0.0.0', 80))
+    if not combined_health_check:
+      self.health_check_address = health_check_address or (default_ip, 80)
+      if health_check_port:
+        self.health_check_address = (self.health_check_address[0], health_check_port)
+
     self.server_thread_count = server_thread_count
     self.secure_health_check = secure_health_check
     # Read cert data.

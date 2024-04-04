@@ -260,7 +260,7 @@ def test_custom_server_config() -> None:
 
 _no_health_args: dict = {
     "kwargs": insecure_kwargs | {
-        'health_check_address': False
+        'combined_health_check': True
     },
     "test_class": CalloutServerTest
 }
