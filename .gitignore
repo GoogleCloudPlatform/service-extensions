@@ -16,7 +16,3 @@
 plugins/bazel-*
 **/__pycache__
 .vscode
-**/pylintrc
-ruff.toml
-py.typed
-upload_images.sh
