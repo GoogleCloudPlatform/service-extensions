@@ -11,7 +11,7 @@
 FROM service-callout-common-python
 
 # Copy over example specific files.
-COPY extproc/example/grpc/*.py ./
+COPY extproc/example/validate_token/*.py ./
 
 # Set up communication ports.
 EXPOSE 443

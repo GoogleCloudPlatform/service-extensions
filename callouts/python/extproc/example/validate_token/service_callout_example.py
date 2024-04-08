@@ -38,13 +38,7 @@ class CalloutServerExample(callout_server.CalloutServer):
 
   For request header callouts we check the content of the request and
   authorize the request or reject the request.
-  The content being checked is if the header has the header header-check.
-  The decision is logged to Cloud Logging.
-
-  For request body callouts we check the content of the request and
-  authorize the request or reject the request.
-  The content being checked is if the body has the body body-check.
-  The decision is logged to Cloud Logging.
+  The content being checked is if the header has a valid token.
   """
 
   def on_request_headers(
@@ -62,4 +56,4 @@ if __name__ == '__main__':
   """Sets up Google Cloud Logging for the cloud_log example"""
 
   # Run the gRPC service
-  CalloutServerExample(insecure_address=('0.0.0.0', 8080), port=8443, health_check_port=8000).run()
+  CalloutServerExample(insecure_address=('0.0.0.0', 8080)).run()
