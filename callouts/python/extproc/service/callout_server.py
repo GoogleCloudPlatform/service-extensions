@@ -101,6 +101,7 @@ class CalloutServer:
       default_ip: str | None = None,
       cert_path: str = './extproc/ssl_creds/localhost.crt',
       cert_key_path: str = './extproc/ssl_creds/localhost.key',
+      public_key_path: str = './extproc/ssl_creds/publickey.pem',
       server_thread_count: int = 2,
   ):
     self._setup = False
@@ -137,6 +138,10 @@ class CalloutServer:
     self.cert_key_path = cert_key_path
     with open(cert_key_path, 'rb') as file:
       self.cert_key = file.read()
+      file.close()
+    self.public_key_path = public_key_path
+    with open(public_key_path, 'rb') as file:
+      self.public_key = file.read()
       file.close()
 
   def run(self):
