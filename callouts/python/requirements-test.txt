@@ -1,1 +1,2 @@
 pytest==7.4.2
+cryptography==42.0.5
