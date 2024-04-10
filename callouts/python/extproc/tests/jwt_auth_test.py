@@ -60,7 +60,7 @@ def test_jwt_auth_rs256_success(server: CalloutServerTest) -> None:
   with get_insecure_channel(server) as channel:
     stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
-    jwt_token = 'Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTcxMjc3Njc2MSwiZXhwIjoyMDc1NjU2NzYxfQ.BSH8s_MexJJYrFqKld-PwaUu3ovXu-ZfBcfsqiFtWQVHtcJu1Q0PHFLfBSx_9Uu57Uzfj2DoALVe-rF7VZoBfB-gFSbNVSneF7kLrpVD_E84ItZINzBqta5UyTdO0T4PHZtB9m_lmZq-u9IPUNF4h_GeWKRAEVwxzp46szBytFuAIEW0mlIoKxYUSlaHxCLqXz9tYyGJe9ZQpBp_tLRnvQslE6ZqsvGuhIJya1HAFy_pf9jmPswufXp5y5m2j3LQ7fcGh8p7cFBWM2mKycjpY420dbuiQcu0MPx2qqkrJuVDx4E9mcXBsdqVUufEnqTPzKnwwHS_mOst9t3kBTXLPg'
+    jwt_token = 'Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTcxMjE3MzQ2MSwiZXhwIjoyMDc1NjU4MjYxfQ.Vv-Lwn1z8BbVBGm-T1EKxv6T3XKCeRlvRrRmdu8USFdZUoSBK_aThzwzM2T8hlpReYsX9YFdJ3hMfq6OZTfHvfPLXvAt7iSKa03ZoPQzU8bRGzYy8xrb0ZQfrejGfHS5iHukzA8vtI2UAJ_9wFQiY5_VGHOBv9116efslbg-_gItJ2avJb0A0yr5uUwmE336rYEwgm4DzzfnTqPt8kcJwkONUsjEH__mePrva1qDT4qtfTPQpGa35TW8n9yZqse3h1w3xyxUfJd3BlDmoz6pQp2CvZkhdQpkWA1bnwpdqSDC7bHk4tYX6K5Q19na-2ff7gkmHZHJr0G9e_vAhQiE5w'
 
     # Construct the HeaderMap
     header_map = HeaderMap()
@@ -74,8 +74,8 @@ def test_jwt_auth_rs256_success(server: CalloutServerTest) -> None:
     decoded_items = [('decoded-sub', '1234567890'),
                      ('decoded-name', 'John Doe'),
                      ('decoded-admin', 'True'),
-                     ('decoded-iat', '1712776761'),
-                     ('decoded-exp', '2075656761')]
+                     ('decoded-iat', '1712173461'),
+                     ('decoded-exp', '2075658261')]
 
     value = make_request(stub, request_headers=request_headers)
     assert value.HasField('request_headers')
