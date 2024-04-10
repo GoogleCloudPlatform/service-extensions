@@ -159,21 +159,21 @@ class TestBasicServer(object):
       headers = HttpHeaders(end_of_stream=False)
       end_headers = HttpHeaders(end_of_stream=True)
 
-      value = make_request(stub, request_body=body, observability_mode=False)
+      value = make_request(stub, request_body=body)
       assert value.HasField('request_body')
       assert value.request_body == add_body_mutation(body='-added-body')
 
-      value = make_request(stub, response_body=body, observability_mode=False)
+      value = make_request(stub, response_body=body)
       assert value.HasField('response_body')
       assert value.response_body == add_body_mutation(body='new-body',
                                                       clear_body=True)
 
-      value = make_request(stub, response_headers=headers, observability_mode=False)
+      value = make_request(stub, response_headers=headers)
       assert value.HasField('response_headers')
       assert value.response_headers == add_header_mutation(
           add=[('hello', 'service-extensions')])
 
-      value = make_request(stub, request_headers=headers, observability_mode=False)
+      value = make_request(stub, request_headers=headers)
       assert value.HasField('request_headers')
       assert value.request_headers == add_header_mutation(
           add=[(':host', 'service-extensions.com'), (':path', '/'),
@@ -181,7 +181,7 @@ class TestBasicServer(object):
           clear_route_cache=True,
           remove=['foo'])
 
-      make_request(stub, request_headers=end_headers, observability_mode=False)
+      make_request(stub, request_headers=end_headers)
       channel.close()
 
   @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
@@ -242,8 +242,7 @@ def test_custom_server_config() -> None:
     with grpc.insecure_channel(f'{ip}:{insecure_port}') as channel:
       stub = ExternalProcessorStub(channel)
       value = make_request(stub,
-                           response_headers=HttpHeaders(end_of_stream=True),
-                           observability_mode=False)
+                           response_headers=HttpHeaders(end_of_stream=True))
       assert value.HasField('response_headers')
       assert value.response_headers == add_header_mutation(
           add=[('hello', 'service-extensions')])

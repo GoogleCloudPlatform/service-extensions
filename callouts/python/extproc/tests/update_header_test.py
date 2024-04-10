@@ -45,14 +45,14 @@ def test_append_action(server: CalloutServerTest) -> None:
     headers = service_pb2.HttpHeaders(end_of_stream=False)
     end_headers = service_pb2.HttpHeaders(end_of_stream=True)
 
-    value = make_request(stub, response_headers=headers, observability_mode=False)
+    value = make_request(stub, response_headers=headers)
     assert value.HasField('response_headers')
     assert value.response_headers == callout_tools.add_header_mutation(
         add=[('header-response', 'response-new-value')],
         append_action=HeaderValueOption.HeaderAppendAction.
         OVERWRITE_IF_EXISTS_OR_ADD)
 
-    value = make_request(stub, request_headers=headers, observability_mode=False)
+    value = make_request(stub, request_headers=headers)
     assert value.HasField('request_headers')
     assert value.request_headers == callout_tools.add_header_mutation(
         add=[('header-request', 'request-new-value')],
@@ -60,4 +60,4 @@ def test_append_action(server: CalloutServerTest) -> None:
         OVERWRITE_IF_EXISTS_OR_ADD,
         clear_route_cache=True)
 
-    make_request(stub, request_headers=end_headers, observability_mode=False)
+    make_request(stub, request_headers=end_headers)
