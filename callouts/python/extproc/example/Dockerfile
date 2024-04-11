@@ -48,7 +48,9 @@ COPY $copy_path ./
 EXPOSE 443
 EXPOSE 80
 # Un-secured debugging port. Can be removed once integrated into a final project.
-EXPOSE 8080 
+EXPOSE 8080
+# Un-secured counters
+EXPOSE 10000
 
 # Apply the module setting to the local enviorment.
 ENV run_module ${run_module}
