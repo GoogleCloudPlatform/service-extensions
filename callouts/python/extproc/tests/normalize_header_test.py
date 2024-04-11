@@ -40,11 +40,11 @@ def test_normalize_header(server: CalloutServerTest) -> None:
     headers = service_pb2.HttpHeaders(end_of_stream=False)
     end_headers = service_pb2.HttpHeaders(end_of_stream=True)
 
-    value = make_request(stub, request_headers=headers, observability_mode=False)
+    value = make_request(stub, request_headers=headers)
     assert value.HasField('request_headers')
     assert value.request_headers == callout_tools.normalize_header_mutation(
         headers=headers,
         clear_route_cache=True,
     )
 
-    make_request(stub, request_headers=end_headers, observability_mode=False)
+    make_request(stub, request_headers=end_headers)
