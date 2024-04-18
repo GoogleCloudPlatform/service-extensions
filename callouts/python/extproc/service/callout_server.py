@@ -207,7 +207,7 @@ class CalloutServer:
   def process(
       self,
       request: ProcessingRequest,
-      context,
+      context: ServicerContext,
   ) -> ProcessingResponse:
     """Process incomming callout requests.
 
@@ -341,7 +341,7 @@ class _GRPCCalloutService(ExternalProcessorServicer):
   def Process(
       self,
       request_iterator: Iterable[ProcessingRequest],
-      context,
+      context: ServicerContext,
   ) -> Iterator[ProcessingResponse]:
     """Process the client request."""
     for request in request_iterator:
