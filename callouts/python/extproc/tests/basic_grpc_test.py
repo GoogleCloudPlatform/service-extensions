@@ -41,6 +41,10 @@ class ServerSetupException(Exception):
   pass
 
 
+class NoResponseError(Exception):
+  pass
+
+
 # Replace the default ports of the server so that they do not clash with running programs.
 default_kwargs: dict = {
     'address': ('0.0.0.0', 8443),
@@ -132,7 +136,11 @@ def make_request(stub: ExternalProcessorStub, **kwargs) -> ProcessingResponse:
   Returns: The response returned from the server.
   """
   request_iter = iter([ProcessingRequest(**kwargs)])
-  return next(stub.Process(request_iter))
+  responses = stub.Process(request_iter)
+  # Get the first response
+  for response in responses:
+    return response
+  raise NoResponseError("Response not found.")
 
 
 class TestBasicServer(object):
