@@ -98,7 +98,7 @@ def _start_server(server: CalloutServer) -> threading.Thread:
 def _stop_server(server: CalloutServer, thread: threading.Thread):
   # Stop the server
   server.shutdown()
-  thread.join(timeout=10)
+  thread.join(timeout=5)
 
 
 @pytest.fixture(scope='class', name='server')
