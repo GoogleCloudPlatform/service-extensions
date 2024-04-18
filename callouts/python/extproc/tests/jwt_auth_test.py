@@ -27,7 +27,6 @@ import pytest
 
 from extproc.example.jwt_auth.service_callout_example import (
     CalloutServerExample as CalloutServerTest)
-from extproc.service.callout_tools import add_header_mutation
 from extproc.tests.basic_grpc_test import (
     make_request,
     setup_server,
