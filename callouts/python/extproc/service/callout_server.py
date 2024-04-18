@@ -338,7 +338,6 @@ class _GRPCCalloutService(ExternalProcessorServicer):
     self._server.start()
     logging.info(self._start_msg)
 
-
   def Process(
       self,
       request_iterator: Iterable[ProcessingRequest],
