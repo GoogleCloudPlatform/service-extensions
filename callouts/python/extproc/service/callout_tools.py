@@ -2,7 +2,7 @@
 import argparse
 import logging
 import typing
-from typing import Union, Literal
+from typing import Union
 
 from envoy.config.core.v3.base_pb2 import HeaderValue
 from envoy.config.core.v3.base_pb2 import HeaderValueOption
@@ -13,13 +13,6 @@ from envoy.service.ext_proc.v3.external_processor_pb2 import HeadersResponse
 from envoy.service.ext_proc.v3.external_processor_pb2 import ImmediateResponse
 from envoy.type.v3.http_status_pb2 import StatusCode
 import grpc
-
-
-def _false_or_addr(value: str) -> Literal[False] | tuple[str, int] | None:
-  if value == "False":
-    return False
-  return _addr(value)
-
 
 def _addr(value: str) -> tuple[str, int] | None:
   if not value:

@@ -39,7 +39,6 @@ from envoy.service.ext_proc.v3.external_processor_pb2_grpc import (
 from envoy.service.ext_proc.v3.external_processor_pb2_grpc import (
     ExternalProcessorServicer,)
 import grpc
-import grpc.aio
 from grpc import ServicerContext
 
 
@@ -146,7 +145,7 @@ class CalloutServer:
 
     self._callout_server = _GRPCCalloutService(self)
 
-  def run(self):
+  def run(self) -> None:
     """Start all requested servers and listen for new connections; blocking."""
     self._start_servers()
     self._setup = True
@@ -158,7 +157,7 @@ class CalloutServer:
       self._stop_servers()
       self._closed = True
 
-  def _start_servers(self):
+  def _start_servers(self) -> None:
     """Start the requested servers."""
     if self.health_check_address:
       self._health_check_server = HTTPServer(self.health_check_address,
@@ -176,7 +175,7 @@ class CalloutServer:
                    addr_to_str(self.health_check_address))
     self._callout_server.start()
 
-  def _stop_servers(self):
+  def _stop_servers(self) -> None:
     """Close the sockets of all servers, and trigger shutdowns."""
     if self._health_check_server:
       self._health_check_server.server_close()
@@ -198,7 +197,7 @@ class CalloutServer:
       # If the only server requested is a grpc callout server, we wait on the grpc server.
       self._callout_server.loop()
 
-  def shutdown(self):
+  def shutdown(self) -> None:
     """Tell the server to shutdown, ending all serving threads."""
     if self._health_check_server:
       self._health_check_server.shutdown()
@@ -327,15 +326,15 @@ class _GRPCCalloutService(ExternalProcessorServicer):
       self._server.add_insecure_port(insecure_str)
       self._start_msg += f' (secure) and {insecure_str} (insecure)'
 
-  def stop(self):
+  def stop(self) -> None:
     self._server.stop(grace=10)
     self._server.wait_for_termination(timeout=10)
     logging.info('GRPC server stopped.')
 
-  def loop(self):
+  def loop(self) -> None:
     self._server.wait_for_termination()
 
-  def start(self):
+  def start(self) -> None:
     self._server.start()
     logging.info(self._start_msg)
 
