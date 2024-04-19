@@ -24,7 +24,8 @@ from http.server import BaseHTTPRequestHandler
 from http.server import HTTPServer
 import logging
 import ssl
-from typing import Iterator, Literal
+from typing import Iterator
+from typing import Iterable
 
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpBody
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpHeaders
@@ -107,10 +108,7 @@ class CalloutServer:
     self._setup = False
     self._shutdown = False
     self._closed = False
-
     self._health_check_server: HTTPServer | None = None
-    self._callout_server: grpc.Server | None = None
-    
     default_ip = default_ip or '0.0.0.0'
 
     self.address: tuple[str, int] = address or (default_ip, 443)
@@ -126,7 +124,8 @@ class CalloutServer:
     if not combined_health_check:
       self.health_check_address = health_check_address or (default_ip, 80)
       if health_check_port:
-        self.health_check_address = (self.health_check_address[0], health_check_port)
+        self.health_check_address = (self.health_check_address[0],
+                                     health_check_port)
 
     self.server_thread_count = server_thread_count
     self.secure_health_check = secure_health_check
@@ -144,7 +143,9 @@ class CalloutServer:
       self.public_key = file.read()
       file.close()
 
-  def run(self):
+    self._callout_server = _GRPCCalloutService(self)
+
+  def run(self) -> None:
     """Start all requested servers and listen for new connections; blocking."""
     self._start_servers()
     self._setup = True
@@ -156,7 +157,7 @@ class CalloutServer:
       self._stop_servers()
       self._closed = True
 
-  def _start_servers(self):
+  def _start_servers(self) -> None:
     """Start the requested servers."""
     if self.health_check_address:
       self._health_check_server = HTTPServer(self.health_check_address,
@@ -172,10 +173,9 @@ class CalloutServer:
 
       logging.info('%s health check server bound to %s.', protocol,
                    addr_to_str(self.health_check_address))
+    self._callout_server.start()
 
-    self._callout_server = _GRPCCalloutService.start_callout_service(self)
-
-  def _stop_servers(self):
+  def _stop_servers(self) -> None:
     """Close the sockets of all servers, and trigger shutdowns."""
     if self._health_check_server:
       self._health_check_server.server_close()
@@ -183,10 +183,9 @@ class CalloutServer:
       logging.info('Health check server stopped.')
 
     if self._callout_server:
-      self._callout_server.stop(grace=10).wait()
-    logging.info('GRPC server stopped.')
+      self._callout_server.stop()
 
-  def _loop_server(self):
+  def _loop_server(self) -> None:
     """Loop server forever, calling shutdown will cause the server to stop."""
 
     # We chose the main serving thread based on what server configuration
@@ -195,50 +194,53 @@ class CalloutServer:
       logging.info("Health check server started.")
       self._health_check_server.serve_forever()
     else:
-      # If the only server requested is a grpc callout server, we loop
-      # this main thread while the server is running.
-      while not self._shutdown:
-        pass
+      # If the only server requested is a grpc callout server, we wait on the grpc server.
+      self._callout_server.loop()
 
-  def shutdown(self):
+  def shutdown(self) -> None:
     """Tell the server to shutdown, ending all serving threads."""
     if self._health_check_server:
       self._health_check_server.shutdown()
-    self._shutdown = True
+    if self._callout_server:
+      self._callout_server.stop()
 
   def process(
       self,
-      request_iterator: Iterator[ProcessingRequest],
+      request: ProcessingRequest,
       context: ServicerContext,
-  ) -> Iterator[ProcessingResponse]:
+  ) -> ProcessingResponse:
     """Process incomming callout requests.
 
     Args:
-        request_iterator: Provides incomming request on next().
+        request: The incomming request.
         context: Stream context on requests.
 
     Yields:
-        Iterator[ProcessingResponse]: Responses per request.
+        ProcessingResponse: A response for the incoming request.
     """
-    for request in request_iterator:
-      if request.HasField('request_headers'):
-        match self.on_request_headers(request.request_headers, context):
-          case ImmediateResponse() as immediate_headers:
-            yield ProcessingResponse(immediate_response=immediate_headers)
-          case HeadersResponse() | None as header_response:
-            yield ProcessingResponse(request_headers=header_response)
-      if request.HasField('response_headers'):
-        yield ProcessingResponse(response_headers=self.on_response_headers(
-            request.response_headers, context))
-      if request.HasField('request_body'):
-        match self.on_request_body(request.request_body, context):
-          case ImmediateResponse() as immediate_body:
-            yield ProcessingResponse(immediate_response=immediate_body)
-          case BodyResponse() | None as body_response:
-            yield ProcessingResponse(request_body=body_response)
-      if request.HasField('response_body'):
-        yield ProcessingResponse(
-            response_body=self.on_response_body(request.response_body, context))
+    if request.HasField('request_headers'):
+      match self.on_request_headers(request.request_headers, context):
+        case ImmediateResponse() as immediate_headers:
+          return ProcessingResponse(immediate_response=immediate_headers)
+        case HeadersResponse() | None as header_response:
+          return ProcessingResponse(request_headers=header_response)
+        case _:
+          logging.warn("MALFORMED REQUEST %s", request)
+    elif request.HasField('response_headers'):
+      return ProcessingResponse(response_headers=self.on_response_headers(
+          request.response_headers, context))
+    elif request.HasField('request_body'):
+      match self.on_request_body(request.request_body, context):
+        case ImmediateResponse() as immediate_body:
+          return ProcessingResponse(immediate_response=immediate_body)
+        case BodyResponse() | None as body_response:
+          return ProcessingResponse(request_body=body_response)
+        case _:
+          logging.warn("MALFORMED REQUEST %s", request)
+    elif request.HasField('response_body'):
+      return ProcessingResponse(
+          response_body=self.on_response_body(request.response_body, context))
+    return ProcessingResponse()
 
   def on_request_headers(
       self,
@@ -309,34 +311,38 @@ class _GRPCCalloutService(ExternalProcessorServicer):
   """GRPC based Callout server implementation."""
 
   def __init__(self, processor, *args, **kwargs):
-    self.processor = processor
-
-  @staticmethod
-  def start_callout_service(server: CalloutServer) -> grpc.Server:
-    """Setup and start a grpc callout server."""
-    grpc_callout_service = _GRPCCalloutService(server)
-    grpc_server = grpc.server(
-        futures.ThreadPoolExecutor(max_workers=server.server_thread_count))
-    add_ExternalProcessorServicer_to_server(grpc_callout_service, grpc_server)
+    self._processor = processor
+    self._server = grpc.server(
+        futures.ThreadPoolExecutor(max_workers=processor.server_thread_count))
+    add_ExternalProcessorServicer_to_server(self, self._server)
     server_credentials = grpc.ssl_server_credentials(
-        private_key_certificate_chain_pairs=[(server.cert_key, server.cert)])
-    address_str = addr_to_str(server.address)
-    grpc_server.add_secure_port(address_str, server_credentials)
-    start_msg = f'GRPC callout server started, listening on {address_str}.'
+        private_key_certificate_chain_pairs=[(processor.cert_key,
+                                              processor.cert)])
+    address_str = addr_to_str(processor.address)
+    self._server.add_secure_port(address_str, server_credentials)
+    self._start_msg = f'GRPC callout server started, listening on {address_str}.'
+    if processor.insecure_address:
+      insecure_str = addr_to_str(processor.insecure_address)
+      self._server.add_insecure_port(insecure_str)
+      self._start_msg += f' (secure) and {insecure_str} (insecure)'
 
-    if server.insecure_address:
-      insecure_str = addr_to_str(server.insecure_address)
-      grpc_server.add_insecure_port(insecure_str)
-      start_msg += f' (secure) and {insecure_str} (insecure)'
+  def stop(self) -> None:
+    self._server.stop(grace=10)
+    self._server.wait_for_termination(timeout=10)
+    logging.info('GRPC server stopped.')
 
-    grpc_server.start()
-    logging.info(start_msg)
-    return grpc_server
+  def loop(self) -> None:
+    self._server.wait_for_termination()
+
+  def start(self) -> None:
+    self._server.start()
+    logging.info(self._start_msg)
 
   def Process(
       self,
-      request_iterator: Iterator[ProcessingRequest],
+      request_iterator: Iterable[ProcessingRequest],
       context: ServicerContext,
   ) -> Iterator[ProcessingResponse]:
     """Process the client request."""
-    return self.processor.process(request_iterator, context)
+    for request in request_iterator:
+      yield self._processor.process(request, context)

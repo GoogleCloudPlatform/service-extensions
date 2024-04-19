@@ -12,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import logging
-from typing import Iterator, Literal
-import grpc
 from grpc import ServicerContext
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from envoy.service.ext_proc.v3.external_processor_pb2 import ProcessingRequest, ProcessingResponse
@@ -58,28 +55,24 @@ default_headers = [('service-callout-response-intercept', 'intercepted'),
 class CalloutServerExample(callout_server.CalloutServer):
   """Example callout server."""
 
-  def process(self, request_iterator: Iterator[ProcessingRequest],
-              context: ServicerContext) -> Iterator[ProcessingResponse]:
-    logging.info('Processing request stream.')
-    for request in request_iterator:
-      logging.info('Received request %s.', request)
-      if request.HasField('response_body'):
-        yield ProcessingResponse(
-            response_body=callout_tools.add_body_mutation('e2e-test'))
-        return
-      if not check_metadata(request):
-        yield ProcessingResponse(
-            response_headers=callout_tools.add_header_mutation(
-                default_headers),)
-      yield ProcessingResponse(
+  def process(self, request: ProcessingRequest,
+              context: ServicerContext) -> ProcessingResponse:
+    logging.info('Received request %s.', request)
+    if request.HasField('response_body'):
+      return ProcessingResponse(
+          response_body=callout_tools.add_body_mutation('e2e-test'))
+    if not check_metadata(request):
+      return ProcessingResponse(
           response_headers=callout_tools.add_header_mutation(
-              add=[('metadata', 'found')] + default_headers),)
+              default_headers),)
+    return ProcessingResponse(
+        response_headers=callout_tools.add_header_mutation(
+            add=[('metadata', 'found')] + default_headers),)
 
 
 if __name__ == '__main__':
   # Setup command line args.
   args = callout_tools.add_command_line_args().parse_args()
-
   # Set the debug level.
   logging.basicConfig(level=logging.DEBUG)
   logging.info('Starting e2e_test server v7.')
