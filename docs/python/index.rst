@@ -11,9 +11,9 @@ Contents:
    :maxdepth: 2
    :caption: Contents:
 
-   introduction
-   setup
-   usage
+   readme/introduction
+   readme/usage
+   readme/setup
 
 .. toctree::
    :maxdepth: 1
