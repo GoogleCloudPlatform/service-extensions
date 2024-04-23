@@ -18,13 +18,13 @@ from extproc.service import callout_server
 from extproc.service import callout_tools
 
 def validate_header(request_headers):
-  """Validate header for a particular client request."""
+  """Validate if contains 'cookie-check' header."""
   return next((header.raw_value
                    for header in request_headers.headers.headers
                    if header.key == 'cookie-check'), None)
 
 class CalloutServerExample(callout_server.CalloutServer):
-  """Example callout server.
+  """Example Set Cookie / Callout server.
 
   Provides a non-comprehensive set of responses for each of the possible
   callout interactions.
