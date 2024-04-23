@@ -22,5 +22,6 @@ Contents:
    extproc/service/callout_tools
    extproc/basic_callout_server
    extproc/add_body/service_callout_example
+   extproc/add_header/service_callout_example
    extproc/add_custom_response/service_callout_example
    extproc/set_cookie/service_callout_example
