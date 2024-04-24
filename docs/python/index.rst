@@ -25,4 +25,5 @@ Contents:
    extproc/add_header/service_callout_example
    extproc/add_custom_response/service_callout_example
    extproc/set_cookie/service_callout_example
+   extproc/redirect/service_callout_example
    extproc/update_header/service_callout_example
