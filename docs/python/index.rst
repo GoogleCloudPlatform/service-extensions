@@ -20,6 +20,11 @@ Contents:
    :caption: SDK Documentation:
 
    extproc/service/callout_tools
+   extproc/service/callout_server
    extproc/basic_callout_server
    extproc/add_body/service_callout_example
    extproc/add_custom_response/service_callout_example
+   extproc/cloud_log/service_callout_example
+   extproc/jwt_auth/service_callout_example
+   extproc/observability_server/service_callout_example
+   extproc/normalize_header/service_callout_example
