@@ -2,22 +2,16 @@ import pytest
 import urllib.request
 import json
 
-from extproc.example.observability.service_callout_example import ObservabilityServerExample
-from extproc.tests.basic_grpc_test import make_request, setup_server, get_insecure_channel
+from extproc.example.e2e_tests.observability_server import ObservabilityServerExample
+from extproc.tests.basic_grpc_test import make_request, setup_server, get_insecure_channel, insecure_kwargs
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpHeaders
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpBody
 from envoy.service.ext_proc.v3.external_processor_pb2_grpc import ExternalProcessorStub
 
-# Replace the default ports of the server so that they do not clash with running programs.
-default_kwargs: dict = {
-    'address': ('0.0.0.0', 8443),
-    'health_check_address': ('0.0.0.0', 8080)
-}
-# Arguments for running an insecure server alongside the secure grpc.
-insecure_kwargs: dict = default_kwargs | {'insecure_address': ('0.0.0.0', 8000)}
+# Set up test fixture.
 _ = setup_server
 _local_test_args: dict = {
-    "kwargs": insecure_kwargs,
+    "kwargs": insecure_kwargs | {'health_check_address': ('0.0.0.0', 8008)},
     "test_class": ObservabilityServerExample
 }
 
@@ -38,7 +32,7 @@ class TestObservabilityServer(object):
             make_request(stub, response_body=body, observability_mode=True)
             make_request(stub, request_headers=end_headers, observability_mode=True)
             channel.close()
-            base_url = 'http://0:10000/counters'
+            base_url = 'http://0:8080/counters'
             with urllib.request.urlopen(base_url) as response:
                 data = response.read().decode()
             counters = json.loads(data)

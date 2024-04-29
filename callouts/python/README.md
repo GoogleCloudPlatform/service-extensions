@@ -180,6 +180,7 @@ The default `CalloutServer` listens on port `8443` for grpc traffic, `8000` for 
 The `on_request_headers` and `on_request_body` methods also accept [`ImmediateResponse`](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#envoy-v3-api-field-service-ext-proc-v3-processingresponse-immediate-response) values as a return value.
 
 
+[CalloutServer](extproc/service/callout_server.py) also contains a `process` method that can be overriden to work directly on incomming `ProcessingRequest`s.
 ## Using the proto files
 The python classes can be imported using the relative [envoy/api](https://github.com/envoyproxy/envoy/tree/main/api) path:
 
