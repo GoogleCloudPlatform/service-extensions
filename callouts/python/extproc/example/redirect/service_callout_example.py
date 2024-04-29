@@ -24,29 +24,17 @@ class CalloutServerExample(callout_server.CalloutServer):
   Provides a non-comprehensive set of responses for each of the possible
   callout interactions.
 
-  For request header callouts we provide a mutation to add a header
-  '{header-request: request}', remove a header 'foo', and to clear the
-  route cache. On response header callouts, we respond with a mutation to add
-  the header '{header-response: response}'.
+  On a request header callout we perform a redirect to '{http://service-extensions.com/redirect}'
+  with the status of '{301}' - MovedPermanently returning an ImmediateResponse
   """
 
   def on_request_headers(
-      self, headers: service_pb2.HttpHeaders, context: ServicerContext
-  ) -> service_pb2.HeadersResponse:
+      self, headers: service_pb2.HttpHeaders,
+      context: ServicerContext) -> service_pb2.ImmediateResponse:
     """Custom processor on request headers."""
-    return callout_tools.add_header_mutation(
-      add=[('header-request', 'request')],
-      clear_route_cache=True
-    )
-
-  def on_response_headers(
-      self, headers: service_pb2.HttpHeaders, context: ServicerContext
-  ) -> service_pb2.HeadersResponse:
-    """Custom processor on response headers."""
-    return callout_tools.add_header_mutation(
-      add=[('header-response', 'response')],
-      remove=['foo']
-    )
+    return callout_tools.header_immediate_response(
+        code=301,
+        headers=[('Location', 'http://service-extensions.com/redirect')])
 
 
 if __name__ == '__main__':

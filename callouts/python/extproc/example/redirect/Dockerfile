@@ -14,7 +14,7 @@
 FROM service-callout-common-python
 
 # Copy over example specific files.
-COPY extproc/example/add_header/*.py ./
+COPY extproc/example/redirect/*.py ./
 
 # Set up communication ports.
 EXPOSE 443

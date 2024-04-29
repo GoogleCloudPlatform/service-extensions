@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from grpc import ServicerContext
-from extproc.proto import service_pb2
+from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from extproc.service import callout_server
 
 
@@ -42,4 +42,6 @@ class CalloutServerExample(callout_server.CalloutServer):
 
 if __name__ == '__main__':
   # Run the gRPC service
-  CalloutServerExample(port=443, insecure_port=8080, health_check_port=80).run()
+  CalloutServerExample(address=('0.0.0.0', 443),
+                       insecure_address=('0.0.0.0', 8080),
+                       health_check_address=('0.0.0.0', 80)).run()

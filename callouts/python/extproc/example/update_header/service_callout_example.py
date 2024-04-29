@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from envoy.config.core.v3.base_pb2 import HeaderValueOption
 from grpc import ServicerContext
-from extproc.proto import service_pb2
-from extproc.service import callout_server
-
+from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
+from extproc.service import callout_server, callout_tools
+actions = HeaderValueOption.HeaderAppendAction
 
 class CalloutServerExample(callout_server.CalloutServer):
   """Example callout server.
@@ -29,25 +30,25 @@ class CalloutServerExample(callout_server.CalloutServer):
   On response header callouts, we respond with a mutation to update
   the header '{header-response: response}'.
   """
+
   def on_request_headers(
-      self, headers: service_pb2.HttpHeaders, context: ServicerContext
-  ) -> service_pb2.HeadersResponse:
+      self, headers: service_pb2.HttpHeaders,
+      context: ServicerContext) -> service_pb2.HeadersResponse:
     """Custom processor on request headers."""
-    return callout_server.add_header_mutation(
+    return callout_tools.add_header_mutation(
         add=[('header-request', 'request-new-value')],
-        append_action=2,  #OVERWRITE_IF_EXISTS_OR_ADD
-        clear_route_cache=True
-    )
+        append_action=actions.OVERWRITE_IF_EXISTS_OR_ADD,
+        clear_route_cache=True)
 
   def on_response_headers(
-      self, headers: service_pb2.HttpHeaders, context: ServicerContext
-  ) -> service_pb2.HeadersResponse:
+      self, headers: service_pb2.HttpHeaders,
+      context: ServicerContext) -> service_pb2.HeadersResponse:
     """Custom processor on response headers."""
-    return callout_server.add_header_mutation(
+    return callout_tools.add_header_mutation(
         add=[('header-response', 'response-new-value')],
-        append_action=2  #OVERWRITE_IF_EXISTS_OR_ADD
-    )
+        append_action=actions.OVERWRITE_IF_EXISTS_OR_ADD)
+
 
 if __name__ == '__main__':
   # Run the gRPC service
-  CalloutServerExample(port=443, insecure_port=8080, health_check_port=80).run()
+  CalloutServerExample().run()

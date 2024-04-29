@@ -17,6 +17,11 @@ from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from extproc.service import callout_server
 from extproc.service import callout_tools
 
+def validate_header(request_headers):
+  """Validate header for a particular client request."""
+  return next((header.raw_value
+                   for header in request_headers.headers.headers
+                   if header.key == 'cookie-check'), None)
 
 class CalloutServerExample(callout_server.CalloutServer):
   """Example callout server.
@@ -24,31 +29,21 @@ class CalloutServerExample(callout_server.CalloutServer):
   Provides a non-comprehensive set of responses for each of the possible
   callout interactions.
 
-  For request header callouts we provide a mutation to add a header
-  '{header-request: request}', remove a header 'foo', and to clear the
-  route cache. On response header callouts, we respond with a mutation to add
-  the header '{header-response: response}'.
+  For response header callouts we set a cookie providing a mutation to add 
+  a header '{Set-Cookie: cookie}'. This cookie is only set for requests from
+  certain clients, based on the presence of the 'cookie-check' header key.
   """
-
-  def on_request_headers(
-      self, headers: service_pb2.HttpHeaders, context: ServicerContext
-  ) -> service_pb2.HeadersResponse:
-    """Custom processor on request headers."""
-    return callout_tools.add_header_mutation(
-      add=[('header-request', 'request')],
-      clear_route_cache=True
-    )
 
   def on_response_headers(
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Custom processor on response headers."""
-    return callout_tools.add_header_mutation(
-      add=[('header-response', 'response')],
-      remove=['foo']
-    )
+    if validate_header(headers):
+      return callout_tools.add_header_mutation(
+        add=[('Set-Cookie', 'your_cookie_name=cookie_value; Max-Age=3600; Path=/')]
+      )
 
 
 if __name__ == '__main__':
   # Run the gRPC service
-  CalloutServerExample(insecure_address=('0.0.0.0', 8080)).run()
+  CalloutServerExample().run()
