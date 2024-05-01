@@ -6,8 +6,8 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 # To override with local branches, pass `--override_repository=REPO=/local/path` to Bazel
 # or persist the option in `.bazelrc`.
 
-PROXY_WASM_HOST_COMMIT = "9be9637b5d595483ddba218eb09879818a5e0ffc"  # 2024-01-29
-PROXY_WASM_HOST_SHA256 = "030e9611bb103691c019e7e8726489ec033bcc18066c93f240b105042672df19"
+PROXY_WASM_HOST_COMMIT = "04dfb94747e6462b65f7ed694e2d9c78ab207e11"  # 2024-04-29
+PROXY_WASM_HOST_SHA256 = "9c6da146d86f9b03d98b975f89c1762fc1b7f179da6775134c66e68c79eec4d1"
 
 http_archive(
     name = "proxy_wasm_cpp_host",
