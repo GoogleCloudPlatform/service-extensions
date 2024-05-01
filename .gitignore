@@ -11,8 +11,9 @@
 /callouts/python/upda/**
 /callouts/python/validate/**
 /callouts/python/xds/**
+/plugins/bazel-*
+/plugins/target
 /.vscode/**
 /.idea/**
-plugins/bazel-*
 **/__pycache__
 .vscode

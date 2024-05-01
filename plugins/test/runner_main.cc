@@ -19,9 +19,13 @@
 // validates a configured set of expectations about output and side effects.
 //
 // TODO Future features
+// - Publish test runner as Docker image
+// - Option to print all logs to file/stdout
+// - Option to set the clock time via config
+// - Support wasm profiling (https://v8.dev/docs/profile)
+// - Tune v8 compiler (v8_flags.liftoff_only, precompile, etc)
 // - YAML config input support (--yaml instead of --proto)
 // - Structured output (JSON) rather than stdout/stderr
-// - Publish test runner as Docker image
 // - Crash / death tests?
 
 #include "absl/flags/flag.h"
