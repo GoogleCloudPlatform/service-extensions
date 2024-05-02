@@ -78,7 +78,16 @@ class CalloutServerExample(callout_server.CalloutServer):
 
   def on_request_body(self, body: service_pb2.HttpBody,
                       context: ServicerContext):
-    """Custom processor on the request body."""
+    """Custom processor on the request body.
+
+    Args:
+      body (service_pb2.BodyResponse): The HTTP body received in the request.
+      context (ServicerContext): The context object for the gRPC service.
+
+    Returns:
+      service_pb2.BodyResponse: The response containing the mutations to be applied
+      to the request body.
+    """
     if validate_body(body):
       callout_tools.deny_request(context)
     if body_mock_check(body):
@@ -87,7 +96,16 @@ class CalloutServerExample(callout_server.CalloutServer):
 
   def on_response_body(self, body: service_pb2.HttpBody,
                        context: ServicerContext):
-    """Custom processor on the response body."""
+    """Custom processor on the response body.
+
+        Args:
+          body (service_pb2.BodyResponse): The HTTP body received in the response.
+          context (ServicerContext): The context object for the gRPC service.
+
+        Returns:
+          service_pb2.BodyResponse: The response containing the mutations to be applied
+          to the response body.
+        """
     if validate_body(body):
       callout_tools.deny_request(context)
     if body_mock_check(body):
@@ -97,7 +115,16 @@ class CalloutServerExample(callout_server.CalloutServer):
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders,
       context: ServicerContext):
-    """Custom processor on request headers."""
+    """Custom processor on request headers.
+
+    Args:
+      headers (service_pb2.HttpHeaders): The HTTP headers received in the request.
+      context (ServicerContext): The context object for the gRPC service.
+
+    Returns:
+      service_pb2.HeadersResponse: The response containing the mutations to be applied
+      to the request headers.
+    """
     if validate_request_header(headers):
       callout_tools.deny_request(context)
     if header_mock_check(headers):
@@ -110,7 +137,16 @@ class CalloutServerExample(callout_server.CalloutServer):
   def on_response_headers(
       self, headers: service_pb2.HttpHeaders,
       context: ServicerContext):
-    """Custom processor on response headers."""
+    """Custom processor on response headers.
+
+        Args:
+          headers (service_pb2.HttpHeaders): The HTTP headers received in the response.
+          context (ServicerContext): The context object for the gRPC service.
+
+        Returns:
+          service_pb2.HeadersResponse: The response containing the mutations to be applied
+          to the response headers.
+        """
     if validate_request_header(headers):
       callout_tools.deny_request(context)
     if header_mock_check(headers):

@@ -52,7 +52,9 @@ class CalloutServerExample(callout_server.CalloutServer):
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Custom processor on response headers.
-    
+
+    This method should set cookie on http response for a particular client request.
+
     Args:
       headers (service_pb2.HttpHeaders): The HTTP headers received in the response.
       context (ServicerContext): The context object for the gRPC service.

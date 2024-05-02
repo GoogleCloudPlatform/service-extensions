@@ -53,7 +53,16 @@ class CalloutServerExample(callout_server.CalloutServer):
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders,
       context: ServicerContext):
-    """Custom processor on request headers."""
+    """Custom processor on request headers.
+
+    Args:
+      headers (service_pb2.HttpHeaders): The HTTP headers received in the request.
+      context (ServicerContext): The context object for the gRPC service.
+
+    Returns:
+      service_pb2.HeadersResponse: The response containing the mutations to be applied
+      to the request headers.
+    """
 
     decoded = validate_jwt_token(self.public_key, headers, "RS256")
 

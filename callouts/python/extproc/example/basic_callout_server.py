@@ -46,17 +46,17 @@ class BasicCalloutServer(CalloutServer):
 
   def on_response_headers(self, headers: HttpHeaders, _) -> HeadersResponse:
     """Custom processor on response headers."""
-    logging.debug("Recived response headers callout: %s", headers)
+    logging.debug("Received response headers callout: %s", headers)
     return add_header_mutation(add=[('hello', 'service-extensions')])
 
   def on_request_body(self, body: HttpBody, _) -> BodyResponse:
     """Custom processor on the request body."""
-    logging.debug("Recived request body callout: %s", body)
+    logging.debug("Received request body callout: %s", body)
     return add_body_mutation(body='-added-body')
 
   def on_response_body(self, body: HttpBody, _) -> BodyResponse:
     """Custom processor on the response body."""
-    logging.debug("Recived response body callout: %s", body)
+    logging.debug("Received response body callout: %s", body)
     return add_body_mutation(body='new-body', clear_body=True)
 
 
