@@ -4,9 +4,6 @@ Documentation for Python Callouts
 
 Welcome to the documentation pages for the Python Callouts. Here you will find detailed guides and SDK references for the components provided in this section.
 
-Contents:
----------
-
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
