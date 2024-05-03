@@ -94,6 +94,14 @@ DynamicTest::LoadWasm(bool benchmark) {
   return CreatePluginVm(engine_, *wasm, plugin_config, min_log_level);
 }
 
+// Macro to stop test execution if the VM has failed.
+// Includes logs in the output so that panic reasons are printed.
+#define ASSERT_VM_HEALTH(phase, handle, context)                           \
+  if (handle->wasm()->isFailed()) {                                        \
+    FAIL() << absl::Substitute("[$0] Wasm VM failed! Logs: \n$1\n", phase, \
+                               absl::StrJoin(context.phase_logs(), "\n")); \
+  }
+
 void DynamicTest::TestBody() {
   // Initialize VM.
   auto load_wasm = LoadWasm(/*benchmark=*/false);
@@ -107,19 +115,19 @@ void DynamicTest::TestBody() {
       handle->wasm()->getRootContext(handle->plugin(),
                                      /*allow_closed=*/false));
   ASSERT_NE(root_context, nullptr);
-  CheckForFailures("plugin_init", handle);
+  ASSERT_VM_HEALTH("plugin_init", handle, (*root_context));
   CheckSideEffects("plugin_init", cfg_.plugin_init(), *root_context);
 
   // Initialize stream.
   auto stream = TestHttpContext(handle);
-  CheckForFailures("stream_init", handle);
+  ASSERT_VM_HEALTH("stream_init", handle, stream);
   CheckSideEffects("stream_init", cfg_.stream_init(), stream);
 
   // Exercise phase tests in sequence.
   if (cfg_.has_request_headers()) {
     const auto& invoke = cfg_.request_headers();
     auto res = stream.SendRequestHeaders(GenHeaders(invoke.input()));
-    CheckForFailures("request_headers", handle);
+    ASSERT_VM_HEALTH("request_headers", handle, stream);
     CheckPhaseResults("request_headers", invoke.result(), stream, res);
   }
   if (cfg_.request_body_size() > 0) {
@@ -128,7 +136,7 @@ void DynamicTest::TestBody() {
   if (cfg_.has_response_headers()) {
     const auto& invoke = cfg_.response_headers();
     auto res = stream.SendResponseHeaders(GenHeaders(invoke.input()));
-    CheckForFailures("response_headers", handle);
+    ASSERT_VM_HEALTH("response_headers", handle, stream);
     CheckPhaseResults("response_headers", invoke.result(), stream, res);
   }
   if (cfg_.response_body_size() > 0) {
@@ -137,7 +145,7 @@ void DynamicTest::TestBody() {
 
   // Tear down HTTP context.
   stream.TearDown();
-  CheckForFailures("stream_destroy", handle);
+  ASSERT_VM_HEALTH("stream_destroy", handle, stream);
   CheckSideEffects("stream_destroy", cfg_.stream_destroy(), stream);
 }
 
@@ -225,14 +233,6 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
       BM_RETURN_IF_FAILED(handle);
     }
     // Future: send response BODY here.
-  }
-}
-
-void DynamicTest::CheckForFailures(
-    const std::string& phase,
-    const std::shared_ptr<proxy_wasm::PluginHandleBase>& handle) {
-  if (handle->wasm()->isFailed()) {
-    ADD_FAILURE() << absl::Substitute("[$0] Wasm VM failed!", phase);
   }
 }
 

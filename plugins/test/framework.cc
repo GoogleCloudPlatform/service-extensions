@@ -32,16 +32,18 @@ uint64_t TestContext::getCurrentTimeNanoseconds() {
   return absl::ToUnixNanos(absl::UnixEpoch());
 }
 uint64_t TestContext::getMonotonicTimeNanoseconds() {
-  unimplemented();
-  return 0;
+  // Return some frozen timestamp.
+  return absl::ToUnixNanos(absl::UnixEpoch());
 }
 proxy_wasm::WasmResult TestContext::log(uint32_t log_level,
                                         std::string_view message) {
   if (wasmVm()->cmpLogLevel(proxy_wasm::LogLevel::trace)) {
     std::cout << "TRACE from testcontext: [log] " << message << std::endl;
   }
-  phase_logs_.emplace_back(message);
-  return proxy_wasm::TestContext::log(log_level, message);
+  if (wasmVm()->cmpLogLevel(static_cast<proxy_wasm::LogLevel>(log_level))) {
+    phase_logs_.emplace_back(message);
+  }
+  return proxy_wasm::WasmResult::Ok;
 }
 
 proxy_wasm::WasmResult TestHttpContext::getHeaderMapSize(
@@ -169,7 +171,6 @@ std::vector<std::string> FindPlugins() {
 absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>> CreatePluginVm(
     const std::string& engine, const std::string& wasm_bytes,
     const std::string& plugin_config, proxy_wasm::LogLevel min_log_level) {
-
   // Create a VM.
   auto vm = proxy_wasm::TestVm::makeVm(engine);
   static_cast<proxy_wasm::TestIntegration*>(vm->integration().get())

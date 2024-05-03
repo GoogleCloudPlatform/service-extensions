@@ -62,11 +62,6 @@ class DynamicTest : public DynamicFixture {
   absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>> LoadWasm(
       bool benchmark);
 
-  // Helper to check for wasm engine failures.
-  void CheckForFailures(
-      const std::string& phase,
-      const std::shared_ptr<proxy_wasm::PluginHandleBase>& handle);
-
   // Helper to check lifecycle phase side effects (e.g. logging).
   void CheckSideEffects(const std::string& phase, const pb::Expectation& expect,
                         const TestContext& context);
