@@ -22,6 +22,20 @@ from extproc.service import callout_server
 from extproc.service import callout_tools
 
 def extract_jwt_token(request_headers):
+  """
+  Extracts the JWT token from the request headers, specifically looking for
+  the 'Authorization' header and parsing out the token part.
+
+  Args:
+      request_headers (service_pb2.HttpHeaders): The HTTP headers received in the request.
+
+  Returns:
+      str: The extracted JWT token if found, otherwise None.
+
+  Example:
+      Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6...
+      -> Returns: eyJhbGciOiJIUzI1NiIsInR5cCI6...
+  """
   jwt_token = next((header.raw_value.decode('utf-8')
                    for header in request_headers.headers.headers
                    if header.key == 'Authorization'), None)
@@ -29,6 +43,28 @@ def extract_jwt_token(request_headers):
   return extracted_jwt
 
 def validate_jwt_token(key, request_headers, algorithm):
+  """
+  Validates the JWT token extracted from the request headers using a specified
+  public key and algorithm. If valid, returns the decoded JWT payload; otherwise,
+  logs an error and returns None.
+
+  Args:
+      key (str): The public key used for token validation.
+      request_headers (service_pb2.HttpHeaders): The HTTP headers received in the request,
+                                                used to extract the JWT token.
+      algorithm (str): The algorithm with which the JWT was signed (e.g., 'RS256').
+
+  Returns:
+      dict | None: The decoded JWT if validation is successful, None if the token is
+                   invalid or an error occurs.
+
+  Raises:
+      InvalidTokenError: If the token is invalid or decoding fails.
+
+  Example:
+      Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6...
+      -> Returns: {'sub': '1234567890', 'name': 'John Doe', 'iat': 1712173461, 'exp': 2075658261}
+  """
   jwt_token = extract_jwt_token(request_headers)
   try:
     decoded = jwt.decode(jwt_token, key, algorithms=[algorithm])
@@ -53,15 +89,13 @@ class CalloutServerExample(callout_server.CalloutServer):
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders,
       context: ServicerContext):
-    """Custom processor on request headers.
+    """Deny token if validation fails and return an error message.
+    See :py:meth:`callouts.python.extproc.service.callout_tools.deny_request` for more information.
 
-    Args:
-      headers (service_pb2.HttpHeaders): The HTTP headers received in the request.
-      context (ServicerContext): The context object for the gRPC service.
+    If the token is valid, apply a header mutation.
+    See :py:meth:`callouts.python.extproc.service.callout_tools.add_header_mutation` for more information.
 
-    Returns:
-      service_pb2.HeadersResponse: The response containing the mutations to be applied
-      to the request headers.
+    See base method: :py:meth:`callouts.python.extproc.service.callout_server.CalloutServer.on_request_headers`.
     """
 
     decoded = validate_jwt_token(self.public_key, headers, "RS256")
