@@ -21,7 +21,7 @@ class CalloutServerExample(callout_server.CalloutServer):
   """Example callout server.
 
   Provides a non-comprehensive set of responses for each of the possible
-  callouts interactions.
+  callout interactions.
 
   For request body callouts, we offer a mutation to append '-added-body'
   to the existing body content. In response body callouts, our solution

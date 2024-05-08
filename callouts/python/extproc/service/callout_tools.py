@@ -37,7 +37,11 @@ def _addr(value: str) -> tuple[str, int] | None:
 
 
 def add_command_line_args() -> argparse.ArgumentParser:
-  """Adds command line args that can be passed to the CalloutServer constructor."""
+  """Adds command line args that can be passed to the CalloutServer constructor.
+
+  Returns:
+      argparse.ArgumentParser: Configured argument parser with callout server options.
+  """
   parser = argparse.ArgumentParser()
   parser.add_argument(
       '--secure_health_check',
@@ -101,7 +105,7 @@ def add_header_mutation(
     clear_route_cache: If true, will enable clear_route_cache on the response.
     append_action: Supported actions types for header append action.
   Returns:
-    The constructed header response object.
+    HeadersResponse: A configured header mutation response with the specified modifications.
   """
   header_mutation = HeadersResponse()
   if add:
@@ -124,13 +128,13 @@ def normalize_header_mutation(
     clear_route_cache: bool = False,
 ) -> HeadersResponse:
   """Generate a header response for incoming requests.
+
   Args:
     headers: Current headers presented in the request
     clear_route_cache: If true, will enable clear_route_cache on the response.
   Returns:
-    The constructed header response object.
+    HeadersResponse: The response after header normalization.
   """
-
   host_value = next((header.raw_value.decode('utf-8')
                      for header in headers.headers.headers
                      if header.key == 'host'), None)
@@ -155,15 +159,15 @@ def add_body_mutation(
 ) -> BodyResponse:
   """Generate a body response for incoming requests.
 
-Args:
-  body: Text of the body.
-  clear_body: If set to true, the modification will clear the previous body,
-    if left false, the text will be appended to the end of the previous
-    body.
-  clear_route_cache: If true, will enable clear_route_cache on the response.
+  Args:
+    body: Text of the body.
+    clear_body: If set to true, the modification will clear the previous body,
+      if left false, the text will be appended to the end of the previous
+      body.
+    clear_route_cache: If true, will enable clear_route_cache on the response.
 
   Returns:
-    The constructed body response object.
+    BodyResponse: The constructed body mutation response.
   """
   body_mutation = BodyResponse()
   if body:
@@ -176,7 +180,14 @@ Args:
 
 
 def get_device_type(host_value: str) -> str:
-  """Determine device type based on user agent."""
+  """Determines the device type based on the 'host' header value.
+
+  Args:
+      host_value (str): The value of the 'host' header.
+
+  Returns:
+      str: The type of device ('mobile', 'tablet', or 'desktop') based on the host value.
+  """
   if 'm.example.com' in host_value:
     return 'mobile'
   elif 't.example.com' in host_value:
@@ -185,7 +196,15 @@ def get_device_type(host_value: str) -> str:
 
 
 def deny_request(context, msg: str | None = None):
-  """Deny a grpc request and print an error message"""
+  """Denies a gRPC request, optionally logging a custom message.
+
+  Args:
+      context (grpc.ServicerContext): The gRPC service context.
+      msg (str, optional): Custom message to log before denying the request.
+
+  Raises:
+      grpc.StatusCode.PERMISSION_DENIED: Always raised to deny the request.
+  """
   msg = msg or "Request content is invalid or not allowed"
   logging.warning(msg)
   context.abort(grpc.StatusCode.PERMISSION_DENIED, msg)
@@ -196,7 +215,16 @@ def header_immediate_response(
     headers: list[tuple[str, str]] | None = None,
     append_action: Union[HeaderValueOption.HeaderAppendAction, None] = None,
 ) -> ImmediateResponse:
-  """Returns an ImmediateResponse for a header request"""
+  """Creates an immediate HTTP response with specific headers and status code.
+
+  Args:
+      code (StatusCode): The HTTP status code to return.
+      headers: Optional list of tuples (header, value) to include in the response.
+      append_action: Optional action specifying how headers should be appended.
+
+  Returns:
+      ImmediateResponse: Configured immediate response with the specified headers and status code.
+  """
   immediate_response = ImmediateResponse()
   immediate_response.status.code = code
 
