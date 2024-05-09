@@ -290,7 +290,7 @@ To just build the base image:
 ```shell
 docker build \
   -f ./extproc/example/Dockerfile \
-  --target service-callout-common-python
+  --target service-callout-common-python \
   -t service-callout-common-python .
 ```
 
