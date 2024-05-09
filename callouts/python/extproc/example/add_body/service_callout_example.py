@@ -38,7 +38,7 @@ class CalloutServerExample(callout_server.CalloutServer):
       self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
     """Custom processor on the response body."""
-    return callout_tools.add_body_mutation(body.body.decode('utf-8') + '-added-response-body')
+    return callout_tools.add_body_mutation('new-body')
 
 
 if __name__ == '__main__':
