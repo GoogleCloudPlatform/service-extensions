@@ -102,7 +102,7 @@
                             <transformers>
                                 <transformer
                                         implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>ServiceCallout</mainClass>
+                                    <mainClass>service.ServiceCallout</mainClass>
                                 </transformer>
                             </transformers>
                         </configuration>

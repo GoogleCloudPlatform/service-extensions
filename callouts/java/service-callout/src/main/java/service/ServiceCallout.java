@@ -1,3 +1,5 @@
+package service;
+
 /*
  * Copyright 2015 The gRPC Authors
  *
@@ -15,8 +17,6 @@
  */
 
 import com.google.common.primitives.Bytes;
-import io.envoyproxy.envoy.api.v2.core.HeaderMap;
-import io.envoyproxy.envoy.api.v2.route.RouteAction;
 import io.envoyproxy.envoy.service.ext_proc.v3.*;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -30,7 +30,7 @@ import java.util.logging.Logger;
 /**
  * Server that manages startup/shutdown of a {@code Greeter} server.
  */
-public class ServiceCallout {
+public abstract class ServiceCallout {
     private static final Logger logger = Logger.getLogger(ServiceCallout.class.getName());
 
     private Server server;
@@ -103,7 +103,7 @@ public class ServiceCallout {
     private int serverThreadCount = 2;
     private boolean enableInsecurePort = true;
 
-    private void start() throws IOException {
+    public void start() throws IOException {
         /* The port on which the server should run */
         server = ServerBuilder.forPort(port).addService(new ExternalProcessorImpl()).build().start();
         logger.info("Server started, listening on " + port);
@@ -133,42 +133,55 @@ public class ServiceCallout {
     /**
      * Await termination on the main thread since the grpc library uses daemon threads.
      */
-    private void blockUntilShutdown() throws InterruptedException {
+    public void blockUntilShutdown() throws InterruptedException {
         if (server != null) {
             server.awaitTermination();
         }
     }
 
     public ProcessingResponse ProcessRequest(ProcessingRequest request) {
+        HeadersResponse headersResponse = null;
 
-        ProcessingResponse response = ProcessingResponse.newBuilder().build();
-        return response;
+        if (request.hasRequestHeaders()) {
+            headersResponse = OnRequestHeaders(request.getRequestHeaders());
+        }
+
+        if(request.hasResponseHeaders()){
+            headersResponse = OnResponseHeaders(request.getRequestHeaders());
+        }
+
+        if (headersResponse != null) {
+            return ProcessingResponse.newBuilder()
+                    .setRequestHeaders(headersResponse)
+                    .build();
+        }
+
+        BodyResponse bodyResponse = null;
+
+        if(request.hasRequestBody()){
+            bodyResponse = OnRequestBody(request.getRequestBody());
+        }
+
+        if(request.hasResponseBody()){
+            bodyResponse = OnResponseBody(request.getResponseBody());
+        }
+
+        if (bodyResponse != null) {
+            return ProcessingResponse.newBuilder()
+                    .setResponseBody(bodyResponse)
+                    .build();
+        }
+
+        return ProcessingResponse.newBuilder().build();
     }
 
-    public HeadersResponse OnRequestHeaders(HttpHeaders headers) {
-        return null;
-    }
+    public abstract HeadersResponse OnRequestHeaders(HttpHeaders headers);
 
-    public HeadersResponse OnResponseHeaders(HttpHeaders headers) {
-        return null;
-    }
+    public abstract HeadersResponse OnResponseHeaders(HttpHeaders headers);
 
-    public BodyResponse OnRequestBody(HttpBody body) {
-        return null;
-    }
+    public abstract BodyResponse OnRequestBody(HttpBody body);
 
-    public BodyResponse OnResponseBody(HttpBody body) {
-        return null;
-    }
-
-    /**
-     * Main launches the server from the command line.
-     */
-    public static void main(String[] args) throws IOException, InterruptedException {
-        final ServiceCallout server = new ServiceCallout();
-        server.start();
-        server.blockUntilShutdown();
-    }
+    public abstract BodyResponse OnResponseBody(HttpBody body);
 
     private class ExternalProcessorImpl extends ExternalProcessorGrpc.ExternalProcessorImplBase {
 
@@ -177,8 +190,9 @@ public class ServiceCallout {
                 final StreamObserver<ProcessingResponse> responseObserver) {
             return new StreamObserver<ProcessingRequest>() {
                 @Override
-                public void onNext(ProcessingRequest note) {
-                    ProcessRequest(note);
+                public void onNext(ProcessingRequest request) {
+                    ProcessingResponse response = ProcessRequest(request);
+                    responseObserver.onNext(response);
                 }
 
                 @Override
