@@ -14,6 +14,7 @@ from envoy.service.ext_proc.v3.external_processor_pb2 import ImmediateResponse
 from envoy.type.v3.http_status_pb2 import StatusCode
 import grpc
 
+
 def _addr(value: str) -> tuple[str, int] | None:
   if not value:
     return None
@@ -80,7 +81,7 @@ def add_header_mutation(
     clear_route_cache: bool = False,
     append_action: typing.Optional[HeaderValueOption.HeaderAppendAction] = None,
 ) -> HeadersResponse:
-  """Generate a header response for incoming requests.
+  """Generate a header mutation response for incoming requests.
 
   Args:
     add: A list of tuples representing headers to add.
@@ -140,14 +141,14 @@ def add_body_mutation(
     clear_body: bool = False,
     clear_route_cache: bool = False,
 ) -> BodyResponse:
-  """Generate a body response for incoming requests.
+  """Generate a body mutation response for incoming requests.
+  
+    If both body and clear_body are left as default, the incoming request's body will not be modified.
 
-Args:
-  body: Text of the body.
-  clear_body: If set to true, the modification will clear the previous body,
-    if left false, the text will be appended to the end of the previous
-    body.
-  clear_route_cache: If true, will enable clear_route_cache on the response.
+  Args:
+    body: Body text to replace the current body of the incomming request.
+    clear_body: If true, will clear the body of the incomming request. 
+    clear_route_cache: If true, will enable clear_route_cache on the response.
 
   Returns:
     The constructed body response object.
@@ -155,8 +156,10 @@ Args:
   body_mutation = BodyResponse()
   if body:
     body_mutation.response.body_mutation.body = bytes(body, 'utf-8')
-  if clear_body:
-    body_mutation.response.body_mutation.clear_body = True
+    if (clear_body):
+      logging.warning("body and clear_body are mutually exclusive.")
+  else:
+    body_mutation.response.body_mutation.clear_body = clear_body
   if clear_route_cache:
     body_mutation.response.clear_route_cache = True
   return body_mutation

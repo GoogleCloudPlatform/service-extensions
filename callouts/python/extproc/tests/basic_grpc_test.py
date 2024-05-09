@@ -173,8 +173,7 @@ class TestBasicServer(object):
 
       value = make_request(stub, response_body=body)
       assert value.HasField('response_body')
-      assert value.response_body == add_body_mutation(body='new-body',
-                                                      clear_body=True)
+      assert value.response_body == add_body_mutation(clear_body=True)
 
       value = make_request(stub, response_headers=headers)
       assert value.HasField('response_headers')

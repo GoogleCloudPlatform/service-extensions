@@ -57,7 +57,7 @@ class BasicCalloutServer(CalloutServer):
   def on_response_body(self, body: HttpBody, _) -> BodyResponse:
     """Custom processor on the response body."""
     logging.debug("Received response body callout: %s", body)
-    return add_body_mutation(body='new-body', clear_body=True)
+    return add_body_mutation(clear_body=True)
 
 
 if __name__ == '__main__':

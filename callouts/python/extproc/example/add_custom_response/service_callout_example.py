@@ -92,7 +92,7 @@ class CalloutServerExample(callout_server.CalloutServer):
       callout_tools.deny_request(context)
     if body_mock_check(body):
       return generate_mock_body_response()
-    return callout_tools.add_body_mutation(body='new-body', clear_body=False)
+    return callout_tools.add_body_mutation()
 
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders,
