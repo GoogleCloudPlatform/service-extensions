@@ -9,7 +9,7 @@
     <packaging>jar</packaging>
     <version>0.1.0</version>
     <properties>
-        <protobuf.input.directory>${project.basedir}/../../protos</protobuf.input.directory>
+        <protobuf.input.directory>${project.basedir}/../protos</protobuf.input.directory>
         <protobuf.output.directory>${project.build.directory}/proto</protobuf.output.directory>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
@@ -63,7 +63,7 @@
                     <pluginId>grpc-java</pluginId>
                     <pluginArtifact>
                         io.grpc:protoc-gen-grpc-java:1.60.0:exe:${os.detected.classifier}</pluginArtifact>
-                    <protoSourceRoot>../../protos</protoSourceRoot>
+                    <protoSourceRoot>../protos</protoSourceRoot>
                 </configuration>
                 <executions>
                     <execution>
