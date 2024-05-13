@@ -1,3 +1,5 @@
+package service;
+
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -36,7 +38,7 @@ public class HealthCheckServer {
     }
 
     public static void main(String[] args) throws IOException {
-        HealthCheckServer healthCheckServer = new HealthCheckServer(8080, "", "0.0.0.0");
+        HealthCheckServer healthCheckServer = new HealthCheckServer(8080, "/", "0.0.0.0");
         healthCheckServer.start();
     }
 }

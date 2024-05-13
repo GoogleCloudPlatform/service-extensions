@@ -16,16 +16,19 @@ package service;
  * limitations under the License.
  */
 
-import com.google.common.primitives.Bytes;
 import io.envoyproxy.envoy.service.ext_proc.v3.*;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
+import io.grpc.netty.NettyServerBuilder;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import static utils.SslUtils.createSslContext;
+import static utils.SslUtils.readFileToBytes;
 
 /**
  * Server that manages startup/shutdown of a {@code Greeter} server.
@@ -36,7 +39,7 @@ public abstract class ServiceCallout {
     private Server server;
 
     public ServiceCallout() {
-        this(null, null, null, null, null, null, null, null, null, null, null, null);
+        this(null, null, null, null, null, null, null, null, null, null, null, null, null);
     }
 
     public ServiceCallout(
@@ -45,10 +48,11 @@ public abstract class ServiceCallout {
             Integer insecurePort,
             String healthCheckIp,
             Integer healthCheckPort,
+            String healthCheckPath,
             Boolean serperateHealthCheck,
-            Bytes cert,
+            byte[] cert,
             String certPath,
-            Bytes certKey,
+            byte[] certKey,
             String certKeyPath,
             Integer serverThreadCount,
             Boolean enableInsecurePort) {
@@ -67,21 +71,32 @@ public abstract class ServiceCallout {
         if (healthCheckPort != null) {
             this.healthCheckPort = healthCheckPort;
         }
+        if (healthCheckPath != null) {
+            this.healthCheckPath = healthCheckPath;
+        }
         if (serperateHealthCheck != null) {
             this.serperateHealthCheck = serperateHealthCheck;
-        }
-        if (cert != null) {
-            this.cert = cert;
         }
         if (certPath != null) {
             this.certPath = certPath;
         }
-        if (certKey != null) {
-            this.certKey = certKey;
+
+        if (cert != null) {
+            this.cert = cert;
+        } else {
+            this.cert = readFileToBytes(this.certPath);
         }
+
         if (certKeyPath != null) {
             this.certKeyPath = certKeyPath;
         }
+
+        if (certKey != null) {
+            this.certKey = certKey;
+        } else {
+            this.certKey = readFileToBytes(this.certKeyPath);
+        }
+
         if (serverThreadCount != null) {
             this.serverThreadCount = serverThreadCount;
         }
@@ -95,17 +110,33 @@ public abstract class ServiceCallout {
     private int insecurePort = 8443;
     private String healthCheckIp = "0.0.0.0";
     private int healthCheckPort = 8000;
+    private String healthCheckPath = "/";
     private boolean serperateHealthCheck = false;
-    private Bytes cert = null;
-    private String certPath = "../ssl_creds/localhost.crt";
-    private Bytes certKey = null;
-    private String certKeyPath = "../ssl_creds/localhost.key";
+    private byte[] cert = null;
+    private String certPath = "certs/server.crt";
+    private byte[] certKey = null;
+    private String certKeyPath = "certs/pkcs8_key.pem";
     private int serverThreadCount = 2;
     private boolean enableInsecurePort = true;
 
     public void start() throws IOException {
+        HealthCheckServer healthCheckServer = new HealthCheckServer(healthCheckPort, healthCheckPath, healthCheckIp);
+        healthCheckServer.start();
+
         /* The port on which the server should run */
-        server = ServerBuilder.forPort(port).addService(new ExternalProcessorImpl()).build().start();
+        ServerBuilder<?> serverBuilder;
+        if (cert != null && certKey != null) {
+            // If both certificate and private key are provided, start the server with SSL
+            logger.info("Secure server starting...");
+            serverBuilder = NettyServerBuilder.forPort(port)
+                    .sslContext(createSslContext(cert, certKey));
+        } else {
+            // Otherwise, start the server without SSL
+            logger.info("Insecure server starting...");
+            serverBuilder = ServerBuilder.forPort(port);
+        }
+
+        server = serverBuilder.addService(new ExternalProcessorImpl()).build().start();
         logger.info("Server started, listening on " + port);
         Runtime.getRuntime()
                 .addShutdownHook(
