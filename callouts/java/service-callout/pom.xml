@@ -17,13 +17,6 @@
         <grpc.version>1.60.0</grpc.version>
     </properties>
 
-    <repositories>
-        <repository>
-            <id>jitpack.io</id>
-            <url>https://jitpack.io</url>
-        </repository>
-    </repositories>
-
     <dependencies>
         <dependency>
             <groupId>io.grpc</groupId>
@@ -59,9 +52,9 @@
         </dependency>
 
         <dependency>
-            <groupId>com.github.envoyproxy</groupId>
-            <artifactId>java-control-plane</artifactId>
-            <version>v1.0.42</version>
+            <groupId>io.envoyproxy.controlplane</groupId>
+            <artifactId>server</artifactId>
+            <version>1.0.42</version>
         </dependency>
 
     </dependencies>
@@ -79,13 +72,14 @@
                 <groupId>org.xolstice.maven.plugins</groupId>
                 <artifactId>protobuf-maven-plugin</artifactId>
                 <version>0.6.1</version>
-
                 <configuration>
-                    <protocArtifact>com.google.protobuf:protoc:3.24.0:exe:${os.detected.classifier}</protocArtifact>
+                    <protocArtifact>com.google.protobuf:protoc:${grpc.version}:exe:${os.detected.classifier}</protocArtifact>
                     <pluginId>grpc-java</pluginId>
-                    <pluginArtifact>
-                        io.grpc:protoc-gen-grpc-java:1.60.0:exe:${os.detected.classifier}</pluginArtifact>
-                    <protoSourceRoot>../../protos</protoSourceRoot>
+                    <pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
+
+                    <useArgumentFile>true</useArgumentFile>
+                    <checkStaleness>true</checkStaleness>
+                    <staleMillis>10000</staleMillis>
                 </configuration>
                 <executions>
                     <execution>
