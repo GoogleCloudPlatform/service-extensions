@@ -146,6 +146,7 @@ public abstract class ServiceCallout {
                                 // Use stderr here since the logger may have been reset by its JVM shutdown hook.
                                 System.err.println("*** shutting down gRPC server since JVM is shutting down");
                                 try {
+                                    healthCheckServer.shutdown();
                                     ServiceCallout.this.stop();
                                 } catch (InterruptedException e) {
                                     e.printStackTrace(System.err);
@@ -171,48 +172,41 @@ public abstract class ServiceCallout {
     }
 
     public ProcessingResponse ProcessRequest(ProcessingRequest request) {
-        HeadersResponse headersResponse = null;
+        ProcessingResponse.Builder builder = ProcessingResponse.newBuilder();
 
-        if (request.hasRequestHeaders()) {
-            headersResponse = OnRequestHeaders(request.getRequestHeaders());
+        switch (request.getRequestCase()) {
+            case REQUEST_HEADERS:
+                OnRequestHeaders(builder.getRequestHeadersBuilder(), request.getRequestHeaders());
+                break;
+            case RESPONSE_HEADERS:
+                OnResponseHeaders(builder.getRequestHeadersBuilder(), request.getResponseHeaders());
+                break;
+            case REQUEST_BODY:
+                OnRequestBody(builder.getRequestBodyBuilder(), request.getRequestBody());
+                break;
+            case RESPONSE_BODY:
+                OnResponseBody(builder.getResponseBodyBuilder(), request.getResponseBody());
+                break;
+            case REQUEST_TRAILERS:
+                break;
+            case RESPONSE_TRAILERS:
+                break;
+            case REQUEST_NOT_SET:
+            default:
+                logger.log(Level.WARNING, "Receieved a ProcessingRequest with no request data.");
+                break;
         }
 
-        if(request.hasResponseHeaders()){
-            headersResponse = OnResponseHeaders(request.getRequestHeaders());
-        }
-
-        if (headersResponse != null) {
-            return ProcessingResponse.newBuilder()
-                    .setRequestHeaders(headersResponse)
-                    .build();
-        }
-
-        BodyResponse bodyResponse = null;
-
-        if(request.hasRequestBody()){
-            bodyResponse = OnRequestBody(request.getRequestBody());
-        }
-
-        if(request.hasResponseBody()){
-            bodyResponse = OnResponseBody(request.getResponseBody());
-        }
-
-        if (bodyResponse != null) {
-            return ProcessingResponse.newBuilder()
-                    .setResponseBody(bodyResponse)
-                    .build();
-        }
-
-        return ProcessingResponse.newBuilder().build();
+        return builder.build();
     }
 
-    public abstract HeadersResponse OnRequestHeaders(HttpHeaders headers);
+    public abstract void OnRequestHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers);
 
-    public abstract HeadersResponse OnResponseHeaders(HttpHeaders headers);
+    public abstract void OnResponseHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers);
 
-    public abstract BodyResponse OnRequestBody(HttpBody body);
+    public abstract void OnRequestBody(BodyResponse.Builder bodyResponse, HttpBody body);
 
-    public abstract BodyResponse OnResponseBody(HttpBody body);
+    public abstract void OnResponseBody(BodyResponse.Builder bodyResponse, HttpBody body);
 
     private class ExternalProcessorImpl extends ExternalProcessorGrpc.ExternalProcessorImplBase {
 
@@ -222,8 +216,7 @@ public abstract class ServiceCallout {
             return new StreamObserver<ProcessingRequest>() {
                 @Override
                 public void onNext(ProcessingRequest request) {
-                    ProcessingResponse response = ProcessRequest(request);
-                    responseObserver.onNext(response);
+                    responseObserver.onNext(ProcessRequest(request));
                 }
 
                 @Override

@@ -12,6 +12,7 @@ public class HealthCheckServer {
     private final int port;
     private final String path;
     private final String ip;
+    private HttpServer server;
 
     public HealthCheckServer(int port, String path, String ip) {
         this.port = port;
@@ -20,10 +21,16 @@ public class HealthCheckServer {
     }
 
     public void start() throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress(ip, port), 0);
+        server = HttpServer.create(new InetSocketAddress(ip, port), 0);
         server.createContext(path, new HealthHandler());
         server.setExecutor(null); // creates a default executor
         server.start();
+    }
+
+    public void shutdown() {
+        if (server != null) {
+            server.stop(30); // Gracefully stop the server with 30 seconds delay
+        }
     }
 
     static class HealthHandler implements HttpHandler {
