@@ -195,7 +195,7 @@ def get_device_type(host_value: str) -> str:
   return 'desktop'
 
 
-def deny_request(context, msg: str | None = None):
+def deny_request(context, msg: str | None = None) -> None:
   """Denies a gRPC request, optionally logging a custom message.
 
   Args:
