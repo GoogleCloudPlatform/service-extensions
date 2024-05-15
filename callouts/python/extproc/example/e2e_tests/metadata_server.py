@@ -36,7 +36,7 @@ def unpack_string(value: any_pb2.Any) -> str:
   return unpacked_value.value
 
 
-def check_metadata(request: service_pb2.ProcessingRequest):
+def check_metadata(request: service_pb2.ProcessingRequest) -> bool:
   """Check if the request contains 'fr' metadata.
 
   Args:
