@@ -8,13 +8,14 @@ on:
     branches: [ "main" ]
     paths:
     - callouts/python/**
+    - docs/python/**
   pull_request:
     branches: [ "main" ]
     paths:
     - callouts/python/**
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -47,7 +48,7 @@ jobs:
       run: |
         sphinx-build docs/python docs/python/_build
     - name: Deploy to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v3
+      uses: peaceiris/actions-gh-pages@v4
       if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
       with:
         publish_branch: gh-pages
