@@ -58,15 +58,15 @@ class CalloutServerExample(callout_server.CalloutServer):
   def on_request_body(
       self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
-    """Custom processor on response headers.
+    """Custom processor on the request body.
 
     Args:
-      headers (service_pb2.HttpHeaders): The HTTP headers received in the response.
+      body (service_pb2.HttpBody): The HTTP body received in the request.
       context (ServicerContext): The context object for the gRPC service.
 
     Returns:
-      service_pb2.HeadersResponse: The response containing the mutations to be applied
-      to the response headers.
+      service_pb2.BodyResponse: The response containing the mutations to be applied
+      to the response body.
     """
     return callout_tools.add_body_mutation(body='-added-body')
 

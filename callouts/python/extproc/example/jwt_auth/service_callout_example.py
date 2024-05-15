@@ -13,6 +13,8 @@
 # limitations under the License.
 
 import logging
+from typing import Union
+
 import jwt
 from jwt.exceptions import InvalidTokenError
 
@@ -21,7 +23,9 @@ from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from extproc.service import callout_server
 from extproc.service import callout_tools
 
-def extract_jwt_token(request_headers):
+def extract_jwt_token(
+    request_headers: service_pb2.HttpHeaders
+) -> str:
   """
   Extracts the JWT token from the request headers, specifically looking for
   the 'Authorization' header and parsing out the token part.
@@ -42,7 +46,11 @@ def extract_jwt_token(request_headers):
   extracted_jwt = jwt_token.split(' ')[1] if jwt_token and ' ' in jwt_token else jwt_token
   return extracted_jwt
 
-def validate_jwt_token(key, request_headers, algorithm):
+def validate_jwt_token(
+    key: str,
+    request_headers: service_pb2.HttpHeaders,
+    algorithm: str
+) -> Union[dict, None]:
   """
   Validates the JWT token extracted from the request headers using a specified
   public key and algorithm. If valid, returns the decoded JWT payload; otherwise,
