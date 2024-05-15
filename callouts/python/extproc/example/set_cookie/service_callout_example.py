@@ -12,32 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Union
 from grpc import ServicerContext
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from extproc.service import callout_server
 from extproc.service import callout_tools
 
-def validate_header(response_headers):
-  """Validate if the request contains the 'cookie-check' header.
+def validate_header(http_headers: service_pb2.HttpHeaders) -> Union[str, None]:
+  """Validate if the incomming headers contain the 'cookie-check' header.
 
   This function checks if the 'cookie-check' header is present in the
-  response headers and returns its raw value if found.
+  headers and returns its raw value if found.
 
   Args:
-      response_headers (service_pb2.HttpHeaders): The HTTP headers of the response.
+      http_headers (service_pb2.HttpHeaders): Incomming http headers to check.
 
   Returns:
       str or None: The raw value of the 'cookie-check' header if found, otherwise None.
   """
   return next((header.raw_value
-                   for header in response_headers.headers.headers
+                   for header in http_headers.headers.headers
                    if header.key == 'cookie-check'), None)
 
 class CalloutServerExample(callout_server.CalloutServer):
   """Example Set Cookie / Callout server.
-
-  Provides a non-comprehensive set of responses for each of the possible
-  callout interactions.
 
   For response header callouts we set a cookie providing a mutation to add 
   a header '{Set-Cookie: cookie}'. This cookie is only set for requests from
