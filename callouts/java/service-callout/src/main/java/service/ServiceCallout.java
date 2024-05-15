@@ -118,10 +118,14 @@ public abstract class ServiceCallout {
     private String certKeyPath = "certs/pkcs8_key.pem";
     private int serverThreadCount = 2;
     private boolean enableInsecurePort = true;
+    private HealthCheckServer healthCheckServer;
 
     public void start() throws IOException {
-        HealthCheckServer healthCheckServer = new HealthCheckServer(healthCheckPort, healthCheckPath, healthCheckIp);
-        healthCheckServer.start();
+        if (!serperateHealthCheck) {
+            logger.info("Health check server starting...");
+            healthCheckServer = new HealthCheckServer(healthCheckPort, healthCheckPath, healthCheckIp);
+            healthCheckServer.start();
+        }
 
         /* The port on which the server should run */
         ServerBuilder<?> serverBuilder;
@@ -144,14 +148,14 @@ public abstract class ServiceCallout {
                             @Override
                             public void run() {
                                 // Use stderr here since the logger may have been reset by its JVM shutdown hook.
-                                System.err.println("*** shutting down gRPC server since JVM is shutting down");
+                                logger.info("*** shutting down gRPC server since JVM is shutting down");
                                 try {
-                                    healthCheckServer.shutdown();
+                                    stopHealthCheckServer();
                                     ServiceCallout.this.stop();
                                 } catch (InterruptedException e) {
                                     e.printStackTrace(System.err);
                                 }
-                                System.err.println("*** server shut down");
+                                logger.info("*** server shut down");
                             }
                         });
     }
@@ -159,6 +163,13 @@ public abstract class ServiceCallout {
     private void stop() throws InterruptedException {
         if (server != null) {
             server.shutdown().awaitTermination(30, TimeUnit.SECONDS);
+        }
+    }
+
+    private void stopHealthCheckServer() throws InterruptedException {
+        if (!serperateHealthCheck) {
+            logger.info("*** shutting down health check server");
+            healthCheckServer.shutdown();
         }
     }
 
@@ -193,7 +204,7 @@ public abstract class ServiceCallout {
                 break;
             case REQUEST_NOT_SET:
             default:
-                logger.log(Level.WARNING, "Receieved a ProcessingRequest with no request data.");
+                logger.log(Level.WARNING, "Received a ProcessingRequest with no request data.");
                 break;
         }
 
