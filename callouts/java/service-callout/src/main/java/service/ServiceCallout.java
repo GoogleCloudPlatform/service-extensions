@@ -31,7 +31,7 @@ import static utils.SslUtils.createSslContext;
 import static utils.SslUtils.readFileToBytes;
 
 /**
- * Server that manages startup/shutdown of a {@code Greeter} server.
+ * ServiceCallout is an abstract class representing a service callout server that can handle various stages of HTTP request/response processing.
  */
 public abstract class ServiceCallout {
     private static final Logger logger = Logger.getLogger(ServiceCallout.class.getName());
@@ -120,6 +120,10 @@ public abstract class ServiceCallout {
     private boolean enableInsecurePort = true;
     private HealthCheckServer healthCheckServer;
 
+    /**
+     * Starts the service callout server.
+     * @throws IOException If an I/O error occurs while starting the server
+     */
     public void start() throws IOException {
         if (!serperateHealthCheck) {
             logger.info("Health check server starting...");
@@ -127,15 +131,12 @@ public abstract class ServiceCallout {
             healthCheckServer.start();
         }
 
-        /* The port on which the server should run */
         ServerBuilder<?> serverBuilder;
         if (cert != null && certKey != null) {
-            // If both certificate and private key are provided, start the server with SSL
             logger.info("Secure server starting...");
             serverBuilder = NettyServerBuilder.forPort(port)
                     .sslContext(createSslContext(cert, certKey));
         } else {
-            // Otherwise, start the server without SSL
             logger.info("Insecure server starting...");
             serverBuilder = ServerBuilder.forPort(port);
         }
@@ -160,12 +161,20 @@ public abstract class ServiceCallout {
                         });
     }
 
+    /**
+     * Stops the service callout server.
+     * @throws InterruptedException If interrupted while waiting for the server to shut down
+     */
     private void stop() throws InterruptedException {
         if (server != null) {
             server.shutdown().awaitTermination(30, TimeUnit.SECONDS);
         }
     }
 
+    /**
+     * Stops the health check server if it exists.
+     * @throws InterruptedException If interrupted while waiting for the server to shut down
+     */
     private void stopHealthCheckServer() throws InterruptedException {
         if (!serperateHealthCheck) {
             logger.info("*** shutting down health check server");
@@ -175,6 +184,7 @@ public abstract class ServiceCallout {
 
     /**
      * Await termination on the main thread since the grpc library uses daemon threads.
+     * @throws InterruptedException If interrupted while waiting for the server to shut down
      */
     public void blockUntilShutdown() throws InterruptedException {
         if (server != null) {
@@ -182,6 +192,11 @@ public abstract class ServiceCallout {
         }
     }
 
+    /**
+     * Processes a given request and returns the corresponding response.
+     * @param request The request to be processed
+     * @return The response to the processed request
+     */
     public ProcessingResponse ProcessRequest(ProcessingRequest request) {
         ProcessingResponse.Builder builder = ProcessingResponse.newBuilder();
 
@@ -211,14 +226,37 @@ public abstract class ServiceCallout {
         return builder.build();
     }
 
+    /**
+     * Callback method invoked upon receiving request headers.
+     * @param headerResponse Builder for modifying response headers
+     * @param headers Incoming request headers
+     */
     public abstract void OnRequestHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers);
 
+    /**
+     * Callback method invoked upon receiving response headers.
+     * @param headerResponse Builder for modifying response headers
+     * @param headers Incoming response headers
+     */
     public abstract void OnResponseHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers);
 
+    /**
+     * Callback method invoked upon receiving request body.
+     * @param bodyResponse Builder for modifying response body
+     * @param body Incoming request body
+     */
     public abstract void OnRequestBody(BodyResponse.Builder bodyResponse, HttpBody body);
 
+    /**
+     * Callback method invoked upon receiving response body.
+     * @param bodyResponse Builder for modifying response body
+     * @param body Incoming response body
+     */
     public abstract void OnResponseBody(BodyResponse.Builder bodyResponse, HttpBody body);
 
+    /**
+     * Implementation of gRPC service for processing requests.
+     */
     private class ExternalProcessorImpl extends ExternalProcessorGrpc.ExternalProcessorImplBase {
 
         @Override
