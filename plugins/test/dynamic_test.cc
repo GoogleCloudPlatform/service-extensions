@@ -178,7 +178,11 @@ void DynamicTest::TestBody() {
     CheckPhaseResults("request_headers", invoke.result(), stream, res);
   }
   if (cfg_.request_body_size() > 0) {
-    ADD_FAILURE() << "BODY processing not implemented yet";
+    for (const auto& invoke : cfg_.request_body()) {
+      auto res = stream.SendRequestBody(invoke.input().content());
+      ASSERT_VM_HEALTH("request_body", handle, stream);
+      CheckPhaseResults("request_body", invoke.result(), stream, res);
+    }
   }
   if (cfg_.has_response_headers()) {
     const auto& invoke = cfg_.response_headers();
@@ -189,7 +193,11 @@ void DynamicTest::TestBody() {
     CheckPhaseResults("response_headers", invoke.result(), stream, res);
   }
   if (cfg_.response_body_size() > 0) {
-    ADD_FAILURE() << "BODY processing not implemented yet";
+    for (const auto& invoke : cfg_.response_body()) {
+      auto res = stream.SendResponseBody(invoke.input().content());
+      ASSERT_VM_HEALTH("response_body", handle, stream);
+      CheckPhaseResults("response_body", invoke.result(), stream, res);
+    }
   }
 
   // Tear down HTTP context.
@@ -280,19 +288,39 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
     BM_RETURN_IF_ERROR(headers.status());
     response_headers = *headers;
   }
+  std::vector<std::optional<std::string>> request_body_chunks;
+  for (const auto& request_body : cfg_.request_body()) {
+    request_body_chunks.emplace_back(request_body.input().content());
+  }
+  std::vector<std::optional<std::string>> response_body_chunks;
+  for (const auto& response_body : cfg_.response_body()) {
+    response_body_chunks.emplace_back(response_body.input().content());
+  }
   for (auto _ : state) {
     if (request_headers) {
       auto res = stream.SendRequestHeaders(*request_headers);
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
-    // Future: send request BODY here.
+    for (std::optional<std::string> body : request_body_chunks) {
+      if (body) {
+        auto res = stream.SendRequestBody(*body);
+        benchmark::DoNotOptimize(res);
+        BM_RETURN_IF_FAILED(handle);
+      }
+    }
     if (response_headers) {
       auto res = stream.SendResponseHeaders(*response_headers);
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
-    // Future: send response BODY here.
+    for (std::optional<std::string> body : response_body_chunks) {
+      if (body) {
+        auto res = stream.SendResponseBody(*body);
+        benchmark::DoNotOptimize(res);
+        BM_RETURN_IF_FAILED(handle);
+      }
+    }
   }
 }
 
@@ -346,14 +374,15 @@ void DynamicTest::CheckPhaseResults(const std::string& phase,
   }
   // Check immediate response.
   bool is_continue =
-      result.status == proxy_wasm::FilterHeadersStatus::Continue ||
-      result.status == proxy_wasm::FilterHeadersStatus::ContinueAndEndStream;
+      result.header_status == proxy_wasm::FilterHeadersStatus::Continue ||
+      result.header_status ==
+          proxy_wasm::FilterHeadersStatus::ContinueAndEndStream;
   if (expect.has_immediate() == is_continue) {
     ADD_FAILURE() << absl::Substitute(
         "[$0] Expected $1, status is $2", phase,
         expect.has_immediate() ? "immediate reply (stop filters status)"
                                : "no immediate reply (continue status)",
-        result.status);
+        result.header_status);
   }
   if (expect.has_immediate() == (result.http_code == 0)) {
     ADD_FAILURE() << absl::Substitute(
