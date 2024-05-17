@@ -1,0 +1,52 @@
+// Copyright 2024 Google LLC.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package utils
+
+import (
+	base "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
+	httpstatus "github.com/envoyproxy/go-control-plane/envoy/type/v3"
+	"github.com/golang/protobuf/proto"
+)
+
+func HeaderImmediateResponse(
+	code httpstatus.StatusCode,
+	headers []struct{ Key, Value string },
+	appendAction *base.HeaderValueOption_HeaderAppendAction,
+) *extproc.ImmediateResponse {
+	immediateResponse := &extproc.ImmediateResponse{
+		Status: &httpstatus.HttpStatus{
+			Code: code,
+		},
+	}
+
+	if len(headers) > 0 {
+		headerMutation := &extproc.HeaderMutation{}
+		for _, h := range headers {
+			headerValueOption := &base.HeaderValueOption{
+				Header: &base.HeaderValue{
+					Key:   h.Key,
+					Value: h.Value,
+				},
+			}
+			if appendAction != nil {
+				headerValueOption.AppendAction = *appendAction
+			}
+			headerMutation.SetHeaders = append(headerMutation.SetHeaders, headerValueOption)
+		}
+		immediateResponse.Headers = proto.Clone(headerMutation).(*extproc.HeaderMutation)
+	}
+	return immediateResponse
+}
