@@ -296,6 +296,14 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
   for (const auto& response_body : cfg_.response_body()) {
     response_body_chunks.emplace_back(response_body.input().content());
   }
+  std::vector<std::optional<std::string>> request_body_chunks;
+  for (const auto& request_body : cfg_.request_body()) {
+    request_body_chunks.emplace_back(request_body.input().content());
+  }
+  std::vector<std::optional<std::string>> response_body_chunks;
+  for (const auto& response_body : cfg_.response_body()) {
+    response_body_chunks.emplace_back(response_body.input().content());
+  }
   for (auto _ : state) {
     if (request_headers) {
       auto res = stream.SendRequestHeaders(*request_headers);
