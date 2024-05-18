@@ -8,29 +8,30 @@ unit test that verifies both.
 
 # Getting started
 
-We recommend the following:
+We recommend the following process:
 
 1.  Using the [samples](samples/) and
     [Proxy-Wasm](https://github.com/proxy-wasm) SDKs as a starting point, write
-    a wasm plugin in a language of your choice.
+    a wasm plugin in a language of your choice. Get it building.
 1.  Write a plugin test file (textproto) to specify the plugin's functional
     expectations ([example](samples/config_denylist/tests.textpb)). Consult the
     plugin tester [proto API](test/runner.proto) as needed.
 1.  Add `benchmark: true` to tests that exemplify common wasm operations
     ([example](samples/add_header/tests.textpb)).
-1.  Run + Test + Benchmark the wasm plugin as follows!
+1.  Run + Test + Benchmark your wasm plugin as follows!
 
 ```
 docker run -it -v $(pwd):/mnt \
-    ghcr.io/GoogleCloudPlatform/service-extensions-samples/plugin-tester:main \
-    --proto /mnt/<local/path/to/tests.textpb> \
-    --plugin /mnt/<local/path/to/plugin.wasm>
+    ghcr.io/googlecloudplatform/service-extensions-samples/plugin-tester:main \
+    --proto /mnt/local/path/to/tests.textpb \
+    --plugin /mnt/local/path/to/plugin.wasm
 ```
 
 Tips:
 
 -   When benchmarking and publishing, compile a release (optimized) wasm build.
 -   To see a trace of logs and wasm ABI calls, add `--min_log_level=TRACE`.
+-   Try sending empty or invalid input. Verify your plugin doesn't crash.
 
 # Samples & Recipes
 
