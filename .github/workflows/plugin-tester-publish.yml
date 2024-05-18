@@ -1,4 +1,4 @@
-name: Publish wasm tester to a Docker image
+name: Publish plugin tester to a Docker image
 
 # Manually invoked. Permissions default to those with repo `write` access.
 # https://docs.github.com/en/actions/using-workflows/manually-running-a-workflow
@@ -6,11 +6,11 @@ on: workflow_dispatch
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/wasm-plugin-tester
+  IMAGE_NAME: ${{ github.repository }}/plugin-tester
 
 jobs:
   build-and-push-image:
-    name: Publish wasm tester
+    name: Publish plugin tester
     runs-on: ubuntu-latest
     # Permissions granted to the `GITHUB_TOKEN` for the actions in this job.
     permissions:
@@ -45,8 +45,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
-      # Build the wasm tester.
-      - name: Build wasm tester
+      # Build.
+      - name: Build plugin tester
         shell: bash
         working-directory: ./plugins
         run: >

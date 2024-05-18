@@ -6,22 +6,36 @@ Recipes and code samples for
 Each recipe has an example plugin written in Rust and C++, and an accompanying
 unit test that verifies both.
 
-# Quick start
+# Getting started
 
-All commands in this README are intended to be run from the `plugins` subdirectory of this repository.
+We recommend the following:
 
-Build all plugins and run all plugin tests:
+1.  Using the [samples](samples/) and
+    [Proxy-Wasm](https://github.com/proxy-wasm) SDKs as a starting point, write
+    a wasm plugin in a language of your choice.
+1.  Write a plugin test file (textproto) to specify the plugin's functional
+    expectations ([example](samples/config_denylist/tests.textpb)). Consult the
+    plugin tester [proto API](test/runner.proto) as needed.
+1.  Add `benchmark: true` to tests that exemplify common wasm operations
+    ([example](samples/add_header/tests.textpb)).
+1.  Run + Test + Benchmark the wasm plugin as follows!
 
-`$ bazelisk test --test_output=all //samples/...`
+```
+docker run -it -v $(pwd):/mnt \
+    ghcr.io/GoogleCloudPlatform/service-extensions-samples/plugin-tester:main \
+    --proto /mnt/<local/path/to/tests.textpb> \
+    --plugin /mnt/<local/path/to/plugin.wasm>
+```
 
-When running benchmarks, be sure to add `--config=bench`:
+Tips:
 
-`$ bazelisk test --test_output=all --config=bench //samples/add_header/...`
+-   When benchmarking and publishing, compile a release (optimized) wasm build.
+-   To see a trace of logs and wasm ABI calls, add `--min_log_level=TRACE`.
 
 # Samples & Recipes
 
-The samples folder contains Samples & Recipes to use as a reference for your own
-plugin. Extend them to fit your particular use case.
+The [samples](samples/) folder contains Samples & Recipes to use as a reference
+for your own plugin. Extend them to fit your particular use case.
 
 *   [Log each Wasm call](samples/noop_logs): Don't change anything about the
     traffic (noop plugin). Log each wasm invocation, including lifecycle
@@ -39,13 +53,25 @@ plugin. Extend them to fit your particular use case.
     URI using regex replacement. Demonstrate a standard way to use regular
     expressions, compiling them at plugin initialization.
 
+# Samples tests
+
+Run these commands from the `plugins/` subdirectory of this repository.
+
+Build all plugins and run all plugin tests:
+
+`$ bazelisk test --test_output=all //samples/...`
+
+When running benchmarks, be sure to add `--config=bench`:
+
+`$ bazelisk test --test_output=all --config=bench //samples/add_header/...`
+
 # Feature set / ABI
 
-Service Extension plugins are compiled against the ProxyWasm ABI, described here:
-https://github.com/proxy-wasm/spec/tree/master
+Service Extension plugins are compiled against the ProxyWasm ABI, described
+here: https://github.com/proxy-wasm/spec/tree/master
 
-Service Extension plugins currently support a subset of the ProxyWasm spec. Support
-will grow over time. The current feature set includes:
+Service Extension plugins currently support a subset of the ProxyWasm spec.
+Support will grow over time. The current feature set includes:
 
 *   Root context lifecycle callbacks
     *   on_context_create
