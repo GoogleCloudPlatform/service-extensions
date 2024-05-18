@@ -118,6 +118,30 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.0.0</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <configuration>
+                    <sourcepath>src/main/java</sourcepath>
+                    <dependencySourceIncludes>
+                        <dependencySourceInclude>groupId:artifactId:*</dependencySourceInclude>
+                    </dependencySourceIncludes>
+                    <reportOutputDirectory>${project.build.directory}/docs</reportOutputDirectory>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
