@@ -1,0 +1,84 @@
+name: Publish wasm tester to a Docker image
+
+# Manually invoked. Permissions default to those with repo `write` access.
+# https://docs.github.com/en/actions/using-workflows/manually-running-a-workflow
+on: workflow_dispatch
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/wasm-plugin-tester
+
+jobs:
+  build-and-push-image:
+    name: Publish wasm tester
+    runs-on: ubuntu-latest
+    # Permissions granted to the `GITHUB_TOKEN` for the actions in this job.
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+
+    # TODO add linux/arm64 (aarch64) build via matrix and cross-compile
+    # https://github.com/GoogleCloudPlatform/service-extensions-samples/blob/main/.github/workflows/test.yml#L38
+    # https://github.com/proxy-wasm/proxy-wasm-cpp-host/blob/04dfb94747e6462b65f7ed694e2d9c78ab207e11/.bazelrc#L72
+    # https://github.com/docker/build-push-action/issues/529#issuecomment-1001080311
+
+    steps:
+      # Get latest repo.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Authenticate to Container registry as the actor.
+      - name: Log in to the Container registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Get metadata: https://github.com/docker/metadata-action#about
+      # The `images` value provides the base name for tags and labels.
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      # Build the wasm tester.
+      - name: Build wasm tester
+        shell: bash
+        working-directory: ./plugins
+        run: >
+          bazel build
+          --verbose_failures
+          --config=bench
+          //test:runner
+
+      # Copy build output to packaging dir.
+      - name: Copy built binary
+        shell: bash
+        working-directory: ./plugins
+        run: cp -f bazel-bin/test/runner test/package/runner
+
+      # Push Docker image: https://github.com/docker/build-push-action#about
+      # Uses the `tags` and `labels` from the `meta` step.
+      - name: Build and push Docker image
+        id: push
+        uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
+        with:
+          context: ./plugins/test/package
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      # This step generates an artifact attestation for the image, which is an
+      # unforgeable statement about where and how it was built. It increases
+      # supply chain security for people who consume the image.
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
