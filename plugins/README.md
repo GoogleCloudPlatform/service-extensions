@@ -1,10 +1,11 @@
 # Google Cloud Service Extension Plugins Samples
 
-Recipes and code samples for
-[Google Cloud Service Extensions](https://cloud.google.com/service-extensions/).
+Code samples and tools for developing
+[Google Cloud Service Extensions](https://cloud.google.com/service-extensions/)
+WebAssembly (wasm) plugins.
 
-Each recipe has an example plugin written in Rust and C++, and an accompanying
-unit test that verifies both.
+Each sample/recipe has an example plugin written in Rust and C++, and an
+accompanying unit test that verifies both.
 
 # Getting started
 
@@ -32,6 +33,7 @@ Tips:
 -   When benchmarking and publishing, compile a release (optimized) wasm build.
 -   To see a trace of logs and wasm ABI calls, add `--min_log_level=TRACE`.
 -   Try sending empty or invalid input. Verify your plugin doesn't crash.
+-   Optionally specify plugin config data using the `--config` flag.
 
 # Samples & Recipes
 
