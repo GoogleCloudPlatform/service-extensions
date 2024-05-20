@@ -47,7 +47,7 @@ class CalloutServerExample(callout_server.CalloutServer):
       self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
     """Custom processor on the request body."""
-    return callout_tools.add_body_mutation(body='-added-body')
+    return callout_tools.add_body_mutation(body='replaced-body')
 
 if __name__ == '__main__':
   """Sets up Google Cloud Logging for the cloud_log example"""
