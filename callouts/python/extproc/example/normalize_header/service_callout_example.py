@@ -48,7 +48,7 @@ class CalloutServerExample(callout_server.CalloutServer):
 
     host_value = next((header.raw_value.decode('utf-8')
                        for header in headers.headers.headers
-                       if header.key == 'host'), None)
+                       if header.key == ':host'), None)
 
     header_mutation = service_pb2.HeadersResponse()
 

@@ -62,7 +62,7 @@ def get_insecure_channel(server: CalloutServer) -> grpc.Channel:
   """From a CalloutServer get the insecure address and create a grpc channel to it.
 
   Args:
-      server : Server to connect to.
+      server: Server to connect to.
   Returns:
       grpc.Channel: Open channel to the server.
   """
@@ -77,8 +77,8 @@ def wait_till_server(server_check: Callable[[], bool], timeout: int = 10):
   Times out after a given time.
 
   Args:
-      server_check : Function to check.
-      timeout : Wait time. Defaults to 10.
+      server_check: Function to check.
+      timeout: Wait time. Defaults to 10.
   """
   expiration = datetime.datetime.now() + datetime.timedelta(seconds=timeout)
   while not server_check() and datetime.datetime.now() < expiration:
@@ -169,7 +169,7 @@ class TestBasicServer(object):
 
       value = make_request(stub, request_body=body)
       assert value.HasField('request_body')
-      assert value.request_body == add_body_mutation(body='-added-body')
+      assert value.request_body == add_body_mutation(body='replaced-body')
 
       value = make_request(stub, response_body=body)
       assert value.HasField('response_body')

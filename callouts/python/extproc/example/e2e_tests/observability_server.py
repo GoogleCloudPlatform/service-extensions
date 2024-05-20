@@ -35,9 +35,10 @@ lock = threading.Lock()
 
 
 class ObservabilityServerExample(callout_server.CalloutServer):
-  """Example async server.
+  """Example observability callout server for use in e2e testing.
 
     Doesn't perform any mutations to the request or the response.
+    Logs callouts to a pollable server interface.
     """
 
   def __init__(self, **kwargs):

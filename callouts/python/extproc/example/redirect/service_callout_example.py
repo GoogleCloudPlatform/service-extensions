@@ -21,11 +21,9 @@ from extproc.service import callout_tools
 class CalloutServerExample(callout_server.CalloutServer):
   """Example callout server.
 
-  Provides a non-comprehensive set of responses for each of the possible
-  callout interactions.
-
-  On a request header callout we perform a redirect to '{http://service-extensions.com/redirect}'
-  with the status of '{301}' - MovedPermanently returning an ImmediateResponse
+  On a request header callout we perform a redirect to 
+  '{http://service-extensions.com/redirect}' with the status of
+  '{301}' - MovedPermanently returning an ImmediateResponse.
   """
 
   def on_request_headers(

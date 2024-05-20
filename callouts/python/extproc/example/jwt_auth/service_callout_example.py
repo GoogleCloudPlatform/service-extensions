@@ -14,6 +14,8 @@
 
 import logging
 import jwt
+
+from typing import Union, Any
 from jwt.exceptions import InvalidTokenError
 
 from grpc import ServicerContext
@@ -21,21 +23,28 @@ from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from extproc.service import callout_server
 from extproc.service import callout_tools
 
-def extract_jwt_token(request_headers):
+
+def extract_jwt_token(request_headers) -> Union[str, None]:
   jwt_token = next((header.raw_value.decode('utf-8')
-                   for header in request_headers.headers.headers
-                   if header.key == 'Authorization'), None)
-  extracted_jwt = jwt_token.split(' ')[1] if jwt_token and ' ' in jwt_token else jwt_token
+                    for header in request_headers.headers.headers
+                    if header.key == 'Authorization'), None)
+  extracted_jwt = jwt_token.split(
+      ' ')[1] if jwt_token and ' ' in jwt_token else jwt_token
   return extracted_jwt
 
-def validate_jwt_token(key, request_headers, algorithm):
+
+def validate_jwt_token(key, request_headers, algorithm) -> Union[Any, None]:
   jwt_token = extract_jwt_token(request_headers)
+  if jwt_token is None:
+    logging.warn('Token failed to decode.')
+    return None
   try:
     decoded = jwt.decode(jwt_token, key, algorithms=[algorithm])
     logging.info('Approved - Decoded Values: %s', decoded)
     return decoded
   except InvalidTokenError:
     return None
+
 
 class CalloutServerExample(callout_server.CalloutServer):
   """Example callout server.
@@ -52,14 +61,17 @@ class CalloutServerExample(callout_server.CalloutServer):
 
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders,
-      context: ServicerContext):
+      context: ServicerContext) -> Union[service_pb2.HeadersResponse, None]:
     """Custom processor on request headers."""
 
     decoded = validate_jwt_token(self.public_key, headers, "RS256")
 
     if decoded:
-      decoded_items = [('decoded-' + key, str(value)) for key, value in decoded.items()]
-      return callout_tools.add_header_mutation(add=decoded_items, clear_route_cache=True)
+      decoded_items = [
+          ('decoded-' + key, str(value)) for key, value in decoded.items()
+      ]
+      return callout_tools.add_header_mutation(add=decoded_items,
+                                               clear_route_cache=True)
     else:
       callout_tools.deny_callout(context, 'Authorization token is invalid')
 

@@ -21,9 +21,6 @@ actions = HeaderValueOption.HeaderAppendAction
 class CalloutServerExample(callout_server.CalloutServer):
   """Example callout server.
 
-  Provides a non-comprehensive set of responses for each of the possible
-  callout interactions.
-
   For request header callouts we provide a mutation to update a header
   '{header-request: request}', and to clear the route cache.
 

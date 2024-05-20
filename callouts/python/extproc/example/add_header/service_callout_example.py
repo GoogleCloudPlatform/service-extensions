@@ -21,9 +21,6 @@ from extproc.service import callout_tools
 class CalloutServerExample(callout_server.CalloutServer):
   """Example callout server.
 
-  Provides a non-comprehensive set of responses for each of the possible
-  callout interactions.
-
   For request header callouts we provide a mutation to add a header
   '{header-request: request}', remove a header 'foo', and to clear the
   route cache. On response header callouts, we respond with a mutation to add

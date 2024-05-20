@@ -42,7 +42,7 @@ def test_normalize_header(server: CalloutServerTest) -> None:
 
     def make_test_headers(host_value: bytes) -> service_pb2.HttpHeaders:
       return service_pb2.HttpHeaders(headers=HeaderMap(
-          headers=[HeaderValue(key="host", raw_value=host_value)]),
+          headers=[HeaderValue(key=":host", raw_value=host_value)]),
                                      end_of_stream=False)
 
     mobile_headers = make_test_headers(b"m.example.com")

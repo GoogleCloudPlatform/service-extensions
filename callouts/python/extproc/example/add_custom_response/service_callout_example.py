@@ -63,9 +63,6 @@ def body_mock_check(http_body: service_pb2.HttpBody):
 class CalloutServerExample(callout_server.CalloutServer):
   """Example callout server.
 
-  Provides a non-comprehensive set of responses for each of the possible
-  callout interactions.
-
   On a request header callout we check if it contains a header called '{mock:}', if yes then it will
   generate a mock response, otherwise it will follow the standard flow and add a header
   '{header-request: request}'. On response header callouts, we respond with a mutation to add

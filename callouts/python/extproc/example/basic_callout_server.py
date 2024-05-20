@@ -27,11 +27,21 @@ from extproc.service.callout_tools import add_body_mutation
 class BasicCalloutServer(CalloutServer):
   """Example callout server.
 
-  Provides a non-comprehensive set of responses for each of the callout events.
+  A non-comprehensive set of examples for each of the possible callout actions.
   """
 
   def on_request_headers(self, headers: HttpHeaders, _) -> HeadersResponse:
-    """Custom processor on request headers."""
+    """Custom processor on request headers.
+    
+    This example contains a few of the possible modifications that can be
+    applied to a request header callout:
+    
+    * A change to the ':host' and ':path' headers.
+    * Adding the header 'header-request' with the value of 'request'.
+    * Removal of a header 'foo'.
+    * Clearing of the route cache.
+    
+    """
     logging.debug("Received request headers callout: %s", headers)
     return add_header_mutation(
         add=[
@@ -45,17 +55,28 @@ class BasicCalloutServer(CalloutServer):
         clear_route_cache=True)
 
   def on_response_headers(self, headers: HttpHeaders, _) -> HeadersResponse:
-    """Custom processor on response headers."""
+    """Custom processor on response headers.
+    
+    Generates an addition to the response headers containing:
+    'hello: service-extensions'.
+    """
     logging.debug("Received response headers callout: %s", headers)
     return add_header_mutation(add=[('hello', 'service-extensions')])
 
   def on_request_body(self, body: HttpBody, _) -> BodyResponse:
-    """Custom processor on the request body."""
+    """Custom processor on the request body.
+
+    Generates a request body modification replacing the request body with
+    'replaced-body'.
+    """
     logging.debug("Received request body callout: %s", body)
-    return add_body_mutation(body='-added-body')
+    return add_body_mutation(body='replaced-body')
 
   def on_response_body(self, body: HttpBody, _) -> BodyResponse:
-    """Custom processor on the response body."""
+    """Custom processor on the response body.
+    
+    Generates a response body modification clearing the response body.
+    """
     logging.debug("Received response body callout: %s", body)
     return add_body_mutation(clear_body=True)
 

@@ -23,9 +23,6 @@ from extproc.service import callout_tools
 class CalloutServerExample(callout_server.CalloutServer):
   """Example callout server.
 
-  Provides a non-comprehensive set of responses for each of the possible
-  callout interactions.
-
   For request header callouts we check the content of the request and
   authorize the request or reject the request.
   The content being checked is if the header has the header header-check.
