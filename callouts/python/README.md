@@ -10,6 +10,8 @@ Files using Copyright 2023 Google LLC & Apache License Version 2.0:
 
 * Python 3.11+
 * [buf](https://buf.build/docs/introduction)
+>`#subdir=` is currently broken in buf `v1.32.0` https://github.com/bufbuild/buf/issues/3000 please install `v1.31.0`, this can be done easily with go via: `go install github.com/bufbuild/buf/cmd/buf@v1.31.0`
+
 * [requirements.txt](./requirements.txt)
 
 # Quick start
