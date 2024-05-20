@@ -4,7 +4,7 @@ Most of the tests in this directory are associated with example images defined u
 
 ## Adding tests for new examples
 
-Create a new example under the [extproc/examples](/callouts/python/extproc/example/) directory that implements the new feature or use case. 
+Create a new example under the [extproc/examples](/callouts/python/extproc/example/) directory that implements the new feature or use case.
 
 Create a new test file importing the new server.
 
@@ -16,6 +16,7 @@ from extproc.example.<path_to_callout_server> import (
 
 Each test case needs a server to test off of.
 Importing `setup_server` from [basic_grpc_test.py](basic_grpc_test.py) gives access to the `server` fixture:
+
 ```python
 from extproc.tests.basic_grpc_test import setup_server
 @pytest.mark.parametrize('server', [{}], indirect=True)
@@ -25,6 +26,7 @@ from extproc.tests.basic_grpc_test import setup_server
 This fixture will set up a server on a per class basis, and will not recreate fixtures with identical parameters within the same class.
 By default this fixture will generate a basic `CalloutServer` to test with.
 To provide the `CalloutServerTest` imported above, generate a custom config:
+
 ```python
 from extproc.tests.basic_grpc_test import insecure_kwargs
 _local_test_args: dict = {
@@ -35,10 +37,12 @@ _local_test_args: dict = {
 @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
 ...
 ```
-In the example above `insecure_kwargs` is a set of `CalloutServer` initalization `kwargs` that will generate a server with the insecure port open. 
+
+In the example above `insecure_kwargs` is a set of `CalloutServer` initalization `kwargs` that will generate a server with the insecure port open.
 Setting `test_class` to the imported local version of `CalloutServerTest` causes `'server'` to generate the callout server from the local `CalloutServerTest` rather than `CalloutServer`.
 
 Putting that all together as a basic health checking test:
+
 ```python
 import urllib.request
 from extproc.example.<path_to_callout_server> import (
