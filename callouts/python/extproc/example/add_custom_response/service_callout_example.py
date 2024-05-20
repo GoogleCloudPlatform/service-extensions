@@ -70,7 +70,7 @@ class CalloutServerExample(callout_server.CalloutServer):
 
   On a request body callout we check if it contains in the body 'mock', if yes then it will generate
   a mock response, otherwise it will follow the standard flow and provide a mutation to replace the body
-  with 'replaced-body' to the body. On response body callouts we send a mutation to replace the body
+  with 'replaced-body'. On response body callouts we send a mutation to replace the body
   with 'new-body'.
   """
 
