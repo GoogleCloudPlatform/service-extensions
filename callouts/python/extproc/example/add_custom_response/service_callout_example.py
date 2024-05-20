@@ -69,8 +69,9 @@ class CalloutServerExample(callout_server.CalloutServer):
   the header '{header-response: response}'.
 
   On a request body callout we check if it contains in the body 'mock', if yes then it will generate
-  a mock response, otherwise it will follow the standard flow and provide a mutation to append '-added-body'
-  to the body. On response body callouts we send a mutation to replace the body with 'new-body'.
+  a mock response, otherwise it will follow the standard flow and provide a mutation to replace the body
+  with 'replaced-body' to the body. On response body callouts we send a mutation to replace the body
+  with 'new-body'.
   """
 
   def on_request_body(self, body: service_pb2.HttpBody,
@@ -80,7 +81,7 @@ class CalloutServerExample(callout_server.CalloutServer):
       callout_tools.deny_callout(context)
     if body_mock_check(body):
       return generate_mock_body_response()
-    return callout_tools.add_body_mutation(body='-added-body')
+    return callout_tools.add_body_mutation(body='replaced-body')
 
   def on_response_body(self, body: service_pb2.HttpBody,
                        context: ServicerContext):
