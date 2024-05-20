@@ -83,9 +83,10 @@ def add_header_mutation(
   """Generate a HeadersResponse mutation for incoming callouts.
 
   Args:
-    add: A list of tuples representing headers to add.
+    add: A list of tuples representing headers to add or replace.
     remove: List of header strings to remove from the callout.
-    clear_route_cache: If true, will enable clear_route_cache on the HeadersResponse.
+    clear_route_cache: If true, will enable clear_route_cache on the generated
+      HeadersResponse.
     append_action: Supported actions types for header append action.
   Returns:
     The constructed HeadersResponse object.
@@ -118,7 +119,8 @@ def add_body_mutation(
   Args:
     body: Body text to replace the current body of the incomming callout.
     clear_body: If true, will clear the body of the incomming callout. 
-    clear_route_cache: If true, will enable clear_route_cache on the BodyResponse.
+    clear_route_cache: If true, will enable clear_route_cache on the generated
+      BodyResponse.
 
   Returns:
     The constructed BodyResponse object.
