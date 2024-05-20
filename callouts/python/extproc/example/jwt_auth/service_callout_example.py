@@ -61,7 +61,7 @@ class CalloutServerExample(callout_server.CalloutServer):
       decoded_items = [('decoded-' + key, str(value)) for key, value in decoded.items()]
       return callout_tools.add_header_mutation(add=decoded_items, clear_route_cache=True)
     else:
-      callout_tools.deny_request(context, 'Authorization token is invalid')
+      callout_tools.deny_callout(context, 'Authorization token is invalid')
 
 
 if __name__ == '__main__':

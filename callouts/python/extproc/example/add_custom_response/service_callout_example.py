@@ -80,7 +80,7 @@ class CalloutServerExample(callout_server.CalloutServer):
                       context: ServicerContext):
     """Custom processor on the request body."""
     if validate_body(body):
-      callout_tools.deny_request(context)
+      callout_tools.deny_callout(context)
     if body_mock_check(body):
       return generate_mock_body_response()
     return callout_tools.add_body_mutation(body='-added-body')
@@ -89,7 +89,7 @@ class CalloutServerExample(callout_server.CalloutServer):
                        context: ServicerContext):
     """Custom processor on the response body."""
     if validate_body(body):
-      callout_tools.deny_request(context)
+      callout_tools.deny_callout(context)
     if body_mock_check(body):
       return generate_mock_body_response()
     return callout_tools.add_body_mutation()
@@ -99,7 +99,7 @@ class CalloutServerExample(callout_server.CalloutServer):
       context: ServicerContext):
     """Custom processor on request headers."""
     if validate_request_header(headers):
-      callout_tools.deny_request(context)
+      callout_tools.deny_callout(context)
     if header_mock_check(headers):
       return generate_mock_header_response()
     return callout_tools.add_header_mutation(add=[('header-request', 'request')
@@ -112,7 +112,7 @@ class CalloutServerExample(callout_server.CalloutServer):
       context: ServicerContext):
     """Custom processor on response headers."""
     if validate_request_header(headers):
-      callout_tools.deny_request(context)
+      callout_tools.deny_callout(context)
     if header_mock_check(headers):
       return generate_mock_header_response()
     return callout_tools.add_header_mutation(add=[('header-response',

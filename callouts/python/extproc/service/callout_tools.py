@@ -7,7 +7,6 @@ from typing import Union
 from envoy.config.core.v3.base_pb2 import HeaderValue
 from envoy.config.core.v3.base_pb2 import HeaderValueOption
 from envoy.service.ext_proc.v3.external_processor_pb2 import HeaderMutation
-from envoy.service.ext_proc.v3.external_processor_pb2 import HttpHeaders
 from envoy.service.ext_proc.v3.external_processor_pb2 import BodyResponse
 from envoy.service.ext_proc.v3.external_processor_pb2 import HeadersResponse
 from envoy.service.ext_proc.v3.external_processor_pb2 import ImmediateResponse
@@ -81,15 +80,15 @@ def add_header_mutation(
     clear_route_cache: bool = False,
     append_action: typing.Optional[HeaderValueOption.HeaderAppendAction] = None,
 ) -> HeadersResponse:
-  """Generate a header mutation response for incoming requests.
+  """Generate a HeadersResponse mutation for incoming callouts.
 
   Args:
     add: A list of tuples representing headers to add.
-    remove: List of header strings to remove from the request.
-    clear_route_cache: If true, will enable clear_route_cache on the response.
+    remove: List of header strings to remove from the callout.
+    clear_route_cache: If true, will enable clear_route_cache on the HeadersResponse.
     append_action: Supported actions types for header append action.
   Returns:
-    The constructed header response object.
+    The constructed HeadersResponse object.
   """
   header_mutation = HeadersResponse()
   if add:
@@ -107,51 +106,22 @@ def add_header_mutation(
   return header_mutation
 
 
-def normalize_header_mutation(
-    headers: HttpHeaders,
-    clear_route_cache: bool = False,
-) -> HeadersResponse:
-  """Generate a header response for incoming requests.
-  Args:
-    headers: Current headers presented in the request
-    clear_route_cache: If true, will enable clear_route_cache on the response.
-  Returns:
-    The constructed header response object.
-  """
-
-  host_value = next((header.raw_value.decode('utf-8')
-                     for header in headers.headers.headers
-                     if header.key == 'host'), None)
-
-  header_mutation = HeadersResponse()
-
-  if host_value:
-    device_type = get_device_type(host_value)
-    header_mutation = add_header_mutation(add=[('client-device-type',
-                                                device_type)],
-                                          clear_route_cache=clear_route_cache)
-
-  if clear_route_cache:
-    header_mutation.response.clear_route_cache = True
-  return header_mutation
-
-
 def add_body_mutation(
     body: str | None = None,
     clear_body: bool = False,
     clear_route_cache: bool = False,
 ) -> BodyResponse:
-  """Generate a body mutation response for incoming requests.
+  """Generate a BodyResponse for incoming callouts.
   
-    If both body and clear_body are left as default, the incoming request's body will not be modified.
+    If both body and clear_body are left as default, the incoming callout's body will not be modified.
 
   Args:
-    body: Body text to replace the current body of the incomming request.
-    clear_body: If true, will clear the body of the incomming request. 
-    clear_route_cache: If true, will enable clear_route_cache on the response.
+    body: Body text to replace the current body of the incomming callout.
+    clear_body: If true, will clear the body of the incomming callout. 
+    clear_route_cache: If true, will enable clear_route_cache on the BodyResponse.
 
   Returns:
-    The constructed body response object.
+    The constructed BodyResponse object.
   """
   body_mutation = BodyResponse()
   if body:
@@ -165,18 +135,9 @@ def add_body_mutation(
   return body_mutation
 
 
-def get_device_type(host_value: str) -> str:
-  """Determine device type based on user agent."""
-  if 'm.example.com' in host_value:
-    return 'mobile'
-  elif 't.example.com' in host_value:
-    return 'tablet'
-  return 'desktop'
-
-
-def deny_request(context, msg: str | None = None):
-  """Deny a grpc request and print an error message"""
-  msg = msg or "Request content is invalid or not allowed"
+def deny_callout(context, msg: str | None = None):
+  """Deny a grpc callout and print an error message."""
+  msg = msg or "Callout content is invalid or not allowed"
   logging.warning(msg)
   context.abort(grpc.StatusCode.PERMISSION_DENIED, msg)
 
@@ -186,7 +147,7 @@ def header_immediate_response(
     headers: list[tuple[str, str]] | None = None,
     append_action: Union[HeaderValueOption.HeaderAppendAction, None] = None,
 ) -> ImmediateResponse:
-  """Returns an ImmediateResponse for a header request"""
+  """Returns an ImmediateResponse for a header callout."""
   immediate_response = ImmediateResponse()
   immediate_response.status.code = code
 

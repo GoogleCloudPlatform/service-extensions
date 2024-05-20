@@ -18,23 +18,52 @@ from extproc.service import callout_tools
 from extproc.service import callout_server
 
 
+def get_device_type(host_value: str) -> str:
+  """Determine device type based on user agent."""
+
+  if 'm.example.com' in host_value:
+    return 'mobile'
+  elif 't.example.com' in host_value:
+    return 'tablet'
+  return 'desktop'
+
+
 class CalloutServerExample(callout_server.CalloutServer):
   """Example callout server.
-
-  Provides a non-comprehensive set of responses for each of the possible
-  callout interactions.
 
   For request header callouts we check the host header
   and create a new HTTP header (client-device-type)
   to shard requests based on device.
   """
 
+  def add_device_type_header(
+      self, headers: service_pb2.HttpHeaders) -> service_pb2.HeadersResponse:
+    """Generate a client-device-type header response.
+
+    Args:
+      headers: Current headers presented in the callout.
+    Returns:
+      The constructed HeadersResponse object.
+    """
+
+    host_value = next((header.raw_value.decode('utf-8')
+                       for header in headers.headers.headers
+                       if header.key == 'host'), None)
+
+    header_mutation = service_pb2.HeadersResponse()
+
+    if host_value:
+      device_type = get_device_type(host_value)
+      header_mutation = callout_tools.add_header_mutation(
+          add=[('client-device-type', device_type)], clear_route_cache=True)
+
+    return header_mutation
+
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders,
-      context: ServicerContext) -> service_pb2.HeadersResponse:
+      _: ServicerContext) -> service_pb2.HeadersResponse:
     """Custom processor on request headers."""
-    return callout_tools.normalize_header_mutation(headers=headers,
-                                                   clear_route_cache=True)
+    return self.add_device_type_header(headers=headers)
 
 
 if __name__ == '__main__':
