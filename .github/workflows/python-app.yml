@@ -38,7 +38,7 @@ jobs:
     - name: Generate protodefs
       working-directory: ./callouts/python
       run: |
-        buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api --path envoy/service/ext_proc/v3/external_processor.proto --include-imports
+        buf -v generate https://github.com/envoyproxy/envoy.git#branch=main&subdir=api --path envoy/service/ext_proc/v3/external_processor.proto --include-imports
         python -m pip install ./protodef
     #- name: Lint with flake8
     #  run: |
