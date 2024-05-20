@@ -93,7 +93,7 @@ if __name__ == '__main__':
   CalloutServer().run()
 ```
 
-Calling the server like this wont do much besides respond to health checks though, in order for the server to respond to requests we need to create a custom class extending `CalloutServer`.
+Calling the server like this wont do much besides respond to health checks, for the server to respond to callouts we create a custom class extending `CalloutServer`.
 
 Make a class extending `CalloutServer`.
 
@@ -138,14 +138,14 @@ For example `on_response_headers`:
 * `context`: associated grpc data.
 * `return`: `response_headers` data from [ProcessingResponse](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingresponse).
 
-There are methods specified under [extproc/service/callout_tools.py](extproc/service/callout_tools.py) that will help in creating a response to the request.
+There are methods specified under [extproc/service/callout_tools.py](extproc/service/callout_tools.py) that will help in creating a response to the callout.
 Import those with:
 
 ``` python
 from extproc.service.callout_tools import add_header_mutation
 ```
 
-With the callout from before we can add the `foo:bar` header mutation on incomming `reponse_headers` requests:
+With the callout from before we can add the `foo:bar` header mutation on incomming `reponse_headers` callouts:
 
 ``` python
 class BasicCalloutServer(CalloutServer):
