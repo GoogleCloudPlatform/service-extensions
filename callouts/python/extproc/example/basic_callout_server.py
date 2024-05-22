@@ -32,7 +32,7 @@ class BasicCalloutServer(CalloutServer):
 
   def on_request_headers(self, headers: HttpHeaders, _) -> HeadersResponse:
     """Custom processor on request headers."""
-    logging.debug("Recived request headers callout: %s", headers)
+    logging.debug("Received request headers callout: %s", headers)
     return add_header_mutation(
         add=[
             # Change the host to 'service-extensions.com'.
