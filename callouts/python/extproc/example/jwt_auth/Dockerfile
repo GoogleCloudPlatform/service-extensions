@@ -21,5 +21,9 @@ EXPOSE 443
 EXPOSE 80
 EXPOSE 8080
 
+# Copy over example specific requirements.
+COPY extproc/example/jwt_auth/*.txt ./
+RUN pip install -r requirements-example.txt --break-system-packages --root-user-action=ignore
+
 # Start the service.
-CMD [ "/usr/bin/python3", "-um", "service_callout_example" ]
+ENTRYPOINT /usr/bin/python3 -um service_callout_example "$@"
