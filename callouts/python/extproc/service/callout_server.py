@@ -42,7 +42,7 @@ import grpc
 from grpc import ServicerContext
 
 
-def addr_to_str(address: tuple[str, int]) -> str:
+def _addr_to_str(address: tuple[str, int]) -> str:
   """Take in an address tuple and returns a formated ip string.
 
   Args:
@@ -73,8 +73,8 @@ class CalloutServer:
     health_check_address: The health check serving address.
     health_check_port: If set, overides the port of the health_check_address.
       If no address is set, defaults to default_ip.
-    combined_health_check: If True, does not create seperate health check server. 
-    insecure_address: If specified, the server will also listen on this, 
+    combined_health_check: If True, does not create seperate health check server.
+    insecure_address: If specified, the server will also listen on this,
       non-authenticated, address.
     insecure_port: If set, overides the port of the insecure_address.
       If no address is set, defaults to default_ip.
@@ -172,7 +172,7 @@ class CalloutServer:
             sock=self._health_check_server.socket,)
 
       logging.info('%s health check server bound to %s.', protocol,
-                   addr_to_str(self.health_check_address))
+                   _addr_to_str(self.health_check_address))
     self._callout_server.start()
 
   def _stop_servers(self) -> None:
@@ -318,11 +318,11 @@ class _GRPCCalloutService(ExternalProcessorServicer):
     server_credentials = grpc.ssl_server_credentials(
         private_key_certificate_chain_pairs=[(processor.cert_key,
                                               processor.cert)])
-    address_str = addr_to_str(processor.address)
+    address_str = _addr_to_str(processor.address)
     self._server.add_secure_port(address_str, server_credentials)
     self._start_msg = f'GRPC callout server started, listening on {address_str}.'
     if processor.insecure_address:
-      insecure_str = addr_to_str(processor.insecure_address)
+      insecure_str = _addr_to_str(processor.insecure_address)
       self._server.add_insecure_port(insecure_str)
       self._start_msg += f' (secure) and {insecure_str} (insecure)'
 
