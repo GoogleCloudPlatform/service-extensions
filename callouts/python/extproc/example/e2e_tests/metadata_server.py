@@ -23,12 +23,28 @@ from google.protobuf import any_pb2
 
 
 def unpack_string(value: any_pb2.Any) -> str:
+  """Unpacks a string value from a protobuf Any object.
+
+  Args:
+    value (google.protobuf.any_pb2.Any): The Any object containing the string value.
+
+  Returns:
+    str: The unpacked string value.
+  """
   unpacked_value = StringValue()
   value.Unpack(unpacked_value)
   return unpacked_value.value
 
 
-def check_metadata(request: service_pb2.ProcessingRequest):
+def check_metadata(request: service_pb2.ProcessingRequest) -> bool:
+  """Check if the request contains 'fr' metadata.
+
+  Args:
+    request (service_pb2.ProcessingRequest): The processing request to check.
+
+  Returns:
+    bool: True if the 'fr' metadata is present and has a non-empty string value, False otherwise.
+  """
   if not request.HasField('metadata_context'):
     logging.info('No metadata context.')
     return False
@@ -53,10 +69,22 @@ default_headers = [('service-callout-response-intercept', 'intercepted'),
 
 
 class CalloutServerExample(callout_server.CalloutServer):
-  """Example callout server."""
+  """Example callout server.
+  
+  This server demonstrates processing of external HTTP requests.
+  """
 
   def process(self, request: ProcessingRequest,
               context: ServicerContext) -> ProcessingResponse:
+    """Process the incoming request.
+
+    Args:
+      request (ProcessingRequest): The processing request received.
+      context (ServicerContext): The context object for the gRPC service.
+
+    Returns:
+      ProcessingResponse: The processing response to be sent back.
+    """
     logging.info('Received request %s.', request)
     if request.HasField('response_body'):
       return ProcessingResponse(

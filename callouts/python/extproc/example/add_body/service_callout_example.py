@@ -24,20 +24,39 @@ class CalloutServerExample(callout_server.CalloutServer):
   Provides a non-comprehensive set of responses for each of the possible
   callout interactions.
 
-  On a request body callout we provide a mutation to append '-added-body' to the body. On response body
-  callouts we send a mutation to replace the body with 'new-body'.
+  For request body callouts, we offer a mutation to append '-added-body'
+  to the existing body content. In response body callouts, our solution
+  involves sending a mutation to replace the current body with 'new-body'.
   """
 
   def on_request_body(
       self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
-    """Custom processor on the request body."""
+    """Custom processor on the request body.
+
+    Args:
+      body (service_pb2.BodyResponse): The HTTP body received in the request.
+      context (ServicerContext): The context object for the gRPC service.
+
+    Returns:
+      service_pb2.BodyResponse: The response containing the mutations to be applied
+      to the request body.
+    """
     return callout_tools.add_body_mutation(body='-added-body')
 
   def on_response_body(
       self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
-    """Custom processor on the response body."""
+    """Custom processor on the response body.
+
+        Args:
+          body (service_pb2.BodyResponse): The HTTP body received in the response.
+          context (ServicerContext): The context object for the gRPC service.
+
+        Returns:
+          service_pb2.BodyResponse: The response containing the mutations to be applied
+          to the response body.
+        """
     return callout_tools.add_body_mutation(body='new-body', clear_body=True)
 
 

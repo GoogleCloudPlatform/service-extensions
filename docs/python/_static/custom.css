@@ -1,0 +1,105 @@
+.document {
+    max-width: 80%;
+    margin: 0 auto;
+    padding: 15px;
+    box-sizing: border-box;
+}
+
+@media (min-width: 768px) { /* Adjustments for larger screens */
+    .document {
+        max-width: 75vw; /* Larger max-width on wider screens */
+    }
+}
+
+.wy-nav-content {
+    padding: 1.618em 3.236em;
+    height: 100%;
+    max-width: 100%; /* Default for smaller screens */
+    margin: auto;
+}
+
+@media (min-width: 768px) { /* Medium screens and above */
+    .wy-nav-content {
+        max-width: 75vw;
+    }
+}
+
+@media (min-width: 1200px) { /* Large screens */
+    .wy-nav-content {
+        max-width: 95vw;
+    }
+}
+
+dl.class, dl.function {
+    width: 100%;
+    margin: 0 auto;
+    padding: 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+dl.class > dt, dl.function > dt {
+    background-color: #2980b9;
+    color: white;
+    padding: 5px 10px;
+}
+
+dl, dd {
+    width: 100%;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto; /* Improve hyphenation to better manage breaks */
+}
+
+.code, .sig-prename, .sig-name, .pre {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: normal; /* Allows text to wrap inside code blocks and signatures */
+}
+
+* {
+    box-sizing: border-box;
+}
+
+.py.method, .py.function, .py.class {
+    display: flex;
+    width: 100%; /* Ensure they take up the full width of their container */
+    flex-direction: column;
+    word-wrap: break-word; /* Wrap long words */
+    overflow-wrap: break-word; /* Break words */
+}
+
+.py.method dt, .py.function dt, .py.class dt,
+.py.method dd, .py.function dd, .py.class dd {
+    flex: 1; /* Allow children to expand and fill the available space */
+    padding-right: 15px; /* Add padding to avoid text touching borders */
+    word-break: break-word; /* Adjust to 'break-word' to maintain whole words integrity when possible */
+}
+
+.py.method dt sig, .py.function dt sig, .py.class dt sig,
+.py.method dd sig, .py.function dd sig, .py.class dd sig {
+    white-space: pre-wrap; /* Wrap contents within signature elements */
+}
+
+.field-list {
+    width: 100%;
+    overflow: hidden; /* Hide overflow */
+}
+
+.field-list .field-odd, .field-list .field-even {
+    padding: 5px 10px; /* Add padding for better spacing */
+    word-wrap: break-word; /* Wrap words that are too long */
+    hyphens: auto; /* Automatically insert hyphens where necessary */
+}
+
+.field-list dd ul {
+    padding-left: 20px; /* Indent list items for better hierarchy visibility */
+}
+
+.field-list dt {
+    font-weight: bold; /* Make the 'Parameters:' label bold */
+}
+
+.field-list dd ul li p {
+    margin: 0; /* Remove margin to reduce space between list items */
+    line-height: 1.5; /* Increase line height for better readability */
+}
