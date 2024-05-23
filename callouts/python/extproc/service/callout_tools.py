@@ -143,7 +143,7 @@ def add_body_mutation(
       BodyResponse.
 
   Returns:
-    BodyResponse: A configured header mutation response with the specified modifications.
+    BodyResponse: A configured body mutation response with the specified modifications.
   """
   body_mutation = BodyResponse()
   if body:
