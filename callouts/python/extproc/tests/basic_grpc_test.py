@@ -33,7 +33,7 @@ import pytest
 
 from extproc.example.basic_callout_server import (BasicCalloutServer as
                                                   CalloutServerTest)
-from extproc.service.callout_server import CalloutServer, addr_to_str
+from extproc.service.callout_server import CalloutServer, _addr_to_str
 from extproc.service.callout_tools import add_body_mutation, add_header_mutation
 
 
@@ -67,7 +67,7 @@ def get_insecure_channel(server: CalloutServer) -> grpc.Channel:
       grpc.Channel: Open channel to the server.
   """
   addr = server.insecure_address
-  return grpc.insecure_channel(addr_to_str(addr) if addr else '')
+  return grpc.insecure_channel(_addr_to_str(addr) if addr else '')
 
 
 def wait_till_server(server_check: Callable[[], bool], timeout: int = 10):
@@ -158,7 +158,7 @@ class TestBasicServer(object):
         'grpc.ssl_target_name_override',
         'localhost',
     ),)
-    with grpc.secure_channel(f'{addr_to_str(server.address)}',
+    with grpc.secure_channel(f'{_addr_to_str(server.address)}',
                              creds,
                              options=options) as channel:
       stub = ExternalProcessorStub(channel)
@@ -196,7 +196,7 @@ class TestBasicServer(object):
     """Test that the health check sub server returns the expected 200 code."""
     assert server.health_check_address is not None
     response = urllib.request.urlopen(
-        f'http://{addr_to_str(server.health_check_address)}')
+        f'http://{_addr_to_str(server.health_check_address)}')
     assert not response.read()
     assert response.getcode() == 200
 
@@ -217,7 +217,7 @@ def test_https_health_check(server: CalloutServerTest) -> None:
   ssl_context.check_hostname = False
   ssl_context.verify_mode = ssl.CERT_NONE
   response = urllib.request.urlopen(
-      f'https://{addr_to_str(server.health_check_address)}',
+      f'https://{_addr_to_str(server.health_check_address)}',
       context=ssl_context)
   assert not response.read()
   assert response.getcode() == 200
