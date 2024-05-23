@@ -196,7 +196,7 @@ def deny_callout(context, msg: str | None = None) -> None:
         Also logged to warning. If no message is specified, defaults to "Callout DENIED.".
 
   Raises:
-      grpc.StatusCode.PERMISSION_DENIED: Always raised to deny the request.
+      grpc.StatusCode.PERMISSION_DENIED: Always raised to deny the callout.
   """
   msg = msg or 'Callout DENIED.'
   logging.warning(msg)
