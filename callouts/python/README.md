@@ -1,4 +1,3 @@
-
 __Copyrights and Licences__
 
 Files using Copyright 2023 Google LLC & Apache License Version 2.0:
@@ -10,8 +9,6 @@ Files using Copyright 2023 Google LLC & Apache License Version 2.0:
 
 * Python 3.11+
 * [buf](https://buf.build/docs/introduction)
->`#subdir=` is currently broken in buf `v1.32.0` https://github.com/bufbuild/buf/issues/3000 please install `v1.31.0`, this can be done easily with go via: `go install github.com/bufbuild/buf/cmd/buf@v1.31.0`
-
 * [requirements.txt](./requirements.txt)
 
 # Quick start
@@ -48,6 +45,18 @@ buf -v generate \
   --path envoy/service/ext_proc/v3/external_processor.proto \
   --include-imports
 ```
+
+> The default template file `buf.gen.yaml` will not generate `pyright` compatible proto stubs.
+> If you plan to develop callouts with a similar type checker and not just build them,
+> we suggest you run the command with the alternative development template using
+> `--template=buf_dev.gen.yaml`:
+>
+> ```shell
+> buf -v generate \
+>  https://github.com/envoyproxy/envoy.git#subdir=api \
+>  --path envoy/service/ext_proc/v3/external_processor.proto \
+>  --include-imports --template=buf_dev.gen.yaml
+> ```
 
 The proto files are then installed as a local package:
 
@@ -226,20 +235,19 @@ And the protobuf library with:
 python -m pip install ./protodef
 ```
 
-### WARNING
-
-Installing the `protodef` package to your system outside of a `venv` could cause unintentional side effects. Only do this if you are inside of a self contained enviornment or you know what you are doing.
+> [!WARNING]
+> Installing the `protodef` package to your system outside of a `venv` could cause unintentional side effects.
 
 ## Without installing the proto code as a local package
 
 Alternatively, rather than installing through pip, the proto code can be placed in the root of this project and imported directly.
 
-```
+```bash
 buf -v generate \
   https://github.com/envoyproxy/envoy.git#subdir=api \
   --path envoy/service/ext_proc/v3/external_processor.proto \
   --include-imports \
-  -o out  && \
+  -o out && \
 mv ./out/protodef/* .
 ```
 
@@ -312,4 +320,3 @@ docker build \
   -f ./extproc/example/add_body/Dockerfile \
   -t add_body .       
 ```
-

@@ -2,7 +2,6 @@
 version: v1
 managed:
   enabled: true
-  optimize_for: CODE_SIZE
 plugins:
   - plugin: buf.build/grpc/python:v1.62.1
     out: protodef
