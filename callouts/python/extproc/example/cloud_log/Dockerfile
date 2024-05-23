@@ -21,9 +21,9 @@ EXPOSE 443
 EXPOSE 80
 EXPOSE 8080
 
-# https://google-auth.readthedocs.io/en/latest/
-RUN pip install --upgrade google-cloud-logging google-auth \
-  --break-system-packages --root-user-action=ignore
+# Copy over example specific requirements.
+COPY extproc/example/cloud_log/*.txt ./
+RUN pip install -r requirements-example.txt --break-system-packages --root-user-action=ignore
 
 # Start the service.
 ENTRYPOINT /usr/bin/python3 -um service_callout_example "$@"
