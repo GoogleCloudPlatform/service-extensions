@@ -11,6 +11,9 @@ Files using Copyright 2023 Google LLC & Apache License Version 2.0:
 * [buf](https://buf.build/docs/introduction)
 * [requirements.txt](./requirements.txt)
 
+> [!NOTE]
+> All commands are expected to be run from within the `callouts/python` directory.
+
 # Quick start
 
 The minimal operation of this Python-based ext_proc server requires the `grpcio` python package as well as the protobuf generator tool [buf](https://buf.build/docs/introduction).
@@ -27,12 +30,6 @@ Then the packages can be installed with:
 
 ```shell
 pip install -r requirements.txt
-```
-
-And if you want to run tests:
-
-```shell
-pip install -r requirements-test.txt
 ```
 
 `buf` can be installed from [here](https://buf.build/docs/installation).
@@ -253,7 +250,13 @@ mv ./out/protodef/* .
 
 # Tests
 
-Tests can be run with:
+Tests require packages from the `requirements.txt` file as well as the `requirements-test.txt` file, installed with:
+
+```shell
+pip install -r requirements.txt -r requirements-test.txt
+```
+
+All tests can then be run with:
 
 ```shell
 pytest
