@@ -1,5 +1,2 @@
 grpcio==1.59.0
-google-cloud-logging==3.9.0
-pyjwt==2.8.0
-cryptography==42.0.5
-google-cloud-logging==3.9.0
+protobuf==4.25.3

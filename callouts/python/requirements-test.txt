@@ -1,1 +1,4 @@
 pytest==7.4.2
+google-cloud-logging==3.9.0
+cryptography==42.0.5
+pyjwt==2.8.0
