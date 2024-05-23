@@ -54,6 +54,9 @@ buf -v generate \
 >  --path envoy/service/ext_proc/v3/external_processor.proto \
 >  --include-imports --template=buf_dev.gen.yaml
 > ```
+>
+> You may need to run `python -m pip uninstall ./protodef` after re-generating the proto files
+> to get the linter to update.
 
 The proto files are then installed as a local package:
 
