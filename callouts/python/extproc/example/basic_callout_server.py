@@ -22,6 +22,7 @@ from envoy.service.ext_proc.v3.external_processor_pb2 import HeadersResponse
 from extproc.service.callout_server import CalloutServer
 from extproc.service.callout_tools import add_header_mutation
 from extproc.service.callout_tools import add_body_mutation
+from extproc.service.callout_tools import add_command_line_args
 
 
 class BasicCalloutServer(CalloutServer):
@@ -83,12 +84,8 @@ class BasicCalloutServer(CalloutServer):
 
 if __name__ == '__main__':
   # Useful command line args.
-  parser = argparse.ArgumentParser()
-  parser.add_argument('--secure_health_check',
-                      action="store_true",
-                      help="Run a HTTPS health check rather than an HTTP one.")
-  args = parser.parse_args()
-  # Set the debug level.
+  args = add_command_line_args().parse_args()
+  # Set the logging debug level.
   logging.basicConfig(level=logging.DEBUG)
   # Run the gRPC service.
-  BasicCalloutServer(secure_health_check=args.secure_health_check).run()
+  BasicCalloutServer(**vars(args)).run()

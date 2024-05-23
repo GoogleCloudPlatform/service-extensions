@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from envoy.config.core.v3.base_pb2 import HeaderValueOption
 from grpc import ServicerContext
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
@@ -47,5 +48,6 @@ class CalloutServerExample(callout_server.CalloutServer):
 
 
 if __name__ == '__main__':
+  logging.basicConfig(level=logging.DEBUG)
   # Run the gRPC service
   CalloutServerExample().run()
