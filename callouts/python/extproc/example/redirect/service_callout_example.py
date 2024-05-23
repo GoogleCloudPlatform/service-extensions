@@ -20,17 +20,32 @@ from extproc.service import callout_tools
 
 
 class CalloutServerExample(callout_server.CalloutServer):
-  """Example callout server.
+  """Example redirect callout server.
 
-  On a request header callout we perform a redirect to 
-  '{http://service-extensions.com/redirect}' with the status of
-  '{301}' - MovedPermanently returning an ImmediateResponse.
+  This class implements the `CalloutServer` interface and provides sample
+  responses for various callout interactions. It showcases how to modify request
+  headers using an immediate response.
+
+  On a request header callout we perform a redirect to '{http://service-extensions.com/redirect}'
+  with the status of '{301}' - MovedPermanently returning an ImmediateResponse
   """
 
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders,
       context: ServicerContext) -> service_pb2.ImmediateResponse:
-    """Custom processor on request headers."""
+    """Custom processor on request headers.
+
+    This method is invoked when Envoy sends the request headers for processing.
+    Here, we modify the headers to perform a 301 redirect.
+    
+    Args:
+      headers (service_pb2.HttpHeaders): The HTTP headers received in the request.
+      context (ServicerContext): The context object for the gRPC service.
+
+    Returns:
+      service_pb2.HeadersResponse: The response containing the mutations to be applied
+      to the request headers.
+    """
     return callout_tools.header_immediate_response(
         code=301,
         headers=[('Location', 'http://service-extensions.com/redirect')])

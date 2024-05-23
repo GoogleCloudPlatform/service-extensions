@@ -30,7 +30,7 @@ def get_device_type(host_value: str) -> str:
 
 
 class CalloutServerExample(callout_server.CalloutServer):
-  """Example callout server.
+  """Example header normalization callout server.
 
   For request header callouts we check the host header
   and create a new HTTP header (client-device-type)
@@ -62,8 +62,17 @@ class CalloutServerExample(callout_server.CalloutServer):
 
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders,
-      _: ServicerContext) -> service_pb2.HeadersResponse:
-    """Custom processor on request headers."""
+      context: ServicerContext) -> service_pb2.HeadersResponse:
+    """Custom processor on request headers.
+
+    Args:
+      headers (service_pb2.HttpHeaders): The HTTP headers received in the request.
+      context (ServicerContext): The context object for the gRPC service.
+
+    Returns:
+      service_pb2.HeadersResponse: The response containing the mutations to be applied
+      to the request headers.
+    """
     return self.add_device_type_header(headers=headers)
 
 

@@ -8,13 +8,14 @@ on:
     branches: [ "main" ]
     paths:
     - callouts/python/**
+    - docs/python/**
   pull_request:
     branches: [ "main" ]
     paths:
     - callouts/python/**
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -40,6 +41,20 @@ jobs:
       run: |
         buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api --path=envoy/service/ext_proc/v3/external_processor.proto --include-imports
         python -m pip install ./protodef
+    - name: Install sphinx dependencies
+      run: |
+        pip install sphinx sphinx_rtd_theme myst_parser
+    - name: Sphinx build
+      run: |
+        sphinx-build docs/python docs/python/_build
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v4
+      if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      with:
+        publish_branch: gh-pages
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: docs/
+        force_orphan: true
     #- name: Lint with flake8
     #  run: |
     #    # stop the build if there are Python syntax errors or undefined names

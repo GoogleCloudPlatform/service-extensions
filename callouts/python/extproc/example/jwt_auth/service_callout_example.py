@@ -13,6 +13,8 @@
 # limitations under the License.
 
 import logging
+from typing import Union
+
 import jwt
 
 from typing import Union, Any
@@ -23,8 +25,23 @@ from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from extproc.service import callout_server
 from extproc.service import callout_tools
 
+def extract_jwt_token(
+    request_headers: service_pb2.HttpHeaders
+) -> Union[str, None]:
+  """
+  Extracts the JWT token from the request headers, specifically looking for
+  the 'Authorization' header and parsing out the token part.
 
-def extract_jwt_token(request_headers) -> Union[str, None]:
+  Args:
+      request_headers (service_pb2.HttpHeaders): The HTTP headers received in the request.
+
+  Returns:
+      str: The extracted JWT token if found, otherwise None.
+
+  Example:
+      Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6...
+      -> Returns: eyJhbGciOiJIUzI1NiIsInR5cCI6...
+  """
   jwt_token = next((header.raw_value.decode('utf-8')
                     for header in request_headers.headers.headers
                     if header.key == 'Authorization'), None)
@@ -32,8 +49,33 @@ def extract_jwt_token(request_headers) -> Union[str, None]:
       ' ')[1] if jwt_token and ' ' in jwt_token else jwt_token
   return extracted_jwt
 
+def validate_jwt_token(
+    key: str,
+    request_headers: service_pb2.HttpHeaders,
+    algorithm: str
+) -> Union[Any, None]:
+  """
+  Validates the JWT token extracted from the request headers using a specified
+  public key and algorithm. If valid, returns the decoded JWT payload; otherwise,
+  logs an error and returns None.
 
-def validate_jwt_token(key, request_headers, algorithm) -> Union[Any, None]:
+  Args:
+      key (str): The public key used for token validation.
+      request_headers (service_pb2.HttpHeaders): The HTTP headers received in the request,
+                                                used to extract the JWT token.
+      algorithm (str): The algorithm with which the JWT was signed (e.g., 'RS256').
+
+  Returns:
+      dict | None: The decoded JWT if validation is successful, None if the token is
+                   invalid or an error occurs.
+
+  Raises:
+      InvalidTokenError: If the token is invalid or decoding fails.
+
+  Example:
+      Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6...
+      -> Returns: {'sub': '1234567890', 'name': 'John Doe', 'iat': 1712173461, 'exp': 2075658261}
+  """
   jwt_token = extract_jwt_token(request_headers)
   if jwt_token is None:
     logging.warn('Token failed to decode.')
@@ -62,8 +104,14 @@ class CalloutServerExample(callout_server.CalloutServer):
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders,
       context: ServicerContext) -> Union[service_pb2.HeadersResponse, None]:
-    """Custom processor on request headers."""
+    """Deny token if validation fails and return an error message.
+    See :py:meth:`callouts.python.extproc.service.callout_tools.deny_request` for more information.
 
+    If the token is valid, apply a header mutation.
+    See :py:meth:`callouts.python.extproc.service.callout_tools.add_header_mutation` for more information.
+
+    See base method: :py:meth:`callouts.python.extproc.service.callout_server.CalloutServer.on_request_headers`.
+    """
     decoded = validate_jwt_token(self.public_key, headers, "RS256")
 
     if decoded:

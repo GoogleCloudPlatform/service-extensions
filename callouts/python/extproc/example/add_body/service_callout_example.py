@@ -20,22 +20,42 @@ from extproc.service import callout_tools
 
 
 class CalloutServerExample(callout_server.CalloutServer):
-  """Example callout server.
+  """Example callout server showing how to add text to a callout body.
 
-  On a request body callout we provide a mutation to append '-added-body' to
-  the body. On response body callouts we send a mutation to replace the body
+  For request body callouts we return a mutation to append '-added-body' to
+  the body. For response body callouts we send a mutation to replace the body
   with 'new-body'.
   """
 
-  def on_request_body(self, body: service_pb2.HttpBody,
-                      context: ServicerContext) -> service_pb2.BodyResponse:
-    """Custom processor on the request body."""
+  def on_request_body(
+      self, body: service_pb2.HttpBody, context: ServicerContext
+  ) -> service_pb2.BodyResponse:
+    """Custom processor on the request body.
+
+    Args:
+      body (service_pb2.BodyResponse): The HTTP body received in the request.
+      context (ServicerContext): The context object for the gRPC service.
+
+    Returns:
+      service_pb2.BodyResponse: The response containing the mutations to be applied
+      to the request body.
+    """
     return callout_tools.add_body_mutation(
         body.body.decode('utf-8') + '-added-request-body')
 
-  def on_response_body(self, body: service_pb2.HttpBody,
-                       context: ServicerContext) -> service_pb2.BodyResponse:
-    """Custom processor on the response body."""
+  def on_response_body(
+      self, body: service_pb2.HttpBody, context: ServicerContext
+  ) -> service_pb2.BodyResponse:
+    """Custom processor on the response body.
+
+        Args:
+          body (service_pb2.BodyResponse): The HTTP body received in the response.
+          context (ServicerContext): The context object for the gRPC service.
+
+        Returns:
+          service_pb2.BodyResponse: The response containing the mutations to be applied
+          to the response body.
+        """
     return callout_tools.add_body_mutation('new-body')
 
 

@@ -1,3 +1,16 @@
+# Copyright 2024 Google LLC.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """Library of commonly used methods within a callout server."""
 import argparse
 import logging
@@ -26,7 +39,11 @@ def _addr(value: str) -> tuple[str, int] | None:
 
 
 def add_command_line_args() -> argparse.ArgumentParser:
-  """Adds command line args that can be passed to the CalloutServer constructor."""
+  """Adds command line args that can be passed to the CalloutServer constructor.
+
+  Returns:
+      argparse.ArgumentParser: Configured argument parser with callout server options.
+  """
   parser = argparse.ArgumentParser()
   parser.add_argument(
       '--secure_health_check',
@@ -91,7 +108,7 @@ def add_header_mutation(
       HeadersResponse.
     append_action: Supported actions types for header append action.
   Returns:
-    The constructed HeadersResponse object.
+    HeadersResponse: A configured header mutation response with the specified modifications.
   """
   header_mutation = HeadersResponse()
   if add:
@@ -125,7 +142,7 @@ def add_body_mutation(
       BodyResponse.
 
   Returns:
-    The constructed BodyResponse object.
+    BodyResponse: A configured header mutation response with the specified modifications.
   """
   body_mutation = BodyResponse()
   if body:
@@ -171,10 +188,15 @@ def body_contains(http_body: HttpBody, body: str) -> bool:
 
 
 def deny_callout(context, msg: str | None = None) -> None:
-  """Deny a grpc callout.
+  """Denies a gRPC callout, optionally logging a custom message.
+
   Args:
-    msg: Message attatched to the deny action. Also logged to warning.
-      If no message is specified, defaults to "Callout DENIED."
+      context (grpc.ServicerContext): The gRPC service context.
+      msg (str, optional): Custom message to log before denying the callout.
+        Also logged to warning. If no message is specified, defaults to "Callout DENIED.".
+
+  Raises:
+      grpc.StatusCode.PERMISSION_DENIED: Always raised to deny the request.
   """
   msg = msg or 'Callout DENIED.'
   logging.warning(msg)
@@ -186,7 +208,16 @@ def header_immediate_response(
     headers: list[tuple[str, str]] | None = None,
     append_action: Union[HeaderValueOption.HeaderAppendAction, None] = None,
 ) -> ImmediateResponse:
-  """Returns an ImmediateResponse for a header callout."""
+  """Creates an immediate HTTP response with specific headers and status code.
+
+  Args:
+      code (StatusCode): The HTTP status code to return.
+      headers: Optional list of tuples (header, value) to include in the response.
+      append_action: Optional action specifying how headers should be appended.
+
+  Returns:
+      ImmediateResponse: Configured immediate response with the specified headers and status code.
+  """
   immediate_response = ImmediateResponse()
   immediate_response.status.code = code
 

@@ -39,12 +39,20 @@ class CalloutServerExample(callout_server.CalloutServer):
   def on_request_headers(
     self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
-    """Custom processor on request headers."""
-    if not header_contains(headers, 'header-check'):
+    """Custom processor on request headers.
+
+    Args:
+      headers (service_pb2.HttpHeaders): The HTTP headers received in the request.
+      context (ServicerContext): The context object for the gRPC service.
+
+    Returns:
+      service_pb2.HeadersResponse: The response containing the mutations to be applied
+      to the request headers.
+    """
+    if not callout_tools.header_contains(headers, 'header-check'):
       callout_tools.deny_callout(
         context, '"header-check" not found within the request headers'
       )
-
     return callout_tools.add_header_mutation(
       add=[('header-request', 'request')], clear_route_cache=True
     )
@@ -52,13 +60,21 @@ class CalloutServerExample(callout_server.CalloutServer):
   def on_request_body(
     self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
-    """Custom processor on the request body."""
-    if not body_contains(body, 'body-check'):
+    """Custom processor on the request body.
+
+    Args:
+      body (service_pb2.HttpBody): The HTTP body received in the request.
+      context (ServicerContext): The context object for the gRPC service.
+
+    Returns:
+      service_pb2.BodyResponse: The response containing the mutations to be applied
+      to the response body.
+    """
+    if not callout_tools.body_contains(body, 'body-check'):
       callout_tools.deny_callout(
         context, '"body-check" not found within the request body'
       )
     return callout_tools.add_body_mutation(body='replaced-body')
-
 
 if __name__ == '__main__':
   """Sets up Google Cloud Logging for the cloud_log example"""

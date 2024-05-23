@@ -24,7 +24,7 @@ from http.server import BaseHTTPRequestHandler
 from http.server import HTTPServer
 import logging
 import ssl
-from typing import Iterator
+from typing import Iterator, Union
 from typing import Iterable
 
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpBody
@@ -246,7 +246,7 @@ class CalloutServer:
       self,
       headers: HttpHeaders,  # pylint: disable=unused-argument
       context: ServicerContext  # pylint: disable=unused-argument
-  ) -> None | HeadersResponse | ImmediateResponse:
+  ) -> Union[None, HeadersResponse, ImmediateResponse]:
     """Process incoming request headers.
 
     Args:
@@ -262,7 +262,7 @@ class CalloutServer:
       self,
       headers: HttpHeaders,  # pylint: disable=unused-argument
       context: ServicerContext  # pylint: disable=unused-argument
-  ) -> None | HeadersResponse:
+  ) -> Union[None, HeadersResponse]:
     """Process incoming response headers.
 
     Args:
@@ -278,7 +278,7 @@ class CalloutServer:
       self,
       body: HttpBody,  # pylint: disable=unused-argument
       context: ServicerContext  # pylint: disable=unused-argument
-  ) -> None | BodyResponse | ImmediateResponse:
+  ) -> Union[None, BodyResponse, ImmediateResponse]:
     """Process an incoming request body.
 
     Args:
@@ -294,7 +294,7 @@ class CalloutServer:
       self,
       body: HttpBody,  # pylint: disable=unused-argument
       context: ServicerContext  # pylint: disable=unused-argument
-  ) -> None | BodyResponse:
+  ) -> Union[None, BodyResponse]:
     """Process an incoming response body.
 
     Args:

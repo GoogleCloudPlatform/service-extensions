@@ -27,12 +27,25 @@ class CalloutServerExample(callout_server.CalloutServer):
 
   On response header callouts, we respond with a mutation to update
   the header '{header-response: response}'.
+
+  Usage:
+    To use this example callout server, instantiate the CalloutServerExample
+    class and run the gRPC service.
   """
 
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders,
       context: ServicerContext) -> service_pb2.HeadersResponse:
-    """Custom processor on request headers."""
+    """Custom processor on request headers.
+    
+    Args:
+      headers (service_pb2.HttpHeaders): The HTTP headers received in the request.
+      context (ServicerContext): The context object for the gRPC service.
+
+    Returns:
+      service_pb2.HeadersResponse: The response containing the mutations to be applied
+      to the request headers.
+    """
     return callout_tools.add_header_mutation(
         add=[('header-request', 'request-new-value')],
         append_action=actions.OVERWRITE_IF_EXISTS_OR_ADD,
@@ -41,7 +54,16 @@ class CalloutServerExample(callout_server.CalloutServer):
   def on_response_headers(
       self, headers: service_pb2.HttpHeaders,
       context: ServicerContext) -> service_pb2.HeadersResponse:
-    """Custom processor on response headers."""
+    """Custom processor on response headers.
+    
+    Args:
+      headers (service_pb2.HttpHeaders): The HTTP headers received in the response.
+      context (ServicerContext): The context object for the gRPC service.
+
+    Returns:
+      service_pb2.HeadersResponse: The response containing the mutations to be applied
+      to the response headers.
+    """
     return callout_tools.add_header_mutation(
         add=[('header-response', 'response-new-value')],
         append_action=actions.OVERWRITE_IF_EXISTS_OR_ADD)
