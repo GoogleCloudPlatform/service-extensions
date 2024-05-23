@@ -6,6 +6,8 @@ from typing import Union
 
 from envoy.config.core.v3.base_pb2 import HeaderValue
 from envoy.config.core.v3.base_pb2 import HeaderValueOption
+from envoy.service.ext_proc.v3.external_processor_pb2 import HttpBody
+from envoy.service.ext_proc.v3.external_processor_pb2 import HttpHeaders
 from envoy.service.ext_proc.v3.external_processor_pb2 import HeaderMutation
 from envoy.service.ext_proc.v3.external_processor_pb2 import BodyResponse
 from envoy.service.ext_proc.v3.external_processor_pb2 import HeadersResponse
@@ -137,9 +139,44 @@ def add_body_mutation(
   return body_mutation
 
 
-def deny_callout(context, msg: str | None = None):
-  """Deny a grpc callout and print an error message."""
-  msg = msg or "Callout content is invalid or not allowed"
+def headers_contain(
+  http_headers: HttpHeaders, key: str, value: Union[str, None] = None
+) -> bool:
+  """Check the headers for a matching key value pair.
+
+  If no value is specified, only checks for the presence of the header key.
+
+  Args:
+    http_headers: Headers to check.
+    key: Header key to find.
+    value: Header value to compare.
+  Returns:
+    True if http_headers contains a match, false otherwise.
+  """
+  for header in http_headers.headers.headers:
+    if header.key == key and (value is None or header.value == value):
+      return True
+  return False
+
+
+def body_contains(http_body: HttpBody, body: str) -> bool:
+  """Check the body for the presence of a substring.
+
+  Args:
+    body: Body substring to look for.
+  Returns:
+    True if http_body contains expected_body, false otherwise.
+  """
+  return body in http_body.body.decode('utf-8')
+
+
+def deny_callout(context, msg: str | None = None) -> None:
+  """Deny a grpc callout.
+  Args:
+    msg: Message attatched to the deny action. Also logged to warning.
+      If no message is specified, defaults to "Callout DENIED."
+  """
+  msg = msg or 'Callout DENIED.'
   logging.warning(msg)
   context.abort(grpc.StatusCode.PERMISSION_DENIED, msg)
 
