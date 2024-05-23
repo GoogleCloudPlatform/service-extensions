@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+from google.auth import compute_engine
 import google.cloud.logging
 
 from grpc import ServicerContext
@@ -25,34 +27,48 @@ class CalloutServerExample(callout_server.CalloutServer):
 
   For request header callouts we check the content of the request and
   authorize the request or reject the request.
-  The content being checked is if the header has the header header-check.
+  The content being checked is if the header has the header 'header-check'.
   The decision is logged to Cloud Logging.
 
   For request body callouts we check the content of the request and
   authorize the request or reject the request.
-  The content being checked is if the body has the body body-check.
+  The content being checked is if the body contains the body 'body-check'.
   The decision is logged to Cloud Logging.
   """
 
   def on_request_headers(
-      self, headers: service_pb2.HttpHeaders, context: ServicerContext
+    self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.HeadersResponse:
     """Custom processor on request headers."""
+    if not header_contains(headers, 'header-check'):
+      callout_tools.deny_callout(
+        context, '"header-check" not found within the request headers'
+      )
+
     return callout_tools.add_header_mutation(
-      add=[('header-request', 'request')],
-      clear_route_cache=True
+      add=[('header-request', 'request')], clear_route_cache=True
     )
 
   def on_request_body(
-      self, body: service_pb2.HttpBody, context: ServicerContext
+    self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
     """Custom processor on the request body."""
+    if not body_contains(body, 'body-check'):
+      callout_tools.deny_callout(
+        context, '"body-check" not found within the request body'
+      )
     return callout_tools.add_body_mutation(body='replaced-body')
+
 
 if __name__ == '__main__':
   """Sets up Google Cloud Logging for the cloud_log example"""
-  client = google.cloud.logging.Client()
+  # Local logging settings.
+  logging.basicConfig(level=logging.DEBUG)
+  # Example logging setup, not intended for production.
+  # Please see https://google-auth.readthedocs.io/en/latest/.
+  client = google.cloud.logging.Client(
+    project='test-project', credentials=compute_engine.Credentials()
+  )
   client.setup_logging()
-
   # Run the gRPC service
-  CalloutServerExample(insecure_address=('0.0.0.0', 8080)).run()
+  CalloutServerExample().run()

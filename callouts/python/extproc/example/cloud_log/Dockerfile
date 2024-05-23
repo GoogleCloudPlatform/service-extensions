@@ -14,12 +14,16 @@
 FROM service-callout-common-python
 
 # Copy over example specific files.
-COPY extproc/example/grpc/*.py ./
+COPY extproc/example/cloud_log/*.py ./
 
 # Set up communication ports.
 EXPOSE 443
 EXPOSE 80
 EXPOSE 8080
 
+# https://google-auth.readthedocs.io/en/latest/
+RUN pip install --upgrade google-cloud-logging google-auth \
+  --break-system-packages --root-user-action=ignore
+
 # Start the service.
-CMD [ "/usr/bin/python3", "-um", "service_callout_example" ]
+ENTRYPOINT /usr/bin/python3 -um service_callout_example "$@"
