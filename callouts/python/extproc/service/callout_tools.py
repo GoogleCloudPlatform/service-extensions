@@ -19,13 +19,15 @@ from typing import Union
 
 from envoy.config.core.v3.base_pb2 import HeaderValue
 from envoy.config.core.v3.base_pb2 import HeaderValueOption
-from envoy.service.ext_proc.v3.external_processor_pb2 import HeaderMutation
+from envoy.service.ext_proc.v3.external_processor_pb2 import HttpBody
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpHeaders
+from envoy.service.ext_proc.v3.external_processor_pb2 import HeaderMutation
 from envoy.service.ext_proc.v3.external_processor_pb2 import BodyResponse
 from envoy.service.ext_proc.v3.external_processor_pb2 import HeadersResponse
 from envoy.service.ext_proc.v3.external_processor_pb2 import ImmediateResponse
 from envoy.type.v3.http_status_pb2 import StatusCode
 import grpc
+
 
 def _addr(value: str) -> tuple[str, int] | None:
   if not value:
@@ -97,12 +99,13 @@ def add_header_mutation(
     clear_route_cache: bool = False,
     append_action: typing.Optional[HeaderValueOption.HeaderAppendAction] = None,
 ) -> HeadersResponse:
-  """Generate a header response for incoming requests.
+  """Generate a HeadersResponse mutation for incoming callouts.
 
   Args:
-    add: A list of tuples representing headers to add.
-    remove: List of header strings to remove from the request.
-    clear_route_cache: If true, will enable clear_route_cache on the response.
+    add: A list of tuples representing headers to add or replace.
+    remove: List of header strings to remove from the callout.
+    clear_route_cache: If true, will enable clear_route_cache on the generated
+      HeadersResponse.
     append_action: Supported actions types for header append action.
   Returns:
     HeadersResponse: A configured header mutation response with the specified modifications.
@@ -123,89 +126,80 @@ def add_header_mutation(
   return header_mutation
 
 
-def normalize_header_mutation(
-    headers: HttpHeaders,
-    clear_route_cache: bool = False,
-) -> HeadersResponse:
-  """Generate a header response for incoming requests.
-
-  Args:
-    headers: Current headers presented in the request
-    clear_route_cache: If true, will enable clear_route_cache on the response.
-  Returns:
-    HeadersResponse: The response after header normalization.
-  """
-  host_value = next((header.raw_value.decode('utf-8')
-                     for header in headers.headers.headers
-                     if header.key == 'host'), None)
-
-  header_mutation = HeadersResponse()
-
-  if host_value:
-    device_type = get_device_type(host_value)
-    header_mutation = add_header_mutation(add=[('client-device-type',
-                                                device_type)],
-                                          clear_route_cache=clear_route_cache)
-
-  if clear_route_cache:
-    header_mutation.response.clear_route_cache = True
-  return header_mutation
-
-
 def add_body_mutation(
     body: str | None = None,
     clear_body: bool = False,
     clear_route_cache: bool = False,
 ) -> BodyResponse:
-  """Generate a body response for incoming requests.
+  """Generate a BodyResponse for incoming callouts.
+
+    body and clear_body are mutually exclusive, if body is set, clear_body will be ignored.
+    If both body and clear_body are left as default, the incoming callout's body will not be modified.
 
   Args:
-    body: Text of the body.
-    clear_body: If set to true, the modification will clear the previous body,
-      if left false, the text will be appended to the end of the previous
-      body.
-    clear_route_cache: If true, will enable clear_route_cache on the response.
+    body: Body text to replace the current body of the incomming callout.
+    clear_body: If true, will clear the body of the incomming callout. 
+    clear_route_cache: If true, will enable clear_route_cache on the generated
+      BodyResponse.
 
   Returns:
-    BodyResponse: The constructed body mutation response.
+    BodyResponse: A configured body mutation response with the specified modifications.
   """
   body_mutation = BodyResponse()
   if body:
     body_mutation.response.body_mutation.body = bytes(body, 'utf-8')
-  if clear_body:
-    body_mutation.response.body_mutation.clear_body = True
+    if (clear_body):
+      logging.warning("body and clear_body are mutually exclusive.")
+  else:
+    body_mutation.response.body_mutation.clear_body = clear_body
   if clear_route_cache:
     body_mutation.response.clear_route_cache = True
   return body_mutation
 
 
-def get_device_type(host_value: str) -> str:
-  """Determines the device type based on the 'host' header value.
+def headers_contain(
+  http_headers: HttpHeaders, key: str, value: Union[str, None] = None
+) -> bool:
+  """Check the headers for a matching key value pair.
+
+  If no value is specified, only checks for the presence of the header key.
 
   Args:
-      host_value (str): The value of the 'host' header.
-
+    http_headers: Headers to check.
+    key: Header key to find.
+    value: Header value to compare.
   Returns:
-      str: The type of device ('mobile', 'tablet', or 'desktop') based on the host value.
+    True if http_headers contains a match, false otherwise.
   """
-  if 'm.example.com' in host_value:
-    return 'mobile'
-  elif 't.example.com' in host_value:
-    return 'tablet'
-  return 'desktop'
+  for header in http_headers.headers.headers:
+    if header.key == key and (value is None or header.value == value):
+      return True
+  return False
 
 
-def deny_request(context, msg: str | None = None) -> None:
-  """Denies a gRPC request, optionally logging a custom message.
+def body_contains(http_body: HttpBody, body: str) -> bool:
+  """Check the body for the presence of a substring.
+
+  Args:
+    body: Body substring to look for.
+  Returns:
+    True if http_body contains expected_body, false otherwise.
+  """
+  return body in http_body.body.decode('utf-8')
+
+
+def deny_callout(context, msg: str | None = None) -> None:
+  """Denies a gRPC callout, optionally logging a custom message.
 
   Args:
       context (grpc.ServicerContext): The gRPC service context.
-      msg (str, optional): Custom message to log before denying the request.
+      msg (str, optional): Custom message to log before denying the callout.
+        Also logged to warning. If no message is specified, defaults to "Callout DENIED.".
 
   Raises:
-      grpc.StatusCode.PERMISSION_DENIED: Always raised to deny the request.
+      grpc.StatusCode.PERMISSION_DENIED: Always raised to deny the callout.
   """
-  msg = msg or "Request content is invalid or not allowed"
+  msg = msg or 'Callout DENIED.'
   logging.warning(msg)
   context.abort(grpc.StatusCode.PERMISSION_DENIED, msg)
 

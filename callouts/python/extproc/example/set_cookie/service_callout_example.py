@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from typing import Union
 from grpc import ServicerContext
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
@@ -37,8 +38,8 @@ def validate_header(http_headers: service_pb2.HttpHeaders) -> Union[str, None]:
 class CalloutServerExample(callout_server.CalloutServer):
   """Example Set Cookie / Callout server.
 
-  For response header callouts we set a cookie providing a mutation to add 
-  a header '{Set-Cookie: cookie}'. This cookie is only set for requests from
+  For response header callouts we set a cookie providing a mutation to add
+  a header '{Set-Cookie: cookie}'. This cookie is only set for callouts from
   certain clients, based on the presence of the 'cookie-check' header key.
 
   Usage:
@@ -51,7 +52,7 @@ class CalloutServerExample(callout_server.CalloutServer):
   ) -> service_pb2.HeadersResponse:
     """Custom processor on response headers.
 
-    This method should set cookie on http response for a particular client request.
+    This method should set cookie on http response for a particular client callout.
 
     Args:
       headers (service_pb2.HttpHeaders): The HTTP headers received in the response.
@@ -68,5 +69,6 @@ class CalloutServerExample(callout_server.CalloutServer):
 
 
 if __name__ == '__main__':
+  logging.basicConfig(level=logging.DEBUG)
   # Run the gRPC service
   CalloutServerExample().run()

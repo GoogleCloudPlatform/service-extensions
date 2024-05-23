@@ -69,10 +69,7 @@ default_headers = [('service-callout-response-intercept', 'intercepted'),
 
 
 class CalloutServerExample(callout_server.CalloutServer):
-  """Example callout server.
-  
-  This server demonstrates processing of external HTTP requests.
-  """
+  """Example callout server for use in e2e metadata testing."""
 
   def process(self, request: ProcessingRequest,
               context: ServicerContext) -> ProcessingResponse:

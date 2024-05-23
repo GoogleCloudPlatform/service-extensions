@@ -16,6 +16,8 @@ import logging
 from typing import Union
 
 import jwt
+
+from typing import Union, Any
 from jwt.exceptions import InvalidTokenError
 
 from grpc import ServicerContext
@@ -25,7 +27,7 @@ from extproc.service import callout_tools
 
 def extract_jwt_token(
     request_headers: service_pb2.HttpHeaders
-) -> str:
+) -> Union[str, None]:
   """
   Extracts the JWT token from the request headers, specifically looking for
   the 'Authorization' header and parsing out the token part.
@@ -41,16 +43,17 @@ def extract_jwt_token(
       -> Returns: eyJhbGciOiJIUzI1NiIsInR5cCI6...
   """
   jwt_token = next((header.raw_value.decode('utf-8')
-                   for header in request_headers.headers.headers
-                   if header.key == 'Authorization'), None)
-  extracted_jwt = jwt_token.split(' ')[1] if jwt_token and ' ' in jwt_token else jwt_token
+                    for header in request_headers.headers.headers
+                    if header.key == 'Authorization'), None)
+  extracted_jwt = jwt_token.split(
+      ' ')[1] if jwt_token and ' ' in jwt_token else jwt_token
   return extracted_jwt
 
 def validate_jwt_token(
     key: str,
     request_headers: service_pb2.HttpHeaders,
     algorithm: str
-) -> Union[dict, None]:
+) -> Union[Any, None]:
   """
   Validates the JWT token extracted from the request headers using a specified
   public key and algorithm. If valid, returns the decoded JWT payload; otherwise,
@@ -74,12 +77,16 @@ def validate_jwt_token(
       -> Returns: {'sub': '1234567890', 'name': 'John Doe', 'iat': 1712173461, 'exp': 2075658261}
   """
   jwt_token = extract_jwt_token(request_headers)
+  if jwt_token is None:
+    logging.warn('Token failed to decode.')
+    return None
   try:
     decoded = jwt.decode(jwt_token, key, algorithms=[algorithm])
     logging.info('Approved - Decoded Values: %s', decoded)
     return decoded
   except InvalidTokenError:
     return None
+
 
 class CalloutServerExample(callout_server.CalloutServer):
   """Example callout server.
@@ -96,7 +103,7 @@ class CalloutServerExample(callout_server.CalloutServer):
 
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders,
-      context: ServicerContext):
+      context: ServicerContext) -> Union[service_pb2.HeadersResponse, None]:
     """Deny token if validation fails and return an error message.
     See :py:meth:`callouts.python.extproc.service.callout_tools.deny_request` for more information.
 
@@ -105,16 +112,19 @@ class CalloutServerExample(callout_server.CalloutServer):
 
     See base method: :py:meth:`callouts.python.extproc.service.callout_server.CalloutServer.on_request_headers`.
     """
-
     decoded = validate_jwt_token(self.public_key, headers, "RS256")
 
     if decoded:
-      decoded_items = [('decoded-' + key, str(value)) for key, value in decoded.items()]
-      return callout_tools.add_header_mutation(add=decoded_items, clear_route_cache=True)
+      decoded_items = [
+          ('decoded-' + key, str(value)) for key, value in decoded.items()
+      ]
+      return callout_tools.add_header_mutation(add=decoded_items,
+                                               clear_route_cache=True)
     else:
-      callout_tools.deny_request(context, 'Authorization token is invalid')
+      callout_tools.deny_callout(context, 'Authorization token is invalid')
 
 
 if __name__ == '__main__':
+  logging.basicConfig(level=logging.DEBUG)
   # Run the gRPC service
-  CalloutServerExample(insecure_address=('0.0.0.0', 8080)).run()
+  CalloutServerExample().run()

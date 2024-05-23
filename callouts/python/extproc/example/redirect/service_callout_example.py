@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from grpc import ServicerContext
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from extproc.service import callout_server
@@ -19,7 +20,7 @@ from extproc.service import callout_tools
 
 
 class CalloutServerExample(callout_server.CalloutServer):
-  """Example callout server.
+  """Example redirect callout server.
 
   This class implements the `CalloutServer` interface and provides sample
   responses for various callout interactions. It showcases how to modify request
@@ -51,5 +52,6 @@ class CalloutServerExample(callout_server.CalloutServer):
 
 
 if __name__ == '__main__':
+  logging.basicConfig(level=logging.DEBUG)
   # Run the gRPC service
-  CalloutServerExample(insecure_address=('0.0.0.0', 8080)).run()
+  CalloutServerExample().run()
