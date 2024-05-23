@@ -264,8 +264,6 @@ pytest
 
 # Docker
 
-## Quickstart
-
 The basic Docker image contains arguments for pointing to and running python modules. For example to build [extproc/example/basic_callout_server.py](extproc/example/basic_callout_server.py) into a run-able Docker image:
 
 ``` bash
@@ -281,24 +279,41 @@ docker build \
 * `copy_path`: Path of python files required on the docker image.
 * `run_module`: The module to run on startup.
 
-This image will copy `extproc/example/basic_callout_server.py` to the base directory and runs it as `basic_callout_server`.
+The image copies `extproc/example/basic_callout_server.py` to the base directory and runs it as `basic_callout_server`.
 
 The image can then be run with:
 
 ``` bash
-docker run -P -it service-callout-example-python:latest
+docker run -P -it --network host service-callout-example-python:latest
 ```
 
 In this example, using the `-P` flag tells docker to connect the exposed ports to the local machine's ports.
 Setting `--network host` tells docker to connect the image to the `0.0.0.0` or `localhost` ip address.
 
-## Docker Images
+> [!NOTE]
+> The docker image is set up to pass command line arguments to the module when specified.
+> This also requires that the example is set up to use command line arguments like in
+> `basic_callout_server.py`
+>
+> For example:
+>
+> ```bash
+> docker run -P -it --network host service-callout-example-python:latest \
+>   -- --combined_health_check
+> ```
+>
+> Will run the health check for `basic_callout_server` combined with the main grpc server.
 
-### Building the base image
+## Custom Docker Files
 
-Because there is a lot of shared setup between images, docker files are built in two steps.
+If the baseline docker file does not contain the required complexity for a given use case.
+A custom image can be created and branched from the provided Dockerfile.
+The file is internally split up into two steps, the base image and the example specific image.
 
-To just build the base image:
+For instance, the `jwt_auth` example requires an additional python library.
+The Dockerfile within that example directory installs that package as part of the image setup.
+
+To build the `jwt_auth` example we first build the base image:
 
 ```shell
 docker build \
@@ -307,19 +322,10 @@ docker build \
   -t service-callout-common-python .
 ```
 
-### Using the base image
-
-A custom Docker file can be made by pointing to the common image
-
-```docker
-FROM service-callout-common-python
-```
-
-Specific examples in `./extproc/example/` subdirectories
-are made this way. For example, the `add_body` one can be built by running:
+and then the `jwt_auth` image:
 
 ```shell
 docker build \
-  -f ./extproc/example/add_body/Dockerfile \
-  -t add_body .       
+  -f ./extproc/example/jwt_auth/Dockerfile \
+  -t service-callout-jwt-example-python .
 ```
