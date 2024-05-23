@@ -132,7 +132,8 @@ def add_body_mutation(
     clear_route_cache: bool = False,
 ) -> BodyResponse:
   """Generate a BodyResponse for incoming callouts.
-  
+
+    body and clear_body are mutually exclusive, if body is set, clear_body will be ignored.
     If both body and clear_body are left as default, the incoming callout's body will not be modified.
 
   Args:
