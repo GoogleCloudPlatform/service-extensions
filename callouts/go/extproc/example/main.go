@@ -17,6 +17,8 @@ package main
 import (
 	"fmt"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
+	"service-extensions-samples/extproc/example/add_body"
+	"service-extensions-samples/extproc/example/add_header"
 	"service-extensions-samples/extproc/example/redirect"
 	server "service-extensions-samples/extproc/service"
 )
@@ -27,13 +29,17 @@ type ExampleService interface {
 
 func main() {
 	//exampleType := os.Getenv("EXAMPLE_TYPE")
-	exampleType := "redirect"
+	exampleType := "add_body"
 
 	var customService ExampleService
 
 	switch exampleType {
 	case "redirect":
 		customService = redirect.NewExampleCalloutService()
+	case "add_header":
+		customService = add_header.NewExampleCalloutService()
+	case "add_body":
+		customService = add_body.NewExampleCalloutService()
 	default:
 		fmt.Println("Unknown EXAMPLE_TYPE. Please set it to a valid example")
 		return

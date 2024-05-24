@@ -50,3 +50,73 @@ func HeaderImmediateResponse(
 	}
 	return immediateResponse
 }
+
+func AddHeaderMutation(
+	add []struct{ Key, Value string },
+	remove []string,
+	clearRouteCache bool,
+	appendAction *base.HeaderValueOption_HeaderAppendAction,
+) *extproc.HeadersResponse {
+	headerMutation := &extproc.HeaderMutation{}
+
+	if add != nil {
+		for _, kv := range add {
+			headerValueOption := &base.HeaderValueOption{
+				Header: &base.HeaderValue{
+					Key:      kv.Key,
+					RawValue: []byte(kv.Value),
+				},
+			}
+			if appendAction != nil {
+				headerValueOption.AppendAction = *appendAction
+			}
+			headerMutation.SetHeaders = append(headerMutation.SetHeaders, headerValueOption)
+		}
+	}
+
+	if remove != nil {
+		headerMutation.RemoveHeaders = append(headerMutation.RemoveHeaders, remove...)
+	}
+
+	headersResponse := &extproc.HeadersResponse{
+		Response: &extproc.CommonResponse{
+			HeaderMutation:  headerMutation,
+			ClearRouteCache: clearRouteCache,
+		},
+	}
+
+	if clearRouteCache {
+		headersResponse.Response.ClearRouteCache = true
+	}
+
+	return headersResponse
+}
+
+func AddBodyMutation(
+	body string,
+	clearBody bool,
+	clearRouteCache bool,
+) *extproc.BodyResponse {
+	bodyMutation := &extproc.BodyMutation{}
+
+	if body != "" {
+		bodyMutation.Mutation = &extproc.BodyMutation_Body{
+			Body: []byte(body),
+		}
+	}
+
+	if clearBody {
+		bodyMutation.Mutation = &extproc.BodyMutation_ClearBody{
+			ClearBody: true,
+		}
+	}
+
+	bodyResponse := &extproc.BodyResponse{
+		Response: &extproc.CommonResponse{
+			BodyMutation:    bodyMutation,
+			ClearRouteCache: clearRouteCache,
+		},
+	}
+
+	return bodyResponse
+}
