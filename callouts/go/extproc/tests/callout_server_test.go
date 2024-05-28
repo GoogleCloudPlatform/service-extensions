@@ -16,6 +16,8 @@ package tests
 
 import (
 	"net/http"
+	"service-extensions-samples/extproc/examples/basic_callout_server"
+	"service-extensions-samples/extproc/internal/server"
 	"testing"
 	"time"
 
@@ -25,7 +27,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
-	server "service-extensions-samples/extproc/service"
 )
 
 type MockExternalProcessorServer struct {
@@ -114,4 +115,48 @@ func TestStartHealthCheck(t *testing.T) {
 	resp, err := http.Get("http://0.0.0.0:8000")
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestBasicServerCapabilities(t *testing.T) {
+	// Create an instance of ExampleCalloutService
+	service := basic_callout_server.NewExampleCalloutService()
+
+	// Create a sample HttpHeaders and HttpBody request
+	body := &extproc.HttpBody{}
+	headers := &extproc.HttpHeaders{}
+
+	// Call the Headers Handlers
+	headersRequest, err := service.HandleRequestHeaders(headers)
+	headersResponse, err := service.HandleResponseHeaders(headers)
+
+	// Call the Body Handlers
+	bodyRequest, err := service.HandleRequestBody(body)
+	bodyResponse, err := service.HandleResponseBody(body)
+
+	// Assert that no error occurred
+	assert.NoError(t, err)
+
+	// Assert that the response is not nil
+	assert.NotNil(t, headersRequest)
+	assert.NotNil(t, headersResponse)
+	assert.NotNil(t, bodyRequest)
+	assert.NotNil(t, bodyResponse)
+
+	// Assert that the response contains the correct header
+	headerRequestValue := headersRequest.GetRequestHeaders().Response.GetHeaderMutation().GetSetHeaders()[0]
+	assert.Equal(t, "header-request", headerRequestValue.GetHeader().GetKey())
+	assert.Equal(t, "", headerRequestValue.GetHeader().GetValue())
+
+	// Assert that the response contains the correct header
+	headerResponseValue := headersResponse.GetResponseHeaders().Response.GetHeaderMutation().GetSetHeaders()[0]
+	assert.Equal(t, "header-response", headerResponseValue.GetHeader().GetKey())
+	assert.Equal(t, "", headerResponseValue.GetHeader().GetValue())
+
+	// Assert that the response contains the correct body
+	bodyRequestValue := bodyRequest.GetRequestBody().GetResponse()
+	assert.Equal(t, "new-body-request", string(bodyRequestValue.GetBodyMutation().GetBody()))
+
+	// Assert that the response contains the correct body
+	bodyResponseValue := bodyResponse.GetResponseBody().GetResponse()
+	assert.Equal(t, "new-body-response", string(bodyResponseValue.GetBodyMutation().GetBody()))
 }

@@ -15,7 +15,7 @@
 package tests
 
 import (
-	server "service-extensions-samples/extproc/service"
+	"service-extensions-samples/extproc/internal/server"
 )
 
 // DefaultConfig returns a default server configuration.
