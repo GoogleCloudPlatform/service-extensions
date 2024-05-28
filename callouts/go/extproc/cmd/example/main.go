@@ -17,10 +17,12 @@ package main
 import (
 	"fmt"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
-	"service-extensions-samples/extproc/example/add_body"
-	"service-extensions-samples/extproc/example/add_header"
-	"service-extensions-samples/extproc/example/redirect"
-	server "service-extensions-samples/extproc/internal/service"
+	"os"
+	"service-extensions-samples/extproc/examples/add_body"
+	"service-extensions-samples/extproc/examples/add_header"
+	"service-extensions-samples/extproc/examples/basic_callout_server"
+	"service-extensions-samples/extproc/examples/redirect"
+	"service-extensions-samples/extproc/internal/server"
 )
 
 type ExampleService interface {
@@ -28,8 +30,7 @@ type ExampleService interface {
 }
 
 func main() {
-	//exampleType := os.Getenv("EXAMPLE_TYPE")
-	exampleType := "add_body"
+	exampleType := os.Getenv("EXAMPLE_TYPE")
 
 	var customService ExampleService
 
@@ -40,6 +41,8 @@ func main() {
 		customService = add_header.NewExampleCalloutService()
 	case "add_body":
 		customService = add_body.NewExampleCalloutService()
+	case "basic_callout_server":
+		customService = basic_callout_server.NewExampleCalloutService()
 	default:
 		fmt.Println("Unknown EXAMPLE_TYPE. Please set it to a valid example")
 		return
