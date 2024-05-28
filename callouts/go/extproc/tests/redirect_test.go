@@ -20,7 +20,7 @@ import (
 
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	"github.com/stretchr/testify/assert"
-	"service-extensions-samples/extproc/example/redirect"
+	"service-extensions-samples/extproc/examples/redirect"
 )
 
 func TestHandleRequestHeaders(t *testing.T) {

@@ -15,7 +15,7 @@
 package tests
 
 import (
-	"service-extensions-samples/extproc/example/add_body"
+	"service-extensions-samples/extproc/examples/add_body"
 	"testing"
 
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
