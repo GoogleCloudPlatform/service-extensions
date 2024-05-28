@@ -16,7 +16,7 @@ package add_body
 
 import (
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
-	server "service-extensions-samples/extproc/internal/service"
+	"service-extensions-samples/extproc/internal/server"
 	"service-extensions-samples/extproc/pkg/utils"
 )
 
