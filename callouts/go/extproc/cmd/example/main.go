@@ -20,7 +20,7 @@ import (
 	"service-extensions-samples/extproc/example/add_body"
 	"service-extensions-samples/extproc/example/add_header"
 	"service-extensions-samples/extproc/example/redirect"
-	server "service-extensions-samples/extproc/service"
+	server "service-extensions-samples/extproc/internal/service"
 )
 
 type ExampleService interface {

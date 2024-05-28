@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package add_header
+package add_body
 
 import (
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
-	server "service-extensions-samples/extproc/service"
-	"service-extensions-samples/extproc/utils"
+	server "service-extensions-samples/extproc/internal/service"
+	"service-extensions-samples/extproc/pkg/utils"
 )
 
 type ExampleCalloutService struct {
@@ -26,34 +26,32 @@ type ExampleCalloutService struct {
 
 func NewExampleCalloutService() *ExampleCalloutService {
 	service := &ExampleCalloutService{}
-	service.Handlers.RequestHeadersHandler = service.HandleRequestHeaders
-	service.Handlers.ResponseHeadersHandler = service.HandleResponseHeaders
+	service.Handlers.RequestBodyHandler = service.HandleRequestBody
+	service.Handlers.ResponseBodyHandler = service.HandleResponseBody
 	return service
 }
 
-func (s *ExampleCalloutService) HandleRequestHeaders(headers *extproc.HttpHeaders) (*extproc.ProcessingResponse, error) {
+func (s *ExampleCalloutService) HandleRequestBody(body *extproc.HttpBody) (*extproc.ProcessingResponse, error) {
 
 	return &extproc.ProcessingResponse{
-		Response: &extproc.ProcessingResponse_RequestHeaders{
-			RequestHeaders: utils.AddHeaderMutation(
-				[]struct{ Key, Value string }{{Key: "header-request", Value: "Value-request"}},
-				nil,
+		Response: &extproc.ProcessingResponse_RequestBody{
+			RequestBody: utils.AddBodyMutation(
+				"new-body-request",
 				false,
-				nil,
+				false,
 			),
 		},
 	}, nil
 }
 
-func (s *ExampleCalloutService) HandleResponseHeaders(headers *extproc.HttpHeaders) (*extproc.ProcessingResponse, error) {
+func (s *ExampleCalloutService) HandleResponseBody(body *extproc.HttpBody) (*extproc.ProcessingResponse, error) {
 
 	return &extproc.ProcessingResponse{
-		Response: &extproc.ProcessingResponse_ResponseHeaders{
-			ResponseHeaders: utils.AddHeaderMutation(
-				[]struct{ Key, Value string }{{Key: "header-response", Value: "Value-response"}},
-				nil,
+		Response: &extproc.ProcessingResponse_ResponseBody{
+			ResponseBody: utils.AddBodyMutation(
+				"new-body-response",
 				false,
-				nil,
+				false,
 			),
 		},
 	}, nil

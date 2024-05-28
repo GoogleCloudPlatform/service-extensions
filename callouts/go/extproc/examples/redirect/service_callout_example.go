@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package add_body
+package redirect
 
 import (
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
-	server "service-extensions-samples/extproc/service"
-	"service-extensions-samples/extproc/utils"
+	server "service-extensions-samples/extproc/internal/service"
+	"service-extensions-samples/extproc/pkg/utils"
 )
 
 type ExampleCalloutService struct {
@@ -26,32 +26,17 @@ type ExampleCalloutService struct {
 
 func NewExampleCalloutService() *ExampleCalloutService {
 	service := &ExampleCalloutService{}
-	service.Handlers.RequestBodyHandler = service.HandleRequestBody
-	service.Handlers.ResponseBodyHandler = service.HandleResponseBody
+	service.Handlers.RequestHeadersHandler = service.HandleRequestHeaders
 	return service
 }
 
-func (s *ExampleCalloutService) HandleRequestBody(body *extproc.HttpBody) (*extproc.ProcessingResponse, error) {
-
+func (s *ExampleCalloutService) HandleRequestHeaders(headers *extproc.HttpHeaders) (*extproc.ProcessingResponse, error) {
 	return &extproc.ProcessingResponse{
-		Response: &extproc.ProcessingResponse_RequestBody{
-			RequestBody: utils.AddBodyMutation(
-				"new-body-request",
-				false,
-				false,
-			),
-		},
-	}, nil
-}
-
-func (s *ExampleCalloutService) HandleResponseBody(body *extproc.HttpBody) (*extproc.ProcessingResponse, error) {
-
-	return &extproc.ProcessingResponse{
-		Response: &extproc.ProcessingResponse_ResponseBody{
-			ResponseBody: utils.AddBodyMutation(
-				"new-body-response",
-				false,
-				false,
+		Response: &extproc.ProcessingResponse_ImmediateResponse{
+			ImmediateResponse: utils.HeaderImmediateResponse(
+				301,
+				[]struct{ Key, Value string }{{Key: "Location", Value: "http://service-extensions.com/redirect"}},
+				nil,
 			),
 		},
 	}, nil

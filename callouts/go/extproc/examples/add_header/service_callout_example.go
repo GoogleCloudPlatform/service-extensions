@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package redirect
+package add_header
 
 import (
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
-	server "service-extensions-samples/extproc/service"
-	"service-extensions-samples/extproc/utils"
+	server "service-extensions-samples/extproc/internal/service"
+	"service-extensions-samples/extproc/pkg/utils"
 )
 
 type ExampleCalloutService struct {
@@ -27,15 +27,32 @@ type ExampleCalloutService struct {
 func NewExampleCalloutService() *ExampleCalloutService {
 	service := &ExampleCalloutService{}
 	service.Handlers.RequestHeadersHandler = service.HandleRequestHeaders
+	service.Handlers.ResponseHeadersHandler = service.HandleResponseHeaders
 	return service
 }
 
 func (s *ExampleCalloutService) HandleRequestHeaders(headers *extproc.HttpHeaders) (*extproc.ProcessingResponse, error) {
+
 	return &extproc.ProcessingResponse{
-		Response: &extproc.ProcessingResponse_ImmediateResponse{
-			ImmediateResponse: utils.HeaderImmediateResponse(
-				301,
-				[]struct{ Key, Value string }{{Key: "Location", Value: "http://service-extensions.com/redirect"}},
+		Response: &extproc.ProcessingResponse_RequestHeaders{
+			RequestHeaders: utils.AddHeaderMutation(
+				[]struct{ Key, Value string }{{Key: "header-request", Value: "Value-request"}},
+				nil,
+				false,
+				nil,
+			),
+		},
+	}, nil
+}
+
+func (s *ExampleCalloutService) HandleResponseHeaders(headers *extproc.HttpHeaders) (*extproc.ProcessingResponse, error) {
+
+	return &extproc.ProcessingResponse{
+		Response: &extproc.ProcessingResponse_ResponseHeaders{
+			ResponseHeaders: utils.AddHeaderMutation(
+				[]struct{ Key, Value string }{{Key: "header-response", Value: "Value-response"}},
+				nil,
+				false,
 				nil,
 			),
 		},
