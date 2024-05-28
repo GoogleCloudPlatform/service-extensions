@@ -18,6 +18,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem/path.hpp>
+#include <string>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -28,10 +29,15 @@
 
 namespace service_extensions_samples {
 
+// Parameters to customize Context behaviors.
+struct ContextOptions {
+  // Wasm logging output file.
+  std::ofstream log_file;
+  // Static time returned to wasm.
+  absl::Time clock_time = absl::UnixEpoch();
+};
+
 // TestContext is GCP-like ProxyWasm context (shared for VM + Root + Stream).
-//
-// NOTE: the base class implements logging. This derived class primarily
-// implements serving plugin configuration.
 class TestContext : public proxy_wasm::TestContext {
  public:
   // VM Context constructor.
@@ -68,6 +74,8 @@ class TestContext : public proxy_wasm::TestContext {
   // --- BEGIN Testing facilities ---
   // Unsafe access to logs. Not thread safe w.r.t. plugin execution.
   const std::vector<std::string>& phase_logs() const { return phase_logs_; }
+  // Options to customize context behavior.
+  ContextOptions& options() const;
   // --- END   Testing facilities ---
 
  protected:
@@ -176,18 +184,14 @@ class TestHttpContext : public TestContext {
 };
 
 // TestWasm is a light wrapper enabling custom TestContext.
-// TODO set allowed_capabilities
 class TestWasm : public proxy_wasm::WasmBase {
  public:
-  TestWasm(std::unique_ptr<proxy_wasm::WasmVm> vm)
+  TestWasm(std::unique_ptr<proxy_wasm::WasmVm> vm, ContextOptions options)
       : proxy_wasm::WasmBase(std::move(vm), /*vm_id=*/"",
                              /*vm_configuration=*/"",
                              /*vm_key=*/"", /*envs=*/{},
-                             /*allowed_capabilities=*/{}) {}
-
-  TestWasm(const std::shared_ptr<proxy_wasm::WasmHandleBase>& base_wasm_handle,
-           const proxy_wasm::WasmVmFactory& factory)
-      : proxy_wasm::WasmBase(base_wasm_handle, factory) {}
+                             /*allowed_capabilities=*/{}),
+        options_(std::move(options)) {}
 
   proxy_wasm::ContextBase* createVmContext() override {
     return new TestContext(this);
@@ -197,6 +201,11 @@ class TestWasm : public proxy_wasm::WasmBase {
       const std::shared_ptr<proxy_wasm::PluginBase>& plugin) override {
     return new TestContext(this, plugin);
   }
+
+  ContextOptions& options() { return options_; }
+
+ private:
+  ContextOptions options_;
 };
 
 // Helper to read a file from disk.
@@ -208,7 +217,8 @@ std::vector<std::string> FindPlugins();
 // Helper to create a VM and load wasm.
 absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>> CreatePluginVm(
     const std::string& engine, const std::string& wasm_bytes,
-    const std::string& plugin_config, proxy_wasm::LogLevel min_log_level);
+    const std::string& plugin_config, proxy_wasm::LogLevel min_log_level,
+    ContextOptions options);
 
 // Helper to initialize a plugin.
 absl::Status InitializePlugin(

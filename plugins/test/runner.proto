@@ -118,7 +118,11 @@ message Env {
     ERROR = 5;
     CRITICAL = 6;
   }
-  LogLevel min_log_level = 3;
+  LogLevel log_level = 3;
+  // Log file to receive plugin output. Can be /dev/std{out,err}.
+  string log_path = 4;
+  // Fixed timestamp in Unix seconds. If unset it will be the Unix epoch.
+  uint64 time_secs = 5;
 }
 
 message TestSuite {
