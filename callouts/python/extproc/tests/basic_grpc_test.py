@@ -50,9 +50,10 @@ default_kwargs: dict = {
     'address': ('0.0.0.0', 8443),
     'health_check_address': ('0.0.0.0', 8000)
 }
-# Arguments for running a custom CalloutServer with testing parameters.
+# Arguments for running an plaintext server alongside the secure grpc.
+plaintext_kwargs: dict = default_kwargs | {'plaintext_address': ('0.0.0.0', 8080)}
 _local_test_args: dict = {
-    "kwargs": default_kwargs,
+    "kwargs": plaintext_kwargs,
     "test_class": CalloutServerTest
 }
 
@@ -199,7 +200,7 @@ class TestBasicServer(object):
 
 
 _secure_test_args: dict = {
-    "kwargs": default_kwargs | {
+    "kwargs": plaintext_kwargs | {
         'secure_health_check': True
     },
     "test_class": CalloutServerTest
@@ -262,7 +263,7 @@ def test_custom_server_config() -> None:
 
 
 _no_health_args: dict = {
-    "kwargs": default_kwargs | {
+    "kwargs": plaintext_kwargs | {
         'combined_health_check': True
     },
     "test_class": CalloutServerTest

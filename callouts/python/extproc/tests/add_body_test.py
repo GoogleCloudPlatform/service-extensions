@@ -25,12 +25,12 @@ from extproc.tests.basic_grpc_test import (
     make_request,
     setup_server,
     get_plaintext_channel,
-    default_kwargs,
+    plaintext_kwargs,
 )
 
 # Import the setup server test fixture.
 _ = setup_server
-_local_test_args = {'kwargs': default_kwargs, 'test_class': CalloutServerTest}
+_local_test_args = {'kwargs': plaintext_kwargs, 'test_class': CalloutServerTest}
 
 
 @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
@@ -65,7 +65,7 @@ class ClearTestServer(callout_server.CalloutServer):
     return callout_tools.add_body_mutation(clear_body=True)
 
 
-_clear_test_args = {'kwargs': default_kwargs, 'test_class': ClearTestServer}
+_clear_test_args = {'kwargs': plaintext_kwargs, 'test_class': ClearTestServer}
 
 
 @pytest.mark.parametrize('server', [_clear_test_args], indirect=True)

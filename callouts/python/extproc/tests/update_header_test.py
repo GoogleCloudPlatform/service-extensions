@@ -24,7 +24,7 @@ from extproc.example.update_header.service_callout_example import (
 from extproc.service import callout_tools
 from extproc.tests.basic_grpc_test import (
   get_plaintext_channel,
-  default_kwargs,
+  plaintext_kwargs,
   make_request,
   setup_server,
 )
@@ -32,7 +32,7 @@ from extproc.tests.basic_grpc_test import (
 
 # Import the setup server test fixture.
 _ = setup_server
-_local_test_args = {"kwargs": default_kwargs, "test_class": CalloutServerTest}
+_local_test_args = {"kwargs": plaintext_kwargs, "test_class": CalloutServerTest}
 
 
 @pytest.mark.parametrize('server', [_local_test_args], indirect=True)

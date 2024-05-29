@@ -25,13 +25,13 @@ from extproc.example.normalize_header.service_callout_example import (
 from extproc.tests.basic_grpc_test import (
     make_request,
     setup_server,
+    plaintext_kwargs,
     get_plaintext_channel,
-    default_kwargs
 )
 
 # Import the setup server test fixture.
 _ = setup_server
-_local_test_args = {"kwargs": default_kwargs, "test_class": CalloutServerTest}
+_local_test_args = {"kwargs": plaintext_kwargs, "test_class": CalloutServerTest}
 
 
 @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
