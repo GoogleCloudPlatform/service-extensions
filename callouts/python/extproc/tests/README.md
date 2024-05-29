@@ -48,7 +48,7 @@ import urllib.request
 from extproc.example.<path_to_callout_server> import (
   CalloutServerExample as CalloutServerTest,
 )
-from extproc.service.callout_server import addr_to_str
+from extproc.service.callout_server import _addr_to_str
 from extproc.tests.basic_grpc_test import setup_server, insecure_kwargs,
 
 _local_test_args: dict = {
@@ -61,7 +61,7 @@ def test_basic_server_health_check(self, server: CalloutServerTest) -> None:
   """Test that the health check sub server returns the expected 200 code."""
   assert server.health_check_address is not None
   response = urllib.request.urlopen(
-      f'http://{addr_to_str(server.health_check_address)}')
+      f'http://{_addr_to_str(server.health_check_address)}')
   assert not response.read()
   assert response.getcode() == 200
 ```

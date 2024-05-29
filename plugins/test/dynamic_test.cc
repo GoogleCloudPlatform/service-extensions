@@ -19,6 +19,7 @@
 #include "absl/strings/substitute.h"
 #include "benchmark/benchmark.h"
 #include "dynamic_test.h"
+#include "framework.h"
 #include "google/protobuf/text_format.h"
 #include "gtest/gtest.h"
 #include "re2/re2.h"
@@ -69,14 +70,14 @@ class StringMatcher {
 absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>>
 DynamicTest::LoadWasm(bool benchmark) {
   // Set log level. Default to INFO. Disable in benchmarks.
-  auto ll = env_.min_log_level();
+  auto ll = env_.log_level();
   if (ll == pb::Env::UNDEFINED) {
     ll = pb::Env::INFO;
   }
   if (benchmark) {
-    ll = pb::Env::CRITICAL;
+    ll = pb::Env::CRITICAL;  // disable logs in benchmarks
   }
-  auto min_log_level = proxy_wasm::LogLevel(ll - 1);  // enum conversion, yuck
+  auto log_level = proxy_wasm::LogLevel(ll - 1);  // enum conversion, yuck
 
   // Load wasm bytes.
   auto wasm = ReadDataFile(env_.wasm_path());
@@ -90,8 +91,18 @@ DynamicTest::LoadWasm(bool benchmark) {
     plugin_config = *config;
   }
 
+  // Context options: logging to file, setting the clock.
+  ContextOptions opt;
+  if (!benchmark && !env_.log_path().empty()) {
+    opt.log_file.open(env_.log_path(), std::ofstream::out | std::ofstream::app);
+  }
+  if (env_.time_secs()) {
+    opt.clock_time = absl::FromUnixSeconds(env_.time_secs());
+  }
+
   // Create VM and load wasm.
-  return CreatePluginVm(engine_, *wasm, plugin_config, min_log_level);
+  return CreatePluginVm(engine_, *wasm, plugin_config, log_level,
+                        std::move(opt));
 }
 
 // Macro to stop test execution if the VM has failed.
@@ -102,11 +113,39 @@ DynamicTest::LoadWasm(bool benchmark) {
                                absl::StrJoin(context.phase_logs(), "\n")); \
   }
 
+namespace {
+// Helper to add some logging at construction and teardown.
+class LogTestBounds {
+ public:
+  LogTestBounds(ContextOptions& options) : options_(options) {
+    if (options_.log_file) {
+      const auto* test = testing::UnitTest::GetInstance()->current_test_info();
+      options_.log_file << "--- Starting test: " << test->name() << " ---"
+                        << std::endl;
+    }
+  }
+  ~LogTestBounds() {
+    if (options_.log_file) {
+      const auto* test = testing::UnitTest::GetInstance()->current_test_info();
+      options_.log_file << "--- Finished test: " << test->name() << " ---"
+                        << std::endl;
+    }
+  }
+
+ private:
+  ContextOptions& options_;
+};
+}  // namespace
+
 void DynamicTest::TestBody() {
   // Initialize VM.
   auto load_wasm = LoadWasm(/*benchmark=*/false);
   ASSERT_TRUE(load_wasm.ok()) << load_wasm.status();
   auto handle = *load_wasm;
+
+  // Log start and end of test to log file output.
+  LogTestBounds test_log(
+      static_cast<TestWasm*>(handle->wasm().get())->options());
 
   // Initialize plugin.
   auto plugin_init = InitializePlugin(handle);
@@ -147,6 +186,13 @@ void DynamicTest::TestBody() {
   stream.TearDown();
   ASSERT_VM_HEALTH("stream_destroy", handle, stream);
   CheckSideEffects("stream_destroy", cfg_.stream_destroy(), stream);
+
+  // Tear down the root contexts. We can't easily test side effects here because
+  // WasmBase uniquely owns these objects and cleans them up.
+  handle->wasm()->startShutdown(handle->plugin()->key());
+  if (handle->wasm()->isFailed()) {
+    FAIL() << "[plugin_destroy] Wasm VM failed!\n";
+  }
 }
 
 #define BM_RETURN_IF_ERROR(status)          \

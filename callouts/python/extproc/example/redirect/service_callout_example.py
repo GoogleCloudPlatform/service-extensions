@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from grpc import ServicerContext
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from extproc.service import callout_server
@@ -19,10 +20,11 @@ from extproc.service import callout_tools
 
 
 class CalloutServerExample(callout_server.CalloutServer):
-  """Example callout server.
+  """Example redirect callout server.
 
-  Provides a non-comprehensive set of responses for each of the possible
-  callout interactions.
+  This class implements the `CalloutServer` interface and provides sample
+  responses for various callout interactions. It showcases how to modify request
+  headers using an immediate response.
 
   On a request header callout we perform a redirect to '{http://service-extensions.com/redirect}'
   with the status of '{301}' - MovedPermanently returning an ImmediateResponse
@@ -31,12 +33,25 @@ class CalloutServerExample(callout_server.CalloutServer):
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders,
       context: ServicerContext) -> service_pb2.ImmediateResponse:
-    """Custom processor on request headers."""
+    """Custom processor on request headers.
+
+    This method is invoked when Envoy sends the request headers for processing.
+    Here, we modify the headers to perform a 301 redirect.
+    
+    Args:
+      headers (service_pb2.HttpHeaders): The HTTP headers received in the request.
+      context (ServicerContext): The context object for the gRPC service.
+
+    Returns:
+      service_pb2.HeadersResponse: The response containing the mutations to be applied
+      to the request headers.
+    """
     return callout_tools.header_immediate_response(
         code=301,
         headers=[('Location', 'http://service-extensions.com/redirect')])
 
 
 if __name__ == '__main__':
+  logging.basicConfig(level=logging.DEBUG)
   # Run the gRPC service
-  CalloutServerExample(insecure_address=('0.0.0.0', 8080)).run()
+  CalloutServerExample().run()

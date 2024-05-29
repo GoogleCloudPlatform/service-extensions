@@ -20,8 +20,6 @@
 //
 // TODO Future features
 // - Publish test runner as Docker image
-// - Option to print all logs to file/stdout
-// - Option to set the clock time via config
 // - Support wasm profiling (https://v8.dev/docs/profile)
 // - Tune v8 compiler (v8_flags.liftoff_only, precompile, etc)
 // - YAML config input support (--yaml instead of --proto)
@@ -42,9 +40,10 @@
 ABSL_FLAG(std::string, proto, "", "Path to test config. Required.");
 ABSL_FLAG(std::string, plugin, "", "Override path to plugin wasm.");
 ABSL_FLAG(std::string, config, "", "Override path to plugin config.");
-ABSL_FLAG(service_extensions_samples::pb::Env::LogLevel, min_log_level,
+ABSL_FLAG(std::string, logfile, "", "Emit plugin logs to disk or stdio.");
+ABSL_FLAG(service_extensions_samples::pb::Env::LogLevel, loglevel,
           service_extensions_samples::pb::Env::UNDEFINED,
-          "Override min_log_level.");
+          "Override log_level.");
 
 namespace service_extensions_samples {
 
@@ -78,7 +77,8 @@ absl::StatusOr<pb::TestSuite> ParseInputs(int argc, char** argv) {
   // Apply flag overrides.
   std::string plugin_override = absl::GetFlag(FLAGS_plugin);
   std::string config_override = absl::GetFlag(FLAGS_config);
-  pb::Env::LogLevel mll_override = absl::GetFlag(FLAGS_min_log_level);
+  pb::Env::LogLevel mll_override = absl::GetFlag(FLAGS_loglevel);
+  std::string logfile = absl::GetFlag(FLAGS_logfile);
   if (!plugin_override.empty()) {
     tests.mutable_env()->set_wasm_path(plugin_override);
   }
@@ -86,9 +86,12 @@ absl::StatusOr<pb::TestSuite> ParseInputs(int argc, char** argv) {
     tests.mutable_env()->set_config_path(config_override);
   }
   if (pb::Env::LogLevel_IsValid(mll_override)) {
-    tests.mutable_env()->set_min_log_level(mll_override);
+    tests.mutable_env()->set_log_level(mll_override);
   }
-  if (tests.env().min_log_level() == pb::Env::TRACE) {
+  if (!logfile.empty()) {
+    tests.mutable_env()->set_log_path(logfile);
+  }
+  if (tests.env().log_level() == pb::Env::TRACE) {
     std::cout << "TRACE from runner: final config:\n" << tests.DebugString();
   }
   return tests;

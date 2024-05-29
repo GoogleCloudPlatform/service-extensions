@@ -33,7 +33,7 @@ import pytest
 
 from extproc.example.basic_callout_server import (BasicCalloutServer as
                                                   CalloutServerTest)
-from extproc.service.callout_server import CalloutServer, addr_to_str
+from extproc.service.callout_server import CalloutServer, _addr_to_str
 from extproc.service.callout_tools import add_body_mutation, add_header_mutation
 
 
@@ -62,12 +62,12 @@ def get_insecure_channel(server: CalloutServer) -> grpc.Channel:
   """From a CalloutServer get the insecure address and create a grpc channel to it.
 
   Args:
-      server : Server to connect to.
+      server: Server to connect to.
   Returns:
       grpc.Channel: Open channel to the server.
   """
   addr = server.insecure_address
-  return grpc.insecure_channel(addr_to_str(addr) if addr else '')
+  return grpc.insecure_channel(_addr_to_str(addr) if addr else '')
 
 
 def wait_till_server(server_check: Callable[[], bool], timeout: int = 10):
@@ -77,8 +77,8 @@ def wait_till_server(server_check: Callable[[], bool], timeout: int = 10):
   Times out after a given time.
 
   Args:
-      server_check : Function to check.
-      timeout : Wait time. Defaults to 10.
+      server_check: Function to check.
+      timeout: Wait time. Defaults to 10.
   """
   expiration = datetime.datetime.now() + datetime.timedelta(seconds=timeout)
   while not server_check() and datetime.datetime.now() < expiration:
@@ -158,7 +158,7 @@ class TestBasicServer(object):
         'grpc.ssl_target_name_override',
         'localhost',
     ),)
-    with grpc.secure_channel(f'{addr_to_str(server.address)}',
+    with grpc.secure_channel(f'{_addr_to_str(server.address)}',
                              creds,
                              options=options) as channel:
       stub = ExternalProcessorStub(channel)
@@ -169,12 +169,11 @@ class TestBasicServer(object):
 
       value = make_request(stub, request_body=body)
       assert value.HasField('request_body')
-      assert value.request_body == add_body_mutation(body='-added-body')
+      assert value.request_body == add_body_mutation(body='replaced-body')
 
       value = make_request(stub, response_body=body)
       assert value.HasField('response_body')
-      assert value.response_body == add_body_mutation(body='new-body',
-                                                      clear_body=True)
+      assert value.response_body == add_body_mutation(clear_body=True)
 
       value = make_request(stub, response_headers=headers)
       assert value.HasField('response_headers')
@@ -197,7 +196,7 @@ class TestBasicServer(object):
     """Test that the health check sub server returns the expected 200 code."""
     assert server.health_check_address is not None
     response = urllib.request.urlopen(
-        f'http://{addr_to_str(server.health_check_address)}')
+        f'http://{_addr_to_str(server.health_check_address)}')
     assert not response.read()
     assert response.getcode() == 200
 
@@ -218,7 +217,7 @@ def test_https_health_check(server: CalloutServerTest) -> None:
   ssl_context.check_hostname = False
   ssl_context.verify_mode = ssl.CERT_NONE
   response = urllib.request.urlopen(
-      f'https://{addr_to_str(server.health_check_address)}',
+      f'https://{_addr_to_str(server.health_check_address)}',
       context=ssl_context)
   assert not response.read()
   assert response.getcode() == 200
