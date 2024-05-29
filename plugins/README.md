@@ -31,9 +31,9 @@ docker run -it -v $(pwd):/mnt \
 Tips:
 
 -   When benchmarking and publishing, compile a release (optimized) wasm build.
--   To see a trace of logs and wasm ABI calls, add `--min_log_level=TRACE`.
+-   To see a trace of logs and wasm ABI calls, add `--loglevel=TRACE`.
 -   Try sending empty or invalid input. Verify your plugin doesn't crash.
--   Optionally specify plugin config data using the `--config` flag.
+-   Optionally specify plugin config data using the `--config=<path>` flag.
 
 # Samples & Recipes
 

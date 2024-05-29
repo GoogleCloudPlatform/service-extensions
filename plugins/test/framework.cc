@@ -29,11 +29,11 @@ proxy_wasm::BufferInterface* TestContext::getBuffer(
 
 uint64_t TestContext::getCurrentTimeNanoseconds() {
   // Return some frozen timestamp.
-  return absl::ToUnixNanos(absl::UnixEpoch());
+  return absl::ToUnixNanos(options().clock_time);
 }
 uint64_t TestContext::getMonotonicTimeNanoseconds() {
   // Return some frozen timestamp.
-  return absl::ToUnixNanos(absl::UnixEpoch());
+  return absl::ToUnixNanos(options().clock_time);
 }
 proxy_wasm::WasmResult TestContext::log(uint32_t log_level,
                                         std::string_view message) {
@@ -42,8 +42,15 @@ proxy_wasm::WasmResult TestContext::log(uint32_t log_level,
   }
   if (wasmVm()->cmpLogLevel(static_cast<proxy_wasm::LogLevel>(log_level))) {
     phase_logs_.emplace_back(message);
+    // Optionally log to file.
+    if (options().log_file) {
+      options().log_file << message << std::endl;
+    }
   }
   return proxy_wasm::WasmResult::Ok;
+}
+ContextOptions& TestContext::options() const {
+  return static_cast<TestWasm*>(wasm())->options();
 }
 
 proxy_wasm::WasmResult TestHttpContext::getHeaderMapSize(
@@ -170,14 +177,15 @@ std::vector<std::string> FindPlugins() {
 
 absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>> CreatePluginVm(
     const std::string& engine, const std::string& wasm_bytes,
-    const std::string& plugin_config, proxy_wasm::LogLevel min_log_level) {
+    const std::string& plugin_config, proxy_wasm::LogLevel min_log_level,
+    ContextOptions options) {
   // Create a VM.
   auto vm = proxy_wasm::TestVm::makeVm(engine);
   static_cast<proxy_wasm::TestIntegration*>(vm->integration().get())
       ->setLogLevel(min_log_level);
 
   // Load the plugin.
-  auto wasm = std::make_shared<TestWasm>(std::move(vm));
+  auto wasm = std::make_shared<TestWasm>(std::move(vm), std::move(options));
   if (!wasm->load(wasm_bytes, /*allow_precompiled=*/false)) {
     absl::string_view err = "Failed to load Wasm code";
     wasm->fail(proxy_wasm::FailState::UnableToInitializeCode, err);
@@ -226,7 +234,8 @@ CreateProxyWasmPlugin(const std::string& engine, const std::string& wasm_path,
     return wasm.status();
   }
   // Create VM and load wasm.
-  auto handle = CreatePluginVm(engine, *wasm, plugin_config, min_log_level);
+  auto handle = CreatePluginVm(engine, *wasm, plugin_config, min_log_level,
+                               /*options=*/{});
   if (!handle.ok()) {
     return handle.status();
   }
