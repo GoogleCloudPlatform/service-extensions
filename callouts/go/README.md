@@ -1,12 +1,12 @@
 # Service Extensions Samples (Go)
 
-This repository contains sample service extensions using gRPC external processing in Go. It demonstrates how to set up and run different examples dynamically using Docker and Docker Compose.
+This repository contains samples for service extensions using gRPC external processing in Go. It demonstrates how to set up and run different examples dynamically using Docker and Docker Compose.
 
 ## Copyrights and Licenses
 
 Files using Copyright 2024 Google LLC & Apache License Version 2.0:
-* [callout_server.go](./extproc/service/callout_server.go)
-* [callout_tools.go](./extproc/utils/callout_tools.go)
+* [callout_server.go](./extproc/internal/server/callout_server.go)
+* [callout_tools.go](./extproc/pkg/utils/callout_tools.go)
 
 ## Requirements
 
@@ -31,7 +31,7 @@ go mod download
 ```
 ### Set Environment Variable
 
-Set the EXAMPLE_TYPE environment variable to the example you want to run (redirect or another_example).
+Set the EXAMPLE_TYPE environment variable to the example you want to run (e.g ``redirect``).
 
 #### For Linux/macOS:
 
@@ -55,33 +55,23 @@ $env:EXAMPLE_TYPE="redirect"
 #### Run the main Go file:
 
 ```sh
-go run ./extproc/example/main.go
+go run ./extproc/cmd/example/main.go
 ```
-   
+
 ## Building and Running the Examples with Docker
 You can run different examples by setting the EXAMPLE_TYPE environment variable and using Docker Compose.
 
-### Building and Running the Redirect Example
+### Building Redirect Example
+Running from the ./extproc/config/
 ```sh
-docker-compose up --build redirect
+EXAMPLE_TYPE=redirect docker-compose build
 ```
 
-### Building and Running Another Example
+### Running Redirect Example
+Running from the ./extproc/config/
 ```sh
-docker-compose up --build another_example
+EXAMPLE_TYPE=redirect docker-compose up
 ```
-
-### Available Examples
-
-#### Redirect Example (redirect)
-
-This example demonstrates how to handle request headers and issue a redirect.
-Defined in extproc/example/redirect/service_callout_example.go.
-
-#### Another Example (another_example)
-
-This example shows another type of request handling with a different redirect URL.
-Defined in extproc/example/another_example/service_callout_example.go.
 
 ## Running Tests
 To run the unit tests, use the following command from the project root:
@@ -93,31 +83,41 @@ go test ./...
 ## Developing Callouts
 This repository provides the following files to be extended to fit the needs of the user:
 
-[CalloutServer](extproc/service/callout_server.go): Baseline service callout server.
+[CalloutServer](extproc/internal/server/callout_server.go): Baseline service callout server.
 
-[CalloutTools](extproc/utils/callout_tools.go): Common functions used in many callout server code paths.
+[CalloutTools](extproc/pkg/utils/callout_tools.go): Common functions used in many callout server code paths.
 
 ### Making a New Server
 
-Create a new Go file server.go and import the CalloutServer class from extproc/service/callout_server.go:
+Create a new Go file server.go and import the ``CalloutServer`` class from extproc/internal/server/callout_server.go:
 
 ```go
 import (
-    "service-extensions-samples/extproc/service"
+    "service-extensions-samples/extproc/internal/server"
 )
 ```
 ### Extend the CalloutServer:
 
-Create a custom class extending CalloutServer:
+Create a custom class extending ``CalloutServer``:
 
 ```go
 type CustomCalloutServer struct {
-    service.GRPCCalloutService
+    server.GRPCCalloutService
+}
+```
+
+Add the handler you are going to override for your custom processing  (e.g: Request Headers):
+```go
+
+func NewExampleCalloutService() *CustomCalloutServer {
+    service := &CustomCalloutServer{}
+    service.Handlers.RequestHeadersHandler = service.HandleRequestHeaders
+    return service
 }
 ```
 ### Override the callback methods:
 
-Override the callback methods in CalloutServer to process headers and bodies:
+Override the callback methods in ``CalloutServer`` to process headers and bodies:
 
 ```go
 func (s *CustomCalloutServer) HandleRequestHeaders(headers *extproc.HttpHeaders) (*extproc.ProcessingResponse, error) {
@@ -142,7 +142,7 @@ func main() {
 }
 ```
 ## Additional Details
-The CalloutServer class has many options to customize the security information as well as port settings. The default CalloutServer listens on port 8443 for gRPC traffic, 8000 for health checks, and 8080 for insecure traffic. Please see the CalloutServer docstring for more information.
+The ``CalloutServer`` class has many options to customize the security information as well as port settings. The default CalloutServer listens on port 8443 for gRPC traffic, 8000 for health checks, and 8181 for insecure traffic.
 
 ## Using the Proto Files
 The Go classes can be imported using the relative envoy/api path:
@@ -151,12 +151,4 @@ The Go classes can be imported using the relative envoy/api path:
 import (
     "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 )
-```
-
-# Docker
-## Quickstart
-The basic Docker image contains arguments for building and running Go modules. For example, to build and run the RedirectCalloutService:
-
-```sh
-docker-compose up --build redirect
 ```
