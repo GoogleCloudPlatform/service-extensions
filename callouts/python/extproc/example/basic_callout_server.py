@@ -31,6 +31,9 @@ class BasicCalloutServer(CalloutServer):
   A non-comprehensive set of examples for each of the possible callout actions.
   """
 
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+
   def on_request_headers(self, headers: HttpHeaders, _) -> HeadersResponse:
     """Custom processor on request headers.
     
