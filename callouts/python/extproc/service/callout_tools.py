@@ -67,9 +67,9 @@ def add_command_line_args() -> argparse.ArgumentParser:
             'if False, no health check will be run.'),
   )
   parser.add_argument(
-      '--insecure_address',
+      '--plaintext_address',
       type=_addr,
-      help='Address for the insecure debug port with format: "0.0.0.0:443"',
+      help='Address for the plaintext (non grpc) server: "0.0.0.0:443"',
   )
 
   parser.add_argument(
@@ -85,10 +85,16 @@ def add_command_line_args() -> argparse.ArgumentParser:
       'Health check port of the server, uses default_ip as the ip unless --health_check_address is specified.',
   )
   parser.add_argument(
-      '--insecure_port',
+      '--plaintext_port',
       type=int,
       help=
-      'Insecure debug port of the server, uses default_ip as the ip unless --insecure_address is specified.',
+      'Plaintext port of the server, uses default_ip as the ip unless --plaintext_address is specified.',
+  )
+  parser.add_argument(
+      '--disable_plaintext',
+      type=int,
+      action="store_true",
+      help='Disables the plaintext address of the callout server.',
   )
   return parser
 

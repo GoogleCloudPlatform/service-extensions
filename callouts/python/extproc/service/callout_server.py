@@ -67,28 +67,27 @@ class CalloutServer:
   """Server wrapper for managing callout servers and processing callouts.
 
   Attributes:
-    address: Address that the main secure server will attempt to connect to.
-    port: If specified, overides the port of the address.
-      If no address is set, defaults to default_ip.
-    health_check_address: The health check serving address.
-    health_check_port: If set, overides the port of the health_check_address.
-      If no address is set, defaults to default_ip.
+    address: Address that the main secure server will attempt to connect to,
+      defaults to default_ip:443.
+    port: If specified, overides the port of address.
+    health_check_address: The health check serving address,
+      defaults to default_ip:80.
+    health_check_port: If set, overides the port of health_check_address.
     combined_health_check: If True, does not create seperate health check server.
-    insecure_address: If specified, the server will also listen on this,
-      non-authenticated, address.
-    insecure_port: If set, overides the port of the insecure_address.
-      If no address is set, defaults to default_ip.
-    default_ip: If left None, defaults to '0.0.0.0'. 
-    cert: If speficied, certificate used to authenticate the main grpc service
-      for secure htps and http connections. If unspecified will attempt to
-      load data from a file pointed to by the cert_path.
-    cert_path: Relative file path pointing to the main services certificate,
-      also used for the health check, if specified.
-    cert_key_path: Relative file path pointing to the public key of the 
-      grpc certificate.
+    secure_health_check: If True, will use HTTPS as the protocol of the health check server.
+      Requires cert_chain_path and private_key_path to be set.
+    plaintext_address: The non-authenticated address to listen to,
+      defaults to default_ip:8080.
+    plaintext_port: If set, overides the port of plaintext_address.
+    disable_plaintext: If true, disables the plaintext address of the server.
+    default_ip: If left None, defaults to '0.0.0.0'.
+    cert_chain: PEM Certificate chain used to authenicate secure connections,
+      required for secure servers.
+    cert_chain_path: Relative file path to the cert_chain.
+    private_key: PEM private key of the server.
+    private_key_path: Relative file path pointing to a file containing private_key data.
     server_thread_count: Threads allocated to the main grpc service.
   """
-
   def __init__(
       self,
       address: tuple[str, int] | None = None,
@@ -97,12 +96,14 @@ class CalloutServer:
       health_check_port: int | None = None,
       combined_health_check: bool = False,
       secure_health_check: bool = False,
-      insecure_address: tuple[str, int] | None = None,
-      insecure_port: int | None = None,
+      plaintext_address: tuple[str, int] | None = None,
+      plaintext_port: int | None = None,
+      disable_plaintext: bool = False,
       default_ip: str | None = None,
-      cert_path: str = './extproc/ssl_creds/localhost.crt',
-      cert_key_path: str = './extproc/ssl_creds/localhost.key',
-      public_key_path: str = './extproc/ssl_creds/publickey.pem',
+      cert_chain: bytes | None = None,
+      cert_chain_path: str | None = './extproc/ssl_creds/chain.pem',
+      private_key: bytes | None = None,
+      private_key_path: str = './extproc/ssl_creds/privatekey.pem',
       server_thread_count: int = 2,
   ):
     self._setup = False
@@ -115,10 +116,11 @@ class CalloutServer:
     if port:
       self.address = (self.address[0], port)
 
-    self.insecure_address: tuple[str, int] | None = insecure_address
-    if insecure_port:
-      ip = self.insecure_address[0] if self.insecure_address else default_ip
-      self.insecure_address = (ip, insecure_port)
+    self.plaintext_address: tuple[str, int] | None = None
+    if not disable_plaintext:
+      self.plaintext_address = plaintext_address or (default_ip, 8080)
+      if plaintext_port:
+        self.plaintext_address = (self.plaintext_address[0], plaintext_port)
 
     self.health_check_address: tuple[str, int] | None = None
     if not combined_health_check:
@@ -127,21 +129,28 @@ class CalloutServer:
         self.health_check_address = (self.health_check_address[0],
                                      health_check_port)
 
+    def _read_cert_file(path: str | None) -> bytes | None:
+      if path:
+        with open(path, 'rb') as file:
+          return file.read()
+      return None
+
     self.server_thread_count = server_thread_count
     self.secure_health_check = secure_health_check
     # Read cert data.
-    self.cert_path = cert_path
-    with open(cert_path, 'rb') as file:
-      self.cert = file.read()
-      file.close()
-    self.cert_key_path = cert_key_path
-    with open(cert_key_path, 'rb') as file:
-      self.cert_key = file.read()
-      file.close()
-    self.public_key_path = public_key_path
-    with open(public_key_path, 'rb') as file:
-      self.public_key = file.read()
-      file.close()
+    self.private_key = private_key or _read_cert_file(private_key_path)
+    self.cert_chain = cert_chain or _read_cert_file(cert_chain_path)
+
+    if secure_health_check:
+      if not private_key_path:
+        logging.error("Secure health check requires a private_key_path.")
+        return
+      if not cert_chain_path:
+        logging.error("Secure health check requires a cert_chain_path.")
+        return
+      self.health_check_ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+      self.health_check_ssl_context.load_cert_chain(certfile=cert_chain_path,
+                                                    keyfile=private_key_path)
 
     self._callout_server = _GRPCCalloutService(self)
 
@@ -165,11 +174,9 @@ class CalloutServer:
       protocol = 'HTTP'
       if self.secure_health_check:
         protocol = 'HTTPS'
-        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ssl_context.load_cert_chain(certfile=self.cert_path,
-                                    keyfile=self.cert_key_path)
-        self._health_check_server.socket = ssl_context.wrap_socket(
-            sock=self._health_check_server.socket,)
+        self._health_check_server.socket = (
+          self.health_check_ssl_context.wrap_socket(
+            sock=self._health_check_server.socket,))
 
       logging.info('%s health check server bound to %s.', protocol,
                    _addr_to_str(self.health_check_address))
@@ -316,15 +323,15 @@ class _GRPCCalloutService(ExternalProcessorServicer):
         futures.ThreadPoolExecutor(max_workers=processor.server_thread_count))
     add_ExternalProcessorServicer_to_server(self, self._server)
     server_credentials = grpc.ssl_server_credentials(
-        private_key_certificate_chain_pairs=[(processor.cert_key,
-                                              processor.cert)])
+        private_key_certificate_chain_pairs=[(processor.private_key,
+                                              processor.cert_chain)])
     address_str = _addr_to_str(processor.address)
     self._server.add_secure_port(address_str, server_credentials)
     self._start_msg = f'GRPC callout server started, listening on {address_str}.'
-    if processor.insecure_address:
-      insecure_str = _addr_to_str(processor.insecure_address)
-      self._server.add_insecure_port(insecure_str)
-      self._start_msg += f' (secure) and {insecure_str} (insecure)'
+    if processor.plaintext_address:
+      plaintext_address_str = _addr_to_str(processor.plaintext_address)
+      self._server.add_insecure_port(plaintext_address_str)
+      self._start_msg += f' (secure) and {plaintext_address_str} (plaintext)'
 
   def stop(self) -> None:
     self._server.stop(grace=10)

@@ -25,19 +25,19 @@ from extproc.example.add_custom_response.service_callout_example import (
 from extproc.tests.basic_grpc_test import (
     make_request,
     setup_server,
-    get_insecure_channel,
-    insecure_kwargs,
+    get_plaintext_channel,
+    plaintext_kwargs,
 )
 
 
 # Import the setup server test fixture.
 _ = setup_server
-_local_test_args = {"kwargs": insecure_kwargs, "test_class": CalloutServerTest}
+_local_test_args = {"kwargs": plaintext_kwargs, "test_class": CalloutServerTest}
 
 
 @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
 def test_mock_header_handling(server: CalloutServerTest) -> None:
-  with get_insecure_channel(server) as channel:
+  with get_plaintext_channel(server) as channel:
     stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
     header_map = HeaderMap()
@@ -60,7 +60,7 @@ def test_mock_header_handling(server: CalloutServerTest) -> None:
 
 @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
 def test_mock_body_handling(server: CalloutServerTest) -> None:
-  with get_insecure_channel(server) as channel:
+  with get_plaintext_channel(server) as channel:
     stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
     mock_body = service_pb2.HttpBody(body=b"body-check-mock")
@@ -76,7 +76,7 @@ def test_mock_body_handling(server: CalloutServerTest) -> None:
 
 @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
 def test_header_validation_failure(server: CalloutServerTest) -> None:
-  with get_insecure_channel(server) as channel:
+  with get_plaintext_channel(server) as channel:
     stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
     header_map = HeaderMap()
@@ -96,7 +96,7 @@ def test_header_validation_failure(server: CalloutServerTest) -> None:
 
 @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
 def test_body_validation_failure(server: CalloutServerTest) -> None:
-  with get_insecure_channel(server) as channel:
+  with get_plaintext_channel(server) as channel:
     stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
     bad_body = service_pb2.HttpBody(body=b"bad-body")

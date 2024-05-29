@@ -50,7 +50,7 @@ def extract_jwt_token(
   return extracted_jwt
 
 def validate_jwt_token(
-    key: str,
+    key: bytes,
     request_headers: service_pb2.HttpHeaders,
     algorithm: str
 ) -> Union[Any, None]:
@@ -60,7 +60,7 @@ def validate_jwt_token(
   logs an error and returns None.
 
   Args:
-      key (str): The public key used for token validation.
+      key (bytes): The public key used for token validation.
       request_headers (service_pb2.HttpHeaders): The HTTP headers received in the request,
                                                 used to extract the JWT token.
       algorithm (str): The algorithm with which the JWT was signed (e.g., 'RS256').
@@ -101,6 +101,14 @@ class CalloutServerExample(callout_server.CalloutServer):
 
   """
 
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self._load_public_key('./extproc/ssl_creds/publickey.pem')
+
+  def _load_public_key(self, path: str) -> None:
+    with open(path, 'rb') as key_file:
+      self.public_key = key_file.read()
+
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders,
       context: ServicerContext) -> Union[service_pb2.HeadersResponse, None]:
@@ -112,6 +120,7 @@ class CalloutServerExample(callout_server.CalloutServer):
 
     See base method: :py:meth:`callouts.python.extproc.service.callout_server.CalloutServer.on_request_headers`.
     """
+   
     decoded = validate_jwt_token(self.public_key, headers, "RS256")
 
     if decoded:
@@ -127,4 +136,4 @@ class CalloutServerExample(callout_server.CalloutServer):
 if __name__ == '__main__':
   logging.basicConfig(level=logging.DEBUG)
   # Run the gRPC service
-  CalloutServerExample().run()
+  server = CalloutServerExample().run()

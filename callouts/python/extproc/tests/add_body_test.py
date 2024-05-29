@@ -24,18 +24,18 @@ from extproc.example.add_body.service_callout_example import (
 from extproc.tests.basic_grpc_test import (
     make_request,
     setup_server,
-    get_insecure_channel,
-    insecure_kwargs,
+    get_plaintext_channel,
+    plaintext_kwargs,
 )
 
 # Import the setup server test fixture.
 _ = setup_server
-_local_test_args = {'kwargs': insecure_kwargs, 'test_class': CalloutServerTest}
+_local_test_args = {'kwargs': plaintext_kwargs, 'test_class': CalloutServerTest}
 
 
 @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
 def test_mock_request_body_handling(server: CalloutServerTest) -> None:
-  with get_insecure_channel(server) as channel:
+  with get_plaintext_channel(server) as channel:
     stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
     mock_body = service_pb2.HttpBody(body=b'mock-body')
@@ -46,7 +46,7 @@ def test_mock_request_body_handling(server: CalloutServerTest) -> None:
 
 @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
 def test_mock_response_body_handling(server: CalloutServerTest) -> None:
-  with get_insecure_channel(server) as channel:
+  with get_plaintext_channel(server) as channel:
     stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
     mock_body = service_pb2.HttpBody(body=b'mock-body')
@@ -65,12 +65,12 @@ class ClearTestServer(callout_server.CalloutServer):
     return callout_tools.add_body_mutation(clear_body=True)
 
 
-_clear_test_args = {'kwargs': insecure_kwargs, 'test_class': ClearTestServer}
+_clear_test_args = {'kwargs': plaintext_kwargs, 'test_class': ClearTestServer}
 
 
 @pytest.mark.parametrize('server', [_clear_test_args], indirect=True)
 def test_clear_request_body_handling(server: ClearTestServer) -> None:
-  with get_insecure_channel(server) as channel:
+  with get_plaintext_channel(server) as channel:
     stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
     mock_body = service_pb2.HttpBody(body=b'inital-body')
@@ -81,7 +81,7 @@ def test_clear_request_body_handling(server: ClearTestServer) -> None:
 
 @pytest.mark.parametrize('server', [_clear_test_args], indirect=True)
 def test_clear_response_body_handling(server: ClearTestServer) -> None:
-  with get_insecure_channel(server) as channel:
+  with get_plaintext_channel(server) as channel:
     stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
     mock_body = service_pb2.HttpBody(body=b'inital-body')

@@ -23,8 +23,8 @@ from extproc.example.update_header.service_callout_example import (
 )
 from extproc.service import callout_tools
 from extproc.tests.basic_grpc_test import (
-  get_insecure_channel,
-  insecure_kwargs,
+  get_plaintext_channel,
+  plaintext_kwargs,
   make_request,
   setup_server,
 )
@@ -32,14 +32,14 @@ from extproc.tests.basic_grpc_test import (
 
 # Import the setup server test fixture.
 _ = setup_server
-_local_test_args = {"kwargs": insecure_kwargs, "test_class": CalloutServerTest}
+_local_test_args = {"kwargs": plaintext_kwargs, "test_class": CalloutServerTest}
 
 
 @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
 def test_append_action(server: CalloutServerTest) -> None:
   """Test the request and response functionality of the server."""
 
-  with get_insecure_channel(server) as channel:
+  with get_plaintext_channel(server) as channel:
     stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
     headers = service_pb2.HttpHeaders(end_of_stream=False)
