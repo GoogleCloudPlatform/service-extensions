@@ -14,7 +14,7 @@
 """SDK for service callout servers.
 
 Provides a customizeable, out of the box, service callout server.
-Takes in service callout requests and performs header and body transformations.
+Takes in service callouts and performs header and body transformations.
 Bundled with an optional health check server.
 Can be set up to use ssl certificates.
 """
@@ -24,7 +24,7 @@ from http.server import BaseHTTPRequestHandler
 from http.server import HTTPServer
 import logging
 import ssl
-from typing import Iterator
+from typing import Iterator, Union
 from typing import Iterable
 
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpBody
@@ -42,7 +42,7 @@ import grpc
 from grpc import ServicerContext
 
 
-def addr_to_str(address: tuple[str, int]) -> str:
+def _addr_to_str(address: tuple[str, int]) -> str:
   """Take in an address tuple and returns a formated ip string.
 
   Args:
@@ -73,8 +73,8 @@ class CalloutServer:
     health_check_address: The health check serving address.
     health_check_port: If set, overides the port of the health_check_address.
       If no address is set, defaults to default_ip.
-    combined_health_check: If True, does not create seperate health check server. 
-    insecure_address: If specified, the server will also listen on this, 
+    combined_health_check: If True, does not create seperate health check server.
+    insecure_address: If specified, the server will also listen on this,
       non-authenticated, address.
     insecure_port: If set, overides the port of the insecure_address.
       If no address is set, defaults to default_ip.
@@ -172,7 +172,7 @@ class CalloutServer:
             sock=self._health_check_server.socket,)
 
       logging.info('%s health check server bound to %s.', protocol,
-                   addr_to_str(self.health_check_address))
+                   _addr_to_str(self.health_check_address))
     self._callout_server.start()
 
   def _stop_servers(self) -> None:
@@ -206,52 +206,52 @@ class CalloutServer:
 
   def process(
       self,
-      request: ProcessingRequest,
+      callout: ProcessingRequest,
       context: ServicerContext,
   ) -> ProcessingResponse:
-    """Process incomming callout requests.
+    """Process incomming callouts.
 
     Args:
-        request: The incomming request.
-        context: Stream context on requests.
+        callout: The incomming callout.
+        context: Stream context on the callout.
 
     Yields:
-        ProcessingResponse: A response for the incoming request.
+        ProcessingResponse: A response for the incoming callout.
     """
-    if request.HasField('request_headers'):
-      match self.on_request_headers(request.request_headers, context):
+    if callout.HasField('request_headers'):
+      match self.on_request_headers(callout.request_headers, context):
         case ImmediateResponse() as immediate_headers:
           return ProcessingResponse(immediate_response=immediate_headers)
         case HeadersResponse() | None as header_response:
           return ProcessingResponse(request_headers=header_response)
         case _:
-          logging.warn("MALFORMED REQUEST %s", request)
-    elif request.HasField('response_headers'):
+          logging.warn("MALFORMED CALLOUT %s", callout)
+    elif callout.HasField('response_headers'):
       return ProcessingResponse(response_headers=self.on_response_headers(
-          request.response_headers, context))
-    elif request.HasField('request_body'):
-      match self.on_request_body(request.request_body, context):
+          callout.response_headers, context))
+    elif callout.HasField('request_body'):
+      match self.on_request_body(callout.request_body, context):
         case ImmediateResponse() as immediate_body:
           return ProcessingResponse(immediate_response=immediate_body)
         case BodyResponse() | None as body_response:
           return ProcessingResponse(request_body=body_response)
         case _:
-          logging.warn("MALFORMED REQUEST %s", request)
-    elif request.HasField('response_body'):
+          logging.warn("MALFORMED CALLOUT %s", callout)
+    elif callout.HasField('response_body'):
       return ProcessingResponse(
-          response_body=self.on_response_body(request.response_body, context))
+          response_body=self.on_response_body(callout.response_body, context))
     return ProcessingResponse()
 
   def on_request_headers(
       self,
       headers: HttpHeaders,  # pylint: disable=unused-argument
       context: ServicerContext  # pylint: disable=unused-argument
-  ) -> None | HeadersResponse | ImmediateResponse:
+  ) -> Union[None, HeadersResponse, ImmediateResponse]:
     """Process incoming request headers.
 
     Args:
       headers: Request headers to process.
-      context: RPC context of the incoming request.
+      context: RPC context of the incoming callout.
 
     Returns:
       Optional header modification object.
@@ -262,12 +262,12 @@ class CalloutServer:
       self,
       headers: HttpHeaders,  # pylint: disable=unused-argument
       context: ServicerContext  # pylint: disable=unused-argument
-  ) -> None | HeadersResponse:
+  ) -> Union[None, HeadersResponse]:
     """Process incoming response headers.
 
     Args:
       headers: Response headers to process.
-      context: RPC context of the incoming request.
+      context: RPC context of the incoming callout.
 
     Returns:
       Optional header modification object.
@@ -278,12 +278,12 @@ class CalloutServer:
       self,
       body: HttpBody,  # pylint: disable=unused-argument
       context: ServicerContext  # pylint: disable=unused-argument
-  ) -> None | BodyResponse | ImmediateResponse:
+  ) -> Union[None, BodyResponse, ImmediateResponse]:
     """Process an incoming request body.
 
     Args:
       headers: Request body to process.
-      context: RPC context of the incoming request.
+      context: RPC context of the incoming callout.
 
     Returns:
       Optional body modification object.
@@ -294,12 +294,12 @@ class CalloutServer:
       self,
       body: HttpBody,  # pylint: disable=unused-argument
       context: ServicerContext  # pylint: disable=unused-argument
-  ) -> None | BodyResponse:
+  ) -> Union[None, BodyResponse]:
     """Process an incoming response body.
 
     Args:
       headers: Response body to process.
-      context: RPC context of the incoming request.
+      context: RPC context of the incoming callout.
 
     Returns:
       Optional body modification object.
@@ -318,11 +318,11 @@ class _GRPCCalloutService(ExternalProcessorServicer):
     server_credentials = grpc.ssl_server_credentials(
         private_key_certificate_chain_pairs=[(processor.cert_key,
                                               processor.cert)])
-    address_str = addr_to_str(processor.address)
+    address_str = _addr_to_str(processor.address)
     self._server.add_secure_port(address_str, server_credentials)
     self._start_msg = f'GRPC callout server started, listening on {address_str}.'
     if processor.insecure_address:
-      insecure_str = addr_to_str(processor.insecure_address)
+      insecure_str = _addr_to_str(processor.insecure_address)
       self._server.add_insecure_port(insecure_str)
       self._start_msg += f' (secure) and {insecure_str} (insecure)'
 
@@ -340,9 +340,9 @@ class _GRPCCalloutService(ExternalProcessorServicer):
 
   def Process(
       self,
-      request_iterator: Iterable[ProcessingRequest],
+      callout_iterator: Iterable[ProcessingRequest],
       context: ServicerContext,
   ) -> Iterator[ProcessingResponse]:
-    """Process the client request."""
-    for request in request_iterator:
-      yield self._processor.process(request, context)
+    """Process the client callout."""
+    for callout in callout_iterator:
+      yield self._processor.process(callout, context)

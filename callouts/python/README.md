@@ -1,4 +1,3 @@
-
 __Copyrights and Licences__
 
 Files using Copyright 2023 Google LLC & Apache License Version 2.0:
@@ -11,6 +10,9 @@ Files using Copyright 2023 Google LLC & Apache License Version 2.0:
 * Python 3.11+
 * [buf](https://buf.build/docs/introduction)
 * [requirements.txt](./requirements.txt)
+
+> [!NOTE]
+> All commands are expected to be run from within the `callouts/python` directory.
 
 # Quick start
 
@@ -30,12 +32,6 @@ Then the packages can be installed with:
 pip install -r requirements.txt
 ```
 
-And if you want to run tests:
-
-```shell
-pip install -r requirements-test.txt
-```
-
 `buf` can be installed from [here](https://buf.build/docs/installation).
 
 The proto library files are generated with `buf` using:
@@ -46,6 +42,21 @@ buf -v generate \
   --path envoy/service/ext_proc/v3/external_processor.proto \
   --include-imports
 ```
+
+> The default template file `buf.gen.yaml` will not generate `pyright` compatible proto stubs.
+> If you plan to develop callouts with a similar type checker and not just build them,
+> we suggest you run the command with the alternative development template using
+> `--template=buf_dev.gen.yaml`:
+>
+> ```shell
+> buf -v generate \
+>  https://github.com/envoyproxy/envoy.git#subdir=api \
+>  --path envoy/service/ext_proc/v3/external_processor.proto \
+>  --include-imports --template=buf_dev.gen.yaml
+> ```
+>
+> You may need to run `python -m pip uninstall ./protodef` after re-generating the proto files
+> to get the linter to update.
 
 The proto files are then installed as a local package:
 
@@ -93,7 +104,7 @@ if __name__ == '__main__':
   CalloutServer().run()
 ```
 
-Calling the server like this wont do much besides respond to health checks though, in order for the server to respond to requests we need to create a custom class extending `CalloutServer`.
+Calling the server like this wont do much besides respond to health checks, for the server to respond to callouts we create a custom class extending `CalloutServer`.
 
 Make a class extending `CalloutServer`.
 
@@ -138,14 +149,14 @@ For example `on_response_headers`:
 * `context`: associated grpc data.
 * `return`: `response_headers` data from [ProcessingResponse](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingresponse).
 
-There are methods specified under [extproc/service/callout_tools.py](extproc/service/callout_tools.py) that will help in creating a response to the request.
+There are methods specified under [extproc/service/callout_tools.py](extproc/service/callout_tools.py) that will help in creating a response to the callout.
 Import those with:
 
 ``` python
 from extproc.service.callout_tools import add_header_mutation
 ```
 
-With the callout from before we can add the `foo:bar` header mutation on incomming `reponse_headers` requests:
+With the callout from before we can add the `foo:bar` header mutation on incomming `reponse_headers` callouts:
 
 ``` python
 class BasicCalloutServer(CalloutServer):
@@ -224,34 +235,37 @@ And the protobuf library with:
 python -m pip install ./protodef
 ```
 
-### WARNING
-
-Installing the `protodef` package to your system outside of a `venv` could cause unintentional side effects. Only do this if you are inside of a self contained enviornment or you know what you are doing.
+> [!WARNING]
+> Installing the `protodef` package to your system outside of a `venv` could cause unintentional side effects.
 
 ## Without installing the proto code as a local package
 
 Alternatively, rather than installing through pip, the proto code can be placed in the root of this project and imported directly.
 
-```
+```bash
 buf -v generate \
   https://github.com/envoyproxy/envoy.git#subdir=api \
   --path envoy/service/ext_proc/v3/external_processor.proto \
   --include-imports \
-  -o out  && \
+  -o out && \
 mv ./out/protodef/* .
 ```
 
 # Tests
 
-Tests can be run with:
+Tests require packages from the `requirements.txt` file as well as the `requirements-test.txt` file, installed with:
+
+```shell
+pip install -r requirements.txt -r requirements-test.txt
+```
+
+All tests can then be run with:
 
 ```shell
 pytest
 ```
 
 # Docker
-
-## Quickstart
 
 The basic Docker image contains arguments for pointing to and running python modules. For example to build [extproc/example/basic_callout_server.py](extproc/example/basic_callout_server.py) into a run-able Docker image:
 
@@ -268,24 +282,41 @@ docker build \
 * `copy_path`: Path of python files required on the docker image.
 * `run_module`: The module to run on startup.
 
-This image will copy `extproc/example/basic_callout_server.py` to the base directory and runs it as `basic_callout_server`.
+The image copies `extproc/example/basic_callout_server.py` to the base directory and runs it as `basic_callout_server`.
 
 The image can then be run with:
 
 ``` bash
-docker run -P -it service-callout-example-python:latest
+docker run -P -it --network host service-callout-example-python:latest
 ```
 
 In this example, using the `-P` flag tells docker to connect the exposed ports to the local machine's ports.
 Setting `--network host` tells docker to connect the image to the `0.0.0.0` or `localhost` ip address.
 
-## Docker Images
+> [!NOTE]
+> The docker image is set up to pass command line arguments to the module when specified.
+> This also requires that the example is set up to use command line arguments like in
+> `basic_callout_server.py`
+>
+> For example:
+>
+> ```bash
+> docker run -P -it --network host service-callout-example-python:latest \
+>   -- --combined_health_check
+> ```
+>
+> Will run the health check for `basic_callout_server` combined with the main grpc server.
 
-### Building the base image
+## Custom Docker Files
 
-Because there is a lot of shared setup between images, docker files are built in two steps.
+If the baseline docker file does not contain the required complexity for a given use case.
+A custom image can be created and branched from the provided Dockerfile.
+The file is internally split up into two steps, the base image and the example specific image.
 
-To just build the base image:
+For instance, the `jwt_auth` example requires an additional python library.
+The Dockerfile within that example directory installs that package as part of the image setup.
+
+To build the `jwt_auth` example we first build the base image:
 
 ```shell
 docker build \
@@ -294,20 +325,10 @@ docker build \
   -t service-callout-common-python .
 ```
 
-### Using the base image
-
-A custom Docker file can be made by pointing to the common image
-
-```docker
-FROM service-callout-common-python
-```
-
-Specific examples in `./extproc/example/` subdirectories
-are made this way. For example, the `add_body` one can be built by running:
+and then the `jwt_auth` image:
 
 ```shell
 docker build \
-  -f ./extproc/example/add_body/Dockerfile \
-  -t add_body .       
+  -f ./extproc/example/jwt_auth/Dockerfile \
+  -t service-callout-jwt-example-python .
 ```
-

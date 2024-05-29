@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from grpc import ServicerContext
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from extproc.service import callout_server
@@ -19,30 +20,46 @@ from extproc.service import callout_tools
 
 
 class CalloutServerExample(callout_server.CalloutServer):
-  """Example callout server.
+  """Example callout server showing how to add text to a callout body.
 
-  Provides a non-comprehensive set of responses for each of the possible
-  callout interactions.
-
-  On a request body callout we provide a mutation to append '-added-body' to the body. On response body
-  callouts we send a mutation to replace the body with 'new-body'.
+  For request body callouts we return a mutation to append '-added-body' to
+  the body. For response body callouts we send a mutation to replace the body
+  with 'new-body'.
   """
 
   def on_request_body(
       self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
-    """Custom processor on the request body."""
-    return callout_tools.add_body_mutation(body='-added-body')
+    """Custom processor on the request body.
+
+    Args:
+      body (service_pb2.BodyResponse): The HTTP body received in the request.
+      context (ServicerContext): The context object for the gRPC service.
+
+    Returns:
+      service_pb2.BodyResponse: The response containing the mutations to be applied
+      to the request body.
+    """
+    return callout_tools.add_body_mutation(
+        body.body.decode('utf-8') + '-added-request-body')
 
   def on_response_body(
       self, body: service_pb2.HttpBody, context: ServicerContext
   ) -> service_pb2.BodyResponse:
-    """Custom processor on the response body."""
-    return callout_tools.add_body_mutation(body='new-body', clear_body=True)
+    """Custom processor on the response body.
+
+        Args:
+          body (service_pb2.BodyResponse): The HTTP body received in the response.
+          context (ServicerContext): The context object for the gRPC service.
+
+        Returns:
+          service_pb2.BodyResponse: The response containing the mutations to be applied
+          to the response body.
+        """
+    return callout_tools.add_body_mutation('new-body')
 
 
 if __name__ == '__main__':
+  logging.basicConfig(level=logging.DEBUG)
   # Run the gRPC service
-  CalloutServerExample(address=('0.0.0.0', 443),
-                       insecure_address=('0.0.0.0', 8080),
-                       health_check_address=('0.0.0.0', 80)).run()
+  CalloutServerExample().run()
