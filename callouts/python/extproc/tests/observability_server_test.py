@@ -3,7 +3,7 @@ import urllib.request
 import json
 
 from extproc.example.e2e_tests.observability_server import ObservabilityServerExample
-from extproc.tests.basic_grpc_test import make_request, setup_server, get_plaintext_channel, plaintext_kwargs
+from extproc.tests.basic_grpc_test import make_request, setup_server, get_plaintext_channel, default_kwargs
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpHeaders
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpBody
 from envoy.service.ext_proc.v3.external_processor_pb2_grpc import ExternalProcessorStub
@@ -11,7 +11,7 @@ from envoy.service.ext_proc.v3.external_processor_pb2_grpc import ExternalProces
 # Set up test fixture.
 _ = setup_server
 _local_test_args: dict = {
-    "kwargs": plaintext_kwargs | {'health_check_address': ('0.0.0.0', 8008),
+    "kwargs": default_kwargs | {'health_check_address': ('0.0.0.0', 8008),
         'plaintext_address': ("0.0.0.0", 1248)},
     "test_class": ObservabilityServerExample
 }

@@ -31,13 +31,13 @@ from extproc.tests.basic_grpc_test import (
     make_request,
     setup_server,
     get_plaintext_channel,
-    plaintext_kwargs,
+    default_kwargs,
 )
 
 
 # Import the setup server test fixture.
 _ = setup_server
-_local_test_args = {"kwargs": plaintext_kwargs, "test_class": CalloutServerTest}
+_local_test_args = {"kwargs": default_kwargs, "test_class": CalloutServerTest}
 
 @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
 def test_jwt_auth_rs256_failure(server: CalloutServerTest) -> None:
