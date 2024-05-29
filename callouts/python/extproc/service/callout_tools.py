@@ -46,6 +46,40 @@ def add_command_line_args() -> argparse.ArgumentParser:
   """
   parser = argparse.ArgumentParser()
   parser.add_argument(
+      '--address',
+      type=_addr,
+      help='Address for the server with format: "0.0.0.0:443"',
+  )
+  parser.add_argument(
+      '--port',
+      type=int,
+      help=
+      'Port of the server, uses default_ip as the ip unless --address is specified.',
+  )
+  parser.add_argument(
+      '--plaintext_address',
+      type=_addr,
+      help='Address for the plaintext (non grpc) server: "0.0.0.0:443"',
+  )
+  parser.add_argument(
+      '--plaintext_port',
+      type=int,
+      help=
+      'Plaintext port of the server, uses default_ip as the ip unless --plaintext_address is specified.',
+  )
+  parser.add_argument(
+      '--health_check_address',
+      type=_addr,
+      help=('Health check address for the server with format: "0.0.0.0:80",' +
+            'if False, no health check will be run.'),
+  )
+  parser.add_argument(
+      '--health_check_port',
+      type=int,
+      help=
+      'Health check port of the server, uses default_ip as the ip unless --health_check_address is specified.',
+  )
+  parser.add_argument(
       '--secure_health_check',
       action="store_true",
       help="Run a HTTPS health check rather than an HTTP one.",
@@ -56,43 +90,7 @@ def add_command_line_args() -> argparse.ArgumentParser:
       help="Do not create a seperate health check server.",
   )
   parser.add_argument(
-      '--address',
-      type=_addr,
-      help='Address for the server with format: "0.0.0.0:443"',
-  )
-  parser.add_argument(
-      '--health_check_address',
-      type=_addr,
-      help=('Health check address for the server with format: "0.0.0.0:80",' +
-            'if False, no health check will be run.'),
-  )
-  parser.add_argument(
-      '--plaintext_address',
-      type=_addr,
-      help='Address for the plaintext (non grpc) server: "0.0.0.0:443"',
-  )
-
-  parser.add_argument(
-      '--port',
-      type=int,
-      help=
-      'Port of the server, uses default_ip as the ip unless --address is specified.',
-  )
-  parser.add_argument(
-      '--health_check_port',
-      type=int,
-      help=
-      'Health check port of the server, uses default_ip as the ip unless --health_check_address is specified.',
-  )
-  parser.add_argument(
-      '--plaintext_port',
-      type=int,
-      help=
-      'Plaintext port of the server, uses default_ip as the ip unless --plaintext_address is specified.',
-  )
-  parser.add_argument(
       '--disable_plaintext',
-      type=int,
       action="store_true",
       help='Disables the plaintext address of the callout server.',
   )
