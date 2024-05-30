@@ -136,4 +136,4 @@ class CalloutServerExample(callout_server.CalloutServer):
 if __name__ == '__main__':
   logging.basicConfig(level=logging.DEBUG)
   # Run the gRPC service
-  server = CalloutServerExample().run()
+  CalloutServerExample().run()
