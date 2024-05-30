@@ -43,7 +43,7 @@ class ObservabilityServerExample(callout_server.CalloutServer):
 
   def __init__(self, **kwargs):
     super().__init__(**kwargs)
-    # Use the insecure port for debugging info.
+    # Use the plaintext port for debugging info.
     self.counter_http_server = HTTPServer(('0.0.0.0', 8080), RequestHandler)
     counter_http_server_thread = threading.Thread(
         target=self.counter_http_server.serve_forever)
@@ -107,4 +107,6 @@ if __name__ == '__main__':
   logging.basicConfig(level=logging.DEBUG)
   logging.info('Starting observability test server.')
   # Run the gRPC service.
-  ObservabilityServerExample(**vars(args)).run()
+  params = vars(args)
+  # We are using the default plaintext address to provide observability data.
+  ObservabilityServerExample(disable_plaintext=True, **params).run()

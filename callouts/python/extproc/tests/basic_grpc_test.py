@@ -48,25 +48,24 @@ class NoResponseError(Exception):
 # Replace the default ports of the server so that they do not clash with running programs.
 default_kwargs: dict = {
     'address': ('0.0.0.0', 8443),
-    'health_check_address': ('0.0.0.0', 8080)
+    'health_check_address': ('0.0.0.0', 8000)
 }
-# Arguments for running an insecure server alongside the secure grpc.
-insecure_kwargs: dict = default_kwargs | {'insecure_address': ('0.0.0.0', 8000)}
+# Arguments for running a custom CalloutServer with testing parameters.
 _local_test_args: dict = {
-    "kwargs": insecure_kwargs,
+    "kwargs": default_kwargs,
     "test_class": CalloutServerTest
 }
 
 
-def get_insecure_channel(server: CalloutServer) -> grpc.Channel:
-  """From a CalloutServer get the insecure address and create a grpc channel to it.
+def get_plaintext_channel(server: CalloutServer) -> grpc.Channel:
+  """From a CalloutServer, obtain the plaintext address and create a grpc channel pointing to it.
 
   Args:
       server: Server to connect to.
   Returns:
       grpc.Channel: Open channel to the server.
   """
-  addr = server.insecure_address
+  addr = server.plaintext_address
   return grpc.insecure_channel(_addr_to_str(addr) if addr else '')
 
 
@@ -149,11 +148,10 @@ class TestBasicServer(object):
   @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
   def test_basic_server_capabilites(self, server: CalloutServerTest) -> None:
     """Test the request and response functionality of the server."""
-    root_cert: bytes = b''
-    with open('./extproc/ssl_creds/root.crt', 'rb') as file:
-      root_cert = file.read()
-      file.close()
-    creds = grpc.ssl_channel_credentials(root_cert)
+    chain_cert: bytes = b''
+    with open('./extproc/ssl_creds/chain.pem', 'rb') as file:
+      chain_cert = file.read()
+    creds = grpc.ssl_channel_credentials(chain_cert)
     options = ((
         'grpc.ssl_target_name_override',
         'localhost',
@@ -189,7 +187,6 @@ class TestBasicServer(object):
           remove=['foo'])
 
       make_request(stub, request_headers=end_headers)
-      channel.close()
 
   @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
   def test_basic_server_health_check(self, server: CalloutServerTest) -> None:
@@ -202,7 +199,7 @@ class TestBasicServer(object):
 
 
 _secure_test_args: dict = {
-    "kwargs": insecure_kwargs | {
+    "kwargs": default_kwargs | {
         'secure_health_check': True
     },
     "test_class": CalloutServerTest
@@ -229,12 +226,12 @@ def test_custom_server_config() -> None:
   try:
     ip = '0.0.0.0'
     port = 8444
-    insecure_port = 8081
+    plaintext_port = 8081
     health_check_port = 8001
 
     server = test_server = CalloutServerTest(
         address=(ip, port),
-        insecure_address=(ip, insecure_port),
+        plaintext_address=(ip, plaintext_port),
         health_check_address=(ip, health_check_port))
     # Start the server in a background thread
     thread = threading.Thread(target=test_server.run)
@@ -246,7 +243,7 @@ def test_custom_server_config() -> None:
     assert response.read() == b''
     assert response.getcode() == 200
 
-    with grpc.insecure_channel(f'{ip}:{insecure_port}') as channel:
+    with grpc.insecure_channel(f'{ip}:{plaintext_port}') as channel:
       stub = ExternalProcessorStub(channel)
       value = make_request(stub,
                            response_headers=HttpHeaders(end_of_stream=True))
@@ -265,7 +262,7 @@ def test_custom_server_config() -> None:
 
 
 _no_health_args: dict = {
-    "kwargs": insecure_kwargs | {
+    "kwargs": default_kwargs | {
         'combined_health_check': True
     },
     "test_class": CalloutServerTest

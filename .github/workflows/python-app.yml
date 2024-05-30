@@ -25,6 +25,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: bufbuild/buf-setup-action@v1
+      with:
+        version: 1.32.2
     - name: Set up Python 3.11
       uses: actions/setup-python@v4
       with:
