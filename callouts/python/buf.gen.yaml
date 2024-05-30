@@ -6,5 +6,5 @@ plugins:
   - plugin: buf.build/grpc/python:v1.62.1
     out: protodef
   # dependencies
-  - plugin: buf.build/protocolbuffers/python
+  - plugin: buf.build/protocolbuffers/python:v26.0
     out: protodef
