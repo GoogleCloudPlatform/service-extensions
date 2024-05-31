@@ -26,7 +26,7 @@ from extproc.example.basic_callout_server import (
 
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpBody
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpHeaders
-from extproc.example.json_client import make_json_request
+from extproc.example.ext_proc_client import make_json_request
 from extproc.tests.basic_grpc_test import (
   setup_server,
   default_kwargs,

@@ -51,12 +51,12 @@ if __name__ == '__main__':
   # Setup command line args.
   parser = argparse.ArgumentParser()
   parser.add_argument(
-    '--address',
+    'address',
     type=_addr,
     help=('Address of the callout server in the format ip:port.'),
   )
   parser.add_argument(
-    '--d',
+    '-d', '--data',
     type=str,
     help=('ProcessingRequest data in json format.'),
   )
