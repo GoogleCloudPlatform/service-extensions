@@ -14,10 +14,9 @@
 
 import argparse
 import logging
-from typing import Iterable, Iterator
+from typing import Iterator
 import grpc
 from google.protobuf.json_format import Parse
-from google.protobuf.json_format import MessageToJson
 from envoy.service.ext_proc.v3.external_processor_pb2 import (
   ProcessingRequest,
   ProcessingResponse,
@@ -30,16 +29,19 @@ from envoy.service.ext_proc.v3.external_processor_pb2_grpc import (
 
 
 def make_json_request(
-  json_data: str, address: tuple[str, int]
+  json_list: list[str], address: tuple[str, int]
 ) -> Iterator[ProcessingResponse]:
-  address_str = _addr_to_str(address)
-  request_data = Parse(json_data, ProcessingRequest())
-  if not address_str:
-    logging.error('Address is not in a valid format {args.address}')
-
-  with grpc.insecure_channel(address_str) as channel:
+  """Make requests to a callout service with ProcessingRequest json data.
+  Args:
+    json_list: A list of json strings representing ProcessingRequest data.
+    address: ip address of the callout server.
+  Returns:
+    An iterator containg each response.
+  """
+  callouts = [Parse(data, ProcessingRequest()) for data in json_list]
+  with grpc.insecure_channel(_addr_to_str(address)) as channel:
     stub = ExternalProcessorStub(channel)
-    for response in stub.Process(iter([request_data])):
+    for response in stub.Process(iter(callouts)):
       yield response
   return None
 
@@ -56,14 +58,21 @@ if __name__ == '__main__':
     help=('Address of the callout server in the format ip:port.'),
   )
   parser.add_argument(
-    '-d', '--data',
+    '-d',
+    '--data',
     type=str,
-    help=('ProcessingRequest data in json format.'),
+    help=(
+      'ProcessingRequest data in json format. Also accepts a list of json'
+      ' objects to preform multiple callouts.'
+    ),
+    nargs='*',
   )
   parser.description = (
     'Sends ProcessingRequest data to a callout server and'
-    'prints out the response.'
+    'prints out the responses.'
   )
   args = parser.parse_args()
-  for response in make_json_request(json_data=args.d, address=args.address):
-    print(MessageToJson(response))
+  # Preform callouts and print the responses.
+  logging.info(
+    list(make_json_request(json_list=args.data, address=args.address))
+  )

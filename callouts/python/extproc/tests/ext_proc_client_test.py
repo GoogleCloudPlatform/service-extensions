@@ -45,7 +45,7 @@ _local_test_args = {'kwargs': default_kwargs, 'test_class': CalloutServerTest}
 def make_request_str(
   request: str, addr: tuple[str, int]
 ) -> ProcessingResponse:
-  return next(make_json_request(request, addr))
+  return next(make_json_request([request], addr))
 
 
 def make_request(
@@ -97,3 +97,14 @@ def test_string_sanity_check(server: CalloutServerTest) -> None:
   assert addr
   response = make_request_str('{"requestBody": {}}', addr)
   assert response.request_body == add_body_mutation(body='replaced-body')
+
+
+@pytest.mark.parametrize('server', [_local_test_args], indirect=True)
+def test_repeated_requests(server: CalloutServerTest) -> None:
+  addr = server.plaintext_address
+  assert addr
+  responses = list(
+    make_json_request(['{"requestBody": {}}', '{"responseBody": {}}'], addr)
+  )
+  assert responses[0].request_body == add_body_mutation(body='replaced-body')
+  assert responses[1].response_body == add_body_mutation(clear_body=True)
