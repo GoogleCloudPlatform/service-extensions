@@ -108,3 +108,15 @@ def test_repeated_requests(server: CalloutServerTest) -> None:
   )
   assert responses[0].request_body == add_body_mutation(body='replaced-body')
   assert responses[1].response_body == add_body_mutation(clear_body=True)
+
+
+@pytest.mark.parametrize('server', [_local_test_args], indirect=True)
+def test_secure_request(server: CalloutServerTest) -> None:
+  responses = list(
+    make_json_request(
+      ['{"requestBody": {}}', '{"responseBody": {}}'],
+      server.address,
+      key='./extproc/ssl_creds/chain.pem',
+    )
+  )
+  assert responses[0].request_body == add_body_mutation(body='replaced-body')

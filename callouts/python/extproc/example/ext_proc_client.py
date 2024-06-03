@@ -28,18 +28,31 @@ from envoy.service.ext_proc.v3.external_processor_pb2_grpc import (
 )
 
 
+def _make_channel(
+  address: tuple[str, int], key: str | None = None
+) -> grpc.Channel:
+  addr_str = _addr_to_str(address)
+  if key:
+    with open(key, 'rb') as file:
+      creds = grpc.ssl_channel_credentials(file.read())
+      return grpc.secure_channel(addr_str, creds)
+  else:
+    return grpc.insecure_channel(addr_str)
+
+
 def make_json_request(
-  json_list: list[str], address: tuple[str, int]
+  json_list: list[str], address: tuple[str, int], key: str | None = None
 ) -> Iterator[ProcessingResponse]:
   """Make requests to a callout service with ProcessingRequest json data.
   Args:
     json_list: A list of json strings representing ProcessingRequest data.
     address: ip address of the callout server.
+    key: Local filepath to a chain authenication certificate.
   Returns:
     An iterator containg each response.
   """
   callouts = [Parse(data, ProcessingRequest()) for data in json_list]
-  with grpc.insecure_channel(_addr_to_str(address)) as channel:
+  with _make_channel(address, key) as channel:
     stub = ExternalProcessorStub(channel)
     for response in stub.Process(iter(callouts)):
       yield response
@@ -58,6 +71,15 @@ if __name__ == '__main__':
     help=('Address of the callout server in the format ip:port.'),
   )
   parser.add_argument(
+    '--cert',
+    type=str,
+    help=(
+      'Local path to a chain or root PEM authenication certificate.'
+      ' If specified, attemps to establish a secure connection to the callout'
+      ' server using the certificate.'
+    ),
+  )
+  parser.add_argument(
     '-d',
     '--data',
     type=str,
@@ -72,7 +94,12 @@ if __name__ == '__main__':
     'prints out the responses.'
   )
   args = parser.parse_args()
-  # Preform callouts and print the responses.
-  logging.info(
-    list(make_json_request(json_list=args.data, address=args.address))
+  # Preform callouts and collect the responses.
+  responses = list(
+    make_json_request(json_list=args.data, address=args.address, key=args.key)
   )
+  # Remove list syntax if there is only one response.
+  if len(responses) == 1:
+    responses = responses[0]
+  # Display the response(s).
+  logging.info(responses)

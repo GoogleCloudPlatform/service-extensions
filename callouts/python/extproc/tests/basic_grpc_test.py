@@ -47,8 +47,8 @@ class NoResponseError(Exception):
 
 # Replace the default ports of the server so that they do not clash with running programs.
 default_kwargs: dict = {
-    'address': ('0.0.0.0', 8443),
-    'health_check_address': ('0.0.0.0', 8000)
+    'address': ('localhost', 8443),
+    'health_check_address': ('localhost', 8000)
 }
 # Arguments for running a custom CalloutServer with testing parameters.
 _local_test_args: dict = {
@@ -152,13 +152,8 @@ class TestBasicServer(object):
     with open('./extproc/ssl_creds/chain.pem', 'rb') as file:
       chain_cert = file.read()
     creds = grpc.ssl_channel_credentials(chain_cert)
-    options = ((
-        'grpc.ssl_target_name_override',
-        'localhost',
-    ),)
     with grpc.secure_channel(f'{_addr_to_str(server.address)}',
-                             creds,
-                             options=options) as channel:
+                             creds) as channel:
       stub = ExternalProcessorStub(channel)
 
       body = HttpBody(end_of_stream=False)
