@@ -21,6 +21,7 @@ import (
 	"service-extensions-samples/extproc/examples/add_body"
 	"service-extensions-samples/extproc/examples/add_header"
 	"service-extensions-samples/extproc/examples/basic_callout_server"
+	"service-extensions-samples/extproc/examples/jwt_auth"
 	"service-extensions-samples/extproc/examples/redirect"
 	"service-extensions-samples/extproc/internal/server"
 )
@@ -43,6 +44,8 @@ func main() {
 		customService = add_body.NewExampleCalloutService()
 	case "basic_callout_server":
 		customService = basic_callout_server.NewExampleCalloutService()
+	case "jwt_auth":
+		customService = jwt_auth.NewExampleCalloutService()
 	default:
 		fmt.Println("Unknown EXAMPLE_TYPE. Please set it to a valid example")
 		return
