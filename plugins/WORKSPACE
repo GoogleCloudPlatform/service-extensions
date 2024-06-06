@@ -27,19 +27,20 @@ http_archive(
 )
 
 http_archive(
-  name = "com_google_benchmark",
-  sha256 = "6bc180a57d23d4d9515519f92b0c83d61b05b5bab188961f36ac7b06b0d9e9ce",
-  urls = ["https://github.com/google/benchmark/archive/refs/tags/v1.8.3.tar.gz"],
-  strip_prefix = "benchmark-1.8.3",
+    name = "com_google_benchmark",
+    sha256 = "6bc180a57d23d4d9515519f92b0c83d61b05b5bab188961f36ac7b06b0d9e9ce",
+    strip_prefix = "benchmark-1.8.3",
+    urls = ["https://github.com/google/benchmark/archive/refs/tags/v1.8.3.tar.gz"],
 )
 
 # rules_boost on 2023-06-29, boost @ 1.80.0
 http_archive(
     name = "com_github_nelhage_rules_boost",
-    url = "https://github.com/nelhage/rules_boost/archive/0598ab9aa992d6ad45088b480e1bf4526ef4ad04.tar.gz",
-    strip_prefix = "rules_boost-0598ab9aa992d6ad45088b480e1bf4526ef4ad04",
     sha256 = "1404ffb9f3f7253927c97bc2e05ef6b4a2a5089b76d00cef0f6b7d5a678fad88",
+    strip_prefix = "rules_boost-0598ab9aa992d6ad45088b480e1bf4526ef4ad04",
+    url = "https://github.com/nelhage/rules_boost/archive/0598ab9aa992d6ad45088b480e1bf4526ef4ad04.tar.gz",
 )
+
 load("@com_github_nelhage_rules_boost//:boost/boost.bzl", "boost_deps")
 boost_deps()
 
@@ -53,15 +54,30 @@ http_archive(
 
 # Upgrade Abseil to work with latest Emscripten and STANDALONE_WASM
 http_archive(
-    name = "com_google_absl",  # 2023-04-06T14:42:25Z
-    sha256 = "a50452f02402262f9a61a8eedda60f76dda6b9538d36b34b55bce9f74a4d5ef8",
-    strip_prefix = "abseil-cpp-e73b9139ee9b853a4bd7812531442c138da09084",
-    urls = ["https://github.com/abseil/abseil-cpp/archive/e73b9139ee9b853a4bd7812531442c138da09084.zip"],
+    name = "com_google_absl",  # 2024-03-06
+    sha256 = "bb5e84fc74362c546ab4193eeafd440a26487f4adf80587d2f2576f03c439c4b",
+    strip_prefix = "abseil-cpp-53e6dae02bf0d9a5a1d304a3d637c083376b86a1",
+    urls = ["https://github.com/abseil/abseil-cpp/archive/53e6dae02bf0d9a5a1d304a3d637c083376b86a1.zip"],
 )
 
-# Duplicate ProxyWasm WORKSPACE files (dependencies)
-# Consider adopting bzlmod for this: https://docs.bazel.build/versions/5.0.0/bzlmod.html
+# For testing, include Quiche for its Balsa header library.
+http_archive(
+    name = "com_github_google_quiche",  # 2024-05-16
+    patch_args = ["-p1"],
+    patches = ["//:quiche.patch"],
+    sha256 = "ae33ab0056fd5119d9aae15abfcb69e5d6f021ec5e18e77535ec0fe0c49dfa66",
+    strip_prefix = "quiche-1397c94d55af0bfc142ac7dda923cf2726857755",
+    urls = ["https://github.com/google/quiche/archive/1397c94d55af0bfc142ac7dda923cf2726857755.tar.gz"],
+)
+# Quiche dependency.
+http_archive(
+    name = "com_google_googleurl",  # 2022-11-03
+    sha256 = "59f14d4fb373083b9dc8d389f16bbb817b5f936d1d436aa67e16eb6936028a51",
+    urls = ["https://storage.googleapis.com/quiche-envoy-integration/dd4080fec0b443296c0ed0036e1e776df8813aa7.tar.gz"],
+)
 
+# Duplicate the ProxyWasm WORKSPACE files (dependencies)
+# Consider adopting bzlmod for this: https://docs.bazel.build/versions/5.0.0/bzlmod.html
 load("@proxy_wasm_cpp_host//bazel:repositories.bzl", "proxy_wasm_cpp_host_repositories")
 proxy_wasm_cpp_host_repositories()
 
@@ -87,12 +103,12 @@ load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
 crates_repository(
     name = "crate_index",
     cargo_lockfile = "//:Cargo.lock",
+    # See https://github.com/GoogleCloudPlatform/service-extensions-samples/issues/31
+    generate_target_compatible_with = False,
     generator = "@cargo_bazel_bootstrap//:cargo-bazel",
     lockfile = "//:Cargo.Bazel.lock",
     manifests = ["//:Cargo.toml"],
     supported_platform_triples = ["wasm32-wasi"],
-    # See https://github.com/GoogleCloudPlatform/service-extensions-samples/issues/31
-    generate_target_compatible_with = False,
 )
 
 # Reference: @crate_index//:proxy-wasm (etc)

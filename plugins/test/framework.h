@@ -22,6 +22,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 #include "include/proxy-wasm/exports.h"
 #include "include/proxy-wasm/wasm.h"
@@ -150,13 +151,23 @@ class TestHttpContext : public TestContext {
 
   // Case insensitive string comparator.
   struct caseless_compare {
-    bool operator()(const std::string& a, const std::string& b) const {
+    bool operator()(absl::string_view a, absl::string_view b) const {
       return boost::ilexicographical_compare(a, b);
     }
   };
 
   // Key-sorted header map with case-insensitive key comparison.
-  using Headers = std::map<std::string, std::string, caseless_compare>;
+  class Headers : public std::map<std::string, std::string, caseless_compare> {
+   public:
+    void InsertOrAppend(absl::string_view key, absl::string_view value) {
+      auto& val = operator[](std::string(key));
+      if (val.empty()) {
+        val = std::string(value);
+      } else {
+        val = absl::StrCat(val, ", ", value);  // RFC 9110 Field Order
+      }
+    }
+  };
 
   struct Result {
     // Filter status returned by handler.
