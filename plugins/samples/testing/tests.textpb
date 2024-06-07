@@ -11,10 +11,10 @@ test {
       header { key: ":method" value: "GET" }
     }
     result {
-      # Positive header matches.
-      has_header { key: ":path" value: "/" }
+      # Positive header matches (two ways).
+      has_header { key: ":method" value: "GET" }
       headers { exact: ":method: GET" }
-      # Negative header matches.
+      # Negative header matches (two ways).
       no_header { key: ":scheme" }
       headers { regex: ":scheme:.*" invert: true }
       # Logging matches.
@@ -43,7 +43,7 @@ test {
 test {
   name: "Headers_Content"
   request_headers {
-    # HTTP1 serialized request input, in origin form.
+    # HTTP1 serialized request input, from string, in origin form.
     input {
       content:
         "GET /my/path?foo=bar HTTP/1.1\n"
@@ -60,7 +60,7 @@ test {
     }
   }
   response_headers {
-    # HTTP1 serialized response input, success.
+    # HTTP1 serialized response input, from string, denoting success.
     input {
       content:
         "HTTP/1.1 200 OK\n"
@@ -77,7 +77,7 @@ test {
 test {
   name: "Headers_File"
   request_headers {
-    # HTTP1 serialized request input, in absolute form, from file.
+    # HTTP1 serialized request input, from file, in absolute form.
     input {
       # GET https://example.com:8080/my/path?foo=bar HTTP/1.1
       # Host: myhost.com
@@ -95,7 +95,7 @@ test {
     }
   }
   response_headers {
-    # HTTP1 serialized response input, error, from file.
+    # HTTP1 serialized response input, from file, denoting error.
     input {
       # HTTP/1.1 403 Forbidden
       # MyHeader: MyVal1
