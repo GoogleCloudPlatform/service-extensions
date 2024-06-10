@@ -1,3 +1,5 @@
+.. _callout_server:
+
 Callout Server
 =====================
 
