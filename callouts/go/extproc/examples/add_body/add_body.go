@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//	http://www.apache.org/licenses/LICENSE-2.0
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,77 +12,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package basic_callout_server
+package add_body
 
 import (
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
+
 	"service-extensions-samples/extproc/internal/server"
 	"service-extensions-samples/extproc/pkg/utils"
 )
 
+// ExampleCalloutService implements the GRPCCalloutService and provides handlers for processing HTTP request and response bodies.
 type ExampleCalloutService struct {
 	server.GRPCCalloutService
 }
 
+// NewExampleCalloutService creates a new instance of ExampleCalloutService with the necessary handlers.
 func NewExampleCalloutService() *ExampleCalloutService {
 	service := &ExampleCalloutService{}
-	service.Handlers.RequestHeadersHandler = service.HandleRequestHeaders
-	service.Handlers.ResponseHeadersHandler = service.HandleResponseHeaders
 	service.Handlers.RequestBodyHandler = service.HandleRequestBody
 	service.Handlers.ResponseBodyHandler = service.HandleResponseBody
 	return service
 }
 
-func (s *ExampleCalloutService) HandleRequestHeaders(headers *extproc.HttpHeaders) (*extproc.ProcessingResponse, error) {
-
-	return &extproc.ProcessingResponse{
-		Response: &extproc.ProcessingResponse_RequestHeaders{
-			RequestHeaders: utils.AddHeaderMutation(
-				[]struct{ Key, Value string }{{Key: "header-request", Value: "Value-request"}},
-				nil,
-				false,
-				nil,
-			),
-		},
-	}, nil
-}
-
-func (s *ExampleCalloutService) HandleResponseHeaders(headers *extproc.HttpHeaders) (*extproc.ProcessingResponse, error) {
-
-	return &extproc.ProcessingResponse{
-		Response: &extproc.ProcessingResponse_ResponseHeaders{
-			ResponseHeaders: utils.AddHeaderMutation(
-				[]struct{ Key, Value string }{{Key: "header-response", Value: "Value-response"}},
-				nil,
-				false,
-				nil,
-			),
-		},
-	}, nil
-}
-
+// HandleRequestBody handles the HTTP request body, adding a new body content.
 func (s *ExampleCalloutService) HandleRequestBody(body *extproc.HttpBody) (*extproc.ProcessingResponse, error) {
-
 	return &extproc.ProcessingResponse{
 		Response: &extproc.ProcessingResponse_RequestBody{
-			RequestBody: utils.AddBodyMutation(
-				"new-body-request",
-				false,
-				false,
-			),
+			RequestBody: utils.AddBodyMutation("new-body-request", false, false),
 		},
 	}, nil
 }
 
+// HandleResponseBody handles the HTTP response body, adding a new body content.
 func (s *ExampleCalloutService) HandleResponseBody(body *extproc.HttpBody) (*extproc.ProcessingResponse, error) {
-
 	return &extproc.ProcessingResponse{
 		Response: &extproc.ProcessingResponse_ResponseBody{
-			ResponseBody: utils.AddBodyMutation(
-				"new-body-response",
-				false,
-				false,
-			),
+			ResponseBody: utils.AddBodyMutation("new-body-response", false, false),
 		},
 	}, nil
 }

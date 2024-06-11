@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//	http://www.apache.org/licenses/LICENSE-2.0
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,27 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package add_header
+package basic_callout_server
 
 import (
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
+
 	"service-extensions-samples/extproc/internal/server"
 	"service-extensions-samples/extproc/pkg/utils"
 )
 
+// ExampleCalloutService is a GRPC callout service that processes HTTP headers and bodies.
 type ExampleCalloutService struct {
 	server.GRPCCalloutService
 }
 
+// NewExampleCalloutService creates a new ExampleCalloutService with initialized handlers.
 func NewExampleCalloutService() *ExampleCalloutService {
 	service := &ExampleCalloutService{}
 	service.Handlers.RequestHeadersHandler = service.HandleRequestHeaders
 	service.Handlers.ResponseHeadersHandler = service.HandleResponseHeaders
+	service.Handlers.RequestBodyHandler = service.HandleRequestBody
+	service.Handlers.ResponseBodyHandler = service.HandleResponseBody
 	return service
 }
 
+// HandleRequestHeaders processes the incoming HTTP request headers and adds a new header.
 func (s *ExampleCalloutService) HandleRequestHeaders(headers *extproc.HttpHeaders) (*extproc.ProcessingResponse, error) {
-
 	return &extproc.ProcessingResponse{
 		Response: &extproc.ProcessingResponse_RequestHeaders{
 			RequestHeaders: utils.AddHeaderMutation(
@@ -45,8 +50,8 @@ func (s *ExampleCalloutService) HandleRequestHeaders(headers *extproc.HttpHeader
 	}, nil
 }
 
+// HandleResponseHeaders processes the outgoing HTTP response headers and adds a new header.
 func (s *ExampleCalloutService) HandleResponseHeaders(headers *extproc.HttpHeaders) (*extproc.ProcessingResponse, error) {
-
 	return &extproc.ProcessingResponse{
 		Response: &extproc.ProcessingResponse_ResponseHeaders{
 			ResponseHeaders: utils.AddHeaderMutation(
@@ -55,6 +60,24 @@ func (s *ExampleCalloutService) HandleResponseHeaders(headers *extproc.HttpHeade
 				false,
 				nil,
 			),
+		},
+	}, nil
+}
+
+// HandleRequestBody processes the incoming HTTP request body and modifies it.
+func (s *ExampleCalloutService) HandleRequestBody(body *extproc.HttpBody) (*extproc.ProcessingResponse, error) {
+	return &extproc.ProcessingResponse{
+		Response: &extproc.ProcessingResponse_RequestBody{
+			RequestBody: utils.AddBodyMutation("new-body-request", false, false),
+		},
+	}, nil
+}
+
+// HandleResponseBody processes the outgoing HTTP response body and modifies it.
+func (s *ExampleCalloutService) HandleResponseBody(body *extproc.HttpBody) (*extproc.ProcessingResponse, error) {
+	return &extproc.ProcessingResponse{
+		Response: &extproc.ProcessingResponse_ResponseBody{
+			ResponseBody: utils.AddBodyMutation("new-body-response", false, false),
 		},
 	}, nil
 }

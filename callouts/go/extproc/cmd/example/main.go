@@ -16,8 +16,10 @@ package main
 
 import (
 	"fmt"
-	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	"os"
+
+	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
+
 	"service-extensions-samples/extproc/examples/add_body"
 	"service-extensions-samples/extproc/examples/add_header"
 	"service-extensions-samples/extproc/examples/basic_callout_server"
@@ -26,6 +28,7 @@ import (
 	"service-extensions-samples/extproc/internal/server"
 )
 
+// ExampleService defines the interface that all example services must implement.
 type ExampleService interface {
 	extproc.ExternalProcessorServer
 }
@@ -51,7 +54,7 @@ func main() {
 		return
 	}
 
-	config := server.ServerConfig{
+	config := server.Config{
 		Address:            "0.0.0.0:8443",
 		InsecureAddress:    "0.0.0.0:8181",
 		HealthCheckAddress: "0.0.0.0:8000",

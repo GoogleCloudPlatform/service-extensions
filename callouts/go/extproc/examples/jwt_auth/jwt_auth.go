@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//	http://www.apache.org/licenses/LICENSE-2.0
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,23 +16,26 @@ package jwt_auth
 
 import (
 	"fmt"
+	"io/ioutil"
+	"log"
+	"strings"
+
 	"github.com/dgrijalva/jwt-go"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"io/ioutil"
-	"log"
+
 	"service-extensions-samples/extproc/internal/server"
 	"service-extensions-samples/extproc/pkg/utils"
-	"strings"
 )
 
+// ExampleCalloutService implements JWT authentication by processing request headers.
 type ExampleCalloutService struct {
 	server.GRPCCalloutService
 	PublicKey []byte
 }
 
-// New constructor function that accepts a public key path
+// NewExampleCalloutServiceWithKeyPath creates a new instance of ExampleCalloutService with the specified public key path.
 func NewExampleCalloutServiceWithKeyPath(keyPath string) *ExampleCalloutService {
 	service := &ExampleCalloutService{}
 	service.Handlers.RequestHeadersHandler = service.HandleRequestHeaders
@@ -40,10 +43,12 @@ func NewExampleCalloutServiceWithKeyPath(keyPath string) *ExampleCalloutService 
 	return service
 }
 
+// NewExampleCalloutService creates a new instance of ExampleCalloutService with the default public key path.
 func NewExampleCalloutService() *ExampleCalloutService {
 	return NewExampleCalloutServiceWithKeyPath("./extproc/ssl_creds/publickey.pem")
 }
 
+// LoadPublicKey loads the public key from the specified file path.
 func (s *ExampleCalloutService) LoadPublicKey(path string) {
 	key, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -52,6 +57,7 @@ func (s *ExampleCalloutService) LoadPublicKey(path string) {
 	s.PublicKey = key
 }
 
+// extractJWTToken extracts the JWT token from the request headers.
 func extractJWTToken(headers *extproc.HttpHeaders) (string, error) {
 	for _, header := range headers.Headers.Headers {
 		if header.Key == "Authorization" {
@@ -61,6 +67,7 @@ func extractJWTToken(headers *extproc.HttpHeaders) (string, error) {
 	return "", fmt.Errorf("no Authorization header found")
 }
 
+// validateJWTToken validates the JWT token using the public key.
 func validateJWTToken(key []byte, headers *extproc.HttpHeaders) (map[string]interface{}, error) {
 	tokenString, err := extractJWTToken(headers)
 
@@ -88,6 +95,7 @@ func validateJWTToken(key []byte, headers *extproc.HttpHeaders) (map[string]inte
 	return nil, fmt.Errorf("invalid token")
 }
 
+// HandleRequestHeaders processes the request headers, validates the JWT token, and adds decoded claims to the headers.
 func (s *ExampleCalloutService) HandleRequestHeaders(headers *extproc.HttpHeaders) (*extproc.ProcessingResponse, error) {
 	claims, err := validateJWTToken(s.PublicKey, headers)
 	if err != nil {

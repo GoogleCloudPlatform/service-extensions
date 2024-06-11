@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//	http://www.apache.org/licenses/LICENSE-2.0
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,18 +16,29 @@ package server
 
 import (
 	"crypto/tls"
+	"log"
+	"net"
+	"net/http"
+
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
-	"log"
-	"net"
-	"net/http"
 )
 
-func loadConfig() ServerConfig {
-	// Load configuration from environment variables or default
-	return ServerConfig{
+// Config holds the server configuration parameters.
+type Config struct {
+	Address              string
+	InsecureAddress      string
+	HealthCheckAddress   string
+	CertFile             string
+	KeyFile              string
+	EnableInsecureServer bool
+}
+
+// loadConfig loads the server configuration from environment variables or uses defaults.
+func loadConfig() Config {
+	return Config{
 		Address:              "0.0.0.0:8443",
 		InsecureAddress:      "0.0.0.0:8181",
 		HealthCheckAddress:   "0.0.0.0:8000",
@@ -37,21 +48,14 @@ func loadConfig() ServerConfig {
 	}
 }
 
-type ServerConfig struct {
-	Address              string
-	InsecureAddress      string
-	HealthCheckAddress   string
-	CertFile             string
-	KeyFile              string
-	EnableInsecureServer bool
-}
-
+// CalloutServer represents a server that handles callouts.
 type CalloutServer struct {
-	Config ServerConfig
+	Config Config
 	Cert   tls.Certificate
 }
 
-func NewCalloutServer(config ServerConfig) *CalloutServer {
+// NewCalloutServer creates a new CalloutServer with the given configuration.
+func NewCalloutServer(config Config) *CalloutServer {
 	var cert tls.Certificate
 	var err error
 
@@ -68,6 +72,7 @@ func NewCalloutServer(config ServerConfig) *CalloutServer {
 	}
 }
 
+// StartGRPC starts the gRPC server with the specified service.
 func (s *CalloutServer) StartGRPC(service extproc.ExternalProcessorServer) {
 	lis, err := net.Listen("tcp", s.Config.Address)
 	if err != nil {
@@ -82,13 +87,14 @@ func (s *CalloutServer) StartGRPC(service extproc.ExternalProcessorServer) {
 	}
 }
 
+// StartHealthCheck starts a health check server.
 func (s *CalloutServer) StartHealthCheck() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	var server *http.Server = &http.Server{
+	server := &http.Server{
 		Addr:    s.Config.HealthCheckAddress,
 		Handler: mux,
 	}
@@ -96,6 +102,7 @@ func (s *CalloutServer) StartHealthCheck() {
 	log.Fatal(server.ListenAndServe())
 }
 
+// StartInsecureGRPC starts the gRPC server without TLS.
 func (s *CalloutServer) StartInsecureGRPC(service extproc.ExternalProcessorServer) {
 	if !s.Config.EnableInsecureServer {
 		return
@@ -104,7 +111,7 @@ func (s *CalloutServer) StartInsecureGRPC(service extproc.ExternalProcessorServe
 	if err != nil {
 		log.Fatalf("Failed to listen on insecure port: %v", err)
 	}
-	grpcServer := grpc.NewServer() // No TLS credentials
+	grpcServer := grpc.NewServer()
 	extproc.RegisterExternalProcessorServer(grpcServer, service)
 	reflection.Register(grpcServer)
 	if err := grpcServer.Serve(lis); err != nil {
@@ -112,13 +119,25 @@ func (s *CalloutServer) StartInsecureGRPC(service extproc.ExternalProcessorServe
 	}
 }
 
+// RequestHeadersHandler handles request headers.
 type RequestHeadersHandler func(*extproc.HttpHeaders) (*extproc.ProcessingResponse, error)
+
+// ResponseHeadersHandler handles response headers.
 type ResponseHeadersHandler func(*extproc.HttpHeaders) (*extproc.ProcessingResponse, error)
+
+// RequestBodyHandler handles request bodies.
 type RequestBodyHandler func(*extproc.HttpBody) (*extproc.ProcessingResponse, error)
+
+// ResponseBodyHandler handles response bodies.
 type ResponseBodyHandler func(*extproc.HttpBody) (*extproc.ProcessingResponse, error)
+
+// RequestTrailersHandler handles request trailers.
 type RequestTrailersHandler func(*extproc.HttpTrailers) (*extproc.ProcessingResponse, error)
+
+// ResponseTrailersHandler handles response trailers.
 type ResponseTrailersHandler func(*extproc.HttpTrailers) (*extproc.ProcessingResponse, error)
 
+// HandlerRegistry registers various handlers.
 type HandlerRegistry struct {
 	RequestHeadersHandler   RequestHeadersHandler
 	ResponseHeadersHandler  ResponseHeadersHandler
@@ -128,11 +147,13 @@ type HandlerRegistry struct {
 	ResponseTrailersHandler ResponseTrailersHandler
 }
 
+// GRPCCalloutService implements the gRPC ExternalProcessorServer.
 type GRPCCalloutService struct {
 	extproc.UnimplementedExternalProcessorServer
 	Handlers HandlerRegistry
 }
 
+// Process processes incoming gRPC streams.
 func (s *GRPCCalloutService) Process(stream extproc.ExternalProcessor_ProcessServer) error {
 	for {
 		req, err := stream.Recv()
@@ -180,6 +201,7 @@ func (s *GRPCCalloutService) Process(stream extproc.ExternalProcessor_ProcessSer
 	}
 }
 
+// HandleRequestHeaders handles request headers.
 func (s *GRPCCalloutService) HandleRequestHeaders(headers *extproc.HttpHeaders) (*extproc.ProcessingResponse, error) {
 	return &extproc.ProcessingResponse{
 		Response: &extproc.ProcessingResponse_RequestHeaders{
@@ -188,6 +210,7 @@ func (s *GRPCCalloutService) HandleRequestHeaders(headers *extproc.HttpHeaders) 
 	}, nil
 }
 
+// HandleResponseHeaders handles response headers.
 func (s *GRPCCalloutService) HandleResponseHeaders(headers *extproc.HttpHeaders) (*extproc.ProcessingResponse, error) {
 	return &extproc.ProcessingResponse{
 		Response: &extproc.ProcessingResponse_ResponseHeaders{
@@ -196,6 +219,7 @@ func (s *GRPCCalloutService) HandleResponseHeaders(headers *extproc.HttpHeaders)
 	}, nil
 }
 
+// HandleRequestBody handles request bodies.
 func (s *GRPCCalloutService) HandleRequestBody(body *extproc.HttpBody) (*extproc.ProcessingResponse, error) {
 	return &extproc.ProcessingResponse{
 		Response: &extproc.ProcessingResponse_RequestBody{
@@ -204,6 +228,7 @@ func (s *GRPCCalloutService) HandleRequestBody(body *extproc.HttpBody) (*extproc
 	}, nil
 }
 
+// HandleResponseBody handles response bodies.
 func (s *GRPCCalloutService) HandleResponseBody(body *extproc.HttpBody) (*extproc.ProcessingResponse, error) {
 	return &extproc.ProcessingResponse{
 		Response: &extproc.ProcessingResponse_ResponseBody{
@@ -212,6 +237,7 @@ func (s *GRPCCalloutService) HandleResponseBody(body *extproc.HttpBody) (*extpro
 	}, nil
 }
 
+// HandleRequestTrailers handles request trailers.
 func (s *GRPCCalloutService) HandleRequestTrailers(trailers *extproc.HttpTrailers) (*extproc.ProcessingResponse, error) {
 	return &extproc.ProcessingResponse{
 		Response: &extproc.ProcessingResponse_RequestTrailers{
@@ -220,6 +246,7 @@ func (s *GRPCCalloutService) HandleRequestTrailers(trailers *extproc.HttpTrailer
 	}, nil
 }
 
+// HandleResponseTrailers handles response trailers.
 func (s *GRPCCalloutService) HandleResponseTrailers(trailers *extproc.HttpTrailers) (*extproc.ProcessingResponse, error) {
 	return &extproc.ProcessingResponse{
 		Response: &extproc.ProcessingResponse_ResponseTrailers{

@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//	http://www.apache.org/licenses/LICENSE-2.0
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,11 +21,9 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-func HeaderImmediateResponse(
-	code httpstatus.StatusCode,
-	headers []struct{ Key, Value string },
-	appendAction *base.HeaderValueOption_HeaderAppendAction,
-) *extproc.ImmediateResponse {
+// HeaderImmediateResponse creates an ImmediateResponse with the given status code and headers.
+// The headers can be appended if appendAction is provided.
+func HeaderImmediateResponse(code httpstatus.StatusCode, headers []struct{ Key, Value string }, appendAction *base.HeaderValueOption_HeaderAppendAction) *extproc.ImmediateResponse {
 	immediateResponse := &extproc.ImmediateResponse{
 		Status: &httpstatus.HttpStatus{
 			Code: code,
@@ -51,12 +49,9 @@ func HeaderImmediateResponse(
 	return immediateResponse
 }
 
-func AddHeaderMutation(
-	add []struct{ Key, Value string },
-	remove []string,
-	clearRouteCache bool,
-	appendAction *base.HeaderValueOption_HeaderAppendAction,
-) *extproc.HeadersResponse {
+// AddHeaderMutation creates a HeadersResponse with the given headers to add and remove.
+// It also allows clearing the route cache and setting an append action for the headers.
+func AddHeaderMutation(add []struct{ Key, Value string }, remove []string, clearRouteCache bool, appendAction *base.HeaderValueOption_HeaderAppendAction) *extproc.HeadersResponse {
 	headerMutation := &extproc.HeaderMutation{}
 
 	if add != nil {
@@ -92,11 +87,9 @@ func AddHeaderMutation(
 	return headersResponse
 }
 
-func AddBodyMutation(
-	body string,
-	clearBody bool,
-	clearRouteCache bool,
-) *extproc.BodyResponse {
+// AddBodyMutation creates a BodyResponse with the given body content.
+// It allows clearing the body and the route cache.
+func AddBodyMutation(body string, clearBody bool, clearRouteCache bool) *extproc.BodyResponse {
 	bodyMutation := &extproc.BodyMutation{}
 
 	if body != "" {
