@@ -24,7 +24,6 @@ import (
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
 	"service-extensions-samples/extproc/internal/server"
 	"service-extensions-samples/extproc/pkg/utils"
 )

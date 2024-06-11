@@ -19,7 +19,6 @@ import (
 	"os"
 
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
-
 	"service-extensions-samples/extproc/examples/add_body"
 	"service-extensions-samples/extproc/examples/add_header"
 	"service-extensions-samples/extproc/examples/basic_callout_server"
