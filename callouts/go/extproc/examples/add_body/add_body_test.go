@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//	http://www.apache.org/licenses/LICENSE-2.0
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,9 +18,9 @@ import (
 	"testing"
 
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
-	"github.com/stretchr/testify/assert"
 )
 
+// TestHandleRequestBody tests the HandleRequestBody method of ExampleCalloutService.
 func TestHandleRequestBody(t *testing.T) {
 	// Create an instance of ExampleCalloutService
 	service := NewExampleCalloutService()
@@ -31,17 +31,24 @@ func TestHandleRequestBody(t *testing.T) {
 	// Call the HandleRequestBody method
 	response, err := service.HandleRequestBody(body)
 
-	// Assert that no error occurred
-	assert.NoError(t, err)
+	// Check if any error occurred
+	if err != nil {
+		t.Errorf("HandleRequestBody got err: %v", err)
+	}
 
-	// Assert that the response is not nil
-	assert.NotNil(t, response)
+	// Check if the response is not nil
+	if response == nil {
+		t.Fatalf("HandleRequestBody(): got nil resp, want non-nil")
+	}
 
-	// Assert that the response contains the correct body
+	// Check if the response contains the correct body
 	bodyValue := response.GetRequestBody().GetResponse()
-	assert.Equal(t, "new-body-request", string(bodyValue.GetBodyMutation().GetBody()))
+	if got, want := string(bodyValue.GetBodyMutation().GetBody()), "new-body-request"; got != want {
+		t.Errorf("Unexpected response body: got %v, want %v", got, want)
+	}
 }
 
+// TestHandleResponseBody tests the HandleResponseBody method of ExampleCalloutService.
 func TestHandleResponseBody(t *testing.T) {
 	// Create an instance of ExampleCalloutService
 	service := NewExampleCalloutService()
@@ -49,16 +56,22 @@ func TestHandleResponseBody(t *testing.T) {
 	// Create a sample HttpBody request
 	body := &extproc.HttpBody{}
 
-	// Call the HandleRequestBody method
+	// Call the HandleResponseBody method
 	response, err := service.HandleResponseBody(body)
 
-	// Assert that no error occurred
-	assert.NoError(t, err)
+	// Check if any error occurred
+	if err != nil {
+		t.Errorf("HandleResponseBody got err: %v", err)
+	}
 
-	// Assert that the response is not nil
-	assert.NotNil(t, response)
+	// Check if the response is not nil
+	if response == nil {
+		t.Fatalf("HandleResponseBody(): got nil resp, want non-nil")
+	}
 
-	// Assert that the response contains the correct body
+	// Check if the response contains the correct body
 	bodyValue := response.GetResponseBody().GetResponse()
-	assert.Equal(t, "new-body-response", string(bodyValue.GetBodyMutation().GetBody()))
+	if got, want := string(bodyValue.GetBodyMutation().GetBody()), "new-body-response"; got != want {
+		t.Errorf("Unexpected response body: got %v, want %v", got, want)
+	}
 }

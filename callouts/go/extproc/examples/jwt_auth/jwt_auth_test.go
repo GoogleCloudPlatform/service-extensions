@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//	http://www.apache.org/licenses/LICENSE-2.0
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,17 +15,18 @@
 package jwt_auth
 
 import (
-	"fmt"
+	"io/ioutil"
+	"regexp"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/dgrijalva/jwt-go"
 	base "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
-	"github.com/stretchr/testify/assert"
-	"io/ioutil"
-	"regexp"
-	"testing"
-	"time"
 )
 
+// generateTestJWTToken generates a JWT token for testing purposes.
 func generateTestJWTToken(privateKey []byte, claims jwt.MapClaims) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	privateKeyParsed, err := jwt.ParseRSAPrivateKeyFromPEM(privateKey)
@@ -35,12 +36,15 @@ func generateTestJWTToken(privateKey []byte, claims jwt.MapClaims) (string, erro
 	return token.SignedString(privateKeyParsed)
 }
 
+// TestHandleRequestHeaders_ValidToken tests the handling of request headers with a valid JWT token.
 func TestHandleRequestHeaders_ValidToken(t *testing.T) {
-	// Load test keys
-	privateKey, err := ioutil.ReadFile("../ssl_creds/localhost.key")
-	assert.NoError(t, err, "failed to load private key")
+	// Load the test private key
+	privateKey, err := ioutil.ReadFile("../../ssl_creds/localhost.key")
+	if err != nil {
+		t.Fatalf("failed to load private key: %v", err)
+	}
 
-	// Create test JWT token
+	// Create a test JWT token
 	now := time.Now().Unix()
 	claims := jwt.MapClaims{
 		"sub":  "1234567890",
@@ -49,7 +53,9 @@ func TestHandleRequestHeaders_ValidToken(t *testing.T) {
 		"exp":  now + 3600,
 	}
 	tokenString, err := generateTestJWTToken(privateKey, claims)
-	assert.NoError(t, err, "failed to generate test JWT token")
+	if err != nil {
+		t.Fatalf("failed to generate test JWT token: %v", err)
+	}
 
 	headers := &extproc.HttpHeaders{
 		Headers: &base.HeaderMap{
@@ -62,19 +68,21 @@ func TestHandleRequestHeaders_ValidToken(t *testing.T) {
 		},
 	}
 
-	// Create an instance of ExampleCalloutService with overridden public key path
-	service := NewExampleCalloutServiceWithKeyPath("../ssl_creds/publickey.pem")
+	// Create an instance of ExampleCalloutService with an overridden public key path
+	service := NewExampleCalloutServiceWithKeyPath("../../ssl_creds/publickey.pem")
 
 	// Call the HandleRequestHeaders method
 	response, err := service.HandleRequestHeaders(headers)
+	if err != nil {
+		t.Fatalf("HandleRequestHeaders got err: %v", err)
+	}
 
-	// Assert that no error occurred
-	assert.NoError(t, err)
+	// Check if the response is not nil
+	if response == nil {
+		t.Fatalf("HandleRequestHeaders(): got nil resp, want non-nil")
+	}
 
-	// Assert that the response is not nil
-	assert.NotNil(t, response)
-
-	// Prepare expected decoded items without iat and exp
+	// Prepare expected decoded items excluding iat and exp
 	expectedItems := []struct{ Key, Value string }{
 		{"decoded-sub", "1234567890"},
 		{"decoded-name", "John Doe"},
@@ -90,12 +98,14 @@ func TestHandleRequestHeaders_ValidToken(t *testing.T) {
 				break
 			}
 		}
-		assert.True(t, found, fmt.Sprintf("header %s: %s not found in response", item.Key, item.Value))
+		if !found {
+			t.Errorf("header %s: %s not found in response", item.Key, item.Value)
+		}
 	}
 
 	// Validate iat and exp separately using regex patterns
-	iatPattern := regexp.MustCompile(`^\d+(\.\d+)?(e[\+\-]?\d+)?$`)
-	expPattern := regexp.MustCompile(`^\d+(\.\d+)?(e[\+\-]?\d+)?$`)
+	iatPattern := regexp.MustCompile(`^\d+(\.\d+)?(e[+\-]?\d+)?$`)
+	expPattern := regexp.MustCompile(`^\d+(\.\d+)?(e[+\-]?\d+)?$`)
 
 	iatFound := false
 	expFound := false
@@ -103,21 +113,29 @@ func TestHandleRequestHeaders_ValidToken(t *testing.T) {
 		key := header.GetHeader().GetKey()
 		value := string(header.GetHeader().GetRawValue())
 		if key == "decoded-iat" {
-			assert.True(t, iatPattern.MatchString(value), fmt.Sprintf("decoded-iat value %s does not match expected pattern", value))
+			if !iatPattern.MatchString(value) {
+				t.Errorf("decoded-iat value %s does not match expected pattern", value)
+			}
 			iatFound = true
 		}
 		if key == "decoded-exp" {
-			assert.True(t, expPattern.MatchString(value), fmt.Sprintf("decoded-exp value %s does not match expected pattern", value))
+			if !expPattern.MatchString(value) {
+				t.Errorf("decoded-exp value %s does not match expected pattern", value)
+			}
 			expFound = true
 		}
 	}
 
-	assert.True(t, iatFound, "header decoded-iat not found or mismatched in response")
-	assert.True(t, expFound, "header decoded-exp not found or mismatched in response")
+	if !iatFound {
+		t.Error("header decoded-iat not found or mismatched in response")
+	}
+	if !expFound {
+		t.Error("header decoded-exp not found or mismatched in response")
+	}
 }
 
+// TestHandleRequestHeaders_InvalidToken tests the handling of request headers with an invalid JWT token.
 func TestHandleRequestHeaders_InvalidToken(t *testing.T) {
-
 	headers := &extproc.HttpHeaders{
 		Headers: &base.HeaderMap{
 			Headers: []*base.HeaderValue{
@@ -129,20 +147,25 @@ func TestHandleRequestHeaders_InvalidToken(t *testing.T) {
 		},
 	}
 
-	// Create an instance of ExampleCalloutService with test public key path
-	service := NewExampleCalloutServiceWithKeyPath("../ssl_creds/publickey.pem")
-
+	// Create an instance of ExampleCalloutService with a test public key path
+	service := NewExampleCalloutServiceWithKeyPath("../../ssl_creds/publickey.pem")
 	service.PublicKey = []byte("invalidpublickey")
 
 	// Call the HandleRequestHeaders method
 	_, err := service.HandleRequestHeaders(headers)
 
-	// Assert that an error occurred
-	assert.Error(t, err)
+	// Check if an error occurred
+	if err == nil {
+		t.Fatal("HandleRequestHeaders() did not return an error, want PermissionDenied error")
+	}
 
-	// Assert that the error is a permission denied error
-	assert.Contains(t, err.Error(), "PermissionDenied")
+	// Check if the error is a permission denied error
+	if got, want := err.Error(), "PermissionDenied"; !strings.Contains(got, want) {
+		t.Errorf("HandleRequestHeaders() error = %v, want %v", got, want)
+	}
 
-	// Assert that the error message contains "Authorization token is invalid"
-	assert.Contains(t, err.Error(), "Authorization token is invalid")
+	// Check if the error message contains "Authorization token is invalid"
+	if got, want := err.Error(), "Authorization token is invalid"; !strings.Contains(got, want) {
+		t.Errorf("HandleRequestHeaders() error = %v, want %v", got, want)
+	}
 }

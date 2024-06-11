@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//	http://www.apache.org/licenses/LICENSE-2.0
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,9 +18,9 @@ import (
 	"testing"
 
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
-	"github.com/stretchr/testify/assert"
 )
 
+// TestHandleRequestHeadersAddHeader tests the HandleRequestHeaders method of ExampleCalloutService for adding headers.
 func TestHandleRequestHeadersAddHeader(t *testing.T) {
 	// Create an instance of ExampleCalloutService
 	service := NewExampleCalloutService()
@@ -31,18 +31,33 @@ func TestHandleRequestHeadersAddHeader(t *testing.T) {
 	// Call the HandleRequestHeaders method
 	response, err := service.HandleRequestHeaders(headers)
 
-	// Assert that no error occurred
-	assert.NoError(t, err)
+	// Check if any error occurred
+	if err != nil {
+		t.Errorf("HandleRequestHeaders got err: %v", err)
+	}
 
-	// Assert that the response is not nil
-	assert.NotNil(t, response)
+	// Check if the response is not nil
+	if response == nil {
+		t.Fatalf("HandleRequestHeaders(): got nil resp, want non-nil")
+	}
 
-	// Assert that the response contains the correct header
-	headerValue := response.GetRequestHeaders().Response.GetHeaderMutation().GetSetHeaders()[0]
-	assert.Equal(t, "header-request", headerValue.GetHeader().GetKey())
-	assert.Equal(t, "", headerValue.GetHeader().GetValue())
+	// Check if the response contains the correct header
+	headerMutation := response.GetRequestHeaders().GetResponse().GetHeaderMutation()
+	if headerMutation == nil || len(headerMutation.GetSetHeaders()) == 0 {
+		t.Fatalf("HandleRequestHeaders(): got nil or empty HeaderMutation")
+	}
+
+	headerValue := headerMutation.GetSetHeaders()[0]
+	if got, want := headerValue.GetHeader().GetKey(), "header-request"; got != want {
+		t.Errorf("Unexpected header key: got %v, want %v", got, want)
+	}
+
+	if got, want := headerValue.GetHeader().GetValue(), ""; got != want {
+		t.Errorf("Unexpected header value: got %v, want %v", got, want)
+	}
 }
 
+// TestHandleResponseHeadersAddHeader tests the HandleResponseHeaders method of ExampleCalloutService for adding headers.
 func TestHandleResponseHeadersAddHeader(t *testing.T) {
 	// Create an instance of ExampleCalloutService
 	service := NewExampleCalloutService()
@@ -53,14 +68,28 @@ func TestHandleResponseHeadersAddHeader(t *testing.T) {
 	// Call the HandleResponseHeaders method
 	response, err := service.HandleResponseHeaders(headers)
 
-	// Assert that no error occurred
-	assert.NoError(t, err)
+	// Check if any error occurred
+	if err != nil {
+		t.Errorf("HandleResponseHeaders got err: %v", err)
+	}
 
-	// Assert that the response is not nil
-	assert.NotNil(t, response)
+	// Check if the response is not nil
+	if response == nil {
+		t.Fatalf("HandleResponseHeaders(): got nil resp, want non-nil")
+	}
 
-	// Assert that the response contains the correct header
-	headerValue := response.GetResponseHeaders().Response.GetHeaderMutation().GetSetHeaders()[0]
-	assert.Equal(t, "header-response", headerValue.GetHeader().GetKey())
-	assert.Equal(t, "", headerValue.GetHeader().GetValue())
+	// Check if the response contains the correct header
+	headerMutation := response.GetResponseHeaders().GetResponse().GetHeaderMutation()
+	if headerMutation == nil || len(headerMutation.GetSetHeaders()) == 0 {
+		t.Fatalf("HandleResponseHeaders(): got nil or empty HeaderMutation")
+	}
+
+	headerValue := headerMutation.GetSetHeaders()[0]
+	if got, want := headerValue.GetHeader().GetKey(), "header-response"; got != want {
+		t.Errorf("Unexpected header key: got %v, want %v", got, want)
+	}
+
+	if got, want := headerValue.GetHeader().GetValue(), ""; got != want {
+		t.Errorf("Unexpected header value: got %v, want %v", got, want)
+	}
 }
