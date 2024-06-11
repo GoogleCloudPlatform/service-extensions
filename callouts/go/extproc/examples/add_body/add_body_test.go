@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tests
+package add_body
 
 import (
-	"service-extensions-samples/extproc/examples/add_body"
 	"testing"
 
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
@@ -24,7 +23,7 @@ import (
 
 func TestHandleRequestBody(t *testing.T) {
 	// Create an instance of ExampleCalloutService
-	service := add_body.NewExampleCalloutService()
+	service := NewExampleCalloutService()
 
 	// Create a sample HttpBody request
 	body := &extproc.HttpBody{}
@@ -45,7 +44,7 @@ func TestHandleRequestBody(t *testing.T) {
 
 func TestHandleResponseBody(t *testing.T) {
 	// Create an instance of ExampleCalloutService
-	service := add_body.NewExampleCalloutService()
+	service := NewExampleCalloutService()
 
 	// Create a sample HttpBody request
 	body := &extproc.HttpBody{}

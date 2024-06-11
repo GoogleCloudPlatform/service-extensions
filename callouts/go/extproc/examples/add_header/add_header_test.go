@@ -12,20 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tests
+package add_header
 
 import (
-	typev3 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	"testing"
 
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	"github.com/stretchr/testify/assert"
-	"service-extensions-samples/extproc/examples/redirect"
 )
 
-func TestHandleRequestHeaders(t *testing.T) {
+func TestHandleRequestHeadersAddHeader(t *testing.T) {
 	// Create an instance of ExampleCalloutService
-	service := redirect.NewExampleCalloutService()
+	service := NewExampleCalloutService()
 
 	// Create a sample HttpHeaders request
 	headers := &extproc.HttpHeaders{}
@@ -39,11 +37,30 @@ func TestHandleRequestHeaders(t *testing.T) {
 	// Assert that the response is not nil
 	assert.NotNil(t, response)
 
-	// Assert that the immediate response status code is 301
-	assert.Equal(t, typev3.StatusCode(301), response.GetImmediateResponse().GetStatus().GetCode())
+	// Assert that the response contains the correct header
+	headerValue := response.GetRequestHeaders().Response.GetHeaderMutation().GetSetHeaders()[0]
+	assert.Equal(t, "header-request", headerValue.GetHeader().GetKey())
+	assert.Equal(t, "", headerValue.GetHeader().GetValue())
+}
+
+func TestHandleResponseHeadersAddHeader(t *testing.T) {
+	// Create an instance of ExampleCalloutService
+	service := NewExampleCalloutService()
+
+	// Create a sample HttpHeaders response
+	headers := &extproc.HttpHeaders{}
+
+	// Call the HandleResponseHeaders method
+	response, err := service.HandleResponseHeaders(headers)
+
+	// Assert that no error occurred
+	assert.NoError(t, err)
+
+	// Assert that the response is not nil
+	assert.NotNil(t, response)
 
 	// Assert that the response contains the correct header
-	locationHeader := response.GetImmediateResponse().GetHeaders().GetSetHeaders()[0]
-	assert.Equal(t, "Location", locationHeader.GetHeader().GetKey())
-	assert.Equal(t, "http://service-extensions.com/redirect", locationHeader.GetHeader().GetValue())
+	headerValue := response.GetResponseHeaders().Response.GetHeaderMutation().GetSetHeaders()[0]
+	assert.Equal(t, "header-response", headerValue.GetHeader().GetKey())
+	assert.Equal(t, "", headerValue.GetHeader().GetValue())
 }

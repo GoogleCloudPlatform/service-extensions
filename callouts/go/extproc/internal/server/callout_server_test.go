@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tests
+package server
 
 import (
 	"net/http"
 	"service-extensions-samples/extproc/examples/basic_callout_server"
-	"service-extensions-samples/extproc/internal/server"
 	"testing"
 	"time"
 
@@ -37,7 +36,7 @@ type MockExternalProcessorServer struct {
 func TestNewCalloutServer(t *testing.T) {
 	config := DefaultConfig()
 
-	calloutServer := server.NewCalloutServer(config)
+	calloutServer := NewCalloutServer(config)
 	assert.NotNil(t, calloutServer)
 	assert.Equal(t, config, calloutServer.Config)
 }
@@ -45,7 +44,7 @@ func TestNewCalloutServer(t *testing.T) {
 func TestStartGRPC(t *testing.T) {
 	config := DefaultConfig()
 
-	calloutServer := server.NewCalloutServer(config)
+	calloutServer := NewCalloutServer(config)
 	mockService := &MockExternalProcessorServer{}
 
 	go func() {
@@ -72,7 +71,7 @@ func TestStartGRPC(t *testing.T) {
 func TestStartInsecureGRPC(t *testing.T) {
 	config := InsecureConfig()
 
-	calloutServer := server.NewCalloutServer(config)
+	calloutServer := NewCalloutServer(config)
 	mockService := &MockExternalProcessorServer{}
 
 	go func() {
@@ -99,7 +98,7 @@ func TestStartInsecureGRPC(t *testing.T) {
 func TestStartHealthCheck(t *testing.T) {
 	config := DefaultConfig()
 
-	calloutServer := server.NewCalloutServer(config)
+	calloutServer := NewCalloutServer(config)
 
 	go func() {
 		defer func() {

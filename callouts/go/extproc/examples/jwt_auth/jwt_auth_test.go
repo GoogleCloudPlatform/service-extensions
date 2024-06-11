@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tests
+package jwt_auth
 
 import (
 	"fmt"
@@ -22,7 +22,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"regexp"
-	"service-extensions-samples/extproc/examples/jwt_auth"
 	"testing"
 	"time"
 )
@@ -64,7 +63,7 @@ func TestHandleRequestHeaders_ValidToken(t *testing.T) {
 	}
 
 	// Create an instance of ExampleCalloutService with overridden public key path
-	service := jwt_auth.NewExampleCalloutServiceWithKeyPath("../ssl_creds/publickey.pem")
+	service := NewExampleCalloutServiceWithKeyPath("../ssl_creds/publickey.pem")
 
 	// Call the HandleRequestHeaders method
 	response, err := service.HandleRequestHeaders(headers)
@@ -131,7 +130,7 @@ func TestHandleRequestHeaders_InvalidToken(t *testing.T) {
 	}
 
 	// Create an instance of ExampleCalloutService with test public key path
-	service := jwt_auth.NewExampleCalloutServiceWithKeyPath("../ssl_creds/publickey.pem")
+	service := NewExampleCalloutServiceWithKeyPath("../ssl_creds/publickey.pem")
 
 	service.PublicKey = []byte("invalidpublickey")
 
