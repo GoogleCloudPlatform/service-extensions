@@ -1,4 +1,4 @@
-package example.add_header;
+package example;
 
 /*
  * Copyright 2024 The gRPC Authors
@@ -19,9 +19,7 @@ package example.add_header;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
-import io.envoyproxy.envoy.service.ext_proc.v3.BodyResponse;
 import io.envoyproxy.envoy.service.ext_proc.v3.HeadersResponse;
-import io.envoyproxy.envoy.service.ext_proc.v3.HttpBody;
 import io.envoyproxy.envoy.service.ext_proc.v3.HttpHeaders;
 import service.ServiceCallout;
 
@@ -54,16 +52,6 @@ public class AddHeader extends ServiceCallout {
         AddHeaderMutations(
                 headerResponse, ImmutableListMultimap.of("response-header", "added", "c", "d").entries());
         ConfigureHeadersResponse(headerResponse, null, ImmutableList.of("c"), false);
-    }
-
-    @Override
-    public void OnRequestBody(BodyResponse.Builder bodyResponse, HttpBody body) {
-
-    }
-
-    @Override
-    public void OnResponseBody(BodyResponse.Builder bodyResponse, HttpBody body) {
-
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {

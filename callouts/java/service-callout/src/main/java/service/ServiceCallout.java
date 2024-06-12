@@ -33,7 +33,7 @@ import static utils.SslUtils.readFileToBytes;
 /**
  * ServiceCallout is an abstract class representing a service callout server that can handle various stages of HTTP request/response processing.
  */
-public abstract class ServiceCallout {
+public class ServiceCallout {
     private static final Logger logger = Logger.getLogger(ServiceCallout.class.getName());
 
     private Server server;
@@ -113,23 +113,17 @@ public abstract class ServiceCallout {
     private String healthCheckPath = "/";
     private boolean serperateHealthCheck = false;
     private byte[] cert = null;
-    private String certPath = "certs/server.crt";
+    private String certPath = "certs/localhost.crt";
     private byte[] certKey = null;
-    private String certKeyPath = "certs/pkcs8_key.pem";
+    private String certKeyPath = "certs/publickey.pem";
     private int serverThreadCount = 2;
     private boolean enableInsecurePort = true;
-    private HealthCheckServer healthCheckServer;
 
     /**
      * Starts the service callout server.
      * @throws IOException If an I/O error occurs while starting the server
      */
     public void start() throws IOException {
-        if (!serperateHealthCheck) {
-            logger.info("Health check server starting...");
-            healthCheckServer = new HealthCheckServer(healthCheckPort, healthCheckPath, healthCheckIp);
-            healthCheckServer.start();
-        }
 
         ServerBuilder<?> serverBuilder;
         if (cert != null && certKey != null) {
@@ -151,7 +145,6 @@ public abstract class ServiceCallout {
                                 // Use stderr here since the logger may have been reset by its JVM shutdown hook.
                                 logger.info("*** shutting down gRPC server since JVM is shutting down");
                                 try {
-                                    stopHealthCheckServer();
                                     ServiceCallout.this.stop();
                                 } catch (InterruptedException e) {
                                     e.printStackTrace(System.err);
@@ -168,17 +161,6 @@ public abstract class ServiceCallout {
     private void stop() throws InterruptedException {
         if (server != null) {
             server.shutdown().awaitTermination(30, TimeUnit.SECONDS);
-        }
-    }
-
-    /**
-     * Stops the health check server if it exists.
-     * @throws InterruptedException If interrupted while waiting for the server to shut down
-     */
-    private void stopHealthCheckServer() throws InterruptedException {
-        if (!serperateHealthCheck) {
-            logger.info("*** shutting down health check server");
-            healthCheckServer.shutdown();
         }
     }
 
@@ -228,31 +210,43 @@ public abstract class ServiceCallout {
 
     /**
      * Callback method invoked upon receiving request headers.
+     *
      * @param headerResponse Builder for modifying response headers
-     * @param headers Incoming request headers
+     * @param headers        Incoming request headers
      */
-    public abstract void OnRequestHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers);
+    public void OnRequestHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers) {
+
+    }
 
     /**
      * Callback method invoked upon receiving response headers.
+     *
      * @param headerResponse Builder for modifying response headers
-     * @param headers Incoming response headers
+     * @param headers        Incoming response headers
      */
-    public abstract void OnResponseHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers);
+    public void OnResponseHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers) {
+
+    }
 
     /**
      * Callback method invoked upon receiving request body.
+     *
      * @param bodyResponse Builder for modifying response body
-     * @param body Incoming request body
+     * @param body         Incoming request body
      */
-    public abstract void OnRequestBody(BodyResponse.Builder bodyResponse, HttpBody body);
+    public void OnRequestBody(BodyResponse.Builder bodyResponse, HttpBody body) {
+
+    }
 
     /**
      * Callback method invoked upon receiving response body.
+     *
      * @param bodyResponse Builder for modifying response body
-     * @param body Incoming response body
+     * @param body         Incoming response body
      */
-    public abstract void OnResponseBody(BodyResponse.Builder bodyResponse, HttpBody body);
+    public void OnResponseBody(BodyResponse.Builder bodyResponse, HttpBody body) {
+
+    }
 
     /**
      * Implementation of gRPC service for processing requests.

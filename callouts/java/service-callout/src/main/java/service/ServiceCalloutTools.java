@@ -18,11 +18,7 @@ package service;
 
 import com.google.protobuf.ByteString;
 import io.envoyproxy.envoy.config.core.v3.HeaderValueOption;
-import io.envoyproxy.envoy.service.ext_proc.v3.BodyMutation;
-import io.envoyproxy.envoy.service.ext_proc.v3.BodyResponse;
-import io.envoyproxy.envoy.service.ext_proc.v3.CommonResponse;
-import io.envoyproxy.envoy.service.ext_proc.v3.HeaderMutation;
-import io.envoyproxy.envoy.service.ext_proc.v3.HeadersResponse;
+import io.envoyproxy.envoy.service.ext_proc.v3.*;
 
 import java.util.Map;
 
@@ -88,7 +84,7 @@ public class ServiceCalloutTools {
      * @param clearRouteCache Boolean indicating whether to clear the route cache
      * @return Constructed BodyResponse object
      */
-    public static BodyResponse BuildBodyMutationResponse(
+    public static BodyResponse AddBodyMutations(
             BodyResponse.Builder bodyResponseBuilder,
             String body,
             Boolean clearBody,

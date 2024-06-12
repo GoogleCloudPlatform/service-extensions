@@ -1,19 +1,11 @@
 package service;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-
-import java.io.IOException;
-
-import org.junit.After;
+import io.envoyproxy.envoy.service.ext_proc.v3.BodyResponse;
+import io.envoyproxy.envoy.service.ext_proc.v3.HeadersResponse;
 import org.junit.Before;
 import org.junit.Test;
 
-import io.envoyproxy.envoy.service.ext_proc.v3.BodyMutation;
-import io.envoyproxy.envoy.service.ext_proc.v3.BodyResponse;
-import io.envoyproxy.envoy.service.ext_proc.v3.CommonResponse;
-import io.envoyproxy.envoy.service.ext_proc.v3.HeaderMutation;
-import io.envoyproxy.envoy.service.ext_proc.v3.HeadersResponse;
+import static org.junit.Assert.assertNotNull;
 
 public class ServiceCalloutToolsTest {
 
@@ -45,8 +37,8 @@ public class ServiceCalloutToolsTest {
     }
 
     @Test
-    public void testBuildBodyMutationResponse() {
-        BodyResponse response = ServiceCalloutTools.BuildBodyMutationResponse(bodyResponseBuilder, null, null, null);
+    public void testAddBodyMutationsResponse() {
+        BodyResponse response = ServiceCalloutTools.AddBodyMutations(bodyResponseBuilder, null, null, null);
 
         assertNotNull(response);
         assertNotNull(response.getResponse());

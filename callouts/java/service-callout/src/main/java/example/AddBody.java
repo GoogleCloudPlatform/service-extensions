@@ -1,4 +1,4 @@
-package example.add_body;
+package example;
 
 /*
  * Copyright 2024 The gRPC Authors
@@ -18,14 +18,12 @@ package example.add_body;
 
 
 import io.envoyproxy.envoy.service.ext_proc.v3.BodyResponse;
-import io.envoyproxy.envoy.service.ext_proc.v3.HeadersResponse;
 import io.envoyproxy.envoy.service.ext_proc.v3.HttpBody;
-import io.envoyproxy.envoy.service.ext_proc.v3.HttpHeaders;
 import service.ServiceCallout;
 
 import java.io.IOException;
 
-import static service.ServiceCalloutTools.BuildBodyMutationResponse;
+import static service.ServiceCalloutTools.AddBodyMutations;
 
 /**
  *  Example callout server.
@@ -41,22 +39,12 @@ public class AddBody extends ServiceCallout {
 
     @Override
     public void OnRequestBody(BodyResponse.Builder bodyResponse, HttpBody body) {
-        BuildBodyMutationResponse(bodyResponse, "body added", null, null);
+        AddBodyMutations(bodyResponse, "body added", null, null);
     }
 
     @Override
     public void OnResponseBody(BodyResponse.Builder bodyResponse, HttpBody body) {
-        BuildBodyMutationResponse(bodyResponse, "body replaced", true, null);
-    }
-
-    @Override
-    public void OnRequestHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers) {
-
-    }
-
-    @Override
-    public void OnResponseHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers) {
-
+        AddBodyMutations(bodyResponse, "body replaced", true, null);
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {

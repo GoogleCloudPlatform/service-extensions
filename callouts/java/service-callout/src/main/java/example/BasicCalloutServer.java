@@ -19,18 +19,15 @@ package example;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
-import service.ServiceCallout;
-
 import io.envoyproxy.envoy.service.ext_proc.v3.BodyResponse;
 import io.envoyproxy.envoy.service.ext_proc.v3.HeadersResponse;
 import io.envoyproxy.envoy.service.ext_proc.v3.HttpBody;
 import io.envoyproxy.envoy.service.ext_proc.v3.HttpHeaders;
+import service.ServiceCallout;
 
 import java.io.IOException;
 
-import static service.ServiceCalloutTools.AddHeaderMutations;
-import static service.ServiceCalloutTools.BuildBodyMutationResponse;
-import static service.ServiceCalloutTools.ConfigureHeadersResponse;
+import static service.ServiceCalloutTools.*;
 
 /**
  *  Example callout server.
@@ -54,12 +51,12 @@ public class BasicCalloutServer extends ServiceCallout {
 
     @Override
     public void OnRequestBody(BodyResponse.Builder bodyResponse, HttpBody body) {
-        BuildBodyMutationResponse(bodyResponse, "body added", null, null);
+        AddBodyMutations(bodyResponse, "body added", null, null);
     }
 
     @Override
     public void OnResponseBody(BodyResponse.Builder bodyResponse, HttpBody body) {
-        BuildBodyMutationResponse(bodyResponse, "body replaced", true, null);
+        AddBodyMutations(bodyResponse, "body replaced", true, null);
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {

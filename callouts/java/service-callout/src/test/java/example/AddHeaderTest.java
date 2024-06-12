@@ -1,9 +1,6 @@
 package example;
 
-import example.add_header.AddHeader;
-import io.envoyproxy.envoy.service.ext_proc.v3.BodyResponse;
 import io.envoyproxy.envoy.service.ext_proc.v3.HeadersResponse;
-import io.envoyproxy.envoy.service.ext_proc.v3.HttpBody;
 import io.envoyproxy.envoy.service.ext_proc.v3.HttpHeaders;
 import org.junit.After;
 import org.junit.Before;
