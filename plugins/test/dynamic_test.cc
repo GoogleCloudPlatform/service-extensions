@@ -296,11 +296,11 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
   for (const auto& response_body : cfg_.response_body()) {
     response_body_chunks.emplace_back(response_body.input().content());
   }
-  std::vector<std::optional<std::string>> request_body_chunks;
+  std::vector<std::string> request_body_chunks;
   for (const auto& request_body : cfg_.request_body()) {
     request_body_chunks.emplace_back(request_body.input().content());
   }
-  std::vector<std::optional<std::string>> response_body_chunks;
+  std::vector<std::string> response_body_chunks;
   for (const auto& response_body : cfg_.response_body()) {
     response_body_chunks.emplace_back(response_body.input().content());
   }
@@ -310,24 +310,20 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
-    for (std::optional<std::string> body : request_body_chunks) {
-      if (body) {
-        auto res = stream.SendRequestBody(*body);
+    for (std::string& body : request_body_chunks) {
+        auto res = stream.SendRequestBody(body);
         benchmark::DoNotOptimize(res);
         BM_RETURN_IF_FAILED(handle);
-      }
     }
     if (response_headers) {
       auto res = stream.SendResponseHeaders(*response_headers);
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
-    for (std::optional<std::string> body : response_body_chunks) {
-      if (body) {
-        auto res = stream.SendResponseBody(*body);
+    for (std::string& body : response_body_chunks) {
+        auto res = stream.SendResponseBody(body);
         benchmark::DoNotOptimize(res);
         BM_RETURN_IF_FAILED(handle);
-      }
     }
   }
 }

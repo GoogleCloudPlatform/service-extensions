@@ -36,7 +36,9 @@ struct ContextOptions {
   std::ofstream log_file;
   // Static time returned to wasm.
   absl::Time clock_time = absl::UnixEpoch();
-}
+};
+
+// Buffer class to handle copying to and from an individual BODY chunk.
 class Buffer : public proxy_wasm::BufferBase {
  public:
   Buffer() = default;
@@ -52,25 +54,24 @@ class Buffer : public proxy_wasm::BufferBase {
   // proxy_wasm::BufferBase
   void clear() override {
     proxy_wasm::BufferBase::clear();
-    string_buffer_ = nullptr;
+    owned_string_buffer_ = "";
   }
   Buffer* set(std::string_view data) {
-    return static_cast<Buffer*>(proxy_wasm::BufferBase::set(data));
-  }
-  Buffer* set(std::unique_ptr<char[]> owned_data, uint32_t owned_data_size) {
-    return static_cast<Buffer*>(
-        proxy_wasm::BufferBase::set(std::move(owned_data), owned_data_size));
-  }
-
-  Buffer* set(std::string* string) {
-    clear();
-    string_buffer_ = string;
+    proxy_wasm::BufferBase::set(data);
     return this;
   }
-  std::string get() { return *string_buffer_; }
+
+  std::string get() {
+    if (made_body_mutation_) {
+      return owned_string_buffer_;
+    }
+    return std::string(data_);
+    }
 
  private:
-  std::string* string_buffer_;
+  bool made_body_mutation_;
+  // Buffer for a chunk post-mutation.
+  std::string owned_string_buffer_;
 };
 
 // TestContext is GCP-like ProxyWasm context (shared for VM + Root + Stream).
@@ -223,9 +224,9 @@ class TestHttpContext : public TestContext {
 
   // Testing helpers. Use these instead of direct on*Headers methods.
   Result SendRequestHeaders(Headers headers);
-  Result SendRequestBody(std::string body);
+  Result SendRequestBody(const std::string_view body);
   Result SendResponseHeaders(Headers headers);
-  Result SendResponseBody(std::string body);
+  Result SendResponseBody(const std::string_view body);
 
  private:
   // Ensure that we invoke teardown handlers just once.
