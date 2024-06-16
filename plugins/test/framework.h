@@ -66,7 +66,7 @@ class Buffer : public proxy_wasm::BufferBase {
       return owned_string_buffer_;
     }
     return std::string(data_);
-    }
+  }
 
  private:
   bool made_body_mutation_;

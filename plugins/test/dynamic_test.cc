@@ -311,9 +311,9 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
       BM_RETURN_IF_FAILED(handle);
     }
     for (std::string& body : request_body_chunks) {
-        auto res = stream.SendRequestBody(body);
-        benchmark::DoNotOptimize(res);
-        BM_RETURN_IF_FAILED(handle);
+      auto res = stream.SendRequestBody(body);
+      benchmark::DoNotOptimize(res);
+      BM_RETURN_IF_FAILED(handle);
     }
     if (response_headers) {
       auto res = stream.SendResponseHeaders(*response_headers);
@@ -321,9 +321,9 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
       BM_RETURN_IF_FAILED(handle);
     }
     for (std::string& body : response_body_chunks) {
-        auto res = stream.SendResponseBody(body);
-        benchmark::DoNotOptimize(res);
-        BM_RETURN_IF_FAILED(handle);
+      auto res = stream.SendResponseBody(body);
+      benchmark::DoNotOptimize(res);
+      BM_RETURN_IF_FAILED(handle);
     }
   }
 }
