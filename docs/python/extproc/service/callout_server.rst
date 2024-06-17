@@ -11,10 +11,8 @@ Class Definition
 .. autoclass:: callouts.python.extproc.service.callout_server.CalloutServer
    :show-inheritance:
 
-Functions
----------
-
-.. rubric:: CalloutServer Methods
+CalloutServer Methods
+---------------------
 
 .. automethod:: callouts.python.extproc.service.callout_server.CalloutServer.run
 .. automethod:: callouts.python.extproc.service.callout_server.CalloutServer.shutdown
