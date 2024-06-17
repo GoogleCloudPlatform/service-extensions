@@ -24,7 +24,7 @@ Setup
 
         pip install -r requirements.txt
 
-3. **Install `buf`**:
+3. **Install buf**:
 
     Install ``buf`` from `here <https://buf.build/docs/installation>`_.
 
@@ -40,6 +40,7 @@ Setup
           --include-imports
 
     The default template file ``buf.gen.yaml`` will not generate ``pyright`` compatible proto stubs.
+
     If you plan to develop callouts with a similar type checker and not just build them,
     we suggest you run the command with the alternative development template using
     ``--template=buf_dev.gen.yaml``:

@@ -26,7 +26,7 @@ Creating a New Server
         if __name__ == '__main__':
             CalloutServer().run()
 
-2. **Extend ``CalloutServer``**:
+2. **Extend CalloutServer**:
 
     Calling the server like this won't do much besides respond to health checks. For the server to respond to callouts, we create a custom class extending ``CalloutServer``.
 
@@ -62,7 +62,7 @@ Creating a New Server
 
     * ``headers``: ``response_headers`` data from `ProcessingRequest <https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingrequest>`_.
     * ``context``: associated grpc data.
-    * ``return``: `response_headers` data from `ProcessingResponse <https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingresponse>`_.
+    * ``return``: ``response_headers`` data from `ProcessingResponse <https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingresponse>`_.
 
     There are methods specified under :ref:`CalloutTools <callout_tools>` that will help in creating a response to the callout. Import those with:
 
