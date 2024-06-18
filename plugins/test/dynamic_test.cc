@@ -453,9 +453,10 @@ absl::Status ParseHTTP1Headers(const std::string& content, bool is_request,
     hdrs.InsertOrAppend(":status", headers.response_code());
   }
 
-  // Emit normal headers to map, coalescing as we go.
+  // Emit normal headers to map, coalescing as we go. Convert header keys to
+  // lowercase like Envoy does. The wasm header map is also case insensitive.
   for (const auto& [key, value] : headers.lines()) {
-    hdrs.InsertOrAppend(key, value);
+    hdrs.InsertOrAppend(absl::AsciiStrToLower(key), value);
   }
   return absl::OkStatus();
 }
