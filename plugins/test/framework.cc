@@ -16,6 +16,8 @@
 
 #include <boost/dll/runtime_symbol_info.hpp>
 
+#include "absl/strings/str_cat.h"
+
 namespace service_extensions_samples {
 
 proxy_wasm::BufferInterface* TestContext::getBuffer(
@@ -74,12 +76,7 @@ proxy_wasm::WasmResult TestHttpContext::addHeaderMapValue(
     proxy_wasm::WasmHeaderMapType type, std::string_view key,
     std::string_view value) {
   if (type != phase_) return proxy_wasm::WasmResult::BadArgument;
-  auto& val = result_.headers[std::string(key)];
-  if (val.empty()) {
-    val = std::string(value);
-  } else {
-    val = absl::StrCat(val, ", ", value);  // RFC 9110 Field Order
-  }
+  result_.headers.InsertOrAppend(key, value);
   return proxy_wasm::WasmResult::Ok;
 }
 proxy_wasm::WasmResult TestHttpContext::replaceHeaderMapValue(
