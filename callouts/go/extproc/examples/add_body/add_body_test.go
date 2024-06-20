@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
+	"github.com/google/go-cmp/cmp"
 )
 
 // TestHandleRequestBody tests the HandleRequestBody method of ExampleCalloutService.
@@ -43,8 +44,8 @@ func TestHandleRequestBody(t *testing.T) {
 
 	// Check if the response contains the correct body
 	bodyValue := response.GetRequestBody().GetResponse()
-	if got, want := string(bodyValue.GetBodyMutation().GetBody()), "new-body-request"; got != want {
-		t.Errorf("Unexpected response body: got %v, want %v", got, want)
+	if diff := cmp.Diff(string(bodyValue.GetBodyMutation().GetBody()), "new-body-request"); diff != "" {
+		t.Errorf("Unexpected response body mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -71,7 +72,7 @@ func TestHandleResponseBody(t *testing.T) {
 
 	// Check if the response contains the correct body
 	bodyValue := response.GetResponseBody().GetResponse()
-	if got, want := string(bodyValue.GetBodyMutation().GetBody()), "new-body-response"; got != want {
-		t.Errorf("Unexpected response body: got %v, want %v", got, want)
+	if diff := cmp.Diff(string(bodyValue.GetBodyMutation().GetBody()), "new-body-response"); diff != "" {
+		t.Errorf("Unexpected response body mismatch (-want +got):\n%s", diff)
 	}
 }

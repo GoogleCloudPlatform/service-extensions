@@ -17,13 +17,15 @@ package jwt_auth
 import (
 	"io/ioutil"
 	"regexp"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	base "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
+	"github.com/google/go-cmp/cmp"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // generateTestJWTToken generates a JWT token for testing purposes.
@@ -159,13 +161,15 @@ func TestHandleRequestHeaders_InvalidToken(t *testing.T) {
 		t.Fatal("HandleRequestHeaders() did not return an error, want PermissionDenied error")
 	}
 
-	// Check if the error is a permission denied error
-	if got, want := err.Error(), "PermissionDenied"; !strings.Contains(got, want) {
-		t.Errorf("HandleRequestHeaders() error = %v, want %v", got, want)
+	// Create the expected error
+	wantErr := status.Errorf(codes.PermissionDenied, "Authorization token is invalid")
+
+	// Compare the actual error with the expected error
+	if diff := cmp.Diff(status.Code(err), status.Code(wantErr)); diff != "" {
+		t.Errorf("HandleRequestHeaders() error code = %v, want %v, diff: %v", status.Code(err), status.Code(wantErr), diff)
 	}
 
-	// Check if the error message contains "Authorization token is invalid"
-	if got, want := err.Error(), "Authorization token is invalid"; !strings.Contains(got, want) {
-		t.Errorf("HandleRequestHeaders() error = %v, want %v", got, want)
+	if diff := cmp.Diff(err.Error(), wantErr.Error()); diff != "" {
+		t.Errorf("HandleRequestHeaders() error message = %v, want %v, diff: %v", err.Error(), wantErr.Error(), diff)
 	}
 }

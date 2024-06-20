@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
+	"github.com/google/go-cmp/cmp"
 )
 
 // TestBasicServerCapabilities tests the basic server capabilities of ExampleCalloutService.
@@ -71,11 +72,11 @@ func TestBasicServerCapabilities(t *testing.T) {
 		t.Fatalf("HandleRequestHeaders(): header mutation is nil or empty")
 	}
 	headerRequestValue := headerRequestMutation.GetSetHeaders()[0]
-	if got, want := headerRequestValue.GetHeader().GetKey(), "header-request"; got != want {
-		t.Errorf("Unexpected header key: got %v, want %v", got, want)
+	if diff := cmp.Diff(headerRequestValue.GetHeader().GetKey(), "header-request"); diff != "" {
+		t.Errorf("Unexpected header key mismatch (-want +got):\n%s", diff)
 	}
-	if got, want := headerRequestValue.GetHeader().GetValue(), ""; got != want {
-		t.Errorf("Unexpected header value: got %v, want %v", got, want)
+	if diff := cmp.Diff(headerRequestValue.GetHeader().GetValue(), ""); diff != "" {
+		t.Errorf("Unexpected header value mismatch (-want +got):\n%s", diff)
 	}
 
 	// Check if the headersResponse contains the correct header
@@ -84,41 +85,91 @@ func TestBasicServerCapabilities(t *testing.T) {
 		t.Fatalf("HandleResponseHeaders(): header mutation is nil or empty")
 	}
 	headerResponseValue := headerResponseMutation.GetSetHeaders()[0]
-	if got, want := headerResponseValue.GetHeader().GetKey(), "header-response"; got != want {
-		t.Errorf("Unexpected header key: got %v, want %v", got, want)
+	if diff := cmp.Diff(headerResponseValue.GetHeader().GetKey(), "header-response"); diff != "" {
+		t.Errorf("Unexpected header key mismatch (-want +got):\n%s", diff)
 	}
-	if got, want := headerResponseValue.GetHeader().GetValue(), ""; got != want {
-		t.Errorf("Unexpected header value: got %v, want %v", got, want)
+	if diff := cmp.Diff(headerResponseValue.GetHeader().GetValue(), ""); diff != "" {
+		t.Errorf("Unexpected header value mismatch (-want +got):\n%s", diff)
 	}
 
 	// Check if the bodyRequest contains the correct body
 	bodyRequestValue := bodyRequest.GetRequestBody().GetResponse()
-	if got, want := string(bodyRequestValue.GetBodyMutation().GetBody()), "new-body-request"; got != want {
-		t.Errorf("Unexpected request body: got %v, want %v", got, want)
+	if diff := cmp.Diff(string(bodyRequestValue.GetBodyMutation().GetBody()), "new-body-request"); diff != "" {
+		t.Errorf("Unexpected request body mismatch (-want +got):\n%s", diff)
 	}
 
 	// Check if the bodyResponse contains the correct body
 	bodyResponseValue := bodyResponse.GetResponseBody().GetResponse()
-	if got, want := string(bodyResponseValue.GetBodyMutation().GetBody()), "new-body-response"; got != want {
-		t.Errorf("Unexpected response body: got %v, want %v", got, want)
+	if diff := cmp.Diff(string(bodyResponseValue.GetBodyMutation().GetBody()), "new-body-response"); diff != "" {
+		t.Errorf("Unexpected response body mismatch (-want +got):\n%s", diff)
 	}
 }
 
-// TestHandleRequestHeaders_Empty tests handling of empty request headers.
-func TestHandleRequestHeaders_Empty(t *testing.T) {
+// TestHandleRequestHeaders tests handling of various HttpHeaders request scenarios.
+func TestHandleRequestHeaders(t *testing.T) {
+	// Define test cases
+	tests := []struct {
+		name    string
+		headers *extproc.HttpHeaders
+	}{
+		{
+			name:    "Empty Request Headers",
+			headers: &extproc.HttpHeaders{},
+		},
+		{
+			name:    "Missing Fields in Request Headers",
+			headers: &extproc.HttpHeaders{Headers: nil},
+		},
+	}
+
 	// Create an instance of ExampleCalloutService
 	service := NewExampleCalloutService()
 
-	// Create an empty HttpHeaders request
-	headers := &extproc.HttpHeaders{}
-
-	// Call the HandleRequestHeaders method
-	response, err := service.HandleRequestHeaders(headers)
-	if err != nil {
-		t.Fatalf("HandleRequestHeaders got err: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Call the HandleRequestHeaders method
+			response, err := service.HandleRequestHeaders(tt.headers)
+			if err != nil {
+				t.Fatalf("HandleRequestHeaders got err: %v", err)
+			}
+			if response == nil {
+				t.Fatalf("HandleRequestHeaders(): got nil resp, want non-nil")
+			}
+		})
 	}
-	if response == nil {
-		t.Fatalf("HandleRequestHeaders(): got nil resp, want non-nil")
+}
+
+// TestHandleRequestBody tests handling of various HttpBody request scenarios.
+func TestHandleRequestBody(t *testing.T) {
+	// Define test cases
+	tests := []struct {
+		name string
+		body *extproc.HttpBody
+	}{
+		{
+			name: "Empty Request Body",
+			body: &extproc.HttpBody{},
+		},
+		{
+			name: "Missing Fields in Request Body",
+			body: &extproc.HttpBody{Body: nil},
+		},
+	}
+
+	// Create an instance of ExampleCalloutService
+	service := NewExampleCalloutService()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Call the HandleRequestBody method
+			response, err := service.HandleRequestBody(tt.body)
+			if err != nil {
+				t.Fatalf("HandleRequestBody got err: %v", err)
+			}
+			if response == nil {
+				t.Fatalf("HandleRequestBody(): got nil resp, want non-nil")
+			}
+		})
 	}
 }
 
@@ -140,24 +191,6 @@ func TestHandleResponseHeaders_Empty(t *testing.T) {
 	}
 }
 
-// TestHandleRequestBody_Empty tests handling of an empty request body.
-func TestHandleRequestBody_Empty(t *testing.T) {
-	// Create an instance of ExampleCalloutService
-	service := NewExampleCalloutService()
-
-	// Create an empty HttpBody request
-	body := &extproc.HttpBody{}
-
-	// Call the HandleRequestBody method
-	response, err := service.HandleRequestBody(body)
-	if err != nil {
-		t.Fatalf("HandleRequestBody got err: %v", err)
-	}
-	if response == nil {
-		t.Fatalf("HandleRequestBody(): got nil resp, want non-nil")
-	}
-}
-
 // TestHandleResponseBody_Empty tests handling of an empty response body.
 func TestHandleResponseBody_Empty(t *testing.T) {
 	// Create an instance of ExampleCalloutService
@@ -173,45 +206,5 @@ func TestHandleResponseBody_Empty(t *testing.T) {
 	}
 	if response == nil {
 		t.Fatalf("HandleResponseBody(): got nil resp, want non-nil")
-	}
-}
-
-// TestHandleRequestHeaders_MissingFields tests handling of request headers with missing fields.
-func TestHandleRequestHeaders_MissingFields(t *testing.T) {
-	// Create an instance of ExampleCalloutService
-	service := NewExampleCalloutService()
-
-	// Create a HttpHeaders request with missing fields
-	headers := &extproc.HttpHeaders{
-		Headers: nil, // Missing Headers
-	}
-
-	// Call the HandleRequestHeaders method
-	response, err := service.HandleRequestHeaders(headers)
-	if err != nil {
-		t.Fatalf("HandleRequestHeaders got err: %v", err)
-	}
-	if response == nil {
-		t.Fatalf("HandleRequestHeaders(): got nil resp, want non-nil")
-	}
-}
-
-// TestHandleRequestBody_MissingFields tests handling of a request body with missing fields.
-func TestHandleRequestBody_MissingFields(t *testing.T) {
-	// Create an instance of ExampleCalloutService
-	service := NewExampleCalloutService()
-
-	// Create a HttpBody request with missing fields
-	body := &extproc.HttpBody{
-		Body: nil, // Missing Body
-	}
-
-	// Call the HandleRequestBody method
-	response, err := service.HandleRequestBody(body)
-	if err != nil {
-		t.Fatalf("HandleRequestBody got err: %v", err)
-	}
-	if response == nil {
-		t.Fatalf("HandleRequestBody(): got nil resp, want non-nil")
 	}
 }

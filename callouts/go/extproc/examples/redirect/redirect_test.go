@@ -19,6 +19,7 @@ import (
 
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	typev3 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
+	"github.com/google/go-cmp/cmp"
 )
 
 // TestHandleRequestHeaders tests the HandleRequestHeaders method to ensure it correctly processes
@@ -45,8 +46,8 @@ func TestHandleRequestHeaders(t *testing.T) {
 
 	// Check if the immediate response status code is 301.
 	statusCode := response.GetImmediateResponse().GetStatus().GetCode()
-	if got, want := statusCode, typev3.StatusCode(301); got != want {
-		t.Errorf("Unexpected status code: got %v, want %v", got, want)
+	if diff := cmp.Diff(statusCode, typev3.StatusCode(301)); diff != "" {
+		t.Errorf("Unexpected status code mismatch (-want +got):\n%s", diff)
 	}
 
 	// Check if the response contains the correct header.
@@ -56,11 +57,15 @@ func TestHandleRequestHeaders(t *testing.T) {
 	}
 
 	locationHeader := headersMutation[0]
-	if got, want := locationHeader.GetHeader().GetKey(), "Location"; got != want {
-		t.Errorf("Unexpected header key: got %v, want %v", got, want)
+
+	expectedKey := "Location"
+	expectedValue := "http://service-extensions.com/redirect"
+
+	if diff := cmp.Diff(locationHeader.GetHeader().GetKey(), expectedKey); diff != "" {
+		t.Errorf("Unexpected header key mismatch (-want +got):\n%s", diff)
 	}
 
-	if got, want := locationHeader.GetHeader().GetValue(), "http://service-extensions.com/redirect"; got != want {
-		t.Errorf("Unexpected header value: got %v, want %v", got, want)
+	if diff := cmp.Diff(string(locationHeader.GetHeader().GetRawValue()), expectedValue); diff != "" {
+		t.Errorf("Unexpected header value mismatch (-want +got):\n%s", diff)
 	}
 }

@@ -70,12 +70,12 @@ func extractJWTToken(headers *extproc.HttpHeaders) (string, error) {
 func validateJWTToken(key []byte, headers *extproc.HttpHeaders) (map[string]interface{}, error) {
 	tokenString, err := extractJWTToken(headers)
 
-	if strings.HasPrefix(tokenString, "Bearer ") {
-		tokenString = strings.TrimPrefix(tokenString, "Bearer ")
-	}
-
 	if err != nil {
 		return nil, err
+	}
+
+	if strings.HasPrefix(tokenString, "Bearer ") {
+		tokenString = strings.TrimPrefix(tokenString, "Bearer ")
 	}
 
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
