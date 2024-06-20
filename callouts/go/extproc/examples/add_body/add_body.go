@@ -34,20 +34,20 @@ func NewExampleCalloutService() *ExampleCalloutService {
 	return service
 }
 
-// HandleRequestBody handles the HTTP request body, adding a new body content.
+// HandleRequestBody processes the incoming HTTP request body and modifies it.
 func (s *ExampleCalloutService) HandleRequestBody(body *extproc.HttpBody) (*extproc.ProcessingResponse, error) {
 	return &extproc.ProcessingResponse{
 		Response: &extproc.ProcessingResponse_RequestBody{
-			RequestBody: utils.AddBodyMutation("new-body-request", false, false),
+			RequestBody: utils.AddBodyStringMutation("new-body-request", false),
 		},
 	}, nil
 }
 
-// HandleResponseBody handles the HTTP response body, adding a new body content.
+// HandleResponseBody processes the outgoing HTTP response body and modifies it.
 func (s *ExampleCalloutService) HandleResponseBody(body *extproc.HttpBody) (*extproc.ProcessingResponse, error) {
 	return &extproc.ProcessingResponse{
 		Response: &extproc.ProcessingResponse_ResponseBody{
-			ResponseBody: utils.AddBodyMutation("new-body-response", false, false),
+			ResponseBody: utils.AddBodyStringMutation("new-body-response", false),
 		},
 	}, nil
 }

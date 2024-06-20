@@ -21,32 +21,16 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-// HeaderImmediateResponse creates an ImmediateResponse with the given status code and headers.
+// HeaderImmediateResponse creates an ImmediateResponse with the given status code, headers to add, and headers to remove.
 // The headers can be appended if appendAction is provided.
-func HeaderImmediateResponse(code httpstatus.StatusCode, headers []struct{ Key, Value string }, appendAction *base.HeaderValueOption_HeaderAppendAction) *extproc.ImmediateResponse {
-	immediateResponse := &extproc.ImmediateResponse{
+func HeaderImmediateResponse(code httpstatus.StatusCode, addHeaders []struct{ Key, Value string }, removeHeaders []string, appendAction *base.HeaderValueOption_HeaderAppendAction) *extproc.ImmediateResponse {
+	headerMutation := AddHeaderMutation(addHeaders, removeHeaders, false, appendAction)
+	return &extproc.ImmediateResponse{
 		Status: &httpstatus.HttpStatus{
 			Code: code,
 		},
+		Headers: proto.Clone(headerMutation.Response.HeaderMutation).(*extproc.HeaderMutation),
 	}
-
-	if len(headers) > 0 {
-		headerMutation := &extproc.HeaderMutation{}
-		for _, h := range headers {
-			headerValueOption := &base.HeaderValueOption{
-				Header: &base.HeaderValue{
-					Key:   h.Key,
-					Value: h.Value,
-				},
-			}
-			if appendAction != nil {
-				headerValueOption.AppendAction = *appendAction
-			}
-			headerMutation.SetHeaders = append(headerMutation.SetHeaders, headerValueOption)
-		}
-		immediateResponse.Headers = proto.Clone(headerMutation).(*extproc.HeaderMutation)
-	}
-	return immediateResponse
 }
 
 // AddHeaderMutation creates a HeadersResponse with the given headers to add and remove.
@@ -87,21 +71,32 @@ func AddHeaderMutation(add []struct{ Key, Value string }, remove []string, clear
 	return headersResponse
 }
 
-// AddBodyMutation creates a BodyResponse with the given body content.
-// It allows clearing the body and the route cache.
-func AddBodyMutation(body string, clearBody bool, clearRouteCache bool) *extproc.BodyResponse {
-	bodyMutation := &extproc.BodyMutation{}
-
-	if body != "" {
-		bodyMutation.Mutation = &extproc.BodyMutation_Body{
+// AddBodyStringMutation creates a BodyResponse with the given body content.
+// It allows clearing the route cache.
+func AddBodyStringMutation(body string, clearRouteCache bool) *extproc.BodyResponse {
+	bodyMutation := &extproc.BodyMutation{
+		Mutation: &extproc.BodyMutation_Body{
 			Body: []byte(body),
-		}
+		},
 	}
 
-	if clearBody {
-		bodyMutation.Mutation = &extproc.BodyMutation_ClearBody{
+	bodyResponse := &extproc.BodyResponse{
+		Response: &extproc.CommonResponse{
+			BodyMutation:    bodyMutation,
+			ClearRouteCache: clearRouteCache,
+		},
+	}
+
+	return bodyResponse
+}
+
+// AddBodyClearMutation creates a BodyResponse that clears the body.
+// It allows clearing the route cache.
+func AddBodyClearMutation(clearRouteCache bool) *extproc.BodyResponse {
+	bodyMutation := &extproc.BodyMutation{
+		Mutation: &extproc.BodyMutation_ClearBody{
 			ClearBody: true,
-		}
+		},
 	}
 
 	bodyResponse := &extproc.BodyResponse{

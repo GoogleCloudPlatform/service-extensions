@@ -40,7 +40,7 @@ func NewExampleCalloutService() *ExampleCalloutService {
 func (s *ExampleCalloutService) HandleRequestHeaders(headers *extproc.HttpHeaders) (*extproc.ProcessingResponse, error) {
 	return &extproc.ProcessingResponse{
 		Response: &extproc.ProcessingResponse_ImmediateResponse{
-			ImmediateResponse: utils.HeaderImmediateResponse(301, []struct{ Key, Value string }{{Key: "Location", Value: "http://service-extensions.com/redirect"}}, nil),
+			ImmediateResponse: utils.HeaderImmediateResponse(301, []struct{ Key, Value string }{{Key: "Location", Value: "http://service-extensions.com/redirect"}}, nil, nil),
 		},
 	}, nil
 }

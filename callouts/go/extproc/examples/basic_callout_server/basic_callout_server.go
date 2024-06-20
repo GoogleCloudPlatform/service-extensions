@@ -40,12 +40,7 @@ func NewExampleCalloutService() *ExampleCalloutService {
 func (s *ExampleCalloutService) HandleRequestHeaders(headers *extproc.HttpHeaders) (*extproc.ProcessingResponse, error) {
 	return &extproc.ProcessingResponse{
 		Response: &extproc.ProcessingResponse_RequestHeaders{
-			RequestHeaders: utils.AddHeaderMutation(
-				[]struct{ Key, Value string }{{Key: "header-request", Value: "Value-request"}},
-				nil,
-				false,
-				nil,
-			),
+			RequestHeaders: utils.AddHeaderMutation([]struct{ Key, Value string }{{Key: "header-request", Value: "Value-request"}}, nil, false, nil),
 		},
 	}, nil
 }
@@ -54,12 +49,7 @@ func (s *ExampleCalloutService) HandleRequestHeaders(headers *extproc.HttpHeader
 func (s *ExampleCalloutService) HandleResponseHeaders(headers *extproc.HttpHeaders) (*extproc.ProcessingResponse, error) {
 	return &extproc.ProcessingResponse{
 		Response: &extproc.ProcessingResponse_ResponseHeaders{
-			ResponseHeaders: utils.AddHeaderMutation(
-				[]struct{ Key, Value string }{{Key: "header-response", Value: "Value-response"}},
-				nil,
-				false,
-				nil,
-			),
+			ResponseHeaders: utils.AddHeaderMutation([]struct{ Key, Value string }{{Key: "header-response", Value: "Value-response"}}, nil, false, nil),
 		},
 	}, nil
 }
@@ -68,7 +58,7 @@ func (s *ExampleCalloutService) HandleResponseHeaders(headers *extproc.HttpHeade
 func (s *ExampleCalloutService) HandleRequestBody(body *extproc.HttpBody) (*extproc.ProcessingResponse, error) {
 	return &extproc.ProcessingResponse{
 		Response: &extproc.ProcessingResponse_RequestBody{
-			RequestBody: utils.AddBodyMutation("new-body-request", false, false),
+			RequestBody: utils.AddBodyStringMutation("new-body-request", false),
 		},
 	}, nil
 }
@@ -77,7 +67,7 @@ func (s *ExampleCalloutService) HandleRequestBody(body *extproc.HttpBody) (*extp
 func (s *ExampleCalloutService) HandleResponseBody(body *extproc.HttpBody) (*extproc.ProcessingResponse, error) {
 	return &extproc.ProcessingResponse{
 		Response: &extproc.ProcessingResponse_ResponseBody{
-			ResponseBody: utils.AddBodyMutation("new-body-response", false, false),
+			ResponseBody: utils.AddBodyStringMutation("new-body-response", false),
 		},
 	}, nil
 }
