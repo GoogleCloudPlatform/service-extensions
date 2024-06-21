@@ -178,8 +178,9 @@ void DynamicTest::TestBody() {
     CheckPhaseResults("request_headers", invoke.result(), stream, res);
   }
   if (cfg_.request_body_size() > 0) {
-    for (const auto& invoke : cfg_.request_body()) {
-      auto res = stream.SendRequestBody(invoke.input().content());
+    for (auto& invoke : *cfg_.mutable_request_body()) {
+      auto res = stream.SendRequestBody(
+          std::move(*invoke.mutable_input()->release_content()));
       ASSERT_VM_HEALTH("request_body", handle, stream);
       CheckPhaseResults("request_body", invoke.result(), stream, res);
     }
@@ -193,8 +194,9 @@ void DynamicTest::TestBody() {
     CheckPhaseResults("response_headers", invoke.result(), stream, res);
   }
   if (cfg_.response_body_size() > 0) {
-    for (const auto& invoke : cfg_.response_body()) {
-      auto res = stream.SendResponseBody(invoke.input().content());
+    for (auto& invoke : *cfg_.mutable_response_body()) {
+      auto res = stream.SendResponseBody(
+          std::move(*invoke.mutable_input()->release_content()));
       ASSERT_VM_HEALTH("response_body", handle, stream);
       CheckPhaseResults("response_body", invoke.result(), stream, res);
     }

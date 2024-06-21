@@ -21,16 +21,16 @@
 namespace service_extensions_samples {
 
 size_t Buffer::size() const {
-  if (made_body_mutation_) {
-    return owned_string_buffer_.length();
+  if (owned_string_buffer_) {
+    return owned_string_buffer_->length();
   }
   return proxy_wasm::BufferBase::size();
 }
 proxy_wasm::WasmResult Buffer::copyTo(proxy_wasm::WasmBase* wasm, size_t start,
                                       size_t length, uint64_t ptr_ptr,
                                       uint64_t size_ptr) const {
-  if (made_body_mutation_) {
-    auto buffer_section = owned_string_buffer_.substr(start, length);
+  if (owned_string_buffer_) {
+    auto buffer_section = owned_string_buffer_->substr(start, length);
     std::string_view s(buffer_section);
     if (!wasm->copyToPointerSize(s, ptr_ptr, size_ptr)) {
       return proxy_wasm::WasmResult::InvalidMemoryAccess;
@@ -42,18 +42,17 @@ proxy_wasm::WasmResult Buffer::copyTo(proxy_wasm::WasmBase* wasm, size_t start,
 
 proxy_wasm::WasmResult Buffer::copyFrom(size_t start, size_t length,
                                         std::string_view data) {
-  if (!made_body_mutation_) {
+  if (!owned_string_buffer_) {
     owned_string_buffer_ = std::string(data_);
-    made_body_mutation_ = true;
   }
   if (start == 0) {
     if (length != 0) {
-      owned_string_buffer_.erase(0, length);
+      owned_string_buffer_->erase(0, length);
     }
-    owned_string_buffer_.insert(start, data);
+    owned_string_buffer_->insert(start, data);
     return proxy_wasm::WasmResult::Ok;
-  } else if (start >= owned_string_buffer_.size()) {
-    owned_string_buffer_.append(data);
+  } else if (start >= owned_string_buffer_->size()) {
+    owned_string_buffer_->append(data);
     return proxy_wasm::WasmResult::Ok;
   } else {
     return proxy_wasm::WasmResult::BadArgument;
@@ -103,12 +102,19 @@ proxy_wasm::BufferInterface* TestHttpContext::getBuffer(
     case proxy_wasm::WasmBufferType::PluginConfiguration:
       return TestContext::getBuffer(type);
     case proxy_wasm::WasmBufferType::HttpRequestBody:
-      return &body_buffer_;
+      if (current_callback_ == TestHttpContext::CallbackType::RequestBody) {
+        return &body_buffer_;
+      }
+      break;
     case proxy_wasm::WasmBufferType::HttpResponseBody:
-      return &body_buffer_;
+      if (current_callback_ == TestHttpContext::CallbackType::ResponseBody) {
+        return &body_buffer_;
+      }
+      break;
     default:
       return nullptr;
   }
+  return nullptr;
 }
 proxy_wasm::WasmResult TestHttpContext::getHeaderMapSize(
     proxy_wasm::WasmHeaderMapType type, uint32_t* result) {
@@ -189,20 +195,21 @@ TestHttpContext::Result TestHttpContext::SendRequestHeaders(
   phase_logs_.clear();
   result_ = Result{.headers = std::move(headers)};
   phase_ = proxy_wasm::WasmHeaderMapType::RequestHeaders;
+  current_callback_ = TestHttpContext::CallbackType::RequestHeaders;
   result_.header_status =
       onRequestHeaders(result_.headers.size(), /*end_of_stream=*/false);
   phase_ = proxy_wasm::WasmHeaderMapType(-1);  // ideally 0 would mean unset
   return std::move(result_);
 }
 
-TestHttpContext::Result TestHttpContext::SendRequestBody(
-    const std::string_view body) {
+TestHttpContext::Result TestHttpContext::SendRequestBody(std::string body) {
   phase_logs_.clear();
   result_ = Result{};
-  body_buffer_.set(body);
+  body_buffer_.set(std::move(body));
+  current_callback_ = TestHttpContext::CallbackType::RequestBody;
   result_.body_status =
       onRequestBody(body_buffer_.size(), /*end_of_stream=*/false);
-  result_.body = body_buffer_.get();
+  result_.body = body_buffer_.release();
   return std::move(result_);
 }
 
@@ -211,19 +218,21 @@ TestHttpContext::Result TestHttpContext::SendResponseHeaders(
   phase_logs_.clear();
   result_ = Result{.headers = std::move(headers)};
   phase_ = proxy_wasm::WasmHeaderMapType::ResponseHeaders;
+  current_callback_ = TestHttpContext::CallbackType::ResponseHeaders;
   result_.header_status =
       onResponseHeaders(result_.headers.size(), /*end_of_stream=*/false);
   phase_ = proxy_wasm::WasmHeaderMapType(-1);  // ideally 0 would mean unset
   return std::move(result_);
 }
-TestHttpContext::Result TestHttpContext::SendResponseBody(
-    const std::string_view body) {
+
+TestHttpContext::Result TestHttpContext::SendResponseBody(std::string body) {
   phase_logs_.clear();
   result_ = Result{};
-  body_buffer_.set(body);
+  body_buffer_.set(std::move(body));
+  current_callback_ = TestHttpContext::CallbackType::ResponseBody;
   result_.body_status =
       onResponseBody(body_buffer_.size(), /*end_of_stream=*/false);
-  result_.body = body_buffer_.get();
+  result_.body = body_buffer_.release();
   return std::move(result_);
 }
 

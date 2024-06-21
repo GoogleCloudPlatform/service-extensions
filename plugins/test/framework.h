@@ -54,24 +54,19 @@ class Buffer : public proxy_wasm::BufferBase {
   // proxy_wasm::BufferBase
   void clear() override {
     proxy_wasm::BufferBase::clear();
-    owned_string_buffer_ = "";
-  }
-  Buffer* set(std::string_view data) {
-    proxy_wasm::BufferBase::set(data);
-    return this;
+    owned_string_buffer_.reset();
   }
 
-  std::string get() {
-    if (made_body_mutation_) {
-      return owned_string_buffer_;
+  std::string release() {
+    if (owned_string_buffer_) {
+      return std::move(*owned_string_buffer_);
     }
     return std::string(data_);
   }
 
  private:
-  bool made_body_mutation_;
   // Buffer for a chunk post-mutation.
-  std::string owned_string_buffer_;
+  std::optional<std::string> owned_string_buffer_;
 };
 
 // TestContext is GCP-like ProxyWasm context (shared for VM + Root + Stream).
@@ -224,9 +219,17 @@ class TestHttpContext : public TestContext {
 
   // Testing helpers. Use these instead of direct on*Headers methods.
   Result SendRequestHeaders(Headers headers);
-  Result SendRequestBody(const std::string_view body);
+  Result SendRequestBody(std::string body);
   Result SendResponseHeaders(Headers headers);
-  Result SendResponseBody(const std::string_view body);
+  Result SendResponseBody(std::string body);
+
+  enum CallbackType {
+    None,
+    RequestHeaders,
+    RequestBody,
+    ResponseHeaders,
+    ResponseBody,
+  };
 
  private:
   // Ensure that we invoke teardown handlers just once.
@@ -236,6 +239,7 @@ class TestHttpContext : public TestContext {
   Result result_;
 
   Buffer body_buffer_;
+  CallbackType current_callback_;
 };
 
 // TestWasm is a light wrapper enabling custom TestContext.
