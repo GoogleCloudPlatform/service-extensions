@@ -12,16 +12,25 @@ build --define engine=v8
 test --per_file_copt=external/boringssl/.*@-DBORINGSSL_UNSAFE_DETERMINISTIC_MODE=1
 
 # For benchmarking, set specific build options.
-build:bench --define run_benchmarks=1
 build:bench --compilation_mode opt
 build:bench --dynamic_mode=off
-build:bench --copt -gmlt
+build:bench --copt -g1  # equals -gmlt in clang
 build:bench --per_file_copt=external/boringssl/.*@-DBORINGSSL_UNSAFE_DETERMINISTIC_MODE=1
 
-# Use Clang compiler.
-build --action_env=BAZEL_COMPILER=clang
-build --action_env=CC=clang
-build --action_env=CXX=clang++
+# Pass CC, CXX, LLVM_CONFIG from the environment.
+build --action_env=CC
+build --action_env=CXX
+build --action_env=LLVM_CONFIG
+
+# Force Clang.
+build:clang --action_env=BAZEL_COMPILER=clang
+build:clang --action_env=CC=clang
+build:clang --action_env=CXX=clang++
+
+# Force GCC.
+build:gcc --action_env=BAZEL_COMPILER=gcc
+build:gcc --action_env=CC=gcc
+build:gcc --action_env=CXX=g++
 
 # Common flags for Clang sanitizers.
 build:clang-xsan --copt -O1

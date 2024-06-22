@@ -60,16 +60,3 @@ def proxy_wasm_tests(
             data = [tests, plugin] + ([config] if config else []) + data,
             deps = ["//test:runner_lib"],
         )
-
-def proxy_wasm_cc_test(deps = [], **kwargs):
-    """Wraps cc_test to select benchmarks or unit tests based on build attributes."""
-    cc_test(
-        deps = deps + [
-            "@com_google_benchmark//:benchmark",
-            "@com_google_googletest//:gtest",
-        ] + select({
-            "//:benchmarks": ["@com_google_benchmark//:benchmark_main"],
-            "//conditions:default": ["@com_google_googletest//:gtest_main"],
-        }),
-        **kwargs
-    )
