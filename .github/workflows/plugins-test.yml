@@ -40,7 +40,7 @@ jobs:
       matrix:
         include:
         - name: 'opt'
-          flags: -c opt --define=crypto=system
+          flags: --config=clang -c opt --define=crypto=system
         - name: 'ASan'
           flags: --config=clang-asan
         - name: 'TSan'

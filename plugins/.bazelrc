@@ -33,6 +33,7 @@ build:gcc --action_env=CC=gcc
 build:gcc --action_env=CXX=g++
 
 # Common flags for Clang sanitizers.
+build:clang-xsan --config=clang
 build:clang-xsan --copt -O1
 build:clang-xsan --copt -fno-omit-frame-pointer
 build:clang-xsan --copt -fno-optimize-sibling-calls
