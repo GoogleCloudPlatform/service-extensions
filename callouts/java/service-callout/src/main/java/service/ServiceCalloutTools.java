@@ -19,6 +19,7 @@ package service;
 import com.google.protobuf.ByteString;
 import io.envoyproxy.envoy.config.core.v3.HeaderValueOption;
 import io.envoyproxy.envoy.service.ext_proc.v3.*;
+import io.envoyproxy.envoy.type.v3.HttpStatus;
 
 import java.util.Map;
 
@@ -30,8 +31,9 @@ public class ServiceCalloutTools {
 
     /**
      * Adds header mutations to the response builder.
+     *
      * @param headersResponseBuilder Builder for modifying response headers
-     * @param add Iterable containing header key-value pairs to be added
+     * @param add                    Iterable containing header key-value pairs to be added
      */
     public static void AddHeaderMutations(
             HeadersResponse.Builder headersResponseBuilder, Iterable<Map.Entry<String, String>> add) {
@@ -51,10 +53,11 @@ public class ServiceCalloutTools {
 
     /**
      * Configures the headers response.
+     *
      * @param headersResponseBuilder Builder for modifying response headers
-     * @param add Iterable containing header value options to be added
-     * @param remove Iterable containing header keys to be removed
-     * @param clearRouteCache Boolean indicating whether to clear the route cache
+     * @param add                    Iterable containing header value options to be added
+     * @param remove                 Iterable containing header keys to be removed
+     * @param clearRouteCache        Boolean indicating whether to clear the route cache
      * @return Constructed HeadersResponse object
      */
     public static HeadersResponse ConfigureHeadersResponse(
@@ -78,10 +81,11 @@ public class ServiceCalloutTools {
 
     /**
      * Builds a body mutation response.
+     *
      * @param bodyResponseBuilder Builder for modifying response body
-     * @param body The body content to be set
-     * @param clearBody Boolean indicating whether to clear the body
-     * @param clearRouteCache Boolean indicating whether to clear the route cache
+     * @param body                The body content to be set
+     * @param clearBody           Boolean indicating whether to clear the body
+     * @param clearRouteCache     Boolean indicating whether to clear the route cache
      * @return Constructed BodyResponse object
      */
     public static BodyResponse AddBodyMutations(
@@ -104,4 +108,37 @@ public class ServiceCalloutTools {
     }
 
 
+    /** Creates an immediate HTTP response with specific headers and status code.
+
+     Args:
+     code (StatusCode): The HTTP status code to return.
+     headers: Optional list of tuples (header, value) to include in the response.
+     append_action: Optional action specifying how headers should be appended.
+
+     Returns:
+     ImmediateResponse: Configured immediate response with the specified headers and status code.*/
+    public static ImmediateResponse BuildImmediateResponse (
+            ImmediateResponse.Builder immediateResponseBuilder,
+            Iterable<Map.Entry<String, String>> addHeaders,
+            HttpStatus status
+    ) {
+
+        HeaderMutation.Builder headerMutationBuilder = immediateResponseBuilder
+                .getHeadersBuilder();
+
+        for(Map.Entry<String, String> entry : addHeaders) {
+            headerMutationBuilder
+                    .addSetHeadersBuilder()
+                    .getHeaderBuilder()
+                    .setKey(entry.getKey())
+                    .setValue(entry.getValue())
+                    .setRawValue(ByteString.copyFromUtf8(entry.getValue()));
+        }
+
+        immediateResponseBuilder.setStatus(status);
+
+        return immediateResponseBuilder.build();
+
+    }
 }
+

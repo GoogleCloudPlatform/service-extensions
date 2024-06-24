@@ -113,9 +113,9 @@ public class ServiceCallout {
     private String healthCheckPath = "/";
     private boolean serperateHealthCheck = false;
     private byte[] cert = null;
-    private String certPath = "certs/localhost.crt";
+    private String certPath = "certs/server.crt";
     private byte[] certKey = null;
-    private String certKeyPath = "certs/publickey.pem";
+    private String certKeyPath = "certs/pkcs8_key.pem";
     private int serverThreadCount = 2;
     private boolean enableInsecurePort = true;
 
@@ -184,8 +184,13 @@ public class ServiceCallout {
 
         switch (request.getRequestCase()) {
             case REQUEST_HEADERS:
-                OnRequestHeaders(builder.getRequestHeadersBuilder(), request.getRequestHeaders());
-                break;
+                if (request.getRequestHeaders().getHeaders().getHeadersList()
+                        .stream().anyMatch(header -> header.getKey().equalsIgnoreCase("Redirect"))){
+                    OnRequestHeaders(builder.getImmediateResponseBuilder(), request.getRequestHeaders());
+                } else{
+                    OnRequestHeaders(builder.getRequestHeadersBuilder(), request.getRequestHeaders());
+                }
+            break;
             case RESPONSE_HEADERS:
                 OnResponseHeaders(builder.getRequestHeadersBuilder(), request.getResponseHeaders());
                 break;
@@ -215,6 +220,16 @@ public class ServiceCallout {
      * @param headers        Incoming request headers
      */
     public void OnRequestHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers) {
+
+    }
+
+    /**
+     * Callback method invoked upon receiving request headers.
+     *
+     * @param immediateResponse Builder for modifying response headers
+     * @param headers        Incoming request headers
+     */
+    public void OnRequestHeaders(ImmediateResponse.Builder immediateResponse, HttpHeaders headers) {
 
     }
 
