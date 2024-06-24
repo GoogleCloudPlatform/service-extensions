@@ -4,6 +4,9 @@ name: Plugins publish wasm tester
 # https://docs.github.com/en/actions/using-workflows/manually-running-a-workflow
 on: workflow_dispatch
 
+# Default permissions are read only.
+permissions: read-all
+
 # Variables. The workflow also depends on secrets.GAR_PLUGINS_TOKEN.
 env:
   REGISTRY: us-docker.pkg.dev
