@@ -14,13 +14,17 @@ on:
     paths:
     - callouts/python/**
 
-permissions:
-  contents: write
+# Default permissions are read only.
+permissions: read-all
 
 jobs:
   build:
 
     runs-on: ubuntu-latest
+
+    permissions:
+      # Workflow can publish documentation
+      contents: write
 
     steps:
     - uses: actions/checkout@v4
