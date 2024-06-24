@@ -27,7 +27,7 @@ http_archive(
 
 # Boost for C++ URL parsing.
 http_archive(
-    name = "com_github_nelhage_rules_boost", # 2023-06-29, boost @ 1.80.0
+    name = "com_github_nelhage_rules_boost",  # 2023-06-29, boost @ 1.80.0
     sha256 = "1404ffb9f3f7253927c97bc2e05ef6b4a2a5089b76d00cef0f6b7d5a678fad88",
     strip_prefix = "rules_boost-0598ab9aa992d6ad45088b480e1bf4526ef4ad04",
     url = "https://github.com/nelhage/rules_boost/archive/0598ab9aa992d6ad45088b480e1bf4526ef4ad04.tar.gz",
@@ -73,26 +73,26 @@ http_archive(
 
 # --- PLUGIN DEPENDENCIES ---
 
-PROXY_WASM_HOST_COMMIT = "04dfb94747e6462b65f7ed694e2d9c78ab207e11"  # 2024-04-29
+PROXY_WASM_CPP_HOST_COMMIT = "04dfb94747e6462b65f7ed694e2d9c78ab207e11"  # 2024-04-29
 
-PROXY_WASM_HOST_SHA256 = "9c6da146d86f9b03d98b975f89c1762fc1b7f179da6775134c66e68c79eec4d1"
+PROXY_WASM_CPP_HOST_SHA256 = "9c6da146d86f9b03d98b975f89c1762fc1b7f179da6775134c66e68c79eec4d1"
 
 http_archive(
     name = "proxy_wasm_cpp_host",
-    sha256 = PROXY_WASM_HOST_SHA256,
-    strip_prefix = "proxy-wasm-cpp-host-" + PROXY_WASM_HOST_COMMIT,
-    url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/" + PROXY_WASM_HOST_COMMIT + ".tar.gz",
+    sha256 = PROXY_WASM_CPP_HOST_SHA256,
+    strip_prefix = "proxy-wasm-cpp-host-" + PROXY_WASM_CPP_HOST_COMMIT,
+    url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/" + PROXY_WASM_CPP_HOST_COMMIT + ".tar.gz",
 )
 
-PROXY_WASM_CPP_COMMIT = "921039ae983ce053bf5cba78a85a3c08ff9791e5"  # 2023-05-01
+PROXY_WASM_CPP_SDK_COMMIT = "921039ae983ce053bf5cba78a85a3c08ff9791e5"  # 2023-05-01
 
-PROXY_WASM_CPP_SHA256 = "a11adfe4e6346d3318ff72643aa5569dc8439d7e8927ed148f93226fa255cc7a"
+PROXY_WASM_CPP_SDK_SHA256 = "a11adfe4e6346d3318ff72643aa5569dc8439d7e8927ed148f93226fa255cc7a"
 
 http_archive(
     name = "proxy_wasm_cpp_sdk",
-    sha256 = PROXY_WASM_CPP_SHA256,
-    strip_prefix = "proxy-wasm-cpp-sdk-" + PROXY_WASM_CPP_COMMIT,
-    url = "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/" + PROXY_WASM_CPP_COMMIT + ".tar.gz",
+    sha256 = PROXY_WASM_CPP_SDK_SHA256,
+    strip_prefix = "proxy-wasm-cpp-sdk-" + PROXY_WASM_CPP_SDK_COMMIT,
+    url = "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/" + PROXY_WASM_CPP_SDK_COMMIT + ".tar.gz",
 )
 
 # Duplicate the ProxyWasm WORKSPACE files (dependencies)
