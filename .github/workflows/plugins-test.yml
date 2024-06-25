@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Plugins
+name: Plugins test
 
 on:
   pull_request:
@@ -29,6 +29,9 @@ on:
     # GitHub removes infrequently accessed caches. Run once a week to keep the cache from going stale.
     - cron: '0 0 * * 1'
 
+# Default permissions are read only.
+permissions: read-all
+
 jobs:
   test:
     name: bazel test (${{ matrix.name }})
@@ -40,7 +43,7 @@ jobs:
       matrix:
         include:
         - name: 'opt'
-          flags: -c opt --define=crypto=system
+          flags: --config=clang -c opt --define=crypto=system
         - name: 'ASan'
           flags: --config=clang-asan
         - name: 'TSan'

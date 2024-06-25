@@ -6,8 +6,3 @@ cc_library(
     deps = ["@boost//:throw_exception"],
     alwayslink = 1,
 )
-
-config_setting(
-    name = "benchmarks",
-    values = {"define": "run_benchmarks=1"},
-)

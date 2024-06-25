@@ -1,0 +1,5 @@
+# Empty version of Dockerfile for fast test "builds".
+
+FROM ubuntu:22.04 as empty
+COPY test/package/licenses/* /opt/licenses/
+ENTRYPOINT ["sh"]
