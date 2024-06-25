@@ -281,6 +281,11 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
     response_headers = *headers;
   }
   for (auto _ : state) {
+    // Initialize new stream for each iteration.
+    state.PauseTiming();
+    auto stream = TestHttpContext(handle);
+    BM_RETURN_IF_FAILED(handle);
+    state.ResumeTiming();
     if (request_headers) {
       auto res = stream.SendRequestHeaders(*request_headers);
       benchmark::DoNotOptimize(res);
