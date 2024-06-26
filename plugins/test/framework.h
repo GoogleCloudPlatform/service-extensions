@@ -61,9 +61,7 @@ class Buffer : public proxy_wasm::BufferBase {
     clear();
     owned_string_buffer_ = std::move(data);
   }
-  std::string release() {
-    return std::move(owned_string_buffer_);
-  }
+  std::string release() { return std::move(owned_string_buffer_); }
 
  private:
   // Buffer for a body chunk.

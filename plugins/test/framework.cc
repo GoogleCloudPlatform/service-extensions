@@ -20,20 +20,18 @@
 
 namespace service_extensions_samples {
 
-size_t Buffer::size() const {
-  return owned_string_buffer_.size();
-}
+size_t Buffer::size() const { return owned_string_buffer_.size(); }
 proxy_wasm::WasmResult Buffer::copyTo(proxy_wasm::WasmBase* wasm, size_t start,
                                       size_t length, uint64_t ptr_ptr,
                                       uint64_t size_ptr) const {
-    if (start + length > owned_string_buffer_.size()) {
-      return proxy_wasm::WasmResult::InvalidMemoryAccess;
-    }
-    std::string_view s(owned_string_buffer_.data() + start, length);
-    if (!wasm->copyToPointerSize(s, ptr_ptr, size_ptr)) {
-      return proxy_wasm::WasmResult::InvalidMemoryAccess;
-    }
-    return proxy_wasm::WasmResult::Ok;
+  if (start + length > owned_string_buffer_.size()) {
+    return proxy_wasm::WasmResult::InvalidMemoryAccess;
+  }
+  std::string_view s(owned_string_buffer_.data() + start, length);
+  if (!wasm->copyToPointerSize(s, ptr_ptr, size_ptr)) {
+    return proxy_wasm::WasmResult::InvalidMemoryAccess;
+  }
+  return proxy_wasm::WasmResult::Ok;
 }
 
 proxy_wasm::WasmResult Buffer::copyFrom(size_t start, size_t length,
