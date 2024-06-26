@@ -21,33 +21,24 @@
 namespace service_extensions_samples {
 
 size_t Buffer::size() const {
-  if (owned_string_buffer_) {
-    return owned_string_buffer_->length();
-  }
-  return proxy_wasm::BufferBase::size();
+  return owned_string_buffer_.size();
 }
 proxy_wasm::WasmResult Buffer::copyTo(proxy_wasm::WasmBase* wasm, size_t start,
                                       size_t length, uint64_t ptr_ptr,
                                       uint64_t size_ptr) const {
-  if (owned_string_buffer_) {
-    if (start + length > owned_string_buffer_->size()) {
+    if (start + length > owned_string_buffer_.size()) {
       return proxy_wasm::WasmResult::InvalidMemoryAccess;
     }
-    std::string_view s(owned_string_buffer_->data() + start, length);
+    std::string_view s(owned_string_buffer_.data() + start, length);
     if (!wasm->copyToPointerSize(s, ptr_ptr, size_ptr)) {
       return proxy_wasm::WasmResult::InvalidMemoryAccess;
     }
     return proxy_wasm::WasmResult::Ok;
-  }
-  return proxy_wasm::BufferBase::copyTo(wasm, start, length, ptr_ptr, size_ptr);
 }
 
 proxy_wasm::WasmResult Buffer::copyFrom(size_t start, size_t length,
                                         std::string_view data) {
-  if (!owned_string_buffer_) {
-    owned_string_buffer_ = std::string(data_);
-  }
-  owned_string_buffer_->replace(start, length, data);
+  owned_string_buffer_.replace(start, length, data);
   return proxy_wasm::WasmResult::Ok;
 }
 
@@ -196,7 +187,7 @@ TestHttpContext::Result TestHttpContext::SendRequestHeaders(
 TestHttpContext::Result TestHttpContext::SendRequestBody(std::string body) {
   phase_logs_.clear();
   result_ = Result{};
-  body_buffer_.set(std::move(body));
+  body_buffer_.setOwned(std::move(body));
   current_callback_ = TestHttpContext::CallbackType::RequestBody;
   result_.body_status =
       onRequestBody(body_buffer_.size(), /*end_of_stream=*/false);
@@ -219,7 +210,7 @@ TestHttpContext::Result TestHttpContext::SendResponseHeaders(
 TestHttpContext::Result TestHttpContext::SendResponseBody(std::string body) {
   phase_logs_.clear();
   result_ = Result{};
-  body_buffer_.set(std::move(body));
+  body_buffer_.setOwned(std::move(body));
   current_callback_ = TestHttpContext::CallbackType::ResponseBody;
   result_.body_status =
       onResponseBody(body_buffer_.size(), /*end_of_stream=*/false);

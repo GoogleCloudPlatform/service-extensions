@@ -54,19 +54,20 @@ class Buffer : public proxy_wasm::BufferBase {
   // proxy_wasm::BufferBase
   void clear() override {
     proxy_wasm::BufferBase::clear();
-    owned_string_buffer_.reset();
+    owned_string_buffer_ = "";
   }
 
+  void setOwned(std::string data) {
+    clear();
+    owned_string_buffer_ = std::move(data);
+  }
   std::string release() {
-    if (owned_string_buffer_) {
-      return std::move(*owned_string_buffer_);
-    }
-    return std::string(data_);
+    return std::move(owned_string_buffer_);
   }
 
  private:
-  // Buffer for a chunk post-mutation.
-  std::optional<std::string> owned_string_buffer_;
+  // Buffer for a body chunk.
+  std::string owned_string_buffer_;
 };
 
 // TestContext is GCP-like ProxyWasm context (shared for VM + Root + Stream).
