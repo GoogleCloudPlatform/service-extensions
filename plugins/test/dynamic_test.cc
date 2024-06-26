@@ -306,7 +306,7 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
       BM_RETURN_IF_FAILED(handle);
     }
     for (std::string& body : request_body_chunks_copies) {
-      auto res = stream.SendRequestBody(body);
+      auto res = stream.SendRequestBody(std::move(body));
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
@@ -316,7 +316,7 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
       BM_RETURN_IF_FAILED(handle);
     }
     for (std::string& body : response_body_chunks_copies) {
-      auto res = stream.SendResponseBody(body);
+      auto res = stream.SendResponseBody(std::move(body));
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
