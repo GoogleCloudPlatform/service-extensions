@@ -263,10 +263,6 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
   BM_RETURN_IF_ERROR(plugin_init);
   BM_RETURN_IF_FAILED(handle);
 
-  // Initialize stream.
-  auto stream = TestHttpContext(handle);
-  BM_RETURN_IF_FAILED(handle);
-
   // Benchmark all configured HTTP handlers.
   std::optional<TestHttpContext::Headers> request_headers;
   if (cfg_.has_request_headers()) {
