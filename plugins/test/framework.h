@@ -38,6 +38,36 @@ struct ContextOptions {
   absl::Time clock_time = absl::UnixEpoch();
 };
 
+// Buffer class to handle copying to and from an individual BODY chunk.
+class Buffer : public proxy_wasm::BufferBase {
+ public:
+  Buffer() = default;
+
+  // proxy_wasm::BufferInterface
+  size_t size() const override;
+  proxy_wasm::WasmResult copyTo(proxy_wasm::WasmBase* wasm, size_t start,
+                                size_t length, uint64_t ptr_ptr,
+                                uint64_t size_ptr) const override;
+  proxy_wasm::WasmResult copyFrom(size_t start, size_t length,
+                                  std::string_view data) override;
+
+  // proxy_wasm::BufferBase
+  void clear() override {
+    proxy_wasm::BufferBase::clear();
+    owned_string_buffer_ = "";
+  }
+
+  void setOwned(std::string data) {
+    clear();
+    owned_string_buffer_ = std::move(data);
+  }
+  std::string release() { return std::move(owned_string_buffer_); }
+
+ private:
+  // Buffer for a body chunk.
+  std::string owned_string_buffer_;
+};
+
 // TestContext is GCP-like ProxyWasm context (shared for VM + Root + Stream).
 class TestContext : public proxy_wasm::TestContext {
  public:
@@ -119,6 +149,8 @@ class TestHttpContext : public TestContext {
   }
 
   // --- BEGIN Wasm facing API ---
+  proxy_wasm::BufferInterface* getBuffer(
+      proxy_wasm::WasmBufferType type) override;
   proxy_wasm::WasmResult getHeaderMapSize(proxy_wasm::WasmHeaderMapType type,
                                           uint32_t* result) override;
   proxy_wasm::WasmResult getHeaderMapValue(proxy_wasm::WasmHeaderMapType type,
@@ -170,10 +202,12 @@ class TestHttpContext : public TestContext {
   };
 
   struct Result {
-    // Filter status returned by handler.
-    proxy_wasm::FilterHeadersStatus status;
+    // Filter status for headers returned by handler.
+    proxy_wasm::FilterHeadersStatus header_status;
     // Mutated headers, also used for immediate response.
     Headers headers = {};
+    // Filter status for body returned by handler.
+    proxy_wasm::FilterDataStatus body_status;
     // Mutated body, also used for immediate response.
     std::string body = "";
     // Immediate response parameters.
@@ -184,7 +218,17 @@ class TestHttpContext : public TestContext {
 
   // Testing helpers. Use these instead of direct on*Headers methods.
   Result SendRequestHeaders(Headers headers);
+  Result SendRequestBody(std::string body);
   Result SendResponseHeaders(Headers headers);
+  Result SendResponseBody(std::string body);
+
+  enum CallbackType {
+    None,
+    RequestHeaders,
+    RequestBody,
+    ResponseHeaders,
+    ResponseBody,
+  };
 
  private:
   // Ensure that we invoke teardown handlers just once.
@@ -192,6 +236,9 @@ class TestHttpContext : public TestContext {
   // State tracked during a headers call. Invalid otherwise.
   proxy_wasm::WasmHeaderMapType phase_;
   Result result_;
+
+  Buffer body_buffer_;
+  CallbackType current_callback_;
 };
 
 // TestWasm is a light wrapper enabling custom TestContext.
