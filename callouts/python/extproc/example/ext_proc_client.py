@@ -96,7 +96,7 @@ if __name__ == '__main__':
   args = parser.parse_args()
   # Preform callouts and collect the responses.
   responses = list(
-    make_json_request(json_list=args.data, address=args.address, key=args.key)
+    make_json_request(json_list=args.data, address=args.address, key=args.cert)
   )
   # Remove list syntax if there is only one response.
   if len(responses) == 1:
