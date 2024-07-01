@@ -45,7 +45,7 @@ Creating a New Server
     * ``on_request_body``: Process request body.
     * ``on_response_body``: Process response body.
 
-    These functions correspond to the ``oneof`` required field in a `ProcessingRequest <https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingrequest>_` and required response field of a `ProcessingResponse <https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_procv3_processingresponse>_`.
+    These functions correspond to the ``oneof`` required field in a `ProcessingRequest <https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingrequest>`_ and required response field of a `ProcessingResponse <https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#service-ext-proc-v3-processingresponse>`_.
 
 3. **Add Required Imports**:
 
