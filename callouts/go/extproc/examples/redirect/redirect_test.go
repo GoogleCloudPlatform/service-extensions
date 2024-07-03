@@ -17,9 +17,11 @@ package redirect
 import (
 	"testing"
 
+	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	typev3 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	"github.com/google/go-cmp/cmp"
+	"google.golang.org/protobuf/testing/protocmp"
 )
 
 // TestHandleRequestHeaders tests the HandleRequestHeaders method to ensure it correctly processes
@@ -44,28 +46,29 @@ func TestHandleRequestHeaders(t *testing.T) {
 		t.Fatalf("HandleRequestHeaders(): got nil resp, want non-nil")
 	}
 
-	// Check if the immediate response status code is 301.
-	statusCode := response.GetImmediateResponse().GetStatus().GetCode()
-	if diff := cmp.Diff(statusCode, typev3.StatusCode(301)); diff != "" {
-		t.Errorf("Unexpected status code mismatch (-want +got):\n%s", diff)
+	// Define the expected response
+	wantResponse := &extproc.ProcessingResponse{
+		Response: &extproc.ProcessingResponse_ImmediateResponse{
+			ImmediateResponse: &extproc.ImmediateResponse{
+				Status: &typev3.HttpStatus{
+					Code: typev3.StatusCode_MovedPermanently,
+				},
+				Headers: &extproc.HeaderMutation{
+					SetHeaders: []*core.HeaderValueOption{
+						{
+							Header: &core.HeaderValue{
+								Key:      "Location",
+								RawValue: []byte("http://service-extensions.com/redirect"),
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
-	// Check if the response contains the correct header.
-	headersMutation := response.GetImmediateResponse().GetHeaders().GetSetHeaders()
-	if len(headersMutation) == 0 {
-		t.Fatalf("HandleRequestHeaders(): no headers found in response")
-	}
-
-	locationHeader := headersMutation[0]
-
-	expectedKey := "Location"
-	expectedValue := "http://service-extensions.com/redirect"
-
-	if diff := cmp.Diff(locationHeader.GetHeader().GetKey(), expectedKey); diff != "" {
-		t.Errorf("Unexpected header key mismatch (-want +got):\n%s", diff)
-	}
-
-	if diff := cmp.Diff(string(locationHeader.GetHeader().GetRawValue()), expectedValue); diff != "" {
-		t.Errorf("Unexpected header value mismatch (-want +got):\n%s", diff)
+	// Compare the entire proto messages
+	if diff := cmp.Diff(response, wantResponse, protocmp.Transform()); diff != "" {
+		t.Errorf("HandleRequestHeaders() mismatch (-want +got):\n%s", diff)
 	}
 }

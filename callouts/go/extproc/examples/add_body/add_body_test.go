@@ -19,6 +19,7 @@ import (
 
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	"github.com/google/go-cmp/cmp"
+	"google.golang.org/protobuf/testing/protocmp"
 )
 
 // TestHandleRequestBody tests the HandleRequestBody method of ExampleCalloutService.
@@ -42,10 +43,24 @@ func TestHandleRequestBody(t *testing.T) {
 		t.Fatalf("HandleRequestBody(): got nil resp, want non-nil")
 	}
 
-	// Check if the response contains the correct body
-	bodyValue := response.GetRequestBody().GetResponse()
-	if diff := cmp.Diff(string(bodyValue.GetBodyMutation().GetBody()), "new-body-request"); diff != "" {
-		t.Errorf("Unexpected response body mismatch (-want +got):\n%s", diff)
+	// Define the expected response
+	wantResponse := &extproc.ProcessingResponse{
+		Response: &extproc.ProcessingResponse_RequestBody{
+			RequestBody: &extproc.BodyResponse{
+				Response: &extproc.CommonResponse{
+					BodyMutation: &extproc.BodyMutation{
+						Mutation: &extproc.BodyMutation_Body{
+							Body: []byte("new-body-request"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Compare the entire proto messages
+	if diff := cmp.Diff(response, wantResponse, protocmp.Transform()); diff != "" {
+		t.Errorf("HandleRequestBody() mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -70,9 +85,23 @@ func TestHandleResponseBody(t *testing.T) {
 		t.Fatalf("HandleResponseBody(): got nil resp, want non-nil")
 	}
 
-	// Check if the response contains the correct body
-	bodyValue := response.GetResponseBody().GetResponse()
-	if diff := cmp.Diff(string(bodyValue.GetBodyMutation().GetBody()), "new-body-response"); diff != "" {
-		t.Errorf("Unexpected response body mismatch (-want +got):\n%s", diff)
+	// Define the expected response
+	wantResponse := &extproc.ProcessingResponse{
+		Response: &extproc.ProcessingResponse_ResponseBody{
+			ResponseBody: &extproc.BodyResponse{
+				Response: &extproc.CommonResponse{
+					BodyMutation: &extproc.BodyMutation{
+						Mutation: &extproc.BodyMutation_Body{
+							Body: []byte("new-body-response"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Compare the entire proto messages
+	if diff := cmp.Diff(response, wantResponse, protocmp.Transform()); diff != "" {
+		t.Errorf("HandleResponseBody() mismatch (-want +got):\n%s", diff)
 	}
 }

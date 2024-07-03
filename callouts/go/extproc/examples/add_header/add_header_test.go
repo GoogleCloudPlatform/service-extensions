@@ -17,8 +17,10 @@ package add_header
 import (
 	"testing"
 
+	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	"github.com/google/go-cmp/cmp"
+	"google.golang.org/protobuf/testing/protocmp"
 )
 
 // TestHandleRequestHeadersAddHeader tests the HandleRequestHeaders method of ExampleCalloutService for adding headers.
@@ -42,22 +44,29 @@ func TestHandleRequestHeadersAddHeader(t *testing.T) {
 		t.Fatalf("HandleRequestHeaders(): got nil resp, want non-nil")
 	}
 
-	// Check if the response contains the correct header
-	headerMutation := response.GetRequestHeaders().GetResponse().GetHeaderMutation()
-	if headerMutation == nil || len(headerMutation.GetSetHeaders()) == 0 {
-		t.Fatalf("HandleRequestHeaders(): got nil or empty HeaderMutation")
+	// Define the expected response
+	wantResponse := &extproc.ProcessingResponse{
+		Response: &extproc.ProcessingResponse_RequestHeaders{
+			RequestHeaders: &extproc.HeadersResponse{
+				Response: &extproc.CommonResponse{
+					HeaderMutation: &extproc.HeaderMutation{
+						SetHeaders: []*core.HeaderValueOption{
+							{
+								Header: &core.HeaderValue{
+									Key:      "header-request",
+									RawValue: []byte("Value-request"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
-	expectedKey := "header-request"
-	expectedValue := "Value-request"
-	headerValue := headerMutation.GetSetHeaders()[0]
-
-	if diff := cmp.Diff(headerValue.GetHeader().GetKey(), expectedKey); diff != "" {
-		t.Errorf("Unexpected header key mismatch (-want +got):\n%s", diff)
-	}
-
-	if diff := cmp.Diff(string(headerValue.GetHeader().GetRawValue()), expectedValue); diff != "" {
-		t.Errorf("Unexpected header value mismatch (-want +got):\n%s", diff)
+	// Compare the entire proto messages
+	if diff := cmp.Diff(response, wantResponse, protocmp.Transform()); diff != "" {
+		t.Errorf("HandleRequestHeaders() mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -82,21 +91,28 @@ func TestHandleResponseHeadersAddHeader(t *testing.T) {
 		t.Fatalf("HandleResponseHeaders(): got nil resp, want non-nil")
 	}
 
-	// Check if the response contains the correct header
-	headerMutation := response.GetResponseHeaders().GetResponse().GetHeaderMutation()
-	if headerMutation == nil || len(headerMutation.GetSetHeaders()) == 0 {
-		t.Fatalf("HandleResponseHeaders(): got nil or empty HeaderMutation")
+	// Define the expected response
+	wantResponse := &extproc.ProcessingResponse{
+		Response: &extproc.ProcessingResponse_ResponseHeaders{
+			ResponseHeaders: &extproc.HeadersResponse{
+				Response: &extproc.CommonResponse{
+					HeaderMutation: &extproc.HeaderMutation{
+						SetHeaders: []*core.HeaderValueOption{
+							{
+								Header: &core.HeaderValue{
+									Key:      "header-response",
+									RawValue: []byte("Value-response"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
-	expectedKey := "header-response"
-	expectedValue := "Value-response"
-	headerValue := headerMutation.GetSetHeaders()[0]
-
-	if diff := cmp.Diff(headerValue.GetHeader().GetKey(), expectedKey); diff != "" {
-		t.Errorf("Unexpected header key mismatch (-want +got):\n%s", diff)
-	}
-
-	if diff := cmp.Diff(string(headerValue.GetHeader().GetRawValue()), expectedValue); diff != "" {
-		t.Errorf("Unexpected header value mismatch (-want +got):\n%s", diff)
+	// Compare the entire proto messages
+	if diff := cmp.Diff(response, wantResponse, protocmp.Transform()); diff != "" {
+		t.Errorf("HandleResponseHeaders() mismatch (-want +got):\n%s", diff)
 	}
 }

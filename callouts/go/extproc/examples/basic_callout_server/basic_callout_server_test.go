@@ -17,8 +17,10 @@ package basic_callout_server
 import (
 	"testing"
 
+	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	"github.com/google/go-cmp/cmp"
+	"google.golang.org/protobuf/testing/protocmp"
 )
 
 // TestBasicServerCapabilities tests the basic server capabilities of ExampleCalloutService.
@@ -66,42 +68,90 @@ func TestBasicServerCapabilities(t *testing.T) {
 		t.Fatalf("HandleResponseBody(): got nil resp, want non-nil")
 	}
 
-	// Check if the headersRequest contains the correct header
-	headerRequestMutation := headersRequest.GetRequestHeaders().GetResponse().GetHeaderMutation()
-	if headerRequestMutation == nil || len(headerRequestMutation.GetSetHeaders()) == 0 {
-		t.Fatalf("HandleRequestHeaders(): header mutation is nil or empty")
-	}
-	headerRequestValue := headerRequestMutation.GetSetHeaders()[0]
-	if diff := cmp.Diff(headerRequestValue.GetHeader().GetKey(), "header-request"); diff != "" {
-		t.Errorf("Unexpected header key mismatch (-want +got):\n%s", diff)
-	}
-	if diff := cmp.Diff(headerRequestValue.GetHeader().GetValue(), ""); diff != "" {
-		t.Errorf("Unexpected header value mismatch (-want +got):\n%s", diff)
-	}
-
-	// Check if the headersResponse contains the correct header
-	headerResponseMutation := headersResponse.GetResponseHeaders().GetResponse().GetHeaderMutation()
-	if headerResponseMutation == nil || len(headerResponseMutation.GetSetHeaders()) == 0 {
-		t.Fatalf("HandleResponseHeaders(): header mutation is nil or empty")
-	}
-	headerResponseValue := headerResponseMutation.GetSetHeaders()[0]
-	if diff := cmp.Diff(headerResponseValue.GetHeader().GetKey(), "header-response"); diff != "" {
-		t.Errorf("Unexpected header key mismatch (-want +got):\n%s", diff)
-	}
-	if diff := cmp.Diff(headerResponseValue.GetHeader().GetValue(), ""); diff != "" {
-		t.Errorf("Unexpected header value mismatch (-want +got):\n%s", diff)
+	wantHeadersRequest := &extproc.ProcessingResponse{
+		Response: &extproc.ProcessingResponse_RequestHeaders{
+			RequestHeaders: &extproc.HeadersResponse{
+				Response: &extproc.CommonResponse{
+					HeaderMutation: &extproc.HeaderMutation{
+						SetHeaders: []*core.HeaderValueOption{
+							{
+								Header: &core.HeaderValue{
+									Key:      "header-request",
+									RawValue: []byte("Value-request"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
-	// Check if the bodyRequest contains the correct body
-	bodyRequestValue := bodyRequest.GetRequestBody().GetResponse()
-	if diff := cmp.Diff(string(bodyRequestValue.GetBodyMutation().GetBody()), "new-body-request"); diff != "" {
-		t.Errorf("Unexpected request body mismatch (-want +got):\n%s", diff)
+	wantHeadersResponse := &extproc.ProcessingResponse{
+		Response: &extproc.ProcessingResponse_ResponseHeaders{
+			ResponseHeaders: &extproc.HeadersResponse{
+				Response: &extproc.CommonResponse{
+					HeaderMutation: &extproc.HeaderMutation{
+						SetHeaders: []*core.HeaderValueOption{
+							{
+								Header: &core.HeaderValue{
+									Key:      "header-response",
+									RawValue: []byte("Value-response"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
-	// Check if the bodyResponse contains the correct body
-	bodyResponseValue := bodyResponse.GetResponseBody().GetResponse()
-	if diff := cmp.Diff(string(bodyResponseValue.GetBodyMutation().GetBody()), "new-body-response"); diff != "" {
-		t.Errorf("Unexpected response body mismatch (-want +got):\n%s", diff)
+	wantBodyRequest := &extproc.ProcessingResponse{
+		Response: &extproc.ProcessingResponse_RequestBody{
+			RequestBody: &extproc.BodyResponse{
+				Response: &extproc.CommonResponse{
+					BodyMutation: &extproc.BodyMutation{
+						Mutation: &extproc.BodyMutation_Body{
+							Body: []byte("new-body-request"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	wantBodyResponse := &extproc.ProcessingResponse{
+		Response: &extproc.ProcessingResponse_ResponseBody{
+			ResponseBody: &extproc.BodyResponse{
+				Response: &extproc.CommonResponse{
+					BodyMutation: &extproc.BodyMutation{
+						Mutation: &extproc.BodyMutation_Body{
+							Body: []byte("new-body-response"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Compare the entire proto messages for headers request
+	if diff := cmp.Diff(headersRequest, wantHeadersRequest, protocmp.Transform()); diff != "" {
+		t.Errorf("HandleRequestHeaders() mismatch (-want +got):\n%s", diff)
+	}
+
+	// Compare the entire proto messages for headers response
+	if diff := cmp.Diff(headersResponse, wantHeadersResponse, protocmp.Transform()); diff != "" {
+		t.Errorf("HandleResponseHeaders() mismatch (-want +got):\n%s", diff)
+	}
+
+	// Compare the entire proto messages for body request
+	if diff := cmp.Diff(bodyRequest, wantBodyRequest, protocmp.Transform()); diff != "" {
+		t.Errorf("HandleRequestBody() mismatch (-want +got):\n%s", diff)
+	}
+
+	// Compare the entire proto messages for body response
+	if diff := cmp.Diff(bodyResponse, wantBodyResponse, protocmp.Transform()); diff != "" {
+		t.Errorf("HandleResponseBody() mismatch (-want +got):\n%s", diff)
 	}
 }
 
