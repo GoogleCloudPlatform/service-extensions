@@ -29,6 +29,14 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/encoding/prototext"
+)
+
+var (
+	tls        = flag.Bool("tls", false, "Connection uses TLS if true, else plain TCP")
+	certFile   = flag.String("cert_file", "", "The file containing the CA root cert file")
+	serverAddr = flag.String("addr", "localhost:8181", "The server address in the format of host:port")
+	dataJSON   = flag.String("data", "", "The JSON string containing the ProcessingRequest data")
 )
 
 // server is an implementation of extproc.ExternalProcessorServer.
@@ -76,13 +84,6 @@ func startServer(wg *sync.WaitGroup, address string) {
 	}
 }
 
-var (
-	tls        = flag.Bool("tls", false, "Connection uses TLS if true, else plain TCP")
-	certFile   = flag.String("cert_file", "", "The file containing the CA root cert file")
-	serverAddr = flag.String("addr", "localhost:8181", "The server address in the format of host:port")
-	dataJSON   = flag.String("data", "", "The JSON string containing the ProcessingRequest data")
-)
-
 // makeChannel creates a gRPC client connection to the given address.
 func makeChannel(addr string, useTLS bool, certFile string) (*grpc.ClientConn, error) {
 	if useTLS {
@@ -111,19 +112,15 @@ func makeJSONRequest(address string, useTLS bool, certFile, jsonData string) ([]
 	client := extproc.NewExternalProcessorClient(conn)
 
 	// Unmarshal the JSON string into a slice of ProcessingRequest
-	var rawRequests []map[string]interface{}
+	var rawRequests []json.RawMessage
 	if err := json.Unmarshal([]byte(jsonData), &rawRequests); err != nil {
 		return nil, err
 	}
 
 	var requests []*extproc.ProcessingRequest
 	for _, rawReq := range rawRequests {
-		reqBytes, err := json.Marshal(rawReq)
-		if err != nil {
-			return nil, err
-		}
 		req := &extproc.ProcessingRequest{}
-		if err := protojson.Unmarshal(reqBytes, req); err != nil {
+		if err := protojson.Unmarshal(rawReq, req); err != nil {
 			return nil, err
 		}
 		requests = append(requests, req)
@@ -188,10 +185,7 @@ func main() {
 	}
 
 	for _, resp := range responses {
-		respJSON, err := protojson.Marshal(resp)
-		if err != nil {
-			log.Fatalf("Failed to marshal response to JSON: %v", err)
-		}
-		log.Printf("Response: %s", string(respJSON))
+		respText := prototext.Format(resp)
+		log.Printf("Response: %s", respText)
 	}
 }
