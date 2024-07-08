@@ -13,7 +13,7 @@ env:
   PROJECT: service-extensions-samples
   REPOSITORY: ${{ github.repository_owner == 'GoogleCloudPlatform' && 'plugins-source' || 'plugins-testing-source' }}
   IMAGE: wasm-tester
-  DOCKERFILE: test/package/Dockerfile
+  DOCKERFILE: test/package/Dockerfile.test
 
 jobs:
   build-and-push-image:
@@ -49,6 +49,8 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}
+          tags: |
+            type=sha,prefix=public-image-,format=short
           labels: |
             org.opencontainers.image.title=Wasm Tester
             org.opencontainers.image.description=Wasm plugin test runner
