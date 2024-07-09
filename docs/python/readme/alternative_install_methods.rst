@@ -13,8 +13,9 @@ Install packages through the package manager:
     sudo apt-get install python3-grpcio -y
     python -m pip install ./protodef
 
-``[!WARNING]``
-Installing the ``protodef`` package to your system outside of a ``venv`` could cause unintentional side effects.
+.. warning::
+
+    Installing the ``protodef`` package to your system outside of a ``venv`` could cause unintentional side effects.
 
 Without Installing Proto Code as a Local Package
 ------------------------------------------------

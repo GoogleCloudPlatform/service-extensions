@@ -34,10 +34,11 @@ Run the image:
 In this example, using the ``-P`` flag tells docker to connect the exposed ports to the local machine's ports.
 Setting ``--network host`` tells docker to connect the image to the ``0.0.0.0`` or ``localhost`` ip address.
 
-``[!NOTE]``
-The docker image is set up to pass command line arguments to the module when specified.
-This also requires that the example is set up to use command line arguments like in
-``basic_callout_server.py``
+.. note::
+
+    The docker image is set up to pass command line arguments to the module when specified.
+    This also requires that the example is set up to use command line arguments like in
+    ``basic_callout_server.py``
 
 For example:
 
