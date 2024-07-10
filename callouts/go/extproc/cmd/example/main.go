@@ -18,13 +18,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/examples/add_body"
+	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/examples/add_header"
+	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/examples/basic_callout_server"
+	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/examples/jwt_auth"
+	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/examples/redirect"
+	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/internal/server"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
-	"service-extensions-samples/extproc/examples/add_body"
-	"service-extensions-samples/extproc/examples/add_header"
-	"service-extensions-samples/extproc/examples/basic_callout_server"
-	"service-extensions-samples/extproc/examples/jwt_auth"
-	"service-extensions-samples/extproc/examples/redirect"
-	"service-extensions-samples/extproc/internal/server"
 )
 
 // ExampleService defines the interface that all example services must implement.

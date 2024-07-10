@@ -23,13 +23,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/pkg/utils"
 	base "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/testing/protocmp"
-	"service-extensions-samples/extproc/pkg/utils"
 )
 
 // testServer implements the extproc.ExternalProcessorServer interface for testing purposes.

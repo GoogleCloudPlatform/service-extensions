@@ -17,8 +17,8 @@ package basic_callout_server
 import (
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 
-	"service-extensions-samples/extproc/internal/server"
-	"service-extensions-samples/extproc/pkg/utils"
+	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/internal/server"
+	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/pkg/utils"
 )
 
 // ExampleCalloutService is a GRPC callout service that processes HTTP headers and bodies.

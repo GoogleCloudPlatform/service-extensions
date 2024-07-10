@@ -17,8 +17,8 @@ package add_header
 import (
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 
-	"service-extensions-samples/extproc/internal/server"
-	"service-extensions-samples/extproc/pkg/utils"
+	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/internal/server"
+	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/pkg/utils"
 )
 
 // ExampleCalloutService is a gRPC service that handles header processing.

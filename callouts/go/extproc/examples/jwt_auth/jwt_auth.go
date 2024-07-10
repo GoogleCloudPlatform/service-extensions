@@ -20,12 +20,12 @@ import (
 	"log"
 	"strings"
 
+	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/internal/server"
+	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/pkg/utils"
 	"github.com/dgrijalva/jwt-go"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"service-extensions-samples/extproc/internal/server"
-	"service-extensions-samples/extproc/pkg/utils"
 )
 
 // ExampleCalloutService implements JWT authentication by processing request headers.

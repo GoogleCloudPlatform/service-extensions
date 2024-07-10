@@ -2,7 +2,7 @@ name: Callouts Go SDK
 
 on:
   push:
-    branches: [ "main", "go-sdk" ]
+    branches: [ "main"]
     paths:
       - callouts/go/**
   pull_request:
