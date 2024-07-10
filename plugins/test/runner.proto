@@ -35,15 +35,22 @@ message Header {
   bytes value = 2;
 }
 
+// Phase input. Only one of these fields may be provided.
 message Input {
   // Set of key-value headers. Includes pseudo-headers (e.g. :path).
   // Looking up header names (keys) is case-insensitive.
   repeated Header header = 1;
 
-  // HTTP BODY raw content.
-  // Consider supporting serialized HTTP headers using this field.
-  // For example: GET /my/path HTTP/1.1\r\nMyHeader: MyVal\r\n\r\n
+  // Serialized HTTP content for headers or body.
+  //
+  // Header input should be HTTP1. Wasm will receive HTTP2 headers.
+  //   Example: GET /my/path HTTP/1.1\r\nMyHeader: MyVal\r\n
+  //   Example: HTTP/1.1 200 OK\r\ncontent-length: 3\r\n
   bytes content = 2;
+
+  // Serialized HTTP content, but provided via a separate file.
+  // File path can be absolute or relative to the test config file.
+  string file = 3;
 }
 
 message Expectation {
@@ -51,10 +58,11 @@ message Expectation {
   repeated Header has_header = 1;
   // Headers expected to be missing. Values are ignored.
   repeated Header no_header = 2;
-  // NOTE: consider adding a generalized HeaderMatcher using 2 StringMatchers.
+  // Generalized header matching against serialized "key: value" lines.
+  repeated StringMatcher headers = 3;
 
-  // Body content accompanying an immediate response or invocation result.
-  repeated StringMatcher body = 3;
+  // Content accompanying an immediate response or body invocation result.
+  repeated StringMatcher body = 4;
 
   // Immediate response to the end user. No further invocations after this.
   message Immediate {
@@ -65,10 +73,10 @@ message Expectation {
     // Reason for immediate response. Used for error or debug logging.
     optional string details = 3;
   }
-  Immediate immediate = 4;
+  Immediate immediate = 5;
 
   // Side effect: logging.
-  repeated StringMatcher log = 5;
+  repeated StringMatcher log = 6;
 }
 
 message Invocation {
@@ -103,10 +111,12 @@ message Test {
 }
 
 message Env {
+  // Path to this config. Only used internally for input diagnostics.
+  string test_path = 1;
   // Path to compiled .wasm binary. Required.
-  string wasm_path = 1;
+  string wasm_path = 2;
   // Path to PluginConfiguration file.
-  string config_path = 2;
+  string config_path = 3;
   // Plugin min_log_level (tests assume 100% sampling).
   // Enum maps to proxy_wasm::LogLevel enum.
   enum LogLevel {
@@ -118,11 +128,11 @@ message Env {
     ERROR = 5;
     CRITICAL = 6;
   }
-  LogLevel log_level = 3;
+  LogLevel log_level = 4;
   // Log file to receive plugin output. Can be /dev/std{out,err}.
-  string log_path = 4;
+  string log_path = 5;
   // Fixed timestamp in Unix seconds. If unset it will be the Unix epoch.
-  uint64 time_secs = 5;
+  uint64 time_secs = 6;
 }
 
 message TestSuite {

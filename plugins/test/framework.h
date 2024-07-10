@@ -22,6 +22,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 #include "include/proxy-wasm/exports.h"
 #include "include/proxy-wasm/wasm.h"
@@ -35,6 +36,36 @@ struct ContextOptions {
   std::ofstream log_file;
   // Static time returned to wasm.
   absl::Time clock_time = absl::UnixEpoch();
+};
+
+// Buffer class to handle copying to and from an individual BODY chunk.
+class Buffer : public proxy_wasm::BufferBase {
+ public:
+  Buffer() = default;
+
+  // proxy_wasm::BufferInterface
+  size_t size() const override;
+  proxy_wasm::WasmResult copyTo(proxy_wasm::WasmBase* wasm, size_t start,
+                                size_t length, uint64_t ptr_ptr,
+                                uint64_t size_ptr) const override;
+  proxy_wasm::WasmResult copyFrom(size_t start, size_t length,
+                                  std::string_view data) override;
+
+  // proxy_wasm::BufferBase
+  void clear() override {
+    proxy_wasm::BufferBase::clear();
+    owned_string_buffer_ = "";
+  }
+
+  void setOwned(std::string data) {
+    clear();
+    owned_string_buffer_ = std::move(data);
+  }
+  std::string release() { return std::move(owned_string_buffer_); }
+
+ private:
+  // Buffer for a body chunk.
+  std::string owned_string_buffer_;
 };
 
 // TestContext is GCP-like ProxyWasm context (shared for VM + Root + Stream).
@@ -118,6 +149,8 @@ class TestHttpContext : public TestContext {
   }
 
   // --- BEGIN Wasm facing API ---
+  proxy_wasm::BufferInterface* getBuffer(
+      proxy_wasm::WasmBufferType type) override;
   proxy_wasm::WasmResult getHeaderMapSize(proxy_wasm::WasmHeaderMapType type,
                                           uint32_t* result) override;
   proxy_wasm::WasmResult getHeaderMapValue(proxy_wasm::WasmHeaderMapType type,
@@ -150,19 +183,31 @@ class TestHttpContext : public TestContext {
 
   // Case insensitive string comparator.
   struct caseless_compare {
-    bool operator()(const std::string& a, const std::string& b) const {
+    bool operator()(absl::string_view a, absl::string_view b) const {
       return boost::ilexicographical_compare(a, b);
     }
   };
 
   // Key-sorted header map with case-insensitive key comparison.
-  using Headers = std::map<std::string, std::string, caseless_compare>;
+  class Headers : public std::map<std::string, std::string, caseless_compare> {
+   public:
+    void InsertOrAppend(absl::string_view key, absl::string_view value) {
+      auto& val = operator[](std::string(key));
+      if (val.empty()) {
+        val = std::string(value);
+      } else {
+        val = absl::StrCat(val, ", ", value);  // RFC 9110 Field Order
+      }
+    }
+  };
 
   struct Result {
-    // Filter status returned by handler.
-    proxy_wasm::FilterHeadersStatus status;
+    // Filter status for headers returned by handler.
+    proxy_wasm::FilterHeadersStatus header_status;
     // Mutated headers, also used for immediate response.
     Headers headers = {};
+    // Filter status for body returned by handler.
+    proxy_wasm::FilterDataStatus body_status;
     // Mutated body, also used for immediate response.
     std::string body = "";
     // Immediate response parameters.
@@ -173,7 +218,17 @@ class TestHttpContext : public TestContext {
 
   // Testing helpers. Use these instead of direct on*Headers methods.
   Result SendRequestHeaders(Headers headers);
+  Result SendRequestBody(std::string body);
   Result SendResponseHeaders(Headers headers);
+  Result SendResponseBody(std::string body);
+
+  enum CallbackType {
+    None,
+    RequestHeaders,
+    RequestBody,
+    ResponseHeaders,
+    ResponseBody,
+  };
 
  private:
   // Ensure that we invoke teardown handlers just once.
@@ -181,6 +236,9 @@ class TestHttpContext : public TestContext {
   // State tracked during a headers call. Invalid otherwise.
   proxy_wasm::WasmHeaderMapType phase_;
   Result result_;
+
+  Buffer body_buffer_;
+  CallbackType current_callback_;
 };
 
 // TestWasm is a light wrapper enabling custom TestContext.

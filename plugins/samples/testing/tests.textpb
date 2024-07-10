@@ -1,0 +1,110 @@
+env {
+  log_level: DEBUG  # aka --loglevel
+  log_path: "/dev/stdout"  # aka --logfile
+  time_secs: 123456789  # set clock
+}
+test {
+  name: "Headers_Proto"
+  request_headers {
+    input {
+      header { key: ":path" value: "/" }
+      header { key: ":method" value: "GET" }
+    }
+    result {
+      # Positive header matches (two ways).
+      has_header { key: ":method" value: "GET" }
+      headers { exact: ":method: GET" }
+      # Negative header matches (two ways).
+      no_header { key: ":scheme" }
+      headers { regex: ":scheme:.*" invert: true }
+      # Logging matches.
+      log { regex: ".*request headers.*" }
+      log { regex: ".*response headers.*" invert: true }
+    }
+  }
+  response_headers {
+    input {
+      header { key: "server-message" value: "welcome" }
+      header { key: "reply-with-error" value: "yes" }
+    }
+    result {
+      # Immediate response matches.
+      immediate { http_status: 500 }
+      body { exact: "fake error" }
+      has_header { key: "error" value: "goaway" }
+      no_header { key: "server-message" }
+      # Log matches showing frozen time behavior.
+      log { regex: ".*time 1: 123456789000000000" }
+      log { regex: ".*time 2: 123456789000000000" }
+      log { regex: ".*time 3: 123456789000000000" }
+    }
+  }
+}
+test {
+  name: "Headers_Content"
+  request_headers {
+    # HTTP1 serialized request input, from string, in origin form.
+    input {
+      content:
+        "GET /my/path?foo=bar HTTP/1.1\n"
+        "Host: myhost.com\n"
+        "MyHeader: MyVal1\n"
+        "MyHeader: MyVal2\n"
+    }
+    result {
+      has_header { key: ":method" value: "GET" }
+      has_header { key: ":path" value: "/my/path?foo=bar" }
+      has_header { key: ":authority" value: "myhost.com" }
+      no_header { key: "Host" }
+      has_header { key: "MyHeader" value: "MyVal1, MyVal2" }
+    }
+  }
+  response_headers {
+    # HTTP1 serialized response input, from string, denoting success.
+    input {
+      content:
+        "HTTP/1.1 200 OK\n"
+        "Content-Type: image/jpeg; charset=utf-8\n"
+        "MyHeader: MyVal1\n"
+        "MyHeader: MyVal2\n"
+    }
+    result {
+      has_header { key: ":status" value: "200" }
+      has_header { key: "MyHeader" value: "MyVal1, MyVal2" }
+    }
+  }
+}
+test {
+  name: "Headers_File"
+  request_headers {
+    # HTTP1 serialized request input, from file, in absolute form.
+    input {
+      # GET https://example.com:8080/my/path?foo=bar HTTP/1.1
+      # Host: myhost.com
+      # MyHeader: MyVal1
+      # MyHeader: MyVal2
+      file: "request_headers.data"
+    }
+    result {
+      has_header { key: ":method" value: "GET" }
+      has_header { key: ":path" value: "/my/path?foo=bar" }
+      has_header { key: ":scheme" value: "https" }
+      has_header { key: ":authority" value: "example.com:8080" }
+      no_header { key: "Host" }
+      has_header { key: "MyHeader" value: "MyVal1, MyVal2" }
+    }
+  }
+  response_headers {
+    # HTTP1 serialized response input, from file, denoting error.
+    input {
+      # HTTP/1.1 403 Forbidden
+      # MyHeader: MyVal1
+      # MyHeader: MyVal2
+      file: "response_headers.data"
+    }
+    result {
+      has_header { key: ":status" value: "403" }
+      has_header { key: "MyHeader" value: "MyVal1, MyVal2" }
+    }
+  }
+}

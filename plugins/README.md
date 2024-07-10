@@ -15,15 +15,15 @@ We recommend the following process:
     [Proxy-Wasm](https://github.com/proxy-wasm) SDKs as a starting point, write
     a wasm plugin in a language of your choice. Get it building.
 1.  Write a plugin test file (textproto) to specify the plugin's functional
-    expectations ([example](samples/config_denylist/tests.textpb)). Consult the
-    plugin tester [proto API](test/runner.proto) as needed.
+    expectations ([example](samples/testing/tests.textpb)). Consult the plugin
+    tester [proto API](test/runner.proto) as needed.
 1.  Add `benchmark: true` to tests that exemplify common wasm operations
     ([example](samples/add_header/tests.textpb)).
 1.  Run + Test + Benchmark your wasm plugin as follows!
 
 ```
 docker run -it -v $(pwd):/mnt \
-    ghcr.io/googlecloudplatform/service-extensions-samples/plugin-tester:main \
+    us-docker.pkg.dev/service-extensions-samples/plugins/wasm-tester:main \
     --proto /mnt/local/path/to/tests.textpb \
     --plugin /mnt/local/path/to/plugin.wasm
 ```
@@ -31,8 +31,9 @@ docker run -it -v $(pwd):/mnt \
 Tips:
 
 -   When benchmarking and publishing, compile a release (optimized) wasm build.
--   To see a trace of logs and wasm ABI calls, add `--loglevel=TRACE`.
 -   Try sending empty or invalid input. Verify your plugin doesn't crash.
+-   To see plugin-emitted logs on the console, add `--logfile=/dev/stdout`.
+-   To see a trace of logs and wasm ABI calls, add `--loglevel=TRACE`.
 -   Optionally specify plugin config data using the `--config=<path>` flag.
 
 # Samples & Recipes
@@ -40,6 +41,8 @@ Tips:
 The [samples](samples/) folder contains Samples & Recipes to use as a reference
 for your own plugin. Extend them to fit your particular use case.
 
+*   [Testing examples](samples/testing): A demonstration of our test framework
+    capabilities (sending inputs and checking results).
 *   [Log each Wasm call](samples/noop_logs): Don't change anything about the
     traffic (noop plugin). Log each wasm invocation, including lifecycle
     callbacks.
