@@ -103,18 +103,15 @@ func (s *ExampleCalloutService) HandleRequestHeaders(headers *extproc.HttpHeader
 
 	var decodedItems []struct{ Key, Value string }
 	for key, value := range claims {
-		switch key {
-		case "iat", "exp":
+		if key == "iat" || key == "exp" {
 			// Ensure iat and exp are formatted as integers without scientific notation
 			if floatVal, ok := value.(float64); ok {
 				intVal := int64(floatVal)
 				decodedItems = append(decodedItems, struct{ Key, Value string }{Key: "decoded-" + key, Value: fmt.Sprintf("%d", intVal)})
-			} else {
-				decodedItems = append(decodedItems, struct{ Key, Value string }{Key: "decoded-" + key, Value: fmt.Sprint(value)})
+				continue
 			}
-		default:
-			decodedItems = append(decodedItems, struct{ Key, Value string }{Key: "decoded-" + key, Value: fmt.Sprint(value)})
 		}
+		decodedItems = append(decodedItems, struct{ Key, Value string }{Key: "decoded-" + key, Value: fmt.Sprint(value)})
 	}
 
 	return &extproc.ProcessingResponse{
