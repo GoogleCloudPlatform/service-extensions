@@ -13,7 +13,7 @@
 # - compile statically, use FROM scratch or FROM busybox
 
 # Base build image
-FROM marketplace.gcr.io/google/ubuntu2204 as build
+FROM launcher.gcr.io/google/ubuntu2204 as build
 RUN apt update && apt upgrade -y
 RUN apt autoremove -y
 
@@ -54,7 +54,7 @@ RUN bazelisk build --verbose_failures --config=clang --config=bench //test:runne
 ################################################################################
 
 # Base runtime image
-FROM marketplace.gcr.io/google/ubuntu2204 as runtime
+FROM launcher.gcr.io/google/ubuntu2204 as runtime
 RUN apt update && apt upgrade -y
 RUN apt autoremove -y
 

@@ -1,6 +1,6 @@
 # Empty version of Dockerfile for fast test "builds".
 
-FROM marketplace.gcr.io/google/ubuntu2204 as empty
+FROM launcher.gcr.io/google/ubuntu2204 as empty
 RUN apt update && apt upgrade -y
 RUN apt autoremove -y
 
