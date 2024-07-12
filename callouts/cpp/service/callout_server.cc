@@ -21,19 +21,21 @@
 #include <memory>
 #include <string>
 
-class EnvoyExtProcServer final
-    : public envoy::service::ext_proc::v3::ExternalProcessor::Service {
+using envoy::service::ext_proc::v3::ExternalProcessor;
+using envoy::service::ext_proc::v3::ProcessingRequest;
+using envoy::service::ext_proc::v3::ProcessingResponse;
+
+class EnvoyExtProcServer final : public ExternalProcessor::Service {
  public:
   grpc::Status Process(
       grpc::ServerContext* context,
-      grpc::ServerReaderWriter<envoy::service::ext_proc::v3::ProcessingResponse,
-                               envoy::service::ext_proc::v3::ProcessingRequest>*
-          stream) override {
+      grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream)
+      override {
     (void)context;
 
-    envoy::service::ext_proc::v3::ProcessingRequest request;
+    ProcessingRequest request;
     while (stream->Read(&request)) {
-      envoy::service::ext_proc::v3::ProcessingResponse response;
+      ProcessingResponse response;
       ProcessRequest(&request, &response);
       stream->Write(response);
     }
@@ -41,18 +43,41 @@ class EnvoyExtProcServer final
     return grpc::Status::OK;
   }
 
+  virtual void OnRequestHeader(ProcessingRequest* request,
+                               ProcessingResponse* response) {}
+
+  virtual void OnResponseHeader(ProcessingRequest* request,
+                                ProcessingResponse* response) {}
+
+  virtual void OnRequestBody(ProcessingRequest* request,
+                             ProcessingResponse* response) {}
+
+  virtual void OnResponseBody(ProcessingRequest* request,
+                              ProcessingResponse* response) {}
+
  private:
-  void ProcessRequest(
-      envoy::service::ext_proc::v3::ProcessingRequest* request,
-      envoy::service::ext_proc::v3::ProcessingResponse* response) {
-      switch (request->request_case())
-      {
-      case envoy::service::ext_proc::v3::ProcessingRequest::RequestCase::kRequestHeaders:
-        /* code */
+  void ProcessRequest(ProcessingRequest* request,
+                      ProcessingResponse* response) {
+    switch (request->request_case()) {
+      case ProcessingRequest::RequestCase::kRequestHeaders:
+        this->OnRequestHeader(request, response);
         break;
+      case ProcessingRequest::RequestCase::kResponseHeaders:
+        this->OnResponseHeader(request, response);
+        break;
+      case ProcessingRequest::RequestCase::kRequestBody:
+        this->OnRequestBody(request, response);
+        break;
+      case ProcessingRequest::RequestCase::kResponseBody:
+        this->OnResponseBody(request, response);
+        break;
+      case ProcessingRequest::RequestCase::kRequestTrailers:
+      case ProcessingRequest::RequestCase::kResponseTrailers:
+        break;
+      case ProcessingRequest::RequestCase::REQUEST_NOT_SET:
       default:
         break;
-      }
+    }
   }
 };
 
