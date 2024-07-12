@@ -1,5 +1,5 @@
 test {
-  name: "Logging"
+  name: "Logging (test again)"
   # Plugin lifecycle tests.
   plugin_init {
     log { regex: ".*root onCreate called" }
