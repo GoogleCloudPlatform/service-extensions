@@ -13,7 +13,7 @@ env:
   PROJECT: service-extensions-samples
   REPOSITORY: ${{ github.repository_owner == 'GoogleCloudPlatform' && 'plugins-source' || 'plugins-testing-source' }}
   IMAGE: wasm-tester
-  DOCKERFILE: test/package/Dockerfile
+  DOCKERFILE: test/package/Dockerfile.test
 
 jobs:
   build-and-push-image:
