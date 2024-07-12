@@ -1,0 +1,36 @@
+# This WORKSPACE file defines the Envoy dependency for Bazel.
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+# GRPC deps
+http_archive(
+    name = "com_github_grpc_grpc",
+    sha256 = "ebc3acfde70cfae3f4f04b8dbb72259540cb1dc427be362569fbc2607dabfe39",
+    strip_prefix = "grpc-1.65.0",
+    url = "https://github.com/grpc/grpc/archive/v1.65.0.tar.gz",
+)
+load('@com_github_grpc_grpc//bazel:grpc_deps.bzl', 'grpc_deps')
+grpc_deps()
+load('@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl', 'grpc_extra_deps')
+grpc_extra_deps()
+
+# GRPC rules
+http_archive(
+    name = "rules_proto_grpc",
+    sha256 = "2a0860a336ae836b54671cbbe0710eec17c64ef70c4c5a88ccfd47ea6e3739bd",
+    strip_prefix = "rules_proto_grpc-4.6.0",
+    urls = ["https://github.com/rules-proto-grpc/rules_proto_grpc/releases/download/4.6.0/rules_proto_grpc-4.6.0.tar.gz"],
+)
+load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains", "rules_proto_grpc_repos")
+rules_proto_grpc_toolchains()
+rules_proto_grpc_repos()
+load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies", "rules_proto_toolchains")
+rules_proto_dependencies()
+rules_proto_toolchains()
+load("@rules_proto_grpc//cpp:repositories.bzl", rules_proto_grpc_cpp_repos = "cpp_repos")
+rules_proto_grpc_cpp_repos()
+
+# Envoy API spec
+http_archive(
+    name = "envoy_api",
+    url = "https://github.com/envoyproxy/data-plane-api/archive/refs/heads/main.zip"
+)

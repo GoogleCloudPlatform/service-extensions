@@ -1,0 +1,5 @@
+# NOTE: If you're using Bazel 7 or newer and working with gRPC,
+# you'll need to turn off bzlmod.
+# This is because gRPC isn't fully compatible with bzlmod yet.
+# To do this, add --enable_bzlmod=false to your Bazel commands.
+build --enable_bzlmod=false
