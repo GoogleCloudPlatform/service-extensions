@@ -55,14 +55,13 @@ jobs:
     - name: set cache name
       id: vars
       working-directory: ./plugins
-      env:
-        # The cache tag consists of the following parts:
-        # * bazel-cache- prefix
-        # * matrix.name, which separates the cache for opt, tsan, and asan.
-        # * hash of WORKSPACE, .bazelrc, and .bazelversion, which is
-        #   purely to differentiate caches for substantial changes in bazel.
-        # * github.sha, which is the commit hash of the commit used to generate
-        #   the cache entry.
+      # The cache tag consists of the following parts:
+      # * bazel-cache- prefix
+      # * matrix.name, which separates the cache for opt, tsan, and asan.
+      # * hash of WORKSPACE, .bazelrc, and .bazelversion, which is
+      #   purely to differentiate caches for substantial changes in bazel.
+      # * github.sha, which is the commit hash of the commit used to generate
+      #   the cache entry.
       run: echo "CACHE_TAG=bazel-cache-${{ matrix.name }}-${{ hashFiles('WORKSPACE', '.bazelrc', '.bazelversion') }}" >> "$GITHUB_OUTPUT"
 
     - name: bazel cache
