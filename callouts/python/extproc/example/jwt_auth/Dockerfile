@@ -23,7 +23,7 @@ EXPOSE 8080
 
 # Copy over example specific requirements.
 COPY extproc/example/jwt_auth/*.txt ./
-RUN pip install -r requirements-example.txt --break-system-packages --root-user-action=ignore
+RUN pip install -r additional-requirements.txt --break-system-packages --root-user-action=ignore
 
 # Start the service.
 ENTRYPOINT /usr/bin/python3 -um service_callout_example "$@"
