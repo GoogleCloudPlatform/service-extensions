@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+from re import DEBUG
 from typing import Union
 
 import jwt
@@ -25,8 +26,10 @@ from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from extproc.service import callout_server
 from extproc.service import callout_tools
 
+
 def extract_jwt_token(
-    request_headers: service_pb2.HttpHeaders
+  request_headers: service_pb2.HttpHeaders,
+
 ) -> Union[str, None]:
   """
   Extracts the JWT token from the request headers, specifically looking for
@@ -42,17 +45,23 @@ def extract_jwt_token(
       Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6...
       -> Returns: eyJhbGciOiJIUzI1NiIsInR5cCI6...
   """
-  jwt_token = next((header.raw_value.decode('utf-8')
-                    for header in request_headers.headers.headers
-                    if header.key == 'Authorization'), None)
-  extracted_jwt = jwt_token.split(
-      ' ')[1] if jwt_token and ' ' in jwt_token else jwt_token
-  return extracted_jwt
+
+  decoded_headers = (
+    header.raw_value.decode('utf-8') or header.value
+    for header in request_headers.headers.headers
+    if header.key.lower() == 'authorization'
+  )
+  result = next(decoded_headers, None)
+  if result is None:
+    return result
+  return result.strip().split(' ')[-1]
+
 
 def validate_jwt_token(
-    key: bytes,
-    request_headers: service_pb2.HttpHeaders,
-    algorithm: str
+  key: bytes,
+  request_headers: service_pb2.HttpHeaders,
+  algorithm: str,
+  context: ServicerContext,
 ) -> Union[Any, None]:
   """
   Validates the JWT token extracted from the request headers using a specified
@@ -64,6 +73,7 @@ def validate_jwt_token(
       request_headers (service_pb2.HttpHeaders): The HTTP headers received in the request,
                                                 used to extract the JWT token.
       algorithm (str): The algorithm with which the JWT was signed (e.g., 'RS256').
+      context: RPC context of the incoming callout.
 
   Returns:
       dict | None: The decoded JWT if validation is successful, None if the token is
@@ -78,7 +88,7 @@ def validate_jwt_token(
   """
   jwt_token = extract_jwt_token(request_headers)
   if jwt_token is None:
-    logging.warn('Token failed to decode.')
+    callout_tools.deny_callout(context, 'No Authorization token found.')
     return None
   try:
     decoded = jwt.decode(jwt_token, key, algorithms=[algorithm])
@@ -110,8 +120,8 @@ class CalloutServerExample(callout_server.CalloutServer):
       self.public_key = key_file.read()
 
   def on_request_headers(
-      self, headers: service_pb2.HttpHeaders,
-      context: ServicerContext) -> Union[service_pb2.HeadersResponse, None]:
+    self, headers: service_pb2.HttpHeaders, context: ServicerContext
+  ) -> Union[service_pb2.HeadersResponse, None]:
     """Deny token if validation fails and return an error message.
     See :py:meth:`callouts.python.extproc.service.callout_tools.deny_request` for more information.
 
@@ -120,20 +130,24 @@ class CalloutServerExample(callout_server.CalloutServer):
 
     See base method: :py:meth:`callouts.python.extproc.service.callout_server.CalloutServer.on_request_headers`.
     """
-   
-    decoded = validate_jwt_token(self.public_key, headers, "RS256")
+    logging.debug(headers)
+    decoded = validate_jwt_token(self.public_key, headers, 'RS256', context)
 
-    if decoded:
+    if decoded is not None:
       decoded_items = [
-          ('decoded-' + key, str(value)) for key, value in decoded.items()
+        ('decoded-' + key, str(value)) for key, value in decoded.items()
       ]
-      return callout_tools.add_header_mutation(add=decoded_items,
-                                               clear_route_cache=True)
+      return callout_tools.add_header_mutation(
+        add=decoded_items, clear_route_cache=True
+      )
     else:
-      callout_tools.deny_callout(context, 'Authorization token is invalid')
+      callout_tools.deny_callout(context, 'Authorization token is invalid.')
 
 
 if __name__ == '__main__':
+  # Useful command line args.
+  args = callout_tools.add_command_line_args().parse_args()
+  # Set the logging debug level.
   logging.basicConfig(level=logging.DEBUG)
-  # Run the gRPC service
-  CalloutServerExample().run()
+  # Run the gRPC service.
+  CalloutServerExample(**vars(args)).run()
