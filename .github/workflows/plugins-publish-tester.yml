@@ -42,6 +42,15 @@ jobs:
           username: _json_key
           password: ${{ secrets.GAR_PLUGINS_TOKEN }}
 
+      # Authenticate to GCR (for GCP base images).
+      # https://cloud.google.com/software-supply-chain-security/docs/base-images
+      - name: Login to Google Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: gcr.io
+          username: _json_key
+          password: ${{ secrets.GAR_PLUGINS_TOKEN }}
+
       # Get metadata: https://github.com/docker/metadata-action#about
       # The `images` value provides the base name for tags and labels.
       - name: Extract metadata for Docker
