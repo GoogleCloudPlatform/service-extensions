@@ -16,7 +16,6 @@ package jwt_auth
 
 import (
 	"io/ioutil"
-	"sort"
 	"strconv"
 	"testing"
 
@@ -38,13 +37,6 @@ func generateTestJWTToken(privateKey []byte, claims jwt.MapClaims) (string, erro
 		return "", err
 	}
 	return token.SignedString(privateKeyParsed)
-}
-
-// sortHeaders sorts headers in-place by their keys.
-func sortHeaders(headers []*base.HeaderValueOption) {
-	sort.Slice(headers, func(i, j int) bool {
-		return headers[i].Header.Key < headers[j].Header.Key
-	})
 }
 
 // TestHandleRequestHeaders_ValidToken tests the handling of request headers with a valid JWT token.
@@ -132,10 +124,12 @@ func TestHandleRequestHeaders_ValidToken(t *testing.T) {
 	}
 
 	// Sort headers for comparison
-	sortHeaders(wantResponse.Response.(*extproc.ProcessingResponse_RequestHeaders).RequestHeaders.Response.HeaderMutation.SetHeaders)
-	sortHeaders(response.Response.(*extproc.ProcessingResponse_RequestHeaders).RequestHeaders.Response.HeaderMutation.SetHeaders)
+	opts := []cmp.Option{
+		protocmp.Transform(),
+		protocmp.SortRepeatedFields(&extproc.HeaderMutation{}, "set_headers"),
+	}
 
-	if diff := cmp.Diff(response, wantResponse, protocmp.Transform()); diff != "" {
+	if diff := cmp.Diff(response, wantResponse, opts...); diff != "" {
 		t.Errorf("HandleRequestHeaders() mismatch (-want +got):\n%s", diff)
 	}
 }
