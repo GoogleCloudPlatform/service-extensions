@@ -28,9 +28,9 @@ By default this fixture will generate a basic `CalloutServer` to test with.
 To provide the `CalloutServerTest` imported above, generate a custom config:
 
 ```python
-from extproc.tests.basic_grpc_test import insecure_kwargs
+from extproc.tests.basic_grpc_test import plaintext_kwargs
 _local_test_args: dict = {
-    "kwargs": insecure_kwargs,
+    "kwargs": plaintext_kwargs,
     "test_class": CalloutServerTest
 }
 
@@ -38,7 +38,7 @@ _local_test_args: dict = {
 ...
 ```
 
-In the example above `insecure_kwargs` is a set of `CalloutServer` initalization `kwargs` that will generate a server with the insecure port open.
+In the example above `plaintext_kwargs` is a set of `CalloutServer` initalization `kwargs` that will generate a server with the plaintext port open.
 Setting `test_class` to the imported local version of `CalloutServerTest` causes `'server'` to generate the callout server from the local `CalloutServerTest` rather than `CalloutServer`.
 
 Putting that all together as a basic health checking test:
@@ -49,10 +49,10 @@ from extproc.example.<path_to_callout_server> import (
   CalloutServerExample as CalloutServerTest,
 )
 from extproc.service.callout_server import _addr_to_str
-from extproc.tests.basic_grpc_test import setup_server, insecure_kwargs,
+from extproc.tests.basic_grpc_test import setup_server, plaintext_kwargs,
 
 _local_test_args: dict = {
-    "kwargs": insecure_kwargs,
+    "kwargs": plaintext_kwargs,
     "test_class": CalloutServerTest
 }
 

@@ -18,7 +18,7 @@ Files using Copyright 2023 Google LLC & Apache License Version 2.0:
 
 The minimal operation of this Python-based ext_proc server requires the `grpcio` python package as well as the protobuf generator tool [buf](https://buf.build/docs/introduction).
 
-The prefered method of installation is through a virtual enviornment, `venv`. To set up the virtual enviornment run:
+The preferred method of installation is through a virtual environment, `venv`. To set up the virtual environment run:
 
 ```shell
 cd service-extensions-samples/callouts/python
@@ -75,7 +75,7 @@ For example the grpc `service_callout_example` server can be started with:
 python -m extproc.example.grpc.service_callout_example
 ```
 
-The server will then run until interupted, for example, by inputing `Ctrl-C`.
+The server will then run until interrupted, for example, by inputting `Ctrl-C`.
 
 # Examples
 
@@ -104,7 +104,7 @@ if __name__ == '__main__':
   CalloutServer().run()
 ```
 
-Calling the server like this wont do much besides respond to health checks, for the server to respond to callouts we create a custom class extending `CalloutServer`.
+Calling the server like this won't do much besides respond to health checks, for the server to respond to callouts we create a custom class extending `CalloutServer`.
 
 Make a class extending `CalloutServer`.
 
@@ -132,7 +132,7 @@ class BasicCalloutServer(CalloutServer):
     ...
 ```
 
-A few things to note here, we are stongly typing our variables with the expected types. This requires the following imports:
+A few things to note here, we are strongly typing our variables with the expected types. This requires the following imports:
 
 ```python
 from grpc import ServicerContext
@@ -156,7 +156,7 @@ Import those with:
 from extproc.service.callout_tools import add_header_mutation
 ```
 
-With the callout from before we can add the `foo:bar` header mutation on incomming `reponse_headers` callouts:
+With the callout from before we can add the `foo:bar` header mutation on incomming `response_headers` callouts:
 
 ``` python
 class BasicCalloutServer(CalloutServer):
@@ -168,7 +168,7 @@ class BasicCalloutServer(CalloutServer):
 
 `add_header_mutation` also has parameters for removing (`remove`) and cache clearing (`clear_route_cache`). See [extproc/service/callout_tools.py](extproc/service/callout_tools.py).
 
-The callout server uses the `logging` module. By default this means that nothing is logged to the terminal on standard use. We reccomend setting the logging level to `INFO` so that normal server opertation is visible.
+The callout server uses the `logging` module. By default, this means that nothing is logged to the terminal on standard use. We recommend setting the logging level to `INFO` so that normal server operation is visible.
 
 All together that is:
 
@@ -199,11 +199,11 @@ python -m server
 ## Additional Details
 
 [CalloutServer](extproc/service/callout_server.py) has many options to customize the security information as well as port settings.
-The default `CalloutServer` listens on port `8443` for grpc traffic, `8000` for health checks and `8080` for insecure traffic. Please see the `CalloutServer` docstring for more information.
+The default `CalloutServer` listens on port `8443` for grpc traffic, `8000` for health checks and `8080` for plaintext traffic. Please see the `CalloutServer` docstring for more information.
 
 The `on_request_headers` and `on_request_body` methods also accept [`ImmediateResponse`](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#envoy-v3-api-field-service-ext-proc-v3-processingresponse-immediate-response) values as a return value.
 
-[CalloutServer](extproc/service/callout_server.py) also contains a `process` method that can be overriden to work directly on incomming `ProcessingRequest`s.
+[CalloutServer](extproc/service/callout_server.py) also contains a `process` method that can be overridden to work directly on incoming `ProcessingRequest`s.
 
 ## Using the proto files
 

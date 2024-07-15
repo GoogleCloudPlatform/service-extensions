@@ -6,7 +6,7 @@ plugins:
   - plugin: buf.build/grpc/python:v1.62.1
     out: protodef
   # dependencies
-  - plugin: buf.build/protocolbuffers/python
+  - plugin: buf.build/protocolbuffers/python:v26.1
     out: protodef
   # type hinting & pyright
   - plugin: buf.build/protocolbuffers/pyi:v26.1

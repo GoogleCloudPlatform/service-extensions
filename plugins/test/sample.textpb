@@ -1,7 +1,7 @@
 runtime {
   wasm_path: "/tmp/my-plugin.wasm"
-  #config_path: "/tmp/my-config-blob"
-  #min_log_level: WARN
+  # config_path: "/tmp/my-config-blob"
+  # min_log_level: WARN
 }
 # Simple success test, specifying input + modifications
 test {

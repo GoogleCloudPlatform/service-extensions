@@ -20,11 +20,10 @@
 //
 // TODO Future features
 // - Publish test runner as Docker image
+// - Structured output (JSON), then convert into product guidance
+// - YAML config input support (--yaml instead of --proto)
 // - Support wasm profiling (https://v8.dev/docs/profile)
 // - Tune v8 compiler (v8_flags.liftoff_only, precompile, etc)
-// - YAML config input support (--yaml instead of --proto)
-// - Structured output (JSON) rather than stdout/stderr
-// - Crash / death tests?
 
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
@@ -44,6 +43,7 @@ ABSL_FLAG(std::string, logfile, "", "Emit plugin logs to disk or stdio.");
 ABSL_FLAG(service_extensions_samples::pb::Env::LogLevel, loglevel,
           service_extensions_samples::pb::Env::UNDEFINED,
           "Override log_level.");
+ABSL_FLAG(bool, bench, true, "Option to disable test-requested benchmarks.");
 
 namespace service_extensions_samples {
 
@@ -66,6 +66,7 @@ absl::StatusOr<pb::TestSuite> ParseInputs(int argc, char** argv) {
   if (cfg_path.empty()) {
     return absl::InvalidArgumentError("Flag --proto is required.");
   }
+
   auto cfg_bytes = ReadDataFile(cfg_path);
   if (!cfg_bytes.ok()) {
     return cfg_bytes.status();
@@ -74,6 +75,8 @@ absl::StatusOr<pb::TestSuite> ParseInputs(int argc, char** argv) {
   if (!google::protobuf::TextFormat::ParseFromString(*cfg_bytes, &tests)) {
     return absl::InvalidArgumentError("Failed to parse input proto");
   }
+  tests.mutable_env()->set_test_path(cfg_path);
+
   // Apply flag overrides.
   std::string plugin_override = absl::GetFlag(FLAGS_plugin);
   std::string config_override = absl::GetFlag(FLAGS_config);
@@ -85,7 +88,7 @@ absl::StatusOr<pb::TestSuite> ParseInputs(int argc, char** argv) {
   if (!config_override.empty()) {
     tests.mutable_env()->set_config_path(config_override);
   }
-  if (pb::Env::LogLevel_IsValid(mll_override)) {
+  if (mll_override != pb::Env::UNDEFINED) {
     tests.mutable_env()->set_log_level(mll_override);
   }
   if (!logfile.empty()) {
@@ -145,8 +148,12 @@ absl::Status RunTests(const pb::TestSuite& cfg) {
 
   // Run performance benchmarks.
   if (have_benchmarks) {
-    benchmark::RunSpecifiedBenchmarks();
-    benchmark::Shutdown();
+    if (absl::GetFlag(FLAGS_bench)) {
+      benchmark::RunSpecifiedBenchmarks();
+      benchmark::Shutdown();
+    } else {
+      std::cout << "Skipping benchmarks due to --bench=false" << std::endl;
+    }
   }
 
   return tests_ok ? absl::OkStatus() : absl::AbortedError("tests failed");
