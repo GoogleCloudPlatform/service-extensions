@@ -3,3 +3,11 @@
 # This is because gRPC isn't fully compatible with bzlmod yet.
 # To do this, add --enable_bzlmod=false to your Bazel commands.
 build --enable_bzlmod=false
+
+# Set per-platform flags (used below).
+build --enable_platform_specific_config
+
+# Use C++17.
+build:linux --cxxopt=-std=c++17
+build:macos --cxxopt=-std=c++17
+build:windows --cxxopt="/std:c++17"

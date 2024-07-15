@@ -7,6 +7,7 @@ cc_binary(
     srcs = glob(['service/callout_server.cc']),
     deps = [
         "@com_github_grpc_grpc//:grpc++",
+        "@com_google_absl//absl/log:log",
         ":envoy_cpp",
     ],
 )

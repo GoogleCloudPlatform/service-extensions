@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <envoy/service/ext_proc/v3/external_processor.grpc.pb.h>
-#include <envoy/service/ext_proc/v3/external_processor.pb.h>
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
 
 #include <memory>
 #include <string>
+
+#include "absl/log/log.h"
+#include "envoy/service/ext_proc/v3/external_processor.grpc.pb.h"
+#include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 using envoy::service::ext_proc::v3::ExternalProcessor;
 using envoy::service::ext_proc::v3::ProcessingRequest;
@@ -76,6 +78,7 @@ class EnvoyExtProcServer final : public ExternalProcessor::Service {
         break;
       case ProcessingRequest::RequestCase::REQUEST_NOT_SET:
       default:
+        LOG(WARNING) << "Received a ProcessingRequest with no request data.";
         break;
     }
   }
@@ -89,8 +92,7 @@ void RunServer(std::string server_address) {
   builder.RegisterService(&service);
 
   std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
-  std::cout << "Envoy Ext Proc server listening on " << server_address
-            << std::endl;
+  LOG(INFO) << "Envoy Ext Proc server listening on " << server_address;
 
   server->Wait();
 }
