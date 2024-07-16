@@ -16,7 +16,9 @@ package service;
  * limitations under the License.
  */
 
+import com.google.common.collect.ImmutableListMultimap;
 import com.google.protobuf.ByteString;
+import io.envoyproxy.envoy.config.core.v3.HeaderValue;
 import io.envoyproxy.envoy.config.core.v3.HeaderValueOption;
 import io.envoyproxy.envoy.service.ext_proc.v3.*;
 import io.envoyproxy.envoy.type.v3.HttpStatus;
@@ -29,13 +31,35 @@ import java.util.Map;
  */
 public class ServiceCalloutTools {
 
+//    /**
+//     * Adds header mutations to the response builder.
+//     *
+//     * @param headersResponseBuilder Builder for modifying response headers
+//     * @param add                    Iterable containing header key-value pairs to be added
+//     */
+//    public static void AddHeaderMutations(
+//            HeadersResponse.Builder headersResponseBuilder, Iterable<Map.Entry<String, String>> add) {
+//        if (add != null) {
+//            HeaderMutation.Builder headerMutationBuilder =
+//                    headersResponseBuilder.getResponseBuilder().getHeaderMutationBuilder();
+//            for (Map.Entry<String, String> entry : add) {
+//                headerMutationBuilder
+//                        .addSetHeadersBuilder()
+//                        .getHeaderBuilder()
+//                        .setKey(entry.getKey())
+//                        .setValue(entry.getValue())
+//                        .setRawValue(ByteString.copyFromUtf8(entry.getValue()));
+//            }
+//        }
+//    }
+
     /**
      * Adds header mutations to the response builder.
      *
      * @param headersResponseBuilder Builder for modifying response headers
      * @param add                    Iterable containing header key-value pairs to be added
      */
-    public static void AddHeaderMutations(
+    public static HeadersResponse addHeaderMutations(
             HeadersResponse.Builder headersResponseBuilder, Iterable<Map.Entry<String, String>> add) {
         if (add != null) {
             HeaderMutation.Builder headerMutationBuilder =
@@ -49,6 +73,7 @@ public class ServiceCalloutTools {
                         .setRawValue(ByteString.copyFromUtf8(entry.getValue()));
             }
         }
+        return headersResponseBuilder.build();
     }
 
     /**
@@ -60,7 +85,7 @@ public class ServiceCalloutTools {
      * @param clearRouteCache        Boolean indicating whether to clear the route cache
      * @return Constructed HeadersResponse object
      */
-    public static HeadersResponse ConfigureHeadersResponse(
+    public static HeadersResponse configureHeadersResponse(
             HeadersResponse.Builder headersResponseBuilder,
             Iterable<HeaderValueOption> add,
             Iterable<String> remove,
@@ -117,28 +142,45 @@ public class ServiceCalloutTools {
 
      Returns:
      ImmediateResponse: Configured immediate response with the specified headers and status code.*/
-    public static ImmediateResponse BuildImmediateResponse (
-            ImmediateResponse.Builder immediateResponseBuilder,
-            Iterable<Map.Entry<String, String>> addHeaders,
-            HttpStatus status
-    ) {
-
-        HeaderMutation.Builder headerMutationBuilder = immediateResponseBuilder
-                .getHeadersBuilder();
-
-        for(Map.Entry<String, String> entry : addHeaders) {
-            headerMutationBuilder
-                    .addSetHeadersBuilder()
-                    .getHeaderBuilder()
-                    .setKey(entry.getKey())
-                    .setValue(entry.getValue())
-                    .setRawValue(ByteString.copyFromUtf8(entry.getValue()));
-        }
-
+//    public static ImmediateResponse BuildImmediateResponse (
+//            ImmediateResponse.Builder immediateResponseBuilder,
+//            Iterable<Map.Entry<String, String>> addHeaders,
+//            HttpStatus status
+//    ) {
+//
+//        HeaderMutation.Builder headerMutationBuilder = immediateResponseBuilder
+//                .getHeadersBuilder();
+//
+//        for(Map.Entry<String, String> entry : addHeaders) {
+//            headerMutationBuilder
+//                    .addSetHeadersBuilder()
+//                    .getHeaderBuilder()
+//                    .setKey(entry.getKey())
+//                    .setValue(entry.getValue())
+//                    .setRawValue(ByteString.copyFromUtf8(entry.getValue()));
+//        }
+//
+//        immediateResponseBuilder.setStatus(status);
+//
+//        return immediateResponseBuilder.build();
+//
+//    }
+    public static ImmediateResponse BuildImmediateResponse(
+            HttpStatus status,
+            ImmutableListMultimap<String, String> headers) {
+        ImmediateResponse.Builder immediateResponseBuilder = ImmediateResponse.newBuilder();
         immediateResponseBuilder.setStatus(status);
 
-        return immediateResponseBuilder.build();
+        HeaderMutation.Builder headerMutationBuilder = immediateResponseBuilder.getHeadersBuilder();
+        headers.entries().forEach(entry -> {
+            headerMutationBuilder.addSetHeaders(
+                    HeaderValueOption.newBuilder().setHeader(
+                            HeaderValue.newBuilder().setKey(entry.getKey()).setValue(entry.getValue()).build()
+                    ).build()
+            );
+        });
 
+        return immediateResponseBuilder.build();
     }
 }
 

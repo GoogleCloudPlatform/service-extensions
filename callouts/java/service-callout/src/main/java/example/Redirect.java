@@ -16,14 +16,16 @@ package example;
  * limitations under the License.
  */
 
-
+import com.google.common.collect.ImmutableListMultimap;
 import io.envoyproxy.envoy.service.ext_proc.v3.HttpHeaders;
 import io.envoyproxy.envoy.service.ext_proc.v3.ImmediateResponse;
 import io.envoyproxy.envoy.type.v3.HttpStatus;
+import service.HeadersOrImmediateResponse;
 import service.ServiceCallout;
 import service.ServiceCalloutTools;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.AbstractMap;
 import java.util.Collections;
 import java.util.List;
@@ -42,18 +44,32 @@ import java.util.Map;
  */
 public class Redirect extends ServiceCallout {
 
+//    @Override
+//    public void OnRequestHeaders(ImmediateResponse.Builder immediateResponse, HttpHeaders headers) {
+//        List<Map.Entry<String, String>> redirectHeaders = Collections.singletonList(
+//                new AbstractMap.SimpleEntry<>("Location", "http://service-extensions.com/redirect")
+//        );
+//
+//        // Generate the immediate response using a utility method
+//        ServiceCalloutTools.BuildImmediateResponse(
+//                immediateResponse,
+//                redirectHeaders,
+//                HttpStatus.newBuilder().setCodeValue(301).build()
+//        );
+//    }
+
     @Override
-    public void OnRequestHeaders(ImmediateResponse.Builder immediateResponse, HttpHeaders headers) {
-        List<Map.Entry<String, String>> redirectHeaders = Collections.singletonList(
-                new AbstractMap.SimpleEntry<>("Location", "http://service-extensions.com/redirect")
+    public Optional<HeadersOrImmediateResponse> onRequestHeaders(HttpHeaders headers) {
+        ImmutableListMultimap<String, String> redirectHeaders = ImmutableListMultimap.of(
+                "Location", "http://service-extensions.com/redirect"
         );
 
-        // Generate the immediate response using a utility method
-        ServiceCalloutTools.BuildImmediateResponse(
-                immediateResponse,
-                redirectHeaders,
-                HttpStatus.newBuilder().setCodeValue(301).build()
+        ImmediateResponse immediateResponse = ServiceCalloutTools.BuildImmediateResponse(
+                HttpStatus.newBuilder().setCodeValue(301).build(),
+                redirectHeaders
         );
+
+        return Optional.of(HeadersOrImmediateResponse.ofImmediate(immediateResponse));
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {

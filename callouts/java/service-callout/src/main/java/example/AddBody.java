@@ -38,13 +38,13 @@ import static service.ServiceCalloutTools.AddBodyMutations;
 public class AddBody extends ServiceCallout {
 
     @Override
-    public void OnRequestBody(BodyResponse.Builder bodyResponse, HttpBody body) {
+    public void onRequestBody(BodyResponse.Builder bodyResponse, HttpBody body) {
         AddBodyMutations(bodyResponse, "body added", null, null);
     }
 
     @Override
-    public void OnResponseBody(BodyResponse.Builder bodyResponse, HttpBody body) {
-        AddBodyMutations(bodyResponse, "body replaced", true, null);
+    public void onResponseBody(BodyResponse.Builder bodyResponse, HttpBody body) {
+        AddBodyMutations(bodyResponse, "body replaced", null, null);
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {

@@ -23,6 +23,7 @@ import io.grpc.stub.StreamObserver;
 import io.grpc.netty.NettyServerBuilder;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -179,26 +180,29 @@ public class ServiceCallout {
      * @param request The request to be processed
      * @return The response to the processed request
      */
-    public ProcessingResponse ProcessRequest(ProcessingRequest request) {
+    public ProcessingResponse processRequest(ProcessingRequest request) {
         ProcessingResponse.Builder builder = ProcessingResponse.newBuilder();
 
         switch (request.getRequestCase()) {
             case REQUEST_HEADERS:
-                if (request.getRequestHeaders().getHeaders().getHeadersList()
-                        .stream().anyMatch(header -> header.getKey().equalsIgnoreCase("Redirect"))){
-                    OnRequestHeaders(builder.getImmediateResponseBuilder(), request.getRequestHeaders());
-                } else{
-                    OnRequestHeaders(builder.getRequestHeadersBuilder(), request.getRequestHeaders());
+                Optional<HeadersOrImmediateResponse> response = onRequestHeaders(request.getRequestHeaders());
+                if (response.isPresent()) {
+                    HeadersOrImmediateResponse headersOrImmediateResponse = response.get();
+                    if (headersOrImmediateResponse.isImmediateResponse()) {
+                        builder.setImmediateResponse(headersOrImmediateResponse.getImmediateResponse());
+                    } else {
+                        builder.setRequestHeaders(headersOrImmediateResponse.getHeadersResponse());
+                    }
                 }
-            break;
+                break;
             case RESPONSE_HEADERS:
-                OnResponseHeaders(builder.getRequestHeadersBuilder(), request.getResponseHeaders());
+                onResponseHeaders(builder.getResponseHeadersBuilder(), request.getResponseHeaders());
                 break;
             case REQUEST_BODY:
-                OnRequestBody(builder.getRequestBodyBuilder(), request.getRequestBody());
+                onRequestBody(builder.getRequestBodyBuilder(), request.getRequestBody());
                 break;
             case RESPONSE_BODY:
-                OnResponseBody(builder.getResponseBodyBuilder(), request.getResponseBody());
+                onResponseBody(builder.getResponseBodyBuilder(), request.getResponseBody());
                 break;
             case REQUEST_TRAILERS:
                 break;
@@ -216,21 +220,11 @@ public class ServiceCallout {
     /**
      * Callback method invoked upon receiving request headers.
      *
-     * @param headerResponse Builder for modifying response headers
-     * @param headers        Incoming request headers
+     * @param headers Incoming request headers
+     * @return Optional HeadersOrImmediateResponse
      */
-    public void OnRequestHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers) {
-
-    }
-
-    /**
-     * Callback method invoked upon receiving request headers.
-     *
-     * @param immediateResponse Builder for modifying response headers
-     * @param headers        Incoming request headers
-     */
-    public void OnRequestHeaders(ImmediateResponse.Builder immediateResponse, HttpHeaders headers) {
-
+    public Optional<HeadersOrImmediateResponse> onRequestHeaders(HttpHeaders headers) {
+        return Optional.empty();
     }
 
     /**
@@ -239,8 +233,8 @@ public class ServiceCallout {
      * @param headerResponse Builder for modifying response headers
      * @param headers        Incoming response headers
      */
-    public void OnResponseHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers) {
-
+    public void onResponseHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers) {
+        // Default implementation does nothing
     }
 
     /**
@@ -249,8 +243,8 @@ public class ServiceCallout {
      * @param bodyResponse Builder for modifying response body
      * @param body         Incoming request body
      */
-    public void OnRequestBody(BodyResponse.Builder bodyResponse, HttpBody body) {
-
+    public void onRequestBody(BodyResponse.Builder bodyResponse, HttpBody body) {
+        // Default implementation does nothing
     }
 
     /**
@@ -259,8 +253,8 @@ public class ServiceCallout {
      * @param bodyResponse Builder for modifying response body
      * @param body         Incoming response body
      */
-    public void OnResponseBody(BodyResponse.Builder bodyResponse, HttpBody body) {
-
+    public void onResponseBody(BodyResponse.Builder bodyResponse, HttpBody body) {
+        // Default implementation does nothing
     }
 
     /**
@@ -274,7 +268,7 @@ public class ServiceCallout {
             return new StreamObserver<ProcessingRequest>() {
                 @Override
                 public void onNext(ProcessingRequest request) {
-                    responseObserver.onNext(ProcessRequest(request));
+                    responseObserver.onNext(processRequest(request));
                 }
 
                 @Override

@@ -35,27 +35,27 @@ import static service.ServiceCalloutTools.*;
  *  Provides a non-comprehensive set of responses for each of the callout events.
  */
 public class BasicCalloutServer extends ServiceCallout {
-    @Override
-    public void OnRequestHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers) {
-        AddHeaderMutations(
-                headerResponse, ImmutableListMultimap.of("request-header", "added", "c", "d").entries());
-        ConfigureHeadersResponse(headerResponse, null, null, true);
-    }
+//    @Override
+//    public void OnRequestHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers) {
+//        AddHeaderMutations(
+//                headerResponse, ImmutableListMultimap.of("request-header", "added", "c", "d").entries());
+//        ConfigureHeadersResponse(headerResponse, null, null, true);
+//    }
+//
+//    @Override
+//    public void OnResponseHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers) {
+//        AddHeaderMutations(
+//                headerResponse, ImmutableListMultimap.of("response-header", "added", "c", "d").entries());
+//        ConfigureHeadersResponse(headerResponse, null, ImmutableList.of("c"), false);
+//    }
 
     @Override
-    public void OnResponseHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers) {
-        AddHeaderMutations(
-                headerResponse, ImmutableListMultimap.of("response-header", "added", "c", "d").entries());
-        ConfigureHeadersResponse(headerResponse, null, ImmutableList.of("c"), false);
-    }
-
-    @Override
-    public void OnRequestBody(BodyResponse.Builder bodyResponse, HttpBody body) {
+    public void onRequestBody(BodyResponse.Builder bodyResponse, HttpBody body) {
         AddBodyMutations(bodyResponse, "body added", null, null);
     }
 
     @Override
-    public void OnResponseBody(BodyResponse.Builder bodyResponse, HttpBody body) {
+    public void onResponseBody(BodyResponse.Builder bodyResponse, HttpBody body) {
         AddBodyMutations(bodyResponse, "body replaced", true, null);
     }
 

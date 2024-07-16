@@ -21,12 +21,13 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import io.envoyproxy.envoy.service.ext_proc.v3.HeadersResponse;
 import io.envoyproxy.envoy.service.ext_proc.v3.HttpHeaders;
+import service.HeadersOrImmediateResponse;
 import service.ServiceCallout;
 
 import java.io.IOException;
+import java.util.Optional;
 
-import static service.ServiceCalloutTools.AddHeaderMutations;
-import static service.ServiceCalloutTools.ConfigureHeadersResponse;
+import static service.ServiceCalloutTools.*;
 
 /**
  *  Example callout server.
@@ -40,18 +41,23 @@ import static service.ServiceCalloutTools.ConfigureHeadersResponse;
  *   the header '{header-response: response}'.
  */
 public class AddHeader extends ServiceCallout {
+
     @Override
-    public void OnRequestHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers) {
-        AddHeaderMutations(
-                headerResponse, ImmutableListMultimap.of("request-header", "added", "c", "d").entries());
-        ConfigureHeadersResponse(headerResponse, null, null, true);
+    public Optional<HeadersOrImmediateResponse> onRequestHeaders(HttpHeaders headers) {
+        HeadersResponse.Builder headerResponseBuilder = HeadersResponse.newBuilder();
+        HeadersResponse modifiedHeaders = addHeaderMutations(
+                headerResponseBuilder, ImmutableListMultimap.of("request-header", "added-request", "c", "d").entries());
+        HeadersResponse finalHeaders = configureHeadersResponse(modifiedHeaders.toBuilder(), null, null, true);
+
+        return Optional.of(HeadersOrImmediateResponse.ofHeaders(finalHeaders));
     }
 
     @Override
-    public void OnResponseHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers) {
-        AddHeaderMutations(
-                headerResponse, ImmutableListMultimap.of("response-header", "added", "c", "d").entries());
-        ConfigureHeadersResponse(headerResponse, null, ImmutableList.of("c"), false);
+    public void onResponseHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers) {
+        HeadersResponse modifiedHeaders = addHeaderMutations(
+                headerResponse, ImmutableListMultimap.of("response-header", "added-response", "c", "d").entries());
+        HeadersResponse finalHeaders = configureHeadersResponse(modifiedHeaders.toBuilder(), null, ImmutableList.of("c"), false);
+        headerResponse.mergeFrom(finalHeaders);
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {
@@ -59,5 +65,7 @@ public class AddHeader extends ServiceCallout {
         server.start();
         server.blockUntilShutdown();
     }
+
+
 
 }
