@@ -98,7 +98,7 @@ void RunServer(std::string server_address) {
 }
 
 int main(int argc, char** argv) {
-  std::string server_address("localhost:50052");
+  std::string server_address("localhost:8080");
 
   RunServer(server_address);
 
