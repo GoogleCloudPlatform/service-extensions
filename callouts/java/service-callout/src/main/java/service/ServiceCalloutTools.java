@@ -31,28 +31,6 @@ import java.util.Map;
  */
 public class ServiceCalloutTools {
 
-//    /**
-//     * Adds header mutations to the response builder.
-//     *
-//     * @param headersResponseBuilder Builder for modifying response headers
-//     * @param add                    Iterable containing header key-value pairs to be added
-//     */
-//    public static void AddHeaderMutations(
-//            HeadersResponse.Builder headersResponseBuilder, Iterable<Map.Entry<String, String>> add) {
-//        if (add != null) {
-//            HeaderMutation.Builder headerMutationBuilder =
-//                    headersResponseBuilder.getResponseBuilder().getHeaderMutationBuilder();
-//            for (Map.Entry<String, String> entry : add) {
-//                headerMutationBuilder
-//                        .addSetHeadersBuilder()
-//                        .getHeaderBuilder()
-//                        .setKey(entry.getKey())
-//                        .setValue(entry.getValue())
-//                        .setRawValue(ByteString.copyFromUtf8(entry.getValue()));
-//            }
-//        }
-//    }
-
     /**
      * Adds header mutations to the response builder.
      *
@@ -133,15 +111,17 @@ public class ServiceCalloutTools {
     }
 
 
-    /** Creates an immediate HTTP response with specific headers and status code.
-
-     Args:
-     code (StatusCode): The HTTP status code to return.
-     headers: Optional list of tuples (header, value) to include in the response.
-     append_action: Optional action specifying how headers should be appended.
-
-     Returns:
-     ImmediateResponse: Configured immediate response with the specified headers and status code.*/
+    /**
+     * Creates an immediate HTTP response with specific headers and status code.
+     * <p>
+     * Args:
+     * code (StatusCode): The HTTP status code to return.
+     * headers: Optional list of tuples (header, value) to include in the response.
+     * append_action: Optional action specifying how headers should be appended.
+     * <p>
+     * Returns:
+     * ImmediateResponse: Configured immediate response with the specified headers and status code.
+     */
 //    public static ImmediateResponse BuildImmediateResponse (
 //            ImmediateResponse.Builder immediateResponseBuilder,
 //            Iterable<Map.Entry<String, String>> addHeaders,

@@ -27,18 +27,19 @@ import service.ServiceCallout;
 import java.io.IOException;
 import java.util.Optional;
 
-import static service.ServiceCalloutTools.*;
+import static service.ServiceCalloutTools.addHeaderMutations;
+import static service.ServiceCalloutTools.configureHeadersResponse;
 
 /**
- *  Example callout server.
- *
- *  Provides a non-comprehensive set of responses for each of the possible
- *   callout interactions.
- *
- *   For request header callouts we provide a mutation to add a header
- *   '{header-request: request}', remove a header 'foo', and to clear the
- *   route cache. On response header callouts, we respond with a mutation to add
- *   the header '{header-response: response}'.
+ * Example callout server.
+ * <p>
+ * Provides a non-comprehensive set of responses for each of the possible
+ * callout interactions.
+ * <p>
+ * For request header callouts we provide a mutation to add a header
+ * '{header-request: request}', remove a header 'foo', and to clear the
+ * route cache. On response header callouts, we respond with a mutation to add
+ * the header '{header-response: response}'.
  */
 public class AddHeader extends ServiceCallout {
 
@@ -65,7 +66,6 @@ public class AddHeader extends ServiceCallout {
         server.start();
         server.blockUntilShutdown();
     }
-
 
 
 }

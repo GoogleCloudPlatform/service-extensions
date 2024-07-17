@@ -5,9 +5,11 @@ import io.envoyproxy.envoy.service.ext_proc.v3.HttpHeaders;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import service.HeadersOrImmediateResponse;
 import service.ServiceCallout;
 
 import java.lang.reflect.Method;
+import java.util.Optional;
 
 import static org.junit.Assert.*;
 
@@ -27,21 +29,19 @@ public class AddHeaderTest {
 
     @Test
     public void testOnRequestHeaders() {
-        HeadersResponse.Builder headerResponse = HeadersResponse.newBuilder();
         HttpHeaders headers = HttpHeaders.getDefaultInstance();
 
-        server.OnRequestHeaders(headerResponse, headers);
+        Optional<HeadersOrImmediateResponse> response = server.onRequestHeaders(headers);
+        HeadersResponse headersResponse = response.get().getHeadersResponse();
 
-        HeadersResponse response = headerResponse.build();
-        assertNotNull(response);
-        assertNotNull(response.getResponse());
-        assertTrue(response.getResponse().getHeaderMutation().getSetHeadersList().stream()
+        assertNotNull(headersResponse);
+        assertTrue(headersResponse.getResponse().getHeaderMutation().getSetHeadersList().stream()
                 .anyMatch(header -> header.getHeader().getKey().equals("request-header")
-                        && header.getHeader().getValue().equals("added")));
-        assertTrue(response.getResponse().getHeaderMutation().getSetHeadersList().stream()
+                        && header.getHeader().getValue().equals("added-request")));
+        assertTrue(headersResponse.getResponse().getHeaderMutation().getSetHeadersList().stream()
                 .anyMatch(header -> header.getHeader().getKey().equals("c")
                         && header.getHeader().getValue().equals("d")));
-        assertTrue(response.getResponse().getClearRouteCache());
+        assertTrue(headersResponse.getResponse().getClearRouteCache());
     }
 
     @Test
@@ -49,12 +49,18 @@ public class AddHeaderTest {
         HeadersResponse.Builder headerResponse = HeadersResponse.newBuilder();
         HttpHeaders headers = HttpHeaders.getDefaultInstance();
 
-        server.OnResponseHeaders(headerResponse, headers);
+        server.onResponseHeaders(headerResponse, headers);
 
         HeadersResponse response = headerResponse.build();
         assertNotNull(response);
         assertNotNull(response.getResponse());
         assertFalse(response.getResponse().getClearRouteCache());
+        assertTrue(response.getResponse().getHeaderMutation().getSetHeadersList().stream()
+                .anyMatch(header -> header.getHeader().getKey().equals("response-header")
+                        && header.getHeader().getValue().equals("added-response")));
+        assertTrue(response.getResponse().getHeaderMutation().getSetHeadersList().stream()
+                .anyMatch(header -> header.getHeader().getKey().equals("c")
+                        && header.getHeader().getValue().equals("d")));
     }
 
     private void stopServer() throws Exception {

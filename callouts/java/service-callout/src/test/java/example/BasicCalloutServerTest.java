@@ -1,21 +1,19 @@
 package example;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-
 import io.envoyproxy.envoy.service.ext_proc.v3.BodyResponse;
 import io.envoyproxy.envoy.service.ext_proc.v3.HeadersResponse;
 import io.envoyproxy.envoy.service.ext_proc.v3.HttpBody;
 import io.envoyproxy.envoy.service.ext_proc.v3.HttpHeaders;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import service.HeadersOrImmediateResponse;
 import service.ServiceCallout;
 
 import java.lang.reflect.Method;
+import java.util.Optional;
+
+import static org.junit.Assert.*;
 
 public class BasicCalloutServerTest {
 
@@ -33,21 +31,19 @@ public class BasicCalloutServerTest {
 
     @Test
     public void testOnRequestHeaders() {
-        HeadersResponse.Builder headerResponse = HeadersResponse.newBuilder();
         HttpHeaders headers = HttpHeaders.getDefaultInstance();
 
-        server.OnRequestHeaders(headerResponse, headers);
+        Optional<HeadersOrImmediateResponse> response = server.onRequestHeaders(headers);
+        HeadersResponse headersResponse = response.get().getHeadersResponse();
 
-        HeadersResponse response = headerResponse.build();
-        assertNotNull(response);
-        assertNotNull(response.getResponse());
-        assertTrue(response.getResponse().getHeaderMutation().getSetHeadersList().stream()
+        assertNotNull(headersResponse);
+        assertTrue(headersResponse.getResponse().getHeaderMutation().getSetHeadersList().stream()
                 .anyMatch(header -> header.getHeader().getKey().equals("request-header")
-                        && header.getHeader().getValue().equals("added")));
-        assertTrue(response.getResponse().getHeaderMutation().getSetHeadersList().stream()
+                        && header.getHeader().getValue().equals("added-request")));
+        assertTrue(headersResponse.getResponse().getHeaderMutation().getSetHeadersList().stream()
                 .anyMatch(header -> header.getHeader().getKey().equals("c")
                         && header.getHeader().getValue().equals("d")));
-        assertTrue(response.getResponse().getClearRouteCache());
+        assertTrue(headersResponse.getResponse().getClearRouteCache());
     }
 
     @Test
@@ -55,12 +51,18 @@ public class BasicCalloutServerTest {
         HeadersResponse.Builder headerResponse = HeadersResponse.newBuilder();
         HttpHeaders headers = HttpHeaders.getDefaultInstance();
 
-        server.OnResponseHeaders(headerResponse, headers);
+        server.onResponseHeaders(headerResponse, headers);
 
         HeadersResponse response = headerResponse.build();
         assertNotNull(response);
         assertNotNull(response.getResponse());
         assertFalse(response.getResponse().getClearRouteCache());
+        assertTrue(response.getResponse().getHeaderMutation().getSetHeadersList().stream()
+                .anyMatch(header -> header.getHeader().getKey().equals("response-header")
+                        && header.getHeader().getValue().equals("added-response")));
+        assertTrue(response.getResponse().getHeaderMutation().getSetHeadersList().stream()
+                .anyMatch(header -> header.getHeader().getKey().equals("c")
+                        && header.getHeader().getValue().equals("d")));
     }
 
     @Test
@@ -68,7 +70,7 @@ public class BasicCalloutServerTest {
         BodyResponse.Builder bodyResponse = BodyResponse.newBuilder();
         HttpBody body = HttpBody.getDefaultInstance();
 
-        server.OnRequestBody(bodyResponse, body);
+        server.onRequestBody(bodyResponse, body);
 
         BodyResponse response = bodyResponse.build();
         assertNotNull(response);
@@ -80,7 +82,7 @@ public class BasicCalloutServerTest {
         BodyResponse.Builder bodyResponse = BodyResponse.newBuilder();
         HttpBody body = HttpBody.getDefaultInstance();
 
-        server.OnResponseBody(bodyResponse, body);
+        server.onResponseBody(bodyResponse, body);
 
         BodyResponse response = bodyResponse.build();
         assertNotNull(response);

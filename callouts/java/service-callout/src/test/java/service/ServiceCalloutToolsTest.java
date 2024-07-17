@@ -20,7 +20,7 @@ public class ServiceCalloutToolsTest {
 
     @Test
     public void testAddHeaderMutations() {
-        ServiceCalloutTools.AddHeaderMutations(headerResponseBuilder, null);
+        ServiceCalloutTools.addHeaderMutations(headerResponseBuilder, null);
 
         HeadersResponse response = headerResponseBuilder.build();
         assertNotNull(response);
@@ -29,7 +29,7 @@ public class ServiceCalloutToolsTest {
 
     @Test
     public void testConfigureHeadersResponse() {
-        HeadersResponse response = ServiceCalloutTools.ConfigureHeadersResponse(headerResponseBuilder, null, null,
+        HeadersResponse response = ServiceCalloutTools.configureHeadersResponse(headerResponseBuilder, null, null,
                 true);
 
         assertNotNull(response);

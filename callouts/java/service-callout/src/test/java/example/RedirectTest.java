@@ -5,9 +5,11 @@ import io.envoyproxy.envoy.service.ext_proc.v3.ImmediateResponse;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import service.HeadersOrImmediateResponse;
 import service.ServiceCallout;
 
 import java.lang.reflect.Method;
+import java.util.Optional;
 
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -28,15 +30,14 @@ public class RedirectTest {
 
     @Test
     public void testOnRequestHeaders() {
-        ImmediateResponse.Builder immediateResponse = ImmediateResponse.newBuilder();
         HttpHeaders headers = HttpHeaders.getDefaultInstance();
 
-        server.OnRequestHeaders(immediateResponse, headers);
+        Optional<HeadersOrImmediateResponse> response = server.onRequestHeaders(headers);
+        ImmediateResponse immediateResponse = response.get().getImmediateResponse();
 
-        ImmediateResponse response = immediateResponse.build();
         assertNotNull(response);
-        assertTrue(response.hasStatus());
-        assertTrue(response.getHeaders().getSetHeadersList().stream()
+        assertTrue(immediateResponse.hasStatus());
+        assertTrue(immediateResponse.getHeaders().getSetHeadersList().stream()
                 .anyMatch(header -> header.getHeader().getKey().equals("Location")
                         && header.getHeader().getValue().equals("http://service-extensions.com/redirect")));
     }

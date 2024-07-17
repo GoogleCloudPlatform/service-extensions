@@ -1,9 +1,7 @@
 package example;
 
 import io.envoyproxy.envoy.service.ext_proc.v3.BodyResponse;
-import io.envoyproxy.envoy.service.ext_proc.v3.HeadersResponse;
 import io.envoyproxy.envoy.service.ext_proc.v3.HttpBody;
-import io.envoyproxy.envoy.service.ext_proc.v3.HttpHeaders;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -11,15 +9,15 @@ import service.ServiceCallout;
 
 import java.lang.reflect.Method;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertNotNull;
 
 public class AddBodyTest {
 
-    private BasicCalloutServer server;
+    private AddBody server;
 
     @Before
     public void setUp() {
-        server = new BasicCalloutServer();
+        server = new AddBody();
     }
 
     @After
@@ -32,7 +30,7 @@ public class AddBodyTest {
         BodyResponse.Builder bodyResponse = BodyResponse.newBuilder();
         HttpBody body = HttpBody.getDefaultInstance();
 
-        server.OnRequestBody(bodyResponse, body);
+        server.onRequestBody(bodyResponse, body);
 
         BodyResponse response = bodyResponse.build();
         assertNotNull(response);
@@ -44,7 +42,7 @@ public class AddBodyTest {
         BodyResponse.Builder bodyResponse = BodyResponse.newBuilder();
         HttpBody body = HttpBody.getDefaultInstance();
 
-        server.OnResponseBody(bodyResponse, body);
+        server.onResponseBody(bodyResponse, body);
 
         BodyResponse response = bodyResponse.build();
         assertNotNull(response);
