@@ -30,14 +30,14 @@
     }
 }
 
-dl.class, dl.function {
+dl.class, dl.function, dl.method {
     width: 100%;
     margin: 0 auto;
     padding: 10px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
-dl.class > dt, dl.function > dt {
+dl.class > dt, dl.function > dt, dl.method > dt {
     background-color: #2980b9;
     color: white;
     padding: 5px 10px;

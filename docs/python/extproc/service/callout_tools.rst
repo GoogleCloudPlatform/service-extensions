@@ -1,3 +1,5 @@
+.. _callout_tools:
+
 Callout Tools
 ====================
 

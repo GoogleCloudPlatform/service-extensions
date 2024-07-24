@@ -12,13 +12,14 @@
 # - use a bazel-public base image (e.g. gcr.io/bazel-public/bazel:5.2.0)
 # - compile statically, use FROM scratch or FROM busybox
 
-# Build image
-FROM ubuntu:22.04 as build
+# Base build image
+FROM launcher.gcr.io/google/ubuntu2204 as build
+RUN apt update && apt upgrade -y
+RUN apt autoremove -y
 
 # Install go for bazelisk
 # Install git/py for v8
 # Install clang/stdc++ for c++
-RUN apt update
 RUN apt install -y \
   ca-certificates \
   openssl \
@@ -50,11 +51,16 @@ WORKDIR /src
 RUN bazelisk --version
 RUN bazelisk build --verbose_failures --config=clang --config=bench //test:runner
 
-# Runtime image
-FROM ubuntu:22.04 as runtime
+################################################################################
+
+# Base runtime image
+FROM launcher.gcr.io/google/ubuntu2204 as runtime
+RUN apt update && apt upgrade -y
+RUN apt autoremove -y
+
 # Install a missing runtime dependency.
-RUN apt update
-RUN apt install libicu70
+RUN apt install -y libicu70
+
 # Copy output from build image.
 COPY --from=build /src/bazel-bin/test/runner /opt/
 COPY --from=build /src/test/package/licenses/* /opt/licenses/
