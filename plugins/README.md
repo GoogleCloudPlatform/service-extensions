@@ -58,6 +58,9 @@ for your own plugin. Extend them to fit your particular use case.
 *   [Rewrite the path using regex](samples/regex_rewrite): Remove a piece of the
     URI using regex replacement. Demonstrate a standard way to use regular
     expressions, compiling them at plugin initialization.
+*   [Normalize a HTTP header on request](samples/normalize_header): Check the host
+    header and create a new HTTP header (client-device-type) to shard requests
+    based on device.
 
 # Samples tests
 
