@@ -1,37 +1,47 @@
 # Expect no matches, so no overwrite.
 test {
-  name: "NoOverwrite"
-  benchmark: true
+  name: "NoOverwriteRequestHeader"
+  benchmark: false
   request_headers {
     input { header { key: "SomeRequestHeaderKey" value: "SomeHeaderValue" } }
-    result { has_header { key: "SomeRequestHeaderKey" value: "SomeHeaderValue" } }
+    result { no_header {value: "changed"} }
   }
+}
+test {
+  name: "NoOverwriteResponseHeader"
+  benchmark: false
   response_headers {
     input { header { key: "SomeResponseHeaderKey" value: "SomeHeaderValue" } }
-    result { has_header { key: "SomeResponseHeaderKey" value: "SomeHeaderValue" } }
+    result { no_header {value: "changed"} }
   }
 }
 # Expect the plugin to overwrite the value for the request header RequestHeader.
 test {
   name: "OverwriteRequestHeader"
-  benchmark: true
+  benchmark: false
   request_headers {
     input { 
       header { key: "RequestHeader" value: "SomeHeaderValue"}
       header { key: "OtherHeader" value: "OtherValue" } 
     }
-    result { has_header { key: "RequestHeader" value: "changed" } }
+    result { 
+      has_header { key: "RequestHeader" value: "changed" }
+      has_header { key: "OtherHeader" value: "OtherValue" }
+    }
   }
 }
 # Expect the plugin to overwrite the value for the response header ResponseHeader.
 test {
   name: "OverwriteResponseHeader"
-  benchmark: true
+  benchmark: false
   response_headers {
     input { 
       header { key: "ResponseHeader" value: "SomeHeaderValue" }
       header { key: "OtherHeader" value: "OtherValue" }
     }
-    result { has_header { key: "ResponseHeader" value: "changed" } }
+    result { 
+      has_header { key: "ResponseHeader" value: "changed" }
+      has_header { key: "OtherHeader" value: "OtherValue" }
+    }
   }
 }

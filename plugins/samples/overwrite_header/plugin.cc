@@ -15,6 +15,9 @@
 // [START serviceextensions_plugin_overwrite_header]
 #include "proxy_wasm_intrinsics.h"
 
+// This sample replaces an HTTP header with the given key and value.
+// Unlike `addRequestHeader` which appends values to existing headers,
+// this plugin overwrites the entire value for the specified key.
 class MyHttpContext : public Context {
  public:
   explicit MyHttpContext(uint32_t id, RootContext* root) : Context(id, root) {}
