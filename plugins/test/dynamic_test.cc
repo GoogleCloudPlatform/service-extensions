@@ -320,6 +320,7 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
+    state.PauseTiming();
   }
 }
 
@@ -338,6 +339,8 @@ void DynamicTest::CheckPhaseResults(const std::string& phase,
                                     const TestHttpContext::Result& result) {
   // Check header values.
   for (const auto& header : expect.has_header()) {
+    ASSERT_TRUE(!header.key().empty()) << absl::Substitute(
+        "[$0] Missing has_header.key: '$1'", phase, header.ShortDebugString());
     auto it = result.headers.find(header.key());
     if (it == result.headers.end()) {
       ADD_FAILURE() << absl::Substitute("[$0] Missing header '$1'", phase,
@@ -350,6 +353,8 @@ void DynamicTest::CheckPhaseResults(const std::string& phase,
   }
   // Check header removals.
   for (const auto& header : expect.no_header()) {
+    ASSERT_TRUE(!header.key().empty()) << absl::Substitute(
+        "[$0] Missing no_header.key: '$1'", phase, header.ShortDebugString());
     auto it = result.headers.find(header.key());
     if (it != result.headers.end()) {
       ADD_FAILURE() << absl::Substitute(
