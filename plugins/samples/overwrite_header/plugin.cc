@@ -25,14 +25,22 @@ class MyHttpContext : public Context {
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
     // Change the key and value according to your needs
-    replaceRequestHeader("RequestHeader", "changed");
+    auto header_key = "RequestHeader";
+    auto header = getRequestHeader(header_key);
+    if (header->size() > 0) {
+      replaceRequestHeader(header_key, "changed");
+    }
     return FilterHeadersStatus::Continue;
   }
 
   FilterHeadersStatus onResponseHeaders(uint32_t headers,
                                         bool end_of_stream) override {
     // Change the key and value according to your needs
-    replaceResponseHeader("ResponseHeader", "changed");
+    auto header_key = "ResponseHeader";
+    auto header = getResponseHeader(header_key);
+    if (header->size() > 0) {
+      replaceResponseHeader(header_key, "changed");
+    }
     return FilterHeadersStatus::Continue;
   }
 };

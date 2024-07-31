@@ -4,7 +4,7 @@ test {
   benchmark: false
   request_headers {
     input { header { key: "SomeRequestHeaderKey" value: "SomeHeaderValue" } }
-    result { no_header {value: "changed"} }
+    result { no_header {key: "RequestHeader" value: "changed"} }
   }
 }
 test {
@@ -12,7 +12,7 @@ test {
   benchmark: false
   response_headers {
     input { header { key: "SomeResponseHeaderKey" value: "SomeHeaderValue" } }
-    result { no_header {value: "changed"} }
+    result { no_header {key: "ResponseHeader" value: "changed"} }
   }
 }
 # Expect the plugin to overwrite the value for the request header RequestHeader.
