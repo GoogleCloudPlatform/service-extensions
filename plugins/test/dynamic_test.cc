@@ -294,33 +294,37 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
   for (const auto& response_body : cfg_.response_body()) {
     response_body_chunks.emplace_back(response_body.input().content());
   }
+  std::optional<TestHttpContext> stream;
   for (auto _ : state) {
+    // Pausing timing here is not recommended. One way we could avoid it:
+    // - include stream context create/destroy cost in handler benchmarks
+    // - don't hand ownership of body chunks to stream context
     state.PauseTiming();
-    auto stream = TestHttpContext(handle);
+    stream.emplace(handle);  // create/destroy TestHttpContext
     std::vector<std::string> request_body_chunks_copies = request_body_chunks;
     std::vector<std::string> response_body_chunks_copies = response_body_chunks;
     state.ResumeTiming();
+
     if (request_headers) {
-      auto res = stream.SendRequestHeaders(*request_headers);
+      auto res = stream->SendRequestHeaders(*request_headers);
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
     for (std::string& body : request_body_chunks_copies) {
-      auto res = stream.SendRequestBody(std::move(body));
+      auto res = stream->SendRequestBody(std::move(body));
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
     if (response_headers) {
-      auto res = stream.SendResponseHeaders(*response_headers);
+      auto res = stream->SendResponseHeaders(*response_headers);
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
     for (std::string& body : response_body_chunks_copies) {
-      auto res = stream.SendResponseBody(std::move(body));
+      auto res = stream->SendResponseBody(std::move(body));
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
-    state.PauseTiming();
   }
 }
 
