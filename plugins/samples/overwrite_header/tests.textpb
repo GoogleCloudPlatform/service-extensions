@@ -1,18 +1,25 @@
-# Expect no matches, so no overwrite.
+# Expect to add the header RequestHeader due to previous non-existence. 
 test {
-  name: "NoOverwriteRequestHeader"
+  name: "DoAddRequestHeader"
   benchmark: false
   request_headers {
-    input { header { key: "SomeRequestHeaderKey" value: "SomeHeaderValue" } }
-    result { no_header {key: "RequestHeader" value: "changed"} }
+    input { header { key: "OtherHeader" value: "OtherValue" } }
+    result { 
+      has_header { key: "RequestHeader" value: "changed" }
+      has_header { key: "OtherHeader" value: "OtherValue" }
+    }
   }
 }
+# Expect to add the header ResponseHeader due to previous non-existence. 
 test {
-  name: "NoOverwriteResponseHeader"
+  name: "DoAddResponseHeader"
   benchmark: false
   response_headers {
-    input { header { key: "SomeResponseHeaderKey" value: "SomeHeaderValue" } }
-    result { no_header {key: "ResponseHeader" value: "changed"} }
+    input { header { key: "OtherHeader" value: "OtherValue" } }
+    result { 
+      has_header { key: "ResponseHeader" value: "changed" }
+      has_header { key: "OtherHeader" value: "OtherValue" }
+    }
   }
 }
 # Expect the plugin to overwrite the value for the request header RequestHeader.

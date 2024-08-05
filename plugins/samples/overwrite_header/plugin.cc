@@ -17,7 +17,8 @@
 
 // This sample replaces an HTTP header with the given key and value.
 // Unlike `addRequestHeader` which appends values to existing headers,
-// this plugin overwrites the entire value for the specified key.
+// this plugin overwrites the entire value for the specified key if the
+// header already exists or create it with the new value.
 class MyHttpContext : public Context {
  public:
   explicit MyHttpContext(uint32_t id, RootContext* root) : Context(id, root) {}
@@ -25,22 +26,16 @@ class MyHttpContext : public Context {
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
     // Change the key and value according to your needs
-    auto header_key = "RequestHeader";
-    auto header = getRequestHeader(header_key);
-    if (header->size() > 0) {
-      replaceRequestHeader(header_key, "changed");
-    }
+    replaceRequestHeader("RequestHeader", "changed");
+
     return FilterHeadersStatus::Continue;
   }
 
   FilterHeadersStatus onResponseHeaders(uint32_t headers,
                                         bool end_of_stream) override {
     // Change the key and value according to your needs
-    auto header_key = "ResponseHeader";
-    auto header = getResponseHeader(header_key);
-    if (header->size() > 0) {
-      replaceResponseHeader(header_key, "changed");
-    }
+    replaceResponseHeader("ResponseHeader", "changed");
+
     return FilterHeadersStatus::Continue;
   }
 };
