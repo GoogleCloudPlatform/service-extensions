@@ -1,12 +1,13 @@
-# Expect to add the header RequestHeader due to previous non-existence. 
+# Expect to not add the header RequestHeader due to validation to only replace
+# the pre-existing ones.
 test {
-  name: "DoAddRequestHeader"
+  name: "DoNotAddRequestHeader"
   benchmark: false
   request_headers {
     input { header { key: "OtherHeader" value: "OtherValue" } }
-    result { 
-      has_header { key: "RequestHeader" value: "changed" }
+    result {
       has_header { key: "OtherHeader" value: "OtherValue" }
+      no_header { key: "RequestHeader" }
     }
   }
 }

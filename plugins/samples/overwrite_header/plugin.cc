@@ -25,15 +25,22 @@ class MyHttpContext : public Context {
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
-    // Change the key and value according to your needs
-    replaceRequestHeader("RequestHeader", "changed");
+    // Change the key and value according to your needs.
+    const auto header_key = "RequestHeader";
+    const auto header = getRequestHeader(header_key);
+    // It will only replace the header if it already exists.
+    if (header->size() > 0) {
+      replaceRequestHeader(header_key, "changed");
+    }
 
     return FilterHeadersStatus::Continue;
   }
 
   FilterHeadersStatus onResponseHeaders(uint32_t headers,
                                         bool end_of_stream) override {
-    // Change the key and value according to your needs
+    // Unlike the previous example, the header will be added if it doesn't exist
+    // or updated if it already does.
+    // Change the key and value according to your needs.
     replaceResponseHeader("ResponseHeader", "changed");
 
     return FilterHeadersStatus::Continue;
