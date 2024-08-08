@@ -15,6 +15,8 @@
 // [START serviceextensions_plugin_normalize_header]
 #include "proxy_wasm_intrinsics.h"
 
+// Determines the device type from the ":host" header and
+// adds a "client-device-type" header accordingly.
 class MyHttpContext : public Context {
  public:
   explicit MyHttpContext(uint32_t id, RootContext* root) : Context(id, root) {}
@@ -32,12 +34,17 @@ class MyHttpContext : public Context {
   }
 
  private:
+  // Helper function to determine the device type based on the host value
   std::string_view getDeviceType(std::string_view host_value) {
+    // Check if the host value indicates a mobile device
     if (host_value.find("m.example.com") != std::string::npos) {
       return "mobile";
-    } else if (host_value.find("t.example.com") != std::string::npos) {
+    }
+    // Check if the host value indicates a tablet device
+    else if (host_value.find("t.example.com") != std::string::npos) {
       return "tablet";
     }
+    // Default to "desktop" if no specific device type is identified
     return "desktop";
   }
 };
