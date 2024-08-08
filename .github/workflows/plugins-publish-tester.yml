@@ -49,6 +49,9 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=public-image-,format=short
           labels: |
             org.opencontainers.image.title=Wasm Tester
             org.opencontainers.image.description=Wasm plugin test runner
