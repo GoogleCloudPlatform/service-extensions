@@ -21,10 +21,10 @@ class MyHttpContext : public Context {
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
-    auto host = getRequestHeader(":host");
+    const auto host = getRequestHeader(":host");
     if (host) {
-      auto host_value = host->toString();  // mutable copy
-      auto device_type = getDeviceType(host_value);
+      const auto host_value = host->toString();
+      const auto device_type = getDeviceType(host_value);
       addRequestHeader("client-device-type", device_type);
     }
 
