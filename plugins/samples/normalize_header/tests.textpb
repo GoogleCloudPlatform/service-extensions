@@ -5,21 +5,21 @@ test {
 test {
   name: "WithMobileHost"
   request_headers {
-    input { header { key: ":host" value: "m.example.com" } }
+    input { header { key: "Host" value: "m.example.com" } }
     result { has_header { key: "client-device-type" value: "mobile" } }
   }
 }
 test {
   name: "WithTabletHost"
   request_headers {
-    input { header { key: ":host" value: "t.example.com" } }
+    input { header { key: "Host" value: "t.example.com" } }
     result { has_header { key: "client-device-type" value: "tablet" } }
   }
 }
 test {
   name: "WithDefaultHost"
   request_headers {
-    input { header { key: ":host" value: "www.example.com" } }
+    input { header { key: "Host" value: "www.example.com" } }
     result { has_header { key: "client-device-type" value: "desktop" } }
   }
 }

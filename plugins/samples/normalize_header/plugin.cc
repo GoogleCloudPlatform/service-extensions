@@ -15,7 +15,7 @@
 // [START serviceextensions_plugin_normalize_header]
 #include "proxy_wasm_intrinsics.h"
 
-// Determines the device type from the ":host" header and
+// Determines the device type from the "Host" header and
 // adds a "client-device-type" header accordingly.
 class MyHttpContext : public Context {
  public:
@@ -23,7 +23,7 @@ class MyHttpContext : public Context {
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
-    const auto host = getRequestHeader(":host");
+    const auto host = getRequestHeader("Host");
     if (host) {
       const auto host_value = host->toString();
       const auto device_type = getDeviceType(host_value);
