@@ -58,6 +58,8 @@ for your own plugin. Extend them to fit your particular use case.
 *   [Rewrite the path using regex](samples/regex_rewrite): Remove a piece of the
     URI using regex replacement. Demonstrate a standard way to use regular
     expressions, compiling them at plugin initialization.
+*   [Overwrite HTTP request & response headers](samples/overwrite_header):
+    Overwrite a header on both the client request and server response paths.
 
 # Samples tests
 
