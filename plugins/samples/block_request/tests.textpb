@@ -1,0 +1,22 @@
+# 
+test {
+  name: "NoForbiddenReferer"
+  benchmark: false
+  request_headers {
+    input { header { key: "Referer" value: "www.safe-site.com" } } 
+    result {has_header { key: "Allowed" value: "true" } }
+  }
+}
+# 
+test {
+  name: "WithForbiddenReferer"
+  benchmark: false
+  request_headers {
+    input { header { key: "Referer" value: "www.forbidden-site.com/somepage/otherpage" } } 
+    result { 
+      immediate { http_status: 404 details: "" }
+      body { exact: "Not found.\n" }
+      no_header { key: "Allowed"}
+    }
+  }
+}
