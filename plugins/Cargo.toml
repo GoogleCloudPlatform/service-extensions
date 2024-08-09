@@ -1,5 +1,5 @@
 [package]
-name = "service-extensions-samples"
+name = "service-extensions"
 version = "0.0.0"
 edition = "2018"
 

@@ -93,7 +93,7 @@ Create a new Go file server.go and import the ``CalloutServer`` class from extpr
 
 ```go
 import (
-    "service-extensions-samples/extproc/internal/server"
+    "service-extensions/extproc/internal/server"
 )
 ```
 ### Extend the CalloutServer:

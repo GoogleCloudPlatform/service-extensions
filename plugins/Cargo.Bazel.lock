@@ -693,8 +693,8 @@
       },
       "license": "MIT OR Apache-2.0"
     },
-    "service-extensions-samples 0.0.0": {
-      "name": "service-extensions-samples",
+    "service-extensions 0.0.0": {
+      "name": "service-extensions",
       "version": "0.0.0",
       "repository": null,
       "targets": [],
@@ -974,7 +974,7 @@
   },
   "binary_crates": [],
   "workspace_members": {
-    "service-extensions-samples 0.0.0": ""
+    "service-extensions 0.0.0": ""
   },
   "conditions": {
     "cfg(not(all(target_arch = \"arm\", target_os = \"none\")))": [
