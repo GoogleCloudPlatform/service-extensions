@@ -14,38 +14,35 @@
 
 // [START serviceextensions_plugin_normalize_header]
 #include "proxy_wasm_intrinsics.h"
+#include "absl/strings/ascii.h"
 
-// Determines the device type from the "Host" header and
-// adds a "client-device-type" header accordingly.
+// Determines client device type based on request headers.
 class MyHttpContext : public Context {
  public:
   explicit MyHttpContext(uint32_t id, RootContext* root) : Context(id, root) {}
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
-    const auto host = getRequestHeader("Host");
-    if (host) {
-      const auto host_value = host->toString();
-      const auto device_type = getDeviceType(host_value);
-      addRequestHeader("client-device-type", device_type);
+    // Check "Sec-CH-UA-Mobile" header first (highest priority)
+    const auto mobile_header = getRequestHeader("Sec-CH-UA-Mobile");
+    if (mobile_header && mobile_header->toString() == "?1") {
+      addRequestHeader("client-device-type", "mobile");
+      return FilterHeadersStatus::Continue;
     }
 
+    // Check "User-Agent" header for mobile substring (case insensitive)
+    const auto user_agent = getRequestHeader("User-Agent");
+    if (user_agent) {
+      const auto user_agent_str = user_agent->toString();
+      if (std::string::npos != absl::AsciiStrToLower(user_agent_str).find("mobile")) {
+        addRequestHeader("client-device-type", "mobile");
+        return FilterHeadersStatus::Continue;
+      }
+    }
+
+    // No specific device type identified, set to "unknown"
+    addRequestHeader("client-device-type", "unknown");
     return FilterHeadersStatus::Continue;
-  }
-
- private:
-  // Helper function to determine the device type based on the host value
-  std::string_view getDeviceType(std::string_view host_value) {
-    // Check if the host value indicates a mobile device
-    if (host_value.find("m.example.com") != std::string::npos) {
-      return "mobile";
-    }
-    // Check if the host value indicates a tablet device
-    else if (host_value.find("t.example.com") != std::string::npos) {
-      return "tablet";
-    }
-    // Default to "desktop" if no specific device type is identified
-    return "desktop";
   }
 };
 

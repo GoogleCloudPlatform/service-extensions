@@ -1,25 +1,39 @@
+# No known header set, expected "unknown"
 test {
-  name: "NoHost"
-  request_headers {}
-}
-test {
-  name: "WithMobileHost"
+  name: "NoHeaderSet"
   request_headers {
-    input { header { key: "Host" value: "m.example.com" } }
+    result { has_header { key: "client-device-type" value: "unknown" } }
+  }
+}
+# Mobile header hint set to true, expected "mobile"
+test {
+  name: "WithMobileHeaderHintEqTrue"
+  request_headers {
+    input { 
+      header { key: "Sec-CH-UA-Mobile" value: "?1" }
+      header { key: "User-Agent" value: "Chrome..." }
+    }
     result { has_header { key: "client-device-type" value: "mobile" } }
   }
 }
+# Mobile header hint set to false and no mobile User Agent, expected "unknown"
 test {
-  name: "WithTabletHost"
+  name: "WithMobileHeaderHintEqFalse"
   request_headers {
-    input { header { key: "Host" value: "t.example.com" } }
-    result { has_header { key: "client-device-type" value: "tablet" } }
+    input {
+      header { key: "Sec-CH-UA-Mobile" value: "?0" }
+      header { key: "User-Agent" value: "Chrome..." }
+    }
+    result { has_header { key: "client-device-type" value: "unknown" } }
   }
 }
+# Mobile User Agent, expected "mobile"
 test {
-  name: "WithDefaultHost"
+  name: "WithMobileUserAgent"
   request_headers {
-    input { header { key: "Host" value: "www.example.com" } }
-    result { has_header { key: "client-device-type" value: "desktop" } }
+    input {
+      header { key: "User-Agent" value: "Chrome/... Mobile/..." }
+    }
+    result { has_header { key: "client-device-type" value: "mobile" } }
   }
 }
