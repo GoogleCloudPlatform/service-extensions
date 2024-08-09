@@ -60,6 +60,9 @@ for your own plugin. Extend them to fit your particular use case.
     expressions, compiling them at plugin initialization.
 *   [Overwrite HTTP request & response headers](samples/overwrite_header):
     Overwrite a header on both the client request and server response paths.
+*   [Block request with particular URL/header](samples/block_request):
+    Check the client referrer header for a bad value, serve a synthetic 404 block
+    with a basic html response (error not found).
 
 # Samples tests
 
