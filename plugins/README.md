@@ -94,13 +94,13 @@ Support will grow over time. The current feature set includes:
 *   Stream context HTTP callbacks (host -> wasm)
     *   on_request_headers
     *   on_response_headers
-*   Stream context HTTP methods (wasm -> host)
+*   Stream context HTTP hostcalls (wasm -> host)
     *   send_local_response
     *   get_header_map_value, add_header_map_value, replace_header_map_value,
         remove_header_map_value
     *   get_header_map_pairs, set_header_map_pairs
     *   get_header_map_size
-*   Other methods (wasm -> host)
+*   Other hostcalls (wasm -> host)
     *   log
     *   get_current_time_nanoseconds (frozen per stream)
     *   get_property ("plugin_root_id" only)
