@@ -71,7 +71,7 @@ html_theme_options = {
 html_context = {
     "display_github": True,  # Integrate GitHub
     "github_user": "GoogleCloudPlatform",  # Username
-    "github_repo": "service-extensions-samples",  # Repo name
+    "github_repo": "service-extensions",  # Repo name
     "github_version": "main",  # Version
     "conf_py_path": "/docs/",  # Path in the checkout to the docs root
 }

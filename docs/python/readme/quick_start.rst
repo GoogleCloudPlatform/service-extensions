@@ -14,7 +14,7 @@ Setup
 
     .. code-block:: shell
 
-        cd service-extensions-samples/callouts/python
+        cd service-extensions/callouts/python
         python -m venv env
         source env/bin/activate
 

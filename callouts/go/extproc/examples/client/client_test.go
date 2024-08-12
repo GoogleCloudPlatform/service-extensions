@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/pkg/utils"
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/pkg/utils"
 	base "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	"github.com/google/go-cmp/cmp"

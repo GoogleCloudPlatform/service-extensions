@@ -1,4 +1,4 @@
-module github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go
+module github.com/GoogleCloudPlatform/service-extensions/callouts/go
 
 require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible

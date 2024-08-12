@@ -20,8 +20,8 @@ import (
 	"log"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/internal/server"
-	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/pkg/utils"
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/internal/server"
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/pkg/utils"
 	"github.com/dgrijalva/jwt-go"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	"google.golang.org/grpc/codes"
