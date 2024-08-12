@@ -18,12 +18,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/examples/add_body"
-	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/examples/add_header"
-	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/examples/basic_callout_server"
-	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/examples/jwt_auth"
-	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/examples/redirect"
-	"github.com/GoogleCloudPlatform/service-extensions-samples/callouts/go/extproc/internal/server"
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/add_body"
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/add_header"
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/basic_callout_server"
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/jwt_auth"
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/redirect"
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/internal/server"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 )
 

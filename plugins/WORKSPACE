@@ -130,7 +130,7 @@ load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
 crates_repository(
     name = "crate_index",
     cargo_lockfile = "//:Cargo.lock",
-    # See https://github.com/GoogleCloudPlatform/service-extensions-samples/issues/31
+    # See https://github.com/GoogleCloudPlatform/service-extensions/issues/31
     generate_target_compatible_with = False,
     generator = "@cargo_bazel_bootstrap//:cargo-bazel",
     lockfile = "//:Cargo.Bazel.lock",

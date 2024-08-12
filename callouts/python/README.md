@@ -21,7 +21,7 @@ The minimal operation of this Python-based ext_proc server requires the `grpcio`
 The preferred method of installation is through a virtual environment, `venv`. To set up the virtual environment run:
 
 ```shell
-cd service-extensions-samples/callouts/python
+cd service-extensions/callouts/python
 python -m venv env
 source env/bin/activate
 ```
