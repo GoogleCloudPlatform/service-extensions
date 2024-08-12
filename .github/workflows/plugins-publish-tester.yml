@@ -10,7 +10,7 @@ permissions: read-all
 # Variables. The workflow also depends on secrets.GAR_PLUGINS_TOKEN.
 env:
   REGISTRY: us-docker.pkg.dev
-  PROJECT: service-extensions
+  PROJECT: service-extensions-samples
   REPOSITORY: ${{ github.repository_owner == 'GoogleCloudPlatform' && 'plugins-source' || 'plugins-testing-source' }}
   IMAGE: wasm-tester
   DOCKERFILE: test/package/Dockerfile

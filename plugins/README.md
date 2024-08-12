@@ -23,7 +23,7 @@ We recommend the following process:
 
 ```
 docker run -it -v $(pwd):/mnt \
-    us-docker.pkg.dev/service-extensions/plugins/wasm-tester:main \
+    us-docker.pkg.dev/service-extensions-samples/plugins/wasm-tester:main \
     --proto /mnt/local/path/to/tests.textpb \
     --plugin /mnt/local/path/to/plugin.wasm
 ```
