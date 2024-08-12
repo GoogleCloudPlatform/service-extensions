@@ -96,7 +96,7 @@ Support will grow over time. The current feature set includes:
     *   on_response_headers
 *   Stream context HTTP methods (wasm -> host)
     *   send_local_response
-    *   get__header_map_value, add_header_map_value, replace_header_map_value,
+    *   get_header_map_value, add_header_map_value, replace_header_map_value,
         remove_header_map_value
     *   get_header_map_pairs, set_header_map_pairs
     *   get_header_map_size
@@ -104,7 +104,8 @@ Support will grow over time. The current feature set includes:
     *   log
     *   get_current_time_nanoseconds (frozen per stream)
     *   get_property ("plugin_root_id" only)
-    *   get_buffer_status, get_buffer_bytes (config + BODY types)
+    *   get_buffer_status, get_buffer_bytes, set_buffer_bytes
+        (PluginConfiguration, HttpRequestBody, HttpResponseBody)
 
 # Implementation details
 
