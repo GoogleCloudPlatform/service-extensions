@@ -13,8 +13,8 @@
 // limitations under the License.
 
 // [START serviceextensions_plugin_normalize_header]
+#include "absl/strings/match.h"
 #include "proxy_wasm_intrinsics.h"
-#include "absl/strings/ascii.h"
 
 // Determines client device type based on request headers.
 class MyHttpContext : public Context {
@@ -25,19 +25,18 @@ class MyHttpContext : public Context {
                                        bool end_of_stream) override {
     // Check "Sec-CH-UA-Mobile" header first (highest priority)
     const auto mobile_header = getRequestHeader("Sec-CH-UA-Mobile");
-    if (mobile_header && mobile_header->toString() == "?1") {
+    if (mobile_header && mobile_header->view() == "?1") {
       addRequestHeader("client-device-type", "mobile");
       return FilterHeadersStatus::Continue;
     }
 
     // Check "User-Agent" header for mobile substring (case insensitive)
     const auto user_agent = getRequestHeader("User-Agent");
-    if (user_agent) {
+    if (user_agent &&
+        absl::StrContainsIgnoreCase(user_agent->view(), "mobile")) {
       const auto user_agent_str = user_agent->toString();
-      if (std::string::npos != absl::AsciiStrToLower(user_agent_str).find("mobile")) {
-        addRequestHeader("client-device-type", "mobile");
-        return FilterHeadersStatus::Continue;
-      }
+      addRequestHeader("client-device-type", "mobile");
+      return FilterHeadersStatus::Continue;
     }
 
     // No specific device type identified, set to "unknown"
