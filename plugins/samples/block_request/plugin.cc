@@ -13,8 +13,8 @@
 // limitations under the License.
 
 // [START serviceextensions_plugin_block_request]
+#include "absl/strings/match.h"
 #include "proxy_wasm_intrinsics.h"
-#include "absl/strings/ascii.h"
 
 // Checks the client referrer header for a bad value,
 // serve a synthetic 404 block with a basic html response.
@@ -25,14 +25,11 @@ class MyHttpContext : public Context {
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
     const auto referer = getRequestHeader("Referer");
-    if (referer) {
-      const auto referer_str = referer->toString();
-      if (std::string::npos !=
-          absl::AsciiStrToLower(referer_str).find("forbidden-site")) {
+    if (referer &&
+        absl::StrContainsIgnoreCase(referer->view(), "forbidden-site")) {
         sendLocalResponse(404, "", "Not found.\n", {});
         return FilterHeadersStatus::StopAllIterationAndWatermark;
       }
-    }
 
     addRequestHeader("Allowed", "true");
     return FilterHeadersStatus::Continue;
