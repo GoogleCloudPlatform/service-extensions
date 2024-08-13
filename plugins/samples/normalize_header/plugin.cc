@@ -34,7 +34,6 @@ class MyHttpContext : public Context {
     const auto user_agent = getRequestHeader("User-Agent");
     if (user_agent &&
         absl::StrContainsIgnoreCase(user_agent->view(), "mobile")) {
-      const auto user_agent_str = user_agent->toString();
       addRequestHeader("client-device-type", "mobile");
       return FilterHeadersStatus::Continue;
     }
