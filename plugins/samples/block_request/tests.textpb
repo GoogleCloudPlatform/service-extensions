@@ -1,4 +1,4 @@
-# 
+# No forbidden referer set, expected allowed request.
 test {
   name: "NoForbiddenReferer"
   benchmark: false
@@ -7,7 +7,7 @@ test {
     result {has_header { key: "Allowed" value: "true" } }
   }
 }
-# 
+# Forbidden referer set, expected block request with 404 status code.
 test {
   name: "WithForbiddenReferer"
   benchmark: false
