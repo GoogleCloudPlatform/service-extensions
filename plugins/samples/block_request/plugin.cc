@@ -25,6 +25,7 @@ class MyHttpContext : public Context {
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
     const auto referer = getRequestHeader("Referer");
+    // Change the value to whatever is considered a bad URL for your needs.
     if (referer &&
         absl::StrContainsIgnoreCase(referer->view(), "forbidden-site")) {
         sendLocalResponse(404, "", "Not found.\n", {});
