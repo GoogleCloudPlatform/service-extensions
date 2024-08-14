@@ -60,6 +60,9 @@ for your own plugin. Extend them to fit your particular use case.
     expressions, compiling them at plugin initialization.
 *   [Overwrite HTTP request & response headers](samples/overwrite_header):
     Overwrite a header on both the client request and server response paths.
+*   [Normalize a HTTP header on request](samples/normalize_header): Creates a new
+    HTTP header (client-device-type) to shard requests based on device according
+    to the existence of HTTP Client Hints or User-Agent header values.
 *   [Block request with particular URL/header](samples/block_request):
     Check the client referrer header for a bad value, serve a synthetic 404 block
     with a basic html response (error not found).
@@ -84,30 +87,31 @@ here: https://github.com/proxy-wasm/spec/tree/master
 Service Extension plugins currently support a subset of the ProxyWasm spec.
 Support will grow over time. The current feature set includes:
 
-*   Root context lifecycle callbacks
+*   Root context lifecycle callbacks (host -> wasm)
     *   on_context_create
     *   on_vm_start
     *   on_configure
     *   on_done
     *   on_delete
-*   Stream context lifecycle callbacks
+*   Stream context lifecycle callbacks (host -> wasm)
     *   on_context_create
     *   on_done
     *   on_delete
-*   Stream context HTTP callbacks
+*   Stream context HTTP callbacks (host -> wasm)
     *   on_request_headers
     *   on_response_headers
-*   Stream context HTTP methods
+*   Stream context HTTP hostcalls (wasm -> host)
     *   send_local_response
-    *   get__header_map_value, add_header_map_value, replace_header_map_value,
+    *   get_header_map_value, add_header_map_value, replace_header_map_value,
         remove_header_map_value
     *   get_header_map_pairs, set_header_map_pairs
     *   get_header_map_size
-*   Other methods
+*   Other hostcalls (wasm -> host)
     *   log
     *   get_current_time_nanoseconds (frozen per stream)
     *   get_property ("plugin_root_id" only)
-    *   get_buffer_status, get_buffer_bytes (PluginConfiguration only)
+    *   get_buffer_status, get_buffer_bytes, set_buffer_bytes
+        (PluginConfiguration, HttpRequestBody, HttpResponseBody)
 
 # Implementation details
 
@@ -127,10 +131,10 @@ This project leverages
 integrate Cargo with Bazel. In order to add new Rust library dependencies:
 
 *   Edit dependencies in Cargo.toml
-*   Regenerate Bazel targets: `$ CARGO_BAZEL_REPIN=1 bazelisk build ...`
+*   Regenerate Bazel targets: `$ CARGO_BAZEL_REPIN=1 bazelisk sync
+    --only=crate_index`
 *   Reference libraries as `@crate_index//:<target>`
 
 # TODO
 
 *   Write more plugin samples
-*   Add Golang recipes: https://github.com/tetratelabs/proxy-wasm-go-sdk
