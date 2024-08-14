@@ -60,6 +60,9 @@ for your own plugin. Extend them to fit your particular use case.
     expressions, compiling them at plugin initialization.
 *   [Overwrite HTTP request & response headers](samples/overwrite_header):
     Overwrite a header on both the client request and server response paths.
+*   [Normalize a HTTP header on request](samples/normalize_header): Creates a new
+    HTTP header (client-device-type) to shard requests based on device according
+    to the existence of HTTP Client Hints or User-Agent header values.
 
 # Samples tests
 
