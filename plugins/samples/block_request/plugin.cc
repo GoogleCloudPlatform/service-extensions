@@ -13,11 +13,13 @@
 // limitations under the License.
 
 // [START serviceextensions_plugin_block_request]
+#include <string>
+
 #include "absl/strings/match.h"
 #include "proxy_wasm_intrinsics.h"
 
-// Checks the client referrer header for a bad value,
-// serve a synthetic 404 block with a basic html response.
+// Checks the client referrer and host headers match and
+// serves a 403 forbidden error if not.
 class MyHttpContext : public Context {
  public:
   explicit MyHttpContext(uint32_t id, RootContext* root) : Context(id, root) {}
@@ -25,15 +27,28 @@ class MyHttpContext : public Context {
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
     const auto referer = getRequestHeader("Referer");
-    // Change the value to whatever is considered a bad URL for your needs.
-    if (referer &&
-        absl::StrContainsIgnoreCase(referer->view(), "forbidden-site")) {
-        sendLocalResponse(404, "", "Not found.\n", {});
-        return FilterHeadersStatus::StopAllIterationAndWatermark;
-      }
+    const auto host = getRequestHeader("Host");
+    // Check if referer and host match.
+    if (referer && host && !absl::StrContains(referer->view(), host->view())) {
+      const auto requestId = generateRandomRequestId();
+      sendLocalResponse(403, "", "Forbidden - Request ID: " + requestId, {});
+      LOG_INFO("Forbidden - Request ID: " + requestId);
+      return FilterHeadersStatus::StopAllIterationAndWatermark;
+    }
 
     addRequestHeader("Allowed", "true");
     return FilterHeadersStatus::Continue;
+  }
+
+ private:
+  // Generate a unique random request ID.
+  std::string generateRandomRequestId() {
+    // Wasm VM does not support the random generation
+    // that involves a file system operation.
+    using namespace std::chrono_literals;
+    const auto ts = std::chrono::high_resolution_clock::now();
+    const auto ns = ts.time_since_epoch() / 1ns;
+    return std::to_string(ns);
   }
 };
 

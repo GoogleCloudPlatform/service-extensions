@@ -1,21 +1,33 @@
-# No forbidden referer set, expected allowed request.
+env {
+  log_level: DEBUG  # aka --loglevel
+  log_path: "/dev/stdout"  # aka --logfile
+  time_secs: 123456789  # set clock
+}
+# Referer and Host match, expected allowed request.
 test {
   name: "NoForbiddenReferer"
   benchmark: false
   request_headers {
-    input { header { key: "Referer" value: "www.safe-site.com" } } 
+    input {
+      header { key: "Host" value: "www.safe-site.com" }
+      header { key: "Referer" value: "https://www.safe-site.com/somepage" }
+    }
     result {has_header { key: "Allowed" value: "true" } }
   }
 }
-# Forbidden referer set, expected block request with 404 status code.
+# Referer and Host not match, expected block request with 403 status code.
 test {
   name: "WithForbiddenReferer"
   benchmark: false
   request_headers {
-    input { header { key: "Referer" value: "www.forbidden-site.com/somepage/otherpage" } } 
-    result { 
-      immediate { http_status: 404 details: "" }
-      body { exact: "Not found.\n" }
+    input {
+      header { key: "Host" value: "www.safe-site.com" }
+      header { key: "Referer" value: "https://www.forbidden-site.com/somepage" }
+    }
+    result {
+      immediate { http_status: 403 details: "" }
+      body { exact: "Forbidden - Request ID: 123456789000000000" }
+      log { regex: ".+Forbidden - Request ID: 123456789000000000" }
       no_header { key: "Allowed"}
     }
   }
