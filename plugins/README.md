@@ -64,7 +64,7 @@ for your own plugin. Extend them to fit your particular use case.
     HTTP header (client-device-type) to shard requests based on device according
     to the existence of HTTP Client Hints or User-Agent header values.
 *   [Block request with particular URL/header](samples/block_request): Check if the
-    client's referrer and host headers are consistent with each other.
+    client's referer and host headers are consistent with each other.
     If there's a mismatch, a 403 Forbidden error is returned.
 
 # Samples tests

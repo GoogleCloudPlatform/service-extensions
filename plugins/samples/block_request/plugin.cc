@@ -18,7 +18,7 @@
 #include "absl/strings/match.h"
 #include "proxy_wasm_intrinsics.h"
 
-// Checks the client referrer and host headers match and
+// Checks the client referer and host headers match and
 // serves a 403 forbidden error if not.
 class MyHttpContext : public Context {
  public:
