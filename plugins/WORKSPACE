@@ -37,6 +37,34 @@ load("@com_github_nelhage_rules_boost//:boost/boost.bzl", "boost_deps")
 
 boost_deps()
 
+# JWT verification lib for C++.
+http_archive(
+    name = "jwt_verify_lib",
+    sha256 = "637e4983506c4f26bbe2808ae4e1944e46cbb2277d34ff0b8a3b72bdac3c4b91",
+    strip_prefix = "jwt_verify_lib-b59e8075d4a4f975ba6f109e1916d6e60aeb5613",
+    url = "https://github.com/google/jwt_verify_lib/archive/b59e8075d4a4f975ba6f109e1916d6e60aeb5613.tar.gz",
+)
+bind(
+    name = "abseil_strings",
+    actual = "@com_google_absl//absl/strings:strings",
+)
+bind(
+    name = "abseil_flat_hash_set",
+    actual = "@com_google_absl//absl/container:flat_hash_set",
+)
+bind(
+    name = "abseil_time",
+    actual = "@com_google_absl//absl/time:time",
+)
+bind(
+    name = "protobuf",
+    actual = "@com_google_protobuf//:protobuf",
+)
+bind(
+    name = "ssl",
+    actual = "@boringssl//:ssl",
+)
+
 # --- TEST RUNNER DEPENDENCIES ---
 
 # Testing frameworks.
