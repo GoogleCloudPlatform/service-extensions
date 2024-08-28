@@ -13,19 +13,80 @@
 // limitations under the License.
 
 // [START serviceextensions_plugin_jwt_auth]
+#include <boost/url/parse.hpp>
+#include <boost/url/url.hpp>
+
 #include "jwt_verify_lib/verify.h"
 #include "proxy_wasm_intrinsics.h"
 
+class MyRootContext : public RootContext {
+ public:
+  explicit MyRootContext(uint32_t id, std::string_view root_id)
+      : RootContext(id, root_id) {}
+
+  bool onConfigure(size_t config_len) override {
+    // Fetch plugin config and take ownership of the buffer.
+    config_ =
+        getBufferBytes(WasmBufferType::PluginConfiguration, 0, config_len);
+
+    // Read the RSA key.
+    const auto rsa_key = config_->toString();
+    jwks = google::jwt_verify::Jwks::createFrom(
+        rsa_key, google::jwt_verify::Jwks::Type::PEM);
+    return jwks->getStatus() == google::jwt_verify::Status::Ok;
+  }
+
+  google::jwt_verify::JwksPtr jwks;
+
+ private:
+  WasmDataPtr config_;
+};
+
 class MyHttpContext : public Context {
  public:
-  explicit MyHttpContext(uint32_t id, RootContext* root) : Context(id, root) {}
+  explicit MyHttpContext(uint32_t id, RootContext* root)
+      : Context(id, root), root_(static_cast<MyRootContext*>(root)) {}
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
+    const auto path = getRequestHeader(":path");
+    if (path && path->size() > 0) {
+      boost::system::result<boost::urls::url> url =
+          boost::urls::parse_uri_reference(path->view());
+      auto it = url->params().find("jwt");
+      if (it == url->params().end()) {
+        LOG_INFO("Access forbidden - missing token.");
+        sendLocalResponse(403, "", "Access forbidden - missing token.\n", {});
+        return FilterHeadersStatus::StopAllIterationAndWatermark;
+      }
+
+      google::jwt_verify::Jwt jwt;
+      if (jwt.parseFromString((*it).value) != google::jwt_verify::Status::Ok) {
+        LOG_INFO("Access forbidden - invalid token.");
+        sendLocalResponse(403, "", "Access forbidden - invalid token.\n", {});
+        return FilterHeadersStatus::StopAllIterationAndWatermark;
+      }
+
+      const auto status = google::jwt_verify::verifyJwt(jwt, *root_->jwks);
+      if (status != google::jwt_verify::Status::Ok) {
+        LOG_INFO("Access forbidden - " +
+                 google::jwt_verify::getStatusString(status));
+        sendLocalResponse(403, "", "Access forbidden.\n", {});
+        return FilterHeadersStatus::StopAllIterationAndWatermark;
+      }
+
+      // Strip the JWT from the URL after validation.
+      url->params().erase(it);
+      replaceRequestHeader(":path", url->buffer());
+    }
+
     return FilterHeadersStatus::Continue;
   }
+
+ private:
+  const MyRootContext* root_;
 };
 
 static RegisterContextFactory register_StaticContext(
-    CONTEXT_FACTORY(MyHttpContext), ROOT_FACTORY(RootContext));
+    CONTEXT_FACTORY(MyHttpContext), ROOT_FACTORY(MyRootContext));
 // [END serviceextensions_plugin_jwt_auth]

@@ -8,6 +8,8 @@ proxy_wasm_plugin_cpp(
     deps = [
         "@proxy_wasm_cpp_sdk//contrib:contrib_lib",
         "@jwt_verify_lib//:jwt_verify_lib",
+        "//:boost_exception",
+        "@boost//:url",
     ],
     linkopts = [
         # To avoid the error:
@@ -19,6 +21,7 @@ proxy_wasm_plugin_cpp(
 
 proxy_wasm_tests(
     name = "tests",
+    config = ":publickey.pem",
     plugins = [
         ":plugin_cpp.wasm",
     ],
