@@ -29,7 +29,7 @@ class MyRootContext : public RootContext {
     config_ =
         getBufferBytes(WasmBufferType::PluginConfiguration, 0, config_len);
 
-    // Read the RSA key.
+    // Read the RSA key from the config file.
     const auto rsa_key = config_->toString();
     jwks = google::jwt_verify::Jwks::createFrom(
         rsa_key, google::jwt_verify::Jwks::Type::PEM);
@@ -54,6 +54,7 @@ class MyHttpContext : public Context {
       boost::system::result<boost::urls::url> url =
           boost::urls::parse_uri_reference(path->view());
       auto it = url->params().find("jwt");
+      // Check if the JWT token exists.
       if (it == url->params().end()) {
         LOG_INFO("Access forbidden - missing token.");
         sendLocalResponse(403, "", "Access forbidden - missing token.\n", {});
@@ -61,12 +62,14 @@ class MyHttpContext : public Context {
       }
 
       google::jwt_verify::Jwt jwt;
+      // Check if the JWT token is valid.
       if (jwt.parseFromString((*it).value) != google::jwt_verify::Status::Ok) {
         LOG_INFO("Access forbidden - invalid token.");
         sendLocalResponse(403, "", "Access forbidden - invalid token.\n", {});
         return FilterHeadersStatus::StopAllIterationAndWatermark;
       }
 
+      // Check if the JWT is allowed.
       const auto status = google::jwt_verify::verifyJwt(jwt, *root_->jwks);
       if (status != google::jwt_verify::Status::Ok) {
         LOG_INFO("Access forbidden - " +
