@@ -63,6 +63,9 @@ for your own plugin. Extend them to fit your particular use case.
 *   [Normalize a HTTP header on request](samples/normalize_header): Creates a new
     HTTP header (client-device-type) to shard requests based on device according
     to the existence of HTTP Client Hints or User-Agent header values.
+*   [Validate client JWT for authorization](samples/jwt_auth): Ensures user
+    authentication by verifying an RS256-signed JWT token in the query string
+    and subsequently removing it.
 
 # Samples tests
 
