@@ -9,10 +9,9 @@ test {
   benchmark: false
   request_headers {
     input {
-      header { key: "Host" value: "www.safe-site.com" }
       header { key: "Referer" value: "https://www.safe-site.com/somepage" }
     }
-    result {has_header { key: "Allowed" value: "true" } }
+    result {has_header { key: "my-plugin-allowed" value: "true" } }
   }
 }
 # Referer and Host not match, expected block request with 403 status code.
@@ -21,14 +20,13 @@ test {
   benchmark: false
   request_headers {
     input {
-      header { key: "Host" value: "www.safe-site.com" }
       header { key: "Referer" value: "https://www.forbidden-site.com/somepage" }
     }
     result {
       immediate { http_status: 403 details: "" }
       body { exact: "Forbidden - Request ID: 123456789000000000" }
       log { regex: ".+Forbidden - Request ID: 123456789000000000" }
-      no_header { key: "Allowed"}
+      no_header { key: "my-plugin-allowed"}
     }
   }
 }
