@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // [START serviceextensions_plugin_redirect]
-#include "absl/strings/match.h"
+#include "absl/strings/str_replace.h"
 #include "proxy_wasm_intrinsics.h"
 
 // This sample may redirects the request for other URL according to the URL
@@ -24,13 +24,10 @@ class MyHttpContext : public Context {
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
-    const auto location = getRequestHeader("Location");
+    auto path = getRequestHeader(":path")->toString();
     // Change the values according to your needs.
-    if (location && absl::StrContainsIgnoreCase(
-                        location->view(), "service-extensions.com/main")) {
-      sendLocalResponse(
-          301, "", "",
-          {{"Location", "https://service-extensions.com/redirect"}});
+    if (absl::StrReplaceAll({{"/foo/images", "/bar/images"}}, &path) > 0) {
+      sendLocalResponse(301, "", "", {{"Location", path}});
 
       return FilterHeadersStatus::StopAllIterationAndWatermark;
     }

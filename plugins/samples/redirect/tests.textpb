@@ -1,22 +1,25 @@
-# No expected URL, no redirect.
+# No expected path, no redirect.
 test {
   name: "NoRedirect"
   benchmark: false
   request_headers {
-    input { header { key: "Location" value: "www.example.com" } } 
-    result { has_header { key: "Location" value: "www.example.com" } }
+    input { header { key: ":path" value: "/main/somepage/otherpage" } } 
+    result { 
+      has_header { key: ":path" value: "/main/somepage/otherpage" }
+      no_header { key: "Location" }
+    }
   }
 }
-# Wirh expected URL, expected imediate with http status code 301 and
+# With expected path, expected imediate with http status code 301 and
 # redirect to other location.
 test {
   name: "DoRedirect"
   benchmark: false
   request_headers {
-    input { header { key: "Location" value: "https://service-extensions.com/main/somepage" } } 
+    input { header { key: ":path" value: "/foo/images/picture.png" } } 
     result { 
       immediate { http_status: 301 details: "" }
-      has_header { key: "Location" value: "https://service-extensions.com/redirect" }
+      has_header { key: "Location" value: "/bar/images/picture.png" }
     }
   }
 }
