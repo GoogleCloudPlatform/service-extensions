@@ -20,7 +20,12 @@ import com.google.common.collect.ImmutableListMultimap;
 import com.google.protobuf.ByteString;
 import io.envoyproxy.envoy.config.core.v3.HeaderValue;
 import io.envoyproxy.envoy.config.core.v3.HeaderValueOption;
-import io.envoyproxy.envoy.service.ext_proc.v3.*;
+import io.envoyproxy.envoy.service.ext_proc.v3.ImmediateResponse;
+import io.envoyproxy.envoy.service.ext_proc.v3.HeaderMutation;
+import io.envoyproxy.envoy.service.ext_proc.v3.HeadersResponse;
+import io.envoyproxy.envoy.service.ext_proc.v3.CommonResponse;
+import io.envoyproxy.envoy.service.ext_proc.v3.BodyResponse;
+import io.envoyproxy.envoy.service.ext_proc.v3.BodyMutation;
 import io.envoyproxy.envoy.type.v3.HttpStatus;
 
 import java.util.Map;
@@ -87,22 +92,17 @@ public class ServiceCalloutTools {
      *
      * @param bodyResponseBuilder Builder for modifying response body
      * @param body                The body content to be set
-     * @param clearBody           Boolean indicating whether to clear the body
      * @param clearRouteCache     Boolean indicating whether to clear the route cache
      * @return Constructed BodyResponse object
      */
-    public static BodyResponse AddBodyMutations(
+    public static BodyResponse ddBodyMutations(
             BodyResponse.Builder bodyResponseBuilder,
             String body,
-            Boolean clearBody,
             Boolean clearRouteCache) {
         CommonResponse.Builder responseBuilder = bodyResponseBuilder.getResponseBuilder();
         BodyMutation.Builder bodyBuilder = responseBuilder.getBodyMutationBuilder();
         if (body != null) {
             bodyBuilder.setBody(ByteString.copyFromUtf8(body));
-        }
-        if (clearBody != null) {
-            bodyBuilder.setClearBody(clearBody);
         }
         if (clearRouteCache != null) {
             responseBuilder.setClearRouteCache(clearRouteCache);

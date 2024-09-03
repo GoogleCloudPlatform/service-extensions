@@ -16,7 +16,14 @@ package service;
  * limitations under the License.
  */
 
-import io.envoyproxy.envoy.service.ext_proc.v3.*;
+
+import io.envoyproxy.envoy.service.ext_proc.v3.ProcessingRequest;
+import io.envoyproxy.envoy.service.ext_proc.v3.ProcessingResponse;
+import io.envoyproxy.envoy.service.ext_proc.v3.ExternalProcessorGrpc;
+import io.envoyproxy.envoy.service.ext_proc.v3.HttpHeaders;
+import io.envoyproxy.envoy.service.ext_proc.v3.HeadersResponse;
+import io.envoyproxy.envoy.service.ext_proc.v3.BodyResponse;
+import io.envoyproxy.envoy.service.ext_proc.v3.HttpBody;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;

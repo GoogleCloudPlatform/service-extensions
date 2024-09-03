@@ -19,6 +19,7 @@ package example;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
+import com.google.common.collect.ImmutableMap;
 import io.envoyproxy.envoy.service.ext_proc.v3.HeadersResponse;
 import io.envoyproxy.envoy.service.ext_proc.v3.HttpHeaders;
 import service.HeadersOrImmediateResponse;
@@ -47,7 +48,7 @@ public class AddHeader extends ServiceCallout {
     public Optional<HeadersOrImmediateResponse> onRequestHeaders(HttpHeaders headers) {
         HeadersResponse.Builder headerResponseBuilder = HeadersResponse.newBuilder();
         HeadersResponse modifiedHeaders = addHeaderMutations(
-                headerResponseBuilder, ImmutableListMultimap.of("request-header", "added-request", "c", "d").entries());
+                headerResponseBuilder, ImmutableMap.of("request-header", "added-request", "c", "d").entrySet());
         HeadersResponse finalHeaders = configureHeadersResponse(modifiedHeaders.toBuilder(), null, null, true);
 
         return Optional.of(HeadersOrImmediateResponse.ofHeaders(finalHeaders));
@@ -56,7 +57,7 @@ public class AddHeader extends ServiceCallout {
     @Override
     public void onResponseHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers) {
         HeadersResponse modifiedHeaders = addHeaderMutations(
-                headerResponse, ImmutableListMultimap.of("response-header", "added-response", "c", "d").entries());
+                headerResponse, ImmutableMap.of("response-header", "added-response", "c", "d").entrySet());
         HeadersResponse finalHeaders = configureHeadersResponse(modifiedHeaders.toBuilder(), null, ImmutableList.of("c"), false);
         headerResponse.mergeFrom(finalHeaders);
     }

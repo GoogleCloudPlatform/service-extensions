@@ -13,7 +13,10 @@ import service.ServiceCallout;
 import java.lang.reflect.Method;
 import java.util.Optional;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
+
 
 public class BasicCalloutServerTest {
 

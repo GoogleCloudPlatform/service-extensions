@@ -39,12 +39,12 @@ public class AddBody extends ServiceCallout {
 
     @Override
     public void onRequestBody(BodyResponse.Builder bodyResponse, HttpBody body) {
-        AddBodyMutations(bodyResponse, "body added", null, null);
+        AddBodyMutations(bodyResponse, "body added", null);
     }
 
     @Override
     public void onResponseBody(BodyResponse.Builder bodyResponse, HttpBody body) {
-        AddBodyMutations(bodyResponse, "body replaced", null, null);
+        AddBodyMutations(bodyResponse, "body replaced",  null);
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {

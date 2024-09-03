@@ -38,7 +38,7 @@ public class ServiceCalloutToolsTest {
 
     @Test
     public void testAddBodyMutationsResponse() {
-        BodyResponse response = ServiceCalloutTools.AddBodyMutations(bodyResponseBuilder, null, null, null);
+        BodyResponse response = ServiceCalloutTools.AddBodyMutations(bodyResponseBuilder, null, null);
 
         assertNotNull(response);
         assertNotNull(response.getResponse());
