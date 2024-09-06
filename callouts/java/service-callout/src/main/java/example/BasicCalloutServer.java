@@ -1,13 +1,11 @@
-package example;
-
 /*
- * Copyright 2015 The gRPC Authors
+ * Copyright (c) 2024 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,60 +13,116 @@ package example;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+package example;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableListMultimap;
-import io.envoyproxy.envoy.service.ext_proc.v3.BodyResponse;
-import io.envoyproxy.envoy.service.ext_proc.v3.HeadersResponse;
+import com.google.common.collect.ImmutableMap;
 import io.envoyproxy.envoy.service.ext_proc.v3.HttpBody;
 import io.envoyproxy.envoy.service.ext_proc.v3.HttpHeaders;
-import service.HeadersOrImmediateResponse;
+import io.envoyproxy.envoy.service.ext_proc.v3.ProcessingResponse;
 import service.ServiceCallout;
 
 import java.io.IOException;
-import java.util.Optional;
 
+import static service.ServiceCalloutTools.addBodyMutations;
 import static service.ServiceCalloutTools.addHeaderMutations;
-import static service.ServiceCalloutTools.AddBodyMutations;
-import static service.ServiceCalloutTools.configureHeadersResponse;
-
 
 /**
- *  Example callout server.
- *
- *  Provides a non-comprehensive set of responses for each of the callout events.
+ * Example callout server for processing HTTP headers and bodies.
+ * <p>
+ * This class handles several callout events and demonstrates how to mutate headers and bodies in both requests and responses.
+ * It provides a basic implementation for:
+ * <ul>
+ *     <li>Request headers: Adds specific headers and clears the route cache.</li>
+ *     <li>Response headers: Adds and removes specific headers without clearing the route cache.</li>
+ *     <li>Request body: Appends content to the body.</li>
+ *     <li>Response body: Replaces the body with a predefined value.</li>
+ * </ul>
  */
 public class BasicCalloutServer extends ServiceCallout {
 
+    /**
+     * Modifies the incoming request headers by adding specific key-value pairs.
+     * <p>
+     * This method appends two headers, "request-header" with the value "added-request" and "c" with "d",
+     * while clearing the route cache to ensure the new route is calculated.
+     *
+     * @param processingResponseBuilder the builder used to construct the {@link ProcessingResponse}.
+     * @param headers the {@link HttpHeaders} representing the original request headers.
+     */
     @Override
-    public Optional<HeadersOrImmediateResponse> onRequestHeaders(HttpHeaders headers) {
-        HeadersResponse.Builder headerResponseBuilder = HeadersResponse.newBuilder();
-        HeadersResponse modifiedHeaders = addHeaderMutations(
-                headerResponseBuilder, ImmutableListMultimap.of("request-header", "added-request", "c", "d").entries());
-        HeadersResponse finalHeaders = configureHeadersResponse(modifiedHeaders.toBuilder(), null, null, true);
+    public void onRequestHeaders(ProcessingResponse.Builder processingResponseBuilder,
+                                 HttpHeaders headers) {
 
-        return Optional.of(HeadersOrImmediateResponse.ofHeaders(finalHeaders));
+        // Modify headers for the request
+        addHeaderMutations(
+                processingResponseBuilder.getRequestHeadersBuilder(),
+                ImmutableMap.of("request-header", "added-request", "c", "d").entrySet(),  // Headers to add
+                null,  // No headers to remove
+                true,  // Clear route cache
+                null   // No append action
+        );
     }
 
+    /**
+     * Modifies the outgoing response headers by adding new headers and removing existing ones.
+     * <p>
+     * This method appends two headers, "response-header" with the value "added-response" and "c" with "d",
+     * while removing the "foo" header. It does not clear the route cache.
+     *
+     * @param processingResponseBuilder the builder used to construct the {@link ProcessingResponse}.
+     * @param headers the {@link HttpHeaders} representing the original response headers.
+     */
     @Override
-    public void onResponseHeaders(HeadersResponse.Builder headerResponse, HttpHeaders headers) {
-        HeadersResponse modifiedHeaders = addHeaderMutations(
-                headerResponse, ImmutableListMultimap.of("response-header", "added-response", "c", "d").entries());
-        HeadersResponse finalHeaders = configureHeadersResponse(modifiedHeaders.toBuilder(), null, ImmutableList.of("c"), false);
-        headerResponse.mergeFrom(finalHeaders);
+    public void onResponseHeaders(ProcessingResponse.Builder processingResponseBuilder,
+                                  HttpHeaders headers) {
+        // Modify headers for the response
+        addHeaderMutations(
+                processingResponseBuilder.getResponseHeadersBuilder(),
+                ImmutableMap.of("response-header", "added-response", "c", "d").entrySet(),  // Headers to add
+                ImmutableList.of("foo"),  // Headers to remove
+                false,  // Do not clear route cache
+                null  // No append action
+        );
     }
 
+    /**
+     * Handles the request body by appending a custom suffix to the existing body.
+     * <p>
+     * The method appends "-added-body" to the original HTTP request body without clearing it.
+     *
+     * @param processingResponseBuilder the builder used to construct the {@link ProcessingResponse}.
+     * @param body the {@link HttpBody} object representing the original request body.
+     */
     @Override
-    public void onRequestBody(BodyResponse.Builder bodyResponse, HttpBody body) {
-        AddBodyMutations(bodyResponse, "body added", null);
+    public void onRequestBody(ProcessingResponse.Builder processingResponseBuilder, HttpBody body) {
+        // Modify the body by appending "-added-body" and ensure no clearBody action
+        addBodyMutations(processingResponseBuilder.getRequestBodyBuilder(), body.getBody().toStringUtf8() + "-added-body", null, null);
     }
 
+    /**
+     * Handles the response body by replacing it with a static value.
+     * <p>
+     * The method completely replaces the original response body with "body replaced".
+     *
+     * @param processingResponseBuilder the builder used to construct the {@link ProcessingResponse}.
+     * @param body the {@link HttpBody} object representing the original response body.
+     */
     @Override
-    public void onResponseBody(BodyResponse.Builder bodyResponse, HttpBody body) {
-        AddBodyMutations(bodyResponse, "body replaced", true);
+    public void onResponseBody(ProcessingResponse.Builder processingResponseBuilder, HttpBody body) {
+        // Replace the body with "body replaced"
+        addBodyMutations(processingResponseBuilder.getResponseBodyBuilder(), "body replaced", null, null);
     }
 
+    /**
+     * Starts the callout server and listens for incoming gRPC requests.
+     * <p>
+     * The server will remain active until interrupted or terminated.
+     *
+     * @param args command-line arguments (not used).
+     * @throws IOException if an I/O error occurs during server startup.
+     * @throws InterruptedException if the server is interrupted while running.
+     */
     public static void main(String[] args) throws IOException, InterruptedException {
         final ServiceCallout server = new BasicCalloutServer();
         server.start();

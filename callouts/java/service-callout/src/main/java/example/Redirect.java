@@ -1,13 +1,11 @@
-package example;
-
 /*
- * Copyright 2024 The gRPC Authors
+ * Copyright (c) 2024 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,63 +13,70 @@ package example;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package example;
 
-import com.google.common.collect.ImmutableListMultimap;
+import com.google.common.collect.ImmutableMap;
 import io.envoyproxy.envoy.service.ext_proc.v3.HttpHeaders;
-import io.envoyproxy.envoy.service.ext_proc.v3.ImmediateResponse;
+import io.envoyproxy.envoy.service.ext_proc.v3.ProcessingResponse;
 import io.envoyproxy.envoy.type.v3.HttpStatus;
-import service.HeadersOrImmediateResponse;
+import io.envoyproxy.envoy.type.v3.StatusCode;
 import service.ServiceCallout;
 import service.ServiceCalloutTools;
 
 import java.io.IOException;
-import java.util.Optional;
 
 /**
- * Example callout server.
+ * Example callout server that performs an HTTP 301 redirect.
  * <p>
- * Provides a non-comprehensive set of responses for each of the possible
- * callout interactions.
- * <p>
- * For request header callouts we provide a mutation to add a header
- * '{header-request: request}', remove a header 'foo', and to clear the
- * route cache. On response header callouts, we respond with a mutation to add
- * the header '{header-response: response}'.
+ * This class demonstrates how to handle a request header callout and return an immediate 301 redirect response
+ * with a specified "Location" header. It modifies the {@link ProcessingResponse} to include the redirect status
+ * and relevant headers.
  */
 public class Redirect extends ServiceCallout {
 
-//    @Override
-//    public void OnRequestHeaders(ImmediateResponse.Builder immediateResponse, HttpHeaders headers) {
-//        List<Map.Entry<String, String>> redirectHeaders = Collections.singletonList(
-//                new AbstractMap.SimpleEntry<>("Location", "http://service-extensions.com/redirect")
-//        );
-//
-//        // Generate the immediate response using a utility method
-//        ServiceCalloutTools.BuildImmediateResponse(
-//                immediateResponse,
-//                redirectHeaders,
-//                HttpStatus.newBuilder().setCodeValue(301).build()
-//        );
-//    }
-
+    /**
+     * Handles request headers and triggers an immediate HTTP 301 redirect.
+     * <p>
+     * This method sets up a response that includes the status code 301 (Moved Permanently) and the "Location" header
+     * with a value of "http://service-extensions.com/redirect", signaling the client to redirect to this URL.
+     *
+     * @param processingResponseBuilder the {@link ProcessingResponse.Builder} used to construct the immediate response.
+     * @param headers                   the {@link HttpHeaders} representing the incoming request headers (not modified).
+     */
     @Override
-    public Optional<HeadersOrImmediateResponse> onRequestHeaders(HttpHeaders headers) {
-        ImmutableListMultimap<String, String> redirectHeaders = ImmutableListMultimap.of(
+    public void onRequestHeaders(ProcessingResponse.Builder processingResponseBuilder,
+                                 HttpHeaders headers) {
+
+        // Define redirect headers using ImmutableMap
+        ImmutableMap<String, String> redirectHeaders = ImmutableMap.of(
                 "Location", "http://service-extensions.com/redirect"
         );
 
-        ImmediateResponse immediateResponse = ServiceCalloutTools.BuildImmediateResponse(
-                HttpStatus.newBuilder().setCodeValue(301).build(),
-                redirectHeaders
-        );
+        // Prepare the status for 301 redirect
+        HttpStatus status = HttpStatus.newBuilder().setCode(StatusCode.forNumber(301)).build();
 
-        return Optional.of(HeadersOrImmediateResponse.ofImmediate(immediateResponse));
+        // Modify the ImmediateResponse.Builder directly using the updated method
+        ServiceCalloutTools.buildImmediateResponse(
+                processingResponseBuilder.getImmediateResponseBuilder(),
+                status,
+                redirectHeaders,
+                null,  // No headers to remove in this case
+                null   // No body for the response
+        );
     }
 
+    /**
+     * Starts the callout server and listens for incoming gRPC requests.
+     * <p>
+     * The server will remain active until interrupted or terminated.
+     *
+     * @param args command-line arguments (not used).
+     * @throws IOException if an I/O error occurs during server startup.
+     * @throws InterruptedException if the server is interrupted while running.
+     */
     public static void main(String[] args) throws IOException, InterruptedException {
         final ServiceCallout server = new Redirect();
         server.start();
         server.blockUntilShutdown();
     }
-
 }
