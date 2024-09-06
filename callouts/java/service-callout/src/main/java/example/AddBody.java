@@ -7,6 +7,7 @@
  *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
+ * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
@@ -51,6 +52,7 @@ public class AddBody extends ServiceCallout {
      * @param processingResponseBuilder the builder used to construct the {@link ProcessingResponse}.
      * @param body the {@link HttpBody} object representing the original request body.
      */
+    @Override
     public void onRequestBody(ProcessingResponse.Builder processingResponseBuilder, HttpBody body) {
         // Modify the body by appending "-added-body" and ensure no clearBody action
         addBodyMutations(processingResponseBuilder.getRequestBodyBuilder(), body.getBody().toStringUtf8() + "-added-body", null, null);
@@ -64,6 +66,7 @@ public class AddBody extends ServiceCallout {
      * @param processingResponseBuilder the builder used to construct the {@link ProcessingResponse}.
      * @param body the {@link HttpBody} object representing the original response body.
      */
+    @Override
     public void onResponseBody(ProcessingResponse.Builder processingResponseBuilder, HttpBody body) {
         // Replace the body with "body replaced"
         addBodyMutations(processingResponseBuilder.getResponseBodyBuilder(), "body replaced", null, null);
