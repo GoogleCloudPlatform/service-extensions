@@ -32,14 +32,23 @@ import service.ServiceCalloutTools;
  */
 public class Redirect extends ServiceCallout {
 
-    /**
-     * Constructor that accepts a ServiceCallout builder.
-     * Passes the builder to the superclass (ServiceCallout) for configuration.
-     *
-     * @param builder The ServiceCallout builder used for custom server configuration.
-     */
-    public Redirect(ServiceCallout.Builder builder) {
+    // Constructor that calls the superclass constructor
+    public Redirect(Redirect.Builder builder) {
         super(builder);
+    }
+
+    // Builder specific to Redirect
+    public static class Builder extends ServiceCallout.Builder<Redirect.Builder> {
+
+        @Override
+        public Redirect build() {
+            return new Redirect(this);
+        }
+
+        @Override
+        protected Redirect.Builder self() {
+            return this;
+        }
     }
 
     /**
@@ -96,10 +105,8 @@ public class Redirect extends ServiceCallout {
      */
     public static void main(String[] args) throws Exception {
         // Create a builder for ServiceCallout with custom configuration
-        ServiceCallout.Builder builder = new ServiceCallout.Builder();
-
-        // Create AddBody server using the configured builder
-        Redirect server = new Redirect(builder);
+        Redirect server = new Redirect.Builder()
+                .build();
 
         // Start the server and block until shutdown
         server.start();

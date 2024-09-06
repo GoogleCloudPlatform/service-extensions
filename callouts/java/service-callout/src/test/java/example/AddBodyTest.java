@@ -32,12 +32,9 @@ public class AddBodyTest {
     private AddBody server;
 
     @Before
-    public void setUp() throws Exception {
-        ServiceCallout.Builder builder = new ServiceCallout.Builder();
-
-        server = new AddBody(builder);
-
-        server.start();
+    public void setUp(){
+        server = new AddBody.Builder()
+                .build();
     }
 
     @After

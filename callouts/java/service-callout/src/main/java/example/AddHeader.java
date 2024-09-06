@@ -34,14 +34,23 @@ import static service.ServiceCalloutTools.addHeaderMutations;
  */
 public class AddHeader extends ServiceCallout {
 
-    /**
-     * Constructor that accepts a ServiceCallout builder.
-     * Passes the builder to the superclass (ServiceCallout) for configuration.
-     *
-     * @param builder The ServiceCallout builder used for custom server configuration.
-     */
-    public AddHeader(ServiceCallout.Builder builder) {
+    // Constructor that calls the superclass constructor
+    public AddHeader(AddHeader.Builder builder) {
         super(builder);
+    }
+
+    // Builder specific to AddHeader
+    public static class Builder extends ServiceCallout.Builder<AddHeader.Builder> {
+
+        @Override
+        public AddHeader build() {
+            return new AddHeader(this);
+        }
+
+        @Override
+        protected AddHeader.Builder self() {
+            return this;
+        }
     }
 
     /**
@@ -112,10 +121,8 @@ public class AddHeader extends ServiceCallout {
      */
     public static void main(String[] args) throws Exception {
         // Create a builder for ServiceCallout with custom configuration
-        ServiceCallout.Builder builder = new ServiceCallout.Builder();
-
-        // Create AddBody server using the configured builder
-        AddHeader server = new AddHeader(builder);
+        AddHeader server = new AddHeader.Builder()
+                .build();
 
         // Start the server and block until shutdown
         server.start();

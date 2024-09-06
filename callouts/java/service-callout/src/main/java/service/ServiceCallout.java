@@ -58,7 +58,7 @@ public class ServiceCallout {
     private int serverThreadCount;
     private boolean enableInsecurePort;
 
-    public ServiceCallout(Builder builder) {
+    protected ServiceCallout(Builder<?> builder) {
         this.ip = Optional.ofNullable(builder.ip).orElse("0.0.0.0");
         this.port = Optional.ofNullable(builder.port).orElse(8443);
         this.insecurePort = Optional.ofNullable(builder.insecurePort).orElse(8443);
@@ -66,18 +66,23 @@ public class ServiceCallout {
         this.healthCheckPort = Optional.ofNullable(builder.healthCheckPort).orElse(8000);
         this.healthCheckPath = Optional.ofNullable(builder.healthCheckPath).orElse("/");
         this.separateHealthCheck = Optional.ofNullable(builder.separateHealthCheck).orElse(false);
+
+        // Handle cert path and cert data
         this.certPath = Optional.ofNullable(builder.certPath).orElse("certs/server.crt");
-        this.cert = Optional.ofNullable(builder.cert).orElseGet(() -> readFileToBytes(this.certPath));
+        this.cert = Optional.ofNullable(builder.cert)
+                .orElseGet(() -> readFileToBytes(this.certPath)); // Read using final path
+
+        // Handle cert key path and cert key data
         this.certKeyPath = Optional.ofNullable(builder.certKeyPath).orElse("certs/pkcs8_key.pem");
-        this.certKey = Optional.ofNullable(builder.certKey).orElseGet(() -> readFileToBytes(this.certKeyPath));
+        this.certKey = Optional.ofNullable(builder.certKey)
+                .orElseGet(() -> readFileToBytes(this.certKeyPath)); // Read using final path
+
         this.serverThreadCount = Optional.ofNullable(builder.serverThreadCount).orElse(2);
         this.enableInsecurePort = Optional.ofNullable(builder.enableInsecurePort).orElse(true);
     }
 
-    /**
-     * Builder class for configuring and creating instances of {@link ServiceCallout}.
-     */
-    public static class Builder {
+    // Builder class using Generics
+    public static class Builder<T extends Builder<T>> {
         private String ip;
         private Integer port;
         private Integer insecurePort;
@@ -92,69 +97,74 @@ public class ServiceCallout {
         private Integer serverThreadCount;
         private Boolean enableInsecurePort;
 
-        public Builder setIp(String ip) {
+        public T setIp(String ip) {
             this.ip = ip;
-            return this;
+            return self();
         }
 
-        public Builder setPort(Integer port) {
+        public T setPort(Integer port) {
             this.port = port;
-            return this;
+            return self();
         }
 
-        public Builder setInsecurePort(Integer insecurePort) {
+        public T setInsecurePort(Integer insecurePort) {
             this.insecurePort = insecurePort;
-            return this;
+            return self();
         }
 
-        public Builder setHealthCheckIp(String healthCheckIp) {
+        public T setHealthCheckIp(String healthCheckIp) {
             this.healthCheckIp = healthCheckIp;
-            return this;
+            return self();
         }
 
-        public Builder setHealthCheckPort(Integer healthCheckPort) {
+        public T setHealthCheckPort(Integer healthCheckPort) {
             this.healthCheckPort = healthCheckPort;
-            return this;
+            return self();
         }
 
-        public Builder setHealthCheckPath(String healthCheckPath) {
+        public T setHealthCheckPath(String healthCheckPath) {
             this.healthCheckPath = healthCheckPath;
-            return this;
+            return self();
         }
 
-        public Builder setSeparateHealthCheck(Boolean separateHealthCheck) {
+        public T setSeparateHealthCheck(Boolean separateHealthCheck) {
             this.separateHealthCheck = separateHealthCheck;
-            return this;
+            return self();
         }
 
-        public Builder setCert(byte[] cert) {
+        public T setCert(byte[] cert) {
             this.cert = cert;
-            return this;
+            return self();
         }
 
-        public Builder setCertPath(String certPath) {
+        public T setCertPath(String certPath) {
             this.certPath = certPath;
-            return this;
+            return self();
         }
 
-        public Builder setCertKey(byte[] certKey) {
+        public T setCertKey(byte[] certKey) {
             this.certKey = certKey;
-            return this;
+            return self();
         }
 
-        public Builder setCertKeyPath(String certKeyPath) {
+        public T setCertKeyPath(String certKeyPath) {
             this.certKeyPath = certKeyPath;
-            return this;
+            return self();
         }
 
-        public Builder setServerThreadCount(Integer serverThreadCount) {
+        public T setServerThreadCount(Integer serverThreadCount) {
             this.serverThreadCount = serverThreadCount;
-            return this;
+            return self();
         }
 
-        public Builder setEnableInsecurePort(Boolean enableInsecurePort) {
+        public T setEnableInsecurePort(Boolean enableInsecurePort) {
             this.enableInsecurePort = enableInsecurePort;
-            return this;
+            return self();
+        }
+
+        // Return type is generic to allow subclass builders to work correctly
+        protected T self() {
+            return (T) this;
         }
 
         public ServiceCallout build() {

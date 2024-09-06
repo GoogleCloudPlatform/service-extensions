@@ -34,14 +34,23 @@ import static service.ServiceCalloutTools.addBodyMutations;
  */
 public class AddBody extends ServiceCallout {
 
-    /**
-     * Constructor that accepts a ServiceCallout builder.
-     * Passes the builder to the superclass (ServiceCallout) for configuration.
-     *
-     * @param builder The ServiceCallout builder used for custom server configuration.
-     */
-    public AddBody(ServiceCallout.Builder builder) {
+    // Constructor that calls the superclass constructor
+    public AddBody(AddBody.Builder builder) {
         super(builder);
+    }
+
+    // Builder specific to AddBody
+    public static class Builder extends ServiceCallout.Builder<AddBody.Builder> {
+
+        @Override
+        public AddBody build() {
+            return new AddBody(this);
+        }
+
+        @Override
+        protected AddBody.Builder self() {
+            return this;
+        }
     }
 
     /**
@@ -95,10 +104,8 @@ public class AddBody extends ServiceCallout {
      */
     public static void main(String[] args) throws Exception {
         // Create a builder for ServiceCallout with custom configuration
-        ServiceCallout.Builder builder = new ServiceCallout.Builder();
-
-        // Create AddBody server using the configured builder
-        AddBody server = new AddBody(builder);
+        AddBody server = new AddBody.Builder()
+                .build();
 
         // Start the server and block until shutdown
         server.start();
