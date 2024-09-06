@@ -1,23 +1,39 @@
+/*
+ * Copyright (c) 2024 Google, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package example;
 
-import io.envoyproxy.envoy.service.ext_proc.v3.BodyResponse;
-import io.envoyproxy.envoy.service.ext_proc.v3.HttpBody;
+import com.google.common.truth.Truth;
+import com.google.protobuf.ByteString;
+import io.envoyproxy.envoy.service.ext_proc.v3.ProcessingResponse;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import service.ServiceCallout;
+import service.ServiceCalloutTools;
 
 import java.lang.reflect.Method;
 
-import static org.junit.Assert.assertNotNull;
 
 public class AddBodyTest {
 
-    private AddBody server;
+    private BasicCalloutServer server;
 
     @Before
     public void setUp() {
-        server = new AddBody();
+        server = new BasicCalloutServer();
     }
 
     @After
@@ -27,26 +43,50 @@ public class AddBodyTest {
 
     @Test
     public void testOnRequestBody() {
-        BodyResponse.Builder bodyResponse = BodyResponse.newBuilder();
-        HttpBody body = HttpBody.getDefaultInstance();
+        ProcessingResponse.Builder processingResponseBuilder = ProcessingResponse.newBuilder();
 
-        server.onRequestBody(bodyResponse, body);
+        // Set the body content
+        String bodyContent = "New body content";
 
-        BodyResponse response = bodyResponse.build();
-        assertNotNull(response);
-        assertNotNull(response.getResponse());
+        // Call the body mutation utility
+        ServiceCalloutTools.addBodyMutations(
+                processingResponseBuilder.getRequestBodyBuilder(),
+                bodyContent,
+                false,
+                true
+        );
+
+        // Build the ProcessingResponse
+        ProcessingResponse response = processingResponseBuilder.build();
+
+        // Assert the response
+        Truth.assertThat(response).isNotNull();
+        Truth.assertThat(response.getRequestBody().getResponse().getBodyMutation().getBody())
+                .isEqualTo(ByteString.copyFromUtf8(bodyContent));
+
+        Truth.assertThat(response.getRequestBody().getResponse().getClearRouteCache()).isTrue();
     }
 
     @Test
     public void testOnResponseBody() {
-        BodyResponse.Builder bodyResponse = BodyResponse.newBuilder();
-        HttpBody body = HttpBody.getDefaultInstance();
+        ProcessingResponse.Builder processingResponseBuilder = ProcessingResponse.newBuilder();
 
-        server.onResponseBody(bodyResponse, body);
+        // Call the body mutation utility to clear the body
+        ServiceCalloutTools.addBodyMutations(
+                processingResponseBuilder.getResponseBodyBuilder(),
+                null,  // No body content
+                true,  // Clear the body
+                false  // Do not clear route cache
+        );
 
-        BodyResponse response = bodyResponse.build();
-        assertNotNull(response);
-        assertNotNull(response.getResponse());
+        // Build the ProcessingResponse
+        ProcessingResponse response = processingResponseBuilder.build();
+
+        // Assert the response
+        Truth.assertThat(response).isNotNull();
+        Truth.assertThat(response.getResponseBody().getResponse().getBodyMutation().getClearBody()).isTrue();
+
+        Truth.assertThat(response.getResponseBody().getResponse().getClearRouteCache()).isFalse();
     }
 
     private void stopServer() throws Exception {
