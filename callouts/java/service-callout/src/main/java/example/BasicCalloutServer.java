@@ -22,8 +22,6 @@ import io.envoyproxy.envoy.service.ext_proc.v3.HttpHeaders;
 import io.envoyproxy.envoy.service.ext_proc.v3.ProcessingResponse;
 import service.ServiceCallout;
 
-import java.io.IOException;
-
 import static service.ServiceCalloutTools.addBodyMutations;
 import static service.ServiceCalloutTools.addHeaderMutations;
 
@@ -40,6 +38,16 @@ import static service.ServiceCalloutTools.addHeaderMutations;
  * </ul>
  */
 public class BasicCalloutServer extends ServiceCallout {
+
+    /**
+     * Constructor that accepts a ServiceCallout builder.
+     * Passes the builder to the superclass (ServiceCallout) for configuration.
+     *
+     * @param builder The ServiceCallout builder used for custom server configuration.
+     */
+    public BasicCalloutServer(ServiceCallout.Builder builder) {
+        super(builder);
+    }
 
     /**
      * Modifies the incoming request headers by adding specific key-value pairs.
@@ -115,16 +123,34 @@ public class BasicCalloutServer extends ServiceCallout {
     }
 
     /**
-     * Starts the callout server and listens for incoming gRPC requests.
+     * Main method to start the gRPC callout server with a custom configuration
+     * using the {@link ServiceCallout.Builder}.
      * <p>
-     * The server will remain active until interrupted or terminated.
+     * This method initializes the server with default or custom configurations,
+     * starts the server, and keeps it running until manually terminated.
+     * The server processes incoming gRPC requests for HTTP manipulations.
+     * </p>
      *
-     * @param args command-line arguments (not used).
-     * @throws IOException if an I/O error occurs during server startup.
-     * @throws InterruptedException if the server is interrupted while running.
+     * <p>Usage:</p>
+     * <pre>{@code
+     * ServiceCallout.Builder builder = new ServiceCallout.Builder()
+     *     .setIp("111.222.333.444")       // Customize IP
+     *     .setPort(8443)                  // Set the port for secure communication
+     *     .setEnableInsecurePort(true)    // Enable an insecure communication port
+     *     .setServerThreadCount(4);       // Set the number of server threads
+     * }</pre>
+     *
+     * @param args Command-line arguments, not used in this implementation.
+     * @throws Exception If an error occurs during server startup or shutdown.
      */
-    public static void main(String[] args) throws IOException, InterruptedException {
-        final ServiceCallout server = new BasicCalloutServer();
+    public static void main(String[] args) throws Exception {
+        // Create a builder for ServiceCallout with custom configuration
+        ServiceCallout.Builder builder = new ServiceCallout.Builder();
+
+        // Create AddBody server using the configured builder
+        BasicCalloutServer server = new BasicCalloutServer(builder);
+
+        // Start the server and block until shutdown
         server.start();
         server.blockUntilShutdown();
     }

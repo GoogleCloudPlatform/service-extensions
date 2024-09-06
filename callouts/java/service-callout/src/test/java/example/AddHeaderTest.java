@@ -36,8 +36,12 @@ public class AddHeaderTest {
     private AddHeader server;
 
     @Before
-    public void setUp() {
-        server = new AddHeader();
+    public void setUp() throws Exception {
+        ServiceCallout.Builder builder = new ServiceCallout.Builder();
+
+        server = new AddHeader(builder);
+
+        server.start();
     }
 
     @After

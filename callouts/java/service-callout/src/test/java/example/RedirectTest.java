@@ -37,8 +37,12 @@ public class RedirectTest {
     private Redirect server;
 
     @Before
-    public void setUp() {
-        server = new Redirect();
+    public void setUp() throws Exception {
+        ServiceCallout.Builder builder = new ServiceCallout.Builder();
+
+        server = new Redirect(builder);
+
+        server.start();
     }
 
     @After

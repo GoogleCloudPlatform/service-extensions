@@ -27,6 +27,7 @@ import io.grpc.netty.NettyServerBuilder;
 
 import java.io.IOException;
 import java.util.Optional;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -43,72 +44,122 @@ public class ServiceCallout {
     private static final Logger logger = Logger.getLogger(ServiceCallout.class.getName());
 
     private Server server;
-    private String ip = "0.0.0.0";
-    private int port = 8443;
-    private int insecurePort = 8443;
-    private String healthCheckIp = "0.0.0.0";
-    private int healthCheckPort = 8000;
-    private String healthCheckPath = "/";
-    private boolean separateHealthCheck = false;
-    private byte[] cert = null;
-    private String certPath = "certs/server.crt";
-    private byte[] certKey = null;
-    private String certKeyPath = "certs/pkcs8_key.pem";
-    private int serverThreadCount = 2;
-    private boolean enableInsecurePort = true;
+    private String ip;
+    private int port;
+    private int insecurePort;
+    private String healthCheckIp;
+    private int healthCheckPort;
+    private String healthCheckPath;
+    private boolean separateHealthCheck;
+    private byte[] cert;
+    private String certPath;
+    private byte[] certKey;
+    private String certKeyPath;
+    private int serverThreadCount;
+    private boolean enableInsecurePort;
 
-    /**
-     * Default constructor initializes the ServiceCallout with default server configurations.
-     */
-    public ServiceCallout() {
-        this(null, null, null, null, null, null, null, null, null, null, null, null, null);
+    public ServiceCallout(Builder builder) {
+        this.ip = Optional.ofNullable(builder.ip).orElse("0.0.0.0");
+        this.port = Optional.ofNullable(builder.port).orElse(8443);
+        this.insecurePort = Optional.ofNullable(builder.insecurePort).orElse(8443);
+        this.healthCheckIp = Optional.ofNullable(builder.healthCheckIp).orElse("0.0.0.0");
+        this.healthCheckPort = Optional.ofNullable(builder.healthCheckPort).orElse(8000);
+        this.healthCheckPath = Optional.ofNullable(builder.healthCheckPath).orElse("/");
+        this.separateHealthCheck = Optional.ofNullable(builder.separateHealthCheck).orElse(false);
+        this.certPath = Optional.ofNullable(builder.certPath).orElse("certs/server.crt");
+        this.cert = Optional.ofNullable(builder.cert).orElseGet(() -> readFileToBytes(this.certPath));
+        this.certKeyPath = Optional.ofNullable(builder.certKeyPath).orElse("certs/pkcs8_key.pem");
+        this.certKey = Optional.ofNullable(builder.certKey).orElseGet(() -> readFileToBytes(this.certKeyPath));
+        this.serverThreadCount = Optional.ofNullable(builder.serverThreadCount).orElse(2);
+        this.enableInsecurePort = Optional.ofNullable(builder.enableInsecurePort).orElse(true);
     }
 
     /**
-     * Overloaded constructor allowing custom configuration for the server.
-     *
-     * @param ip                 The IP address to bind the server.
-     * @param port               The secure port for the server.
-     * @param insecurePort        The insecure port for the server.
-     * @param healthCheckIp       The IP address for the health check.
-     * @param healthCheckPort     The port for the health check.
-     * @param healthCheckPath     The HTTP path for health checks.
-     * @param separateHealthCheck Whether a separate health check service is enabled.
-     * @param cert                The SSL certificate as a byte array.
-     * @param certPath            The file path to the SSL certificate.
-     * @param certKey             The private key for the SSL certificate as a byte array.
-     * @param certKeyPath         The file path to the private key.
-     * @param serverThreadCount   The number of threads to allocate for the server.
-     * @param enableInsecurePort  If true, enables the insecure port.
+     * Builder class for configuring and creating instances of {@link ServiceCallout}.
      */
-    public ServiceCallout(
-            String ip,
-            Integer port,
-            Integer insecurePort,
-            String healthCheckIp,
-            Integer healthCheckPort,
-            String healthCheckPath,
-            Boolean separateHealthCheck,
-            byte[] cert,
-            String certPath,
-            byte[] certKey,
-            String certKeyPath,
-            Integer serverThreadCount,
-            Boolean enableInsecurePort) {
+    public static class Builder {
+        private String ip;
+        private Integer port;
+        private Integer insecurePort;
+        private String healthCheckIp;
+        private Integer healthCheckPort;
+        private String healthCheckPath;
+        private Boolean separateHealthCheck;
+        private byte[] cert;
+        private String certPath;
+        private byte[] certKey;
+        private String certKeyPath;
+        private Integer serverThreadCount;
+        private Boolean enableInsecurePort;
 
-        this.ip = Optional.ofNullable(ip).orElse(this.ip);
-        this.port = Optional.ofNullable(port).orElse(this.port);
-        this.insecurePort = Optional.ofNullable(insecurePort).orElse(this.insecurePort);
-        this.healthCheckIp = Optional.ofNullable(healthCheckIp).orElse(this.healthCheckIp);
-        this.healthCheckPort = Optional.ofNullable(healthCheckPort).orElse(this.healthCheckPort);
-        this.healthCheckPath = Optional.ofNullable(healthCheckPath).orElse(this.healthCheckPath);
-        this.separateHealthCheck = Optional.ofNullable(separateHealthCheck).orElse(this.separateHealthCheck);
-        this.certPath = Optional.ofNullable(certPath).orElse(this.certPath);
-        this.cert = Optional.ofNullable(cert).orElseGet(() -> readFileToBytes(this.certPath));
-        this.certKeyPath = Optional.ofNullable(certKeyPath).orElse(this.certKeyPath);
-        this.certKey = Optional.ofNullable(certKey).orElseGet(() -> readFileToBytes(this.certKeyPath));
-        this.serverThreadCount = Optional.ofNullable(serverThreadCount).orElse(this.serverThreadCount);
-        this.enableInsecurePort = Optional.ofNullable(enableInsecurePort).orElse(this.enableInsecurePort);
+        public Builder setIp(String ip) {
+            this.ip = ip;
+            return this;
+        }
+
+        public Builder setPort(Integer port) {
+            this.port = port;
+            return this;
+        }
+
+        public Builder setInsecurePort(Integer insecurePort) {
+            this.insecurePort = insecurePort;
+            return this;
+        }
+
+        public Builder setHealthCheckIp(String healthCheckIp) {
+            this.healthCheckIp = healthCheckIp;
+            return this;
+        }
+
+        public Builder setHealthCheckPort(Integer healthCheckPort) {
+            this.healthCheckPort = healthCheckPort;
+            return this;
+        }
+
+        public Builder setHealthCheckPath(String healthCheckPath) {
+            this.healthCheckPath = healthCheckPath;
+            return this;
+        }
+
+        public Builder setSeparateHealthCheck(Boolean separateHealthCheck) {
+            this.separateHealthCheck = separateHealthCheck;
+            return this;
+        }
+
+        public Builder setCert(byte[] cert) {
+            this.cert = cert;
+            return this;
+        }
+
+        public Builder setCertPath(String certPath) {
+            this.certPath = certPath;
+            return this;
+        }
+
+        public Builder setCertKey(byte[] certKey) {
+            this.certKey = certKey;
+            return this;
+        }
+
+        public Builder setCertKeyPath(String certKeyPath) {
+            this.certKeyPath = certKeyPath;
+            return this;
+        }
+
+        public Builder setServerThreadCount(Integer serverThreadCount) {
+            this.serverThreadCount = serverThreadCount;
+            return this;
+        }
+
+        public Builder setEnableInsecurePort(Boolean enableInsecurePort) {
+            this.enableInsecurePort = enableInsecurePort;
+            return this;
+        }
+
+        public ServiceCallout build() {
+            return new ServiceCallout(this);
+        }
     }
 
     /**
@@ -132,7 +183,7 @@ public class ServiceCallout {
 
         server = serverBuilder
                 .addService(new ExternalProcessorImpl())
-                .executor(java.util.concurrent.Executors.newFixedThreadPool(serverThreadCount)) // Configurable thread pool
+                .executor(Executors.newFixedThreadPool(serverThreadCount)) // Configurable thread pool
                 .build()
                 .start();
 

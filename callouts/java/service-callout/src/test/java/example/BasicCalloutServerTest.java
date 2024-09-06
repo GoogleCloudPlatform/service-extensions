@@ -36,8 +36,12 @@ public class BasicCalloutServerTest {
     private BasicCalloutServer server;
 
     @Before
-    public void setUp() {
-        server = new BasicCalloutServer();
+    public void setUp() throws Exception {
+        ServiceCallout.Builder builder = new ServiceCallout.Builder();
+
+        server = new BasicCalloutServer(builder);
+
+        server.start();
     }
 
     @After

@@ -7,7 +7,6 @@
  *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
@@ -18,8 +17,6 @@ package example;
 import io.envoyproxy.envoy.service.ext_proc.v3.HttpBody;
 import io.envoyproxy.envoy.service.ext_proc.v3.ProcessingResponse;
 import service.ServiceCallout;
-
-import java.io.IOException;
 
 import static service.ServiceCalloutTools.addBodyMutations;
 
@@ -37,6 +34,16 @@ import static service.ServiceCalloutTools.addBodyMutations;
 public class AddBody extends ServiceCallout {
 
     /**
+     * Constructor that accepts a ServiceCallout builder.
+     * Passes the builder to the superclass (ServiceCallout) for configuration.
+     *
+     * @param builder The ServiceCallout builder used for custom server configuration.
+     */
+    public AddBody(ServiceCallout.Builder builder) {
+        super(builder);
+    }
+
+    /**
      * Handles the request body by appending a custom suffix to the existing body.
      * <p>
      * The method appends "-added-body" to the original HTTP request body without clearing it.
@@ -44,7 +51,6 @@ public class AddBody extends ServiceCallout {
      * @param processingResponseBuilder the builder used to construct the {@link ProcessingResponse}.
      * @param body the {@link HttpBody} object representing the original request body.
      */
-    @Override
     public void onRequestBody(ProcessingResponse.Builder processingResponseBuilder, HttpBody body) {
         // Modify the body by appending "-added-body" and ensure no clearBody action
         addBodyMutations(processingResponseBuilder.getRequestBodyBuilder(), body.getBody().toStringUtf8() + "-added-body", null, null);
@@ -58,23 +64,40 @@ public class AddBody extends ServiceCallout {
      * @param processingResponseBuilder the builder used to construct the {@link ProcessingResponse}.
      * @param body the {@link HttpBody} object representing the original response body.
      */
-    @Override
     public void onResponseBody(ProcessingResponse.Builder processingResponseBuilder, HttpBody body) {
         // Replace the body with "body replaced"
         addBodyMutations(processingResponseBuilder.getResponseBodyBuilder(), "body replaced", null, null);
     }
 
     /**
-     * Starts the callout server and listens for incoming gRPC requests.
+     * Main method to start the gRPC callout server with a custom configuration
+     * using the {@link ServiceCallout.Builder}.
      * <p>
-     * The server will remain active until interrupted or terminated.
+     * This method initializes the server with default or custom configurations,
+     * starts the server, and keeps it running until manually terminated.
+     * The server processes incoming gRPC requests for HTTP manipulations.
+     * </p>
      *
-     * @param args command-line arguments (not used).
-     * @throws IOException if an I/O error occurs during server startup.
-     * @throws InterruptedException if the server is interrupted while running.
+     * <p>Usage:</p>
+     * <pre>{@code
+     * ServiceCallout.Builder builder = new ServiceCallout.Builder()
+     *     .setIp("111.222.333.444")       // Customize IP
+     *     .setPort(8443)                  // Set the port for secure communication
+     *     .setEnableInsecurePort(true)    // Enable an insecure communication port
+     *     .setServerThreadCount(4);       // Set the number of server threads
+     * }</pre>
+     *
+     * @param args Command-line arguments, not used in this implementation.
+     * @throws Exception If an error occurs during server startup or shutdown.
      */
-    public static void main(String[] args) throws IOException, InterruptedException {
-        final ServiceCallout server = new AddBody();
+    public static void main(String[] args) throws Exception {
+        // Create a builder for ServiceCallout with custom configuration
+        ServiceCallout.Builder builder = new ServiceCallout.Builder();
+
+        // Create AddBody server using the configured builder
+        AddBody server = new AddBody(builder);
+
+        // Start the server and block until shutdown
         server.start();
         server.blockUntilShutdown();
     }
