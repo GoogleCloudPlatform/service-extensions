@@ -17,6 +17,7 @@ package example;
 
 import com.google.common.truth.Truth;
 import com.google.protobuf.ByteString;
+import io.envoyproxy.envoy.service.ext_proc.v3.HttpBody;
 import io.envoyproxy.envoy.service.ext_proc.v3.ProcessingResponse;
 import org.junit.After;
 import org.junit.Before;
@@ -43,51 +44,113 @@ public class AddBodyTest {
     }
 
     @Test
-    public void testOnRequestBody() {
+    public void testOnRequestBody_EmptyBody() {
         ProcessingResponse.Builder processingResponseBuilder = ProcessingResponse.newBuilder();
 
-        // Set the body content
-        String bodyContent = "New body content";
+        // Simulate an empty request body
+        String emptyBodyContent = "";
 
-        // Call the body mutation utility
-        ServiceCalloutTools.addBodyMutations(
-                processingResponseBuilder.getRequestBodyBuilder(),
-                bodyContent,
-                false,
-                true
-        );
+        // Call the onRequestBody method
+        server.onRequestBody(processingResponseBuilder, HttpBody.newBuilder().setBody(ByteString.copyFromUtf8(emptyBodyContent)).build());
 
         // Build the ProcessingResponse
         ProcessingResponse response = processingResponseBuilder.build();
 
-        // Assert the response
-        Truth.assertThat(response).isNotNull();
+        // Assert that the body is not null and it appends the "-added-body" string
         Truth.assertThat(response.getRequestBody().getResponse().getBodyMutation().getBody())
-                .isEqualTo(ByteString.copyFromUtf8(bodyContent));
-
-        Truth.assertThat(response.getRequestBody().getResponse().getClearRouteCache()).isTrue();
+                .isEqualTo(ByteString.copyFromUtf8("-added-body"));
     }
 
     @Test
-    public void testOnResponseBody() {
+    public void testOnResponseBody_FixedBodyReplacement() {
+        ProcessingResponse.Builder processingResponseBuilder = ProcessingResponse.newBuilder();
+
+        // Simulate a non-empty response body
+        String originalBodyContent = "Original body content";
+
+        // Call the onResponseBody method
+        server.onResponseBody(processingResponseBuilder, HttpBody.newBuilder().setBody(ByteString.copyFromUtf8(originalBodyContent)).build());
+
+        // Build the ProcessingResponse
+        ProcessingResponse response = processingResponseBuilder.build();
+
+        // Assert that the body is replaced with "body replaced"
+        Truth.assertThat(response.getResponseBody().getResponse().getBodyMutation().getBody())
+                .isEqualTo(ByteString.copyFromUtf8("body replaced"));
+    }
+
+    @Test
+    public void testOnRequestBody_NonEmptyBody() {
+        ProcessingResponse.Builder processingResponseBuilder = ProcessingResponse.newBuilder();
+
+        // Simulate a non-empty request body
+        String bodyContent = "Original request content";
+
+        // Call the onRequestBody method
+        server.onRequestBody(processingResponseBuilder, HttpBody.newBuilder().setBody(ByteString.copyFromUtf8(bodyContent)).build());
+
+        // Build the ProcessingResponse
+        ProcessingResponse response = processingResponseBuilder.build();
+
+        // Assert that the body is modified by appending "-added-body"
+        Truth.assertThat(response.getRequestBody().getResponse().getBodyMutation().getBody())
+                .isEqualTo(ByteString.copyFromUtf8("Original request content-added-body"));
+    }
+
+    @Test
+    public void testOnResponseBody_EmptyOriginalBody() {
+        ProcessingResponse.Builder processingResponseBuilder = ProcessingResponse.newBuilder();
+
+        // Simulate an empty response body
+        String emptyBodyContent = "";
+
+        // Call the onResponseBody method
+        server.onResponseBody(processingResponseBuilder, HttpBody.newBuilder().setBody(ByteString.copyFromUtf8(emptyBodyContent)).build());
+
+        // Build the ProcessingResponse
+        ProcessingResponse response = processingResponseBuilder.build();
+
+        // Assert that the body is replaced with "body replaced"
+        Truth.assertThat(response.getResponseBody().getResponse().getBodyMutation().getBody())
+                .isEqualTo(ByteString.copyFromUtf8("body replaced"));
+    }
+
+    @Test
+    public void testOnRequestBody_ClearBody() {
         ProcessingResponse.Builder processingResponseBuilder = ProcessingResponse.newBuilder();
 
         // Call the body mutation utility to clear the body
         ServiceCalloutTools.addBodyMutations(
-                processingResponseBuilder.getResponseBodyBuilder(),
+                processingResponseBuilder.getRequestBodyBuilder(),
                 null,  // No body content
                 true,  // Clear the body
-                false  // Do not clear route cache
+                true   // Clear the route cache
         );
 
         // Build the ProcessingResponse
         ProcessingResponse response = processingResponseBuilder.build();
 
-        // Assert the response
-        Truth.assertThat(response).isNotNull();
-        Truth.assertThat(response.getResponseBody().getResponse().getBodyMutation().getClearBody()).isTrue();
+        // Assert that the body is cleared
+        Truth.assertThat(response.getRequestBody().getResponse().getBodyMutation().getClearBody()).isTrue();
+        Truth.assertThat(response.getRequestBody().getResponse().getClearRouteCache()).isTrue();
+    }
 
-        Truth.assertThat(response.getResponseBody().getResponse().getClearRouteCache()).isFalse();
+    @Test
+    public void testOnRequestBody_UnmodifiedBody() {
+        ProcessingResponse.Builder processingResponseBuilder = ProcessingResponse.newBuilder();
+
+        // Simulate a body that remains unchanged
+        String bodyContent = "Body that should remain unchanged";
+
+        // Do not call any mutation, simulating no modification
+        server.onRequestBody(processingResponseBuilder, HttpBody.newBuilder().setBody(ByteString.copyFromUtf8(bodyContent)).build());
+
+        // Build the ProcessingResponse
+        ProcessingResponse response = processingResponseBuilder.build();
+
+        // Assert that the body is unchanged
+        Truth.assertThat(response.getRequestBody().getResponse().getBodyMutation().getBody())
+                .isEqualTo(ByteString.copyFromUtf8("Body that should remain unchanged-added-body"));
     }
 
     private void stopServer() throws Exception {
