@@ -176,7 +176,7 @@ class TestBasicServer(object):
       value = make_request(stub, request_headers=headers)
       assert value.HasField('request_headers')
       assert value.request_headers == add_header_mutation(
-          add=[(':host', 'service-extensions.com'), (':path', '/'),
+          add=[(':authority', 'service-extensions.com'), (':path', '/'),
                ('header-request', 'request')],
           clear_route_cache=True,
           remove=['foo'])
