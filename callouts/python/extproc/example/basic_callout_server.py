@@ -37,7 +37,7 @@ class BasicCalloutServer(CalloutServer):
     This example contains a few of the possible modifications that can be
     applied to a request header callout:
     
-    * A change to the ':host' and ':path' headers.
+    * A change to the ':authority' and ':path' headers.
     * Adding the header 'header-request' with the value of 'request'.
     * Removal of a header 'foo'.
     * Clearing of the route cache.
@@ -47,7 +47,7 @@ class BasicCalloutServer(CalloutServer):
     return add_header_mutation(
         add=[
             # Change the host to 'service-extensions.com'.
-            (':host', 'service-extensions.com'),
+            (':authority', 'service-extensions.com'),
             # Change the destination path to '/'.
             (':path', '/'),
             ('header-request', 'request')
