@@ -1,0 +1,21 @@
+test {
+  name: "Wih200StatusCodeCookieSet"
+  response_headers {
+    input { header { key: ":status" value: "200" } }
+    result { has_header { key: "Set-Cookie" value: "your_cookie_name=cookie_value; Path=/; HttpOnly" } }
+  }
+}
+test {
+  name: "Wih202StatusCodeCookieSet"
+  response_headers {
+    input { header { key: ":status" value: "202" } }
+    result { has_header { key: "Set-Cookie" value: "your_cookie_name=cookie_value; Path=/; HttpOnly" } }
+  }
+}
+test {
+  name: "Wih401StatusCodeNoCookieSet"
+  response_headers {
+    input { header { key: ":status" value: "401" } }
+    result { no_header { key: "Set-Cookie" } }
+  }
+}
