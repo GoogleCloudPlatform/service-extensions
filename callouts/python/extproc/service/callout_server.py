@@ -73,7 +73,7 @@ class CalloutServer:
     health_check_address: The health check serving address,
       defaults to default_ip:80.
     health_check_port: If set, overrides the port of health_check_address.
-    combined_health_check: If True, does not create seperate health check server.
+    combined_health_check: If True, does not create separate health check server.
     secure_health_check: If True, will use HTTPS as the protocol of the health check server.
       Requires cert_chain_path and private_key_path to be set.
     plaintext_address: The non-authenticated address to listen to,
