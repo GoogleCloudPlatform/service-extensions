@@ -63,6 +63,8 @@ for your own plugin. Extend them to fit your particular use case.
 *   [Normalize a HTTP header on request](samples/normalize_header): Creates a new
     HTTP header (client-device-type) to shard requests based on device according
     to the existence of HTTP Client Hints or User-Agent header values.
+*   [Set a cookie for a given client request](samples/set_cookie): Set cookie on
+    HTTP response for a particular client request.
 
 # Samples tests
 
