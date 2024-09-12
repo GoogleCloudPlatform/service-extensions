@@ -69,19 +69,19 @@ class CalloutServer:
   Attributes:
     address: Address that the main secure server will attempt to connect to,
       defaults to default_ip:443.
-    port: If specified, overides the port of address.
+    port: If specified, overrides the port of address.
     health_check_address: The health check serving address,
       defaults to default_ip:80.
-    health_check_port: If set, overides the port of health_check_address.
+    health_check_port: If set, overrides the port of health_check_address.
     combined_health_check: If True, does not create seperate health check server.
     secure_health_check: If True, will use HTTPS as the protocol of the health check server.
       Requires cert_chain_path and private_key_path to be set.
     plaintext_address: The non-authenticated address to listen to,
       defaults to default_ip:8080.
-    plaintext_port: If set, overides the port of plaintext_address.
+    plaintext_port: If set, overrides the port of plaintext_address.
     disable_plaintext: If true, disables the plaintext address of the server.
     default_ip: If left None, defaults to '0.0.0.0'.
-    cert_chain: PEM Certificate chain used to authenicate secure connections,
+    cert_chain: PEM Certificate chain used to authenticate secure connections,
       required for secure servers.
     cert_chain_path: Relative file path to the cert_chain.
     private_key: PEM private key of the server.
