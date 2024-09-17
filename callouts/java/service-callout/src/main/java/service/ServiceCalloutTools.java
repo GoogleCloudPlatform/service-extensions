@@ -119,7 +119,7 @@ public class ServiceCalloutTools {
 
             // Log a warning if both body and clearBody are provided
             if (Boolean.TRUE.equals(clearBody)) {
-                logger.log(Level.WARNING, "body and clearBody are mutually exclusive. clearBody will be ignored.");
+                logger.log(Level.WARNING, "Body and clearBody are mutually exclusive. clearBody will be ignored.");
             }
         } else {
             // If body is not provided, use clearBody
