@@ -1,0 +1,20 @@
+# Given a 5XX return code, expect change to 4XX
+test {
+  name: "With5XXStatusCodeChangeTo4XX"
+  response_headers {
+    input { header { key: ":status" value: "510" } }
+    result { 
+      has_header { key: ":status" value: "410" }
+    }
+  }
+}
+# Given a 200 return code, expect no changes
+test {
+  name: "With200StatusCodeNothingChanges"
+  response_headers {
+    input { header { key: ":status" value: "200" } }
+    result { 
+      has_header { key: ":status" value: "200" }
+    }
+  }
+}
