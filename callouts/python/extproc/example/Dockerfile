@@ -53,7 +53,6 @@ RUN [ -f requirements-example.txt ] && pip install -r additional-requirements.tx
 # Set up communication ports.
 EXPOSE 443
 EXPOSE 80
-# Un-secured debugging port. Can be removed once integrated into a final project.
 EXPOSE 8080
 
 # Apply the module setting to the local enviorment.
