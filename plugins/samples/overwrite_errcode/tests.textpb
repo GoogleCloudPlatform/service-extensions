@@ -1,10 +1,50 @@
-# Given a 5XX return code, expect change to 4XX
+# Given a 500 return code, expect change to 400
 test {
-  name: "With5XXStatusCodeChangeTo4XX"
+  name: "With500StatusCodeChangeTo400"
   response_headers {
-    input { header { key: ":status" value: "510" } }
+    input { header { key: ":status" value: "500" } }
     result { 
-      has_header { key: ":status" value: "410" }
+      has_header { key: ":status" value: "400" }
+    }
+  }
+}
+# Given a 502 return code, expect change to 400
+test {
+  name: "With502StatusCodeChangeTo400"
+  response_headers {
+    input { header { key: ":status" value: "502" } }
+    result { 
+      has_header { key: ":status" value: "400" }
+    }
+  }
+}
+# Given a 503 return code, expect change to 429
+test {
+  name: "With503StatusCodeChangeTo429"
+  response_headers {
+    input { header { key: ":status" value: "503" } }
+    result { 
+      has_header { key: ":status" value: "429" }
+    }
+  }
+}
+# Given a 504 return code, expect change to 408
+test {
+  name: "With504StatusCodeChangeTo408"
+  response_headers {
+    input { header { key: ":status" value: "504" } }
+    result { 
+      has_header { key: ":status" value: "408" }
+    }
+  }
+}
+# Given a 599 return code, expect change to 404
+test {
+  name: "With599StatusCodeChangeTo404"
+  response_headers {
+    input { header { key: ":status" value: "599" } }
+    result { 
+      has_header { key: ":status" value: "404" }
     }
   }
 }
