@@ -36,7 +36,7 @@ class MyHttpContext : public Context {
   }
 
  private:
-  int mapResponseCode(int response_code) {
+  static int mapResponseCode(int response_code) {
     // Example: remap all 5xx responses to 404.
     return (response_code / 100 == 5) ? 404 : response_code;
   }
