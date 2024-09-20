@@ -14,6 +14,7 @@
 
 // [START serviceextensions_plugin_overwrite_errcode]
 #include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
 #include "proxy_wasm_intrinsics.h"
 
 class MyHttpContext : public Context {
@@ -24,30 +25,20 @@ class MyHttpContext : public Context {
                                         bool end_of_stream) override {
     const auto response_status = getResponseHeader(":status");
     int response_code;
-    // Replaces the error code from 5XX to 4XX according to its equivalent value
     if (response_status &&
         absl::SimpleAtoi(response_status->view(), &response_code) &&
         (response_code / 100 == 5)) {
-      std::string new_status;
-      switch (response_code) {
-        case 500:              // Internal Server Error
-        case 502:              // Bad Gateway
-          new_status = "400";  // Bad Request
-          break;
-        case 503:              // Service Unavailable
-          new_status = "429";  // Too Many Requests
-          break;
-        case 504:              // Gateway Timeout
-          new_status = "408";  // Request Timeout
-          break;
-        default:
-          new_status = "404";  // Not Found
-          break;
-      }
-      replaceResponseHeader(":status", new_status);
+      replaceResponseHeader(":status",
+                            absl::StrCat(mapResponseCode(response_code)));
     }
 
     return FilterHeadersStatus::Continue;
+  }
+
+ private:
+  int mapResponseCode(int response_code) {
+    // Example: remap all 5xx responses to 404.
+    return (response_code / 100 == 5) ? 404 : response_code;
   }
 };
 
