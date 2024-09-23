@@ -34,7 +34,7 @@ class MyHttpContext : public Context {
       const auto requestId = generateRandomRequestId();
       sendLocalResponse(403, "", "Forbidden - Request ID: " + requestId, {});
       LOG_INFO("Forbidden - Request ID: " + requestId);
-      return FilterHeadersStatus::StopAllIterationAndWatermark;
+      return FilterHeadersStatus::ContinueAndEndStream;
     }
 
     // Change it to a meaningful name according to your needs.
@@ -44,7 +44,7 @@ class MyHttpContext : public Context {
 
  private:
   // Generate a unique random request ID.
-  std::string generateRandomRequestId() {
+  static std::string generateRandomRequestId() {
     // Wasm VM does not support the random generation
     // that involves a file system operation.
     using namespace std::chrono_literals;
