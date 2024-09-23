@@ -36,7 +36,7 @@ class MyHttpContext : public Context {
       LOG_INFO("Access forbidden - missing HMAC cookie.");
       sendLocalResponse(403, "", "Access forbidden - missing HMAC cookie.\n",
                         {});
-      return FilterHeadersStatus::StopAllIterationAndWatermark;
+      return FilterHeadersStatus::ContinueAndEndStream;
     }
 
     const auto path = getRequestHeader(":path")->toString();
@@ -44,7 +44,7 @@ class MyHttpContext : public Context {
       LOG_INFO("Access forbidden - invalid HMAC cookie.");
       sendLocalResponse(403, "", "Access forbidden - invalid HMAC cookie.\n",
                         {});
-      return FilterHeadersStatus::StopAllIterationAndWatermark;
+      return FilterHeadersStatus::ContinueAndEndStream;
     }
 
     return FilterHeadersStatus::Continue;
