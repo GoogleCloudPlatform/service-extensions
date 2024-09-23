@@ -13,11 +13,15 @@
 // limitations under the License.
 
 // [START serviceextensions_plugin_redirect]
-#include "absl/strings/str_replace.h"
+#include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 #include "proxy_wasm_intrinsics.h"
 
-// This sample may redirects the request for other URL according to the URL
-// requested.
+constexpr std::string_view old_path_prefix = "/foo/";
+constexpr std::string_view new_path_prefix = "/bar/";
+
+// This sample redirects any requests to paths starting with /foo/ to instead
+// use path /bar/.
 class MyHttpContext : public Context {
  public:
   explicit MyHttpContext(uint32_t id, RootContext* root) : Context(id, root) {}
@@ -25,11 +29,12 @@ class MyHttpContext : public Context {
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
     auto path = getRequestHeader(":path")->toString();
-    // Change the values according to your needs.
-    if (absl::StrReplaceAll({{"/foo/images", "/bar/images"}}, &path) > 0) {
-      sendLocalResponse(301, "", "", {{"Location", path}});
-
-      return FilterHeadersStatus::StopAllIterationAndWatermark;
+    if (absl::StartsWith(path, old_path_prefix)) {
+      std::string new_path =
+          absl::StrCat(new_path_prefix, path.substr(old_path_prefix.length()));
+      sendLocalResponse(301, "", absl::StrCat("Content moved to ", new_path),
+                        {{"Location", new_path}});
+      return FilterHeadersStatus::ContinueAndEndStream;
     }
     return FilterHeadersStatus::Continue;
   }

@@ -23,3 +23,15 @@ test {
     }
   }
 }
+# With 'foo' not at the beggining, no redirect.
+test {
+  name: "DoRedirect"
+  benchmark: false
+  request_headers {
+    input { header { key: ":path" value: "/main/foo/images/picture.png" } } 
+    result { 
+      has_header { key: ":path" value: "/main/foo/images/picture.png" }
+      no_header { key: "Location" }
+    }
+  }
+}
