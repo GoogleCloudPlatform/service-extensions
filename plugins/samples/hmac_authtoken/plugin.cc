@@ -39,7 +39,7 @@ class MyHttpContext : public Context {
     if (it == url->params().end()) {
       LOG_INFO("Access forbidden - missing token.");
       sendLocalResponse(403, "", "Access forbidden - missing token.\n", {});
-      return FilterHeadersStatus::StopAllIterationAndWatermark;
+      return FilterHeadersStatus::ContinueAndEndStream;
     }
 
     const auto token = (*it).value;
@@ -51,7 +51,7 @@ class MyHttpContext : public Context {
     if (computeHmacSignature(path) != token) {
       LOG_INFO("Access forbidden - invalid token.");
       sendLocalResponse(403, "", "Access forbidden - invalid token.\n", {});
-      return FilterHeadersStatus::StopAllIterationAndWatermark;
+      return FilterHeadersStatus::ContinueAndEndStream;
     }
 
     replaceRequestHeader(":path", path);
