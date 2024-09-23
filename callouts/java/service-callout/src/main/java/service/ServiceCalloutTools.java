@@ -26,6 +26,8 @@ import io.envoyproxy.envoy.service.ext_proc.v3.HeaderMutation;
 import io.envoyproxy.envoy.service.ext_proc.v3.HeadersResponse;
 import io.envoyproxy.envoy.service.ext_proc.v3.ImmediateResponse;
 import io.envoyproxy.envoy.type.v3.HttpStatus;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 
 import java.util.List;
 import java.util.Map;
@@ -183,5 +185,24 @@ public class ServiceCalloutTools {
         if (body != null) {
             builder.setBody(body);
         }
+    }
+
+    /**
+     * Denies a gRPC callout, optionally logging a custom message.
+     *
+     * @param context The gRPC StreamObserver or any context object managing the call.
+     * @param msg     Custom message to log before denying the callout. Defaults to "Callout DENIED." if null.
+     * @throws StatusRuntimeException Always raised to deny the callout.
+     */
+    public static void denyCallout(HeadersResponse.Builder context, String msg) {
+        if (msg == null || msg.isEmpty()) {
+            msg = "Callout DENIED.";
+        }
+
+        // Log a warning message
+        logger.info(msg);
+
+        // Deny the callout and abort the call by throwing a StatusRuntimeException
+        context.onError(Status.PERMISSION_DENIED.withDescription(msg).asRuntimeException());
     }
 }
