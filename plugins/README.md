@@ -65,6 +65,7 @@ for your own plugin. Extend them to fit your particular use case.
     to the existence of HTTP Client Hints or User-Agent header values.
 *   [Overwrite origin response error code](samples/overwrite_errcode): Overwrites
     error code served from origin from 5xx error to 4xx error class.
+*   [Perform a HTTP redirect](samples/redirect): Redirect a given URL to another URL.
 
 # Samples tests
 
