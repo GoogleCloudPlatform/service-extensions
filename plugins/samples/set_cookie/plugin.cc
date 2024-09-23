@@ -13,10 +13,8 @@
 // limitations under the License.
 
 // [START serviceextensions_plugin_set_cookie]
-#include "absl/strings/match.h"
+#include "absl/strings/numbers.h"
 #include "proxy_wasm_intrinsics.h"
-
-constexpr absl::string_view kRangeStatusSuccess = "2";  // 2XX
 
 class MyHttpContext : public Context {
  public:
@@ -24,10 +22,12 @@ class MyHttpContext : public Context {
 
   FilterHeadersStatus onResponseHeaders(uint32_t headers,
                                         bool end_of_stream) override {
-    const auto status = getResponseHeader(":status");
+    const auto response_status = getResponseHeader(":status");
+    int response_code;
     // Check if response status is part of the success range (2XX).
-    if (status &&
-        absl::StartsWithIgnoreCase(status->view(), kRangeStatusSuccess)) {
+    if (response_status &&
+        absl::SimpleAtoi(response_status->view(), &response_code) &&
+        (response_code / 100 == 2)) {
       // Change the new cookie according to your needs.
       addResponseHeader("Set-Cookie",
                         "your_cookie_name=cookie_value; Path=/; HttpOnly");
