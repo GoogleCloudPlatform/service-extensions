@@ -58,7 +58,7 @@ class MyHttpContext : public Context {
       if (it == url->params().end()) {
         LOG_INFO("Access forbidden - missing token.");
         sendLocalResponse(403, "", "Access forbidden - missing token.\n", {});
-        return FilterHeadersStatus::StopAllIterationAndWatermark;
+        return FilterHeadersStatus::ContinueAndEndStream;
       }
 
       google::jwt_verify::Jwt jwt;
@@ -66,7 +66,7 @@ class MyHttpContext : public Context {
       if (jwt.parseFromString((*it).value) != google::jwt_verify::Status::Ok) {
         LOG_INFO("Access forbidden - invalid token.");
         sendLocalResponse(403, "", "Access forbidden - invalid token.\n", {});
-        return FilterHeadersStatus::StopAllIterationAndWatermark;
+        return FilterHeadersStatus::ContinueAndEndStream;
       }
 
       // Check if the JWT is allowed.
@@ -75,7 +75,7 @@ class MyHttpContext : public Context {
         LOG_INFO("Access forbidden - " +
                  google::jwt_verify::getStatusString(status));
         sendLocalResponse(403, "", "Access forbidden.\n", {});
-        return FilterHeadersStatus::StopAllIterationAndWatermark;
+        return FilterHeadersStatus::ContinueAndEndStream;
       }
 
       // Strip the JWT from the URL after validation.
