@@ -1,0 +1,33 @@
+test {
+  name: "WithHashBelowThresholdRedirectsToBFile"
+  request_headers {
+    input { 
+      header { key: ":path" value: "/file1.png?user=jhon" }
+    }
+    result {
+      has_header { key: ":path" value: "/file2.png?user=jhon" }
+    }
+  }
+}
+test {
+  name: "WithHashAboveThresholdKeepTheSame"
+  request_headers {
+    input { 
+      header { key: ":path" value: "/file1.png?user=mary" }
+    }
+    result {
+      has_header { key: ":path" value: "/file1.png?user=mary" }
+    }
+  }
+}
+test {
+  name: "WithAnotherPathKeepTheSame"
+  request_headers {
+    input { 
+      header { key: ":path" value: "/file3.png?user=jhon" }
+    }
+    result {
+      has_header { key: ":path" value: "/file3.png?user=jhon" }
+    }
+  }
+}
