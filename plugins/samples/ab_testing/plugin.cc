@@ -39,9 +39,9 @@ class MyHttpContext : public Context {
     // percentile. If the hash value is less than or equal to the percentile,
     // the request is served by the v2 file. Otherwise, it is served by the
     // original file.
-    const auto usr = extractUserFromPath(path);
-    if (absl::StartsWithIgnoreCase(path, a_path) && usr != "" &&
-        (std::hash<std::string_view>{}(usr) % 100 <= percentile)) {
+    const auto user = extractUserFromPath(path);
+    if (absl::StartsWithIgnoreCase(path, a_path) && user != "" &&
+        (std::hash<std::string_view>{}(user) % 100 <= percentile)) {
       std::string new_path = absl::StrCat(b_path, path.substr(a_path.length()));
       replaceRequestHeader(":path", new_path);
     }
