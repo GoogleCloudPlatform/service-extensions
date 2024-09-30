@@ -22,7 +22,7 @@ class MyHttpContext : public Context {
 
   FilterHeadersStatus onResponseHeaders(uint32_t headers,
                                         bool end_of_stream) override {
-    const auto response_status = getResponseHeader(":status");
+    const WasmDataPtr response_status = getResponseHeader(":status");
     int response_code;
     // Check if response status is part of the success range (2XX).
     if (response_status &&
