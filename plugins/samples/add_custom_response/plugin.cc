@@ -25,13 +25,13 @@ class MyHttpContext : public Context {
 
   FilterHeadersStatus onResponseHeaders(uint32_t headers,
                                         bool end_of_stream) override {
-    const auto response_status = getResponseHeader(":status");
+    const WasmDataPtr response_status = getResponseHeader(":status");
     int response_code;
     if (response_status &&
         absl::SimpleAtoi(response_status->view(), &response_code) &&
         (response_code / 100 == 5)) {
       sendLocalResponse(301, "", "",
-                        {{":status", response_status->toString()},
+                        {{"Orign-Status", response_status->toString()},
                          {"Location", std::string{redirect_page}}});
       return FilterHeadersStatus::ContinueAndEndStream;
     }

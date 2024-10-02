@@ -1,0 +1,21 @@
+test {
+  name: "NoRedirect"
+  response_headers {
+    input { header { key: ":status" value: "200" } }
+    result { 
+      has_header { key: ":status" value: "200" }
+      no_header { key: "Location" }
+    }
+  }
+}
+test {
+  name: "DoRedirect"
+  response_headers {
+    input { header { key: ":status" value: "501" } } 
+    result { 
+      immediate { http_status: 301 details: "" }
+      has_header { key: "Location" value: "http://storage.googleapis.com/www.example.com/server-error.html" }
+      has_header { key: "Orign-Status" value: "501" }
+    }
+  }
+}
