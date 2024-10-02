@@ -26,6 +26,7 @@ import io.grpc.stub.StreamObserver;
 import io.grpc.netty.NettyServerBuilder;
 
 import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -58,7 +59,7 @@ public class ServiceCallout {
     private int serverThreadCount;
     private boolean enableInsecurePort;
 
-    protected ServiceCallout(Builder<?> builder) {
+       protected ServiceCallout(Builder<?> builder) {
         this.ip = Optional.ofNullable(builder.ip).orElse("0.0.0.0");
         this.port = Optional.ofNullable(builder.port).orElse(8443);
         this.insecurePort = Optional.ofNullable(builder.insecurePort).orElse(8443);
@@ -167,7 +168,7 @@ public class ServiceCallout {
             return (T) this;
         }
 
-        public ServiceCallout build() {
+        public ServiceCallout build()  throws GeneralSecurityException, IOException  {
             return new ServiceCallout(this);
         }
     }

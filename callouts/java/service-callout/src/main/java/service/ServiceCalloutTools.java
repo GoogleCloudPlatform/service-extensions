@@ -190,7 +190,7 @@ public class ServiceCalloutTools {
     /**
      * Denies a gRPC callout, optionally logging a custom message.
      *
-     * @param context The gRPC StreamObserver or any context object managing the call.
+     * @param context The gRPC StreamObserver or other context object.
      * @param msg     Custom message to log before denying the callout. Defaults to "Callout DENIED." if null.
      * @throws StatusRuntimeException Always raised to deny the callout.
      */
@@ -199,10 +199,10 @@ public class ServiceCalloutTools {
             msg = "Callout DENIED.";
         }
 
-        // Log a warning message
+        // Log the warning message
         logger.info(msg);
 
-        // Deny the callout and abort the call by throwing a StatusRuntimeException
-        context.onError(Status.PERMISSION_DENIED.withDescription(msg).asRuntimeException());
+        // Use the StreamObserver (or other context) to abort the call
+        throw Status.PERMISSION_DENIED.withDescription(msg).asRuntimeException();
     }
 }
