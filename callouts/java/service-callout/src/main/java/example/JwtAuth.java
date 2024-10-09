@@ -21,11 +21,17 @@ import io.envoyproxy.envoy.service.ext_proc.v3.ProcessingResponse;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.SignatureException;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.openssl.PEMParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import service.ServiceCallout;
 import service.ServiceCalloutTools;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.PublicKey;
@@ -33,13 +39,6 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-
-import org.bouncycastle.openssl.PEMParser;
-import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 
 /**
  * Handles JWT authentication by extracting and validating JWT tokens from HTTP headers.
@@ -60,7 +59,7 @@ public class JwtAuth extends ServiceCallout {
      *
      * @param builder The builder instance containing configuration parameters.
      * @throws GeneralSecurityException If there is an issue generating the PublicKey.
-     * @throws IOException If there is an issue reading the PEM file.
+     * @throws IOException              If there is an issue reading the PEM file.
      */
     public JwtAuth(Builder builder) throws GeneralSecurityException, IOException {
         super(builder);
@@ -90,7 +89,7 @@ public class JwtAuth extends ServiceCallout {
      *
      * @param pemFilePath The path to the PEM file within the resources directory.
      * @return The loaded RSA PublicKey.
-     * @throws IOException If there is an issue reading the PEM file.
+     * @throws IOException              If there is an issue reading the PEM file.
      * @throws GeneralSecurityException If there is an issue generating the PublicKey.
      */
     public static PublicKey loadPublicKey(String pemFilePath) throws IOException, GeneralSecurityException {
