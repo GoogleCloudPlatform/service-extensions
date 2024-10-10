@@ -17,6 +17,7 @@ package example;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.truth.Truth;
 import com.google.common.truth.extensions.proto.ProtoTruth;
 import com.google.protobuf.ByteString;
 import io.envoyproxy.envoy.config.core.v3.HeaderValue;
@@ -35,16 +36,27 @@ import org.junit.Test;
 import service.ServiceCallout;
 import service.ServiceCalloutTools;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.lang.reflect.Method;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.concurrent.TimeUnit;
 
 public class BasicCalloutServerTest {
 
     private TestServiceCallout server;
 
     @Before
-    public void setUp(){
+    public void setUp() throws IOException {
         server = new TestServiceCallout.Builder()
+                .setHealthCheckPort(8000)
+                .setHealthCheckPath("/health")
+                .setSeparateHealthCheck(true)
                 .build();
+
+        server.start();
     }
 
     @After
@@ -279,6 +291,53 @@ public class BasicCalloutServerTest {
 
         // Assert that the actual response matches the expected response
         ProtoTruth.assertThat(response).isEqualTo(expectedResponse);
+    }
+
+    @Test
+    public void testHealthCheck() throws Exception {
+        // Define the health check URL
+        String healthCheckUrl = "http://0.0.0.0:8000/health";
+
+        // Wait briefly to ensure the health check server is up
+        TimeUnit.SECONDS.sleep(1);
+
+        // Create a URL object
+        URL url = new URL(healthCheckUrl);
+
+        // Open a connection
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+
+        try {
+            // Set request method to GET
+            connection.setRequestMethod("GET");
+
+            // Set a reasonable timeout
+            connection.setConnectTimeout(3000); // 3 seconds
+            connection.setReadTimeout(3000);    // 3 seconds
+
+            // Connect and get the response code
+            int responseCode = connection.getResponseCode();
+
+            // Assert that the response code is 200 (OK)
+            Truth.assertThat(responseCode).isEqualTo(200);
+
+            // Read and assert the response body
+            BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+            String inputLine;
+            StringBuilder responseContent = new StringBuilder();
+
+            while ((inputLine = in.readLine()) != null) {
+                responseContent.append(inputLine);
+            }
+            in.close();
+
+            // Response body contains "OK"
+            Truth.assertThat(responseContent.toString()).contains("OK");
+
+        } finally {
+            // Disconnect the connection
+            connection.disconnect();
+        }
     }
 
     private void stopServer() throws Exception {
