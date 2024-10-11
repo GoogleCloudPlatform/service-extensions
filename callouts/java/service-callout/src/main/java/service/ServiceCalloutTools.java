@@ -121,7 +121,7 @@ public class ServiceCalloutTools {
 
             // Log a warning if both body and clearBody are provided
             if (Boolean.TRUE.equals(clearBody)) {
-                logger.log(Level.WARNING, "body and clearBody are mutually exclusive. clearBody will be ignored.");
+                logger.log(Level.WARNING, "Body and clearBody are mutually exclusive. clearBody will be ignored.");
             }
         } else {
             // If body is not provided, use clearBody
@@ -156,30 +156,28 @@ public class ServiceCalloutTools {
         // Set the HTTP status
         builder.setStatus(status);
 
-        // Create a HeaderMutation builder to modify the headers
-        HeaderMutation.Builder headerMutationBuilder = HeaderMutation.newBuilder();
+        // Obtain HeaderMutation.Builder from the parent ImmediateResponse.Builder
+        HeaderMutation.Builder headerMutationBuilder = builder.getHeadersBuilder();
 
-        // Add each header to the HeaderMutation builder (headers to add)
-        headersToAdd.forEach((key, value) -> {
-            HeaderValue header = HeaderValue.newBuilder()
-                    .setKey(key)
-                    .setRawValue(ByteString.copyFromUtf8(value))
-                    .build();
+        // Handle adding headers
+        if (headersToAdd != null) {
+            for (Map.Entry<String, String> entry : headersToAdd.entrySet()) {
+                HeaderValueOption headerOption = HeaderValueOption.newBuilder()
+                        .setHeader(HeaderValue.newBuilder()
+                                .setKey(entry.getKey())
+                                .setRawValue(ByteString.copyFromUtf8(entry.getValue()))
+                                .build()
+                        )
+                        .build();
 
-            HeaderValueOption headerOption = HeaderValueOption.newBuilder()
-                    .setHeader(header)
-                    .build();
-
-            headerMutationBuilder.addSetHeaders(headerOption);
-        });
-
-        // Remove headers (headers to remove)
-        if (headersToRemove != null) {
-            headersToRemove.forEach(headerMutationBuilder::addRemoveHeaders);
+                headerMutationBuilder.addSetHeaders(headerOption);
+            }
         }
 
-        // Set the header mutation in the ImmediateResponse builder
-        builder.setHeaders(headerMutationBuilder.build());
+        // Handle removing headers
+        if (headersToRemove != null) {
+            headerMutationBuilder.addAllRemoveHeaders(headersToRemove);
+        }
 
         // Set the body if it is not null
         if (body != null) {

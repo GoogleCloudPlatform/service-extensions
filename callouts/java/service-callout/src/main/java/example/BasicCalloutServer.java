@@ -155,6 +155,9 @@ public class BasicCalloutServer extends ServiceCallout {
     public static void main(String[] args) throws Exception {
         // Create a builder for ServiceCallout with custom configuration
         BasicCalloutServer server = new BasicCalloutServer.Builder()
+                .setHealthCheckPort(8000)
+                .setHealthCheckPath("/health")
+                .setSeparateHealthCheck(true)
                 .build();
 
         // Start the server

@@ -26,12 +26,18 @@ import io.grpc.stub.StreamObserver;
 import io.grpc.netty.NettyServerBuilder;
 
 import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
 import java.security.GeneralSecurityException;
 import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import com.sun.net.httpserver.HttpServer;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpExchange;
 
 import static utils.SslUtils.createSslContext;
 import static utils.SslUtils.readFileToBytes;
@@ -45,6 +51,7 @@ public class ServiceCallout {
     private static final Logger logger = Logger.getLogger(ServiceCallout.class.getName());
 
     private Server server;
+    private HttpServer healthCheckServer;
     private String ip;
     private int port;
     private int insecurePort;
@@ -59,7 +66,7 @@ public class ServiceCallout {
     private int serverThreadCount;
     private boolean enableInsecurePort;
 
-       protected ServiceCallout(Builder<?> builder) {
+    protected ServiceCallout(Builder<?> builder) {
         this.ip = Optional.ofNullable(builder.ip).orElse("0.0.0.0");
         this.port = Optional.ofNullable(builder.port).orElse(8443);
         this.insecurePort = Optional.ofNullable(builder.insecurePort).orElse(8443);
@@ -80,6 +87,16 @@ public class ServiceCallout {
 
         this.serverThreadCount = Optional.ofNullable(builder.serverThreadCount).orElse(2);
         this.enableInsecurePort = Optional.ofNullable(builder.enableInsecurePort).orElse(true);
+
+        // Initialize health check server if enabled
+        if (this.separateHealthCheck) {
+            try {
+                initHealthCheckServer();
+            } catch (IOException e) {
+                logger.log(Level.SEVERE, "Failed to initialize Health Check Server", e);
+                throw new RuntimeException(e);
+            }
+        }
     }
 
     // Builder class using Generics
@@ -168,9 +185,20 @@ public class ServiceCallout {
             return (T) this;
         }
 
-        public ServiceCallout build()  throws GeneralSecurityException, IOException  {
+        public ServiceCallout build() throws GeneralSecurityException, IOException {
             return new ServiceCallout(this);
         }
+    }
+
+    /**
+     * Initializes the Health Check Server.
+     *
+     * @throws IOException If an error occurs while creating the server.
+     */
+    private void initHealthCheckServer() throws IOException {
+        healthCheckServer = HttpServer.create(new InetSocketAddress(healthCheckIp, healthCheckPort), 0);
+        healthCheckServer.createContext(healthCheckPath, new HealthCheckHandler());
+        healthCheckServer.setExecutor(Executors.newFixedThreadPool(1)); // Single-threaded executor
     }
 
     /**
@@ -200,6 +228,12 @@ public class ServiceCallout {
 
         logger.info("Server started, listening on " + port);
 
+        // Start Health Check Server if enabled
+        if (separateHealthCheck) {
+            healthCheckServer.start();
+            logger.info("Health Check Server started, listening on " + healthCheckIp + ":" + healthCheckPort + " at path " + healthCheckPath);
+        }
+
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             logger.info("*** shutting down gRPC server since JVM is shutting down");
             try {
@@ -220,6 +254,11 @@ public class ServiceCallout {
     private void stop() throws InterruptedException {
         if (server != null) {
             server.shutdown().awaitTermination(30, TimeUnit.SECONDS);
+        }
+
+        if (separateHealthCheck && healthCheckServer != null) {
+            healthCheckServer.stop(0); // 0 delay for immediate stop
+            logger.info("Health Check Server stopped.");
         }
     }
 
@@ -328,6 +367,20 @@ public class ServiceCallout {
                     responseObserver.onCompleted();
                 }
             };
+        }
+    }
+
+    /**
+     * Health Check Handler responds with a simple "OK" message to indicate the server is healthy.
+     */
+    private static class HealthCheckHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String response = "OK";
+            exchange.sendResponseHeaders(200, response.length());
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(response.getBytes());
+            }
         }
     }
 }
