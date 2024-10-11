@@ -2,13 +2,11 @@ package utils;
 
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import javax.net.ssl.SSLException;
 
 import io.netty.handler.ssl.SslContext;
-
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
 
 import org.junit.Test;
 
@@ -23,13 +21,8 @@ public class SslUtilsTest {
 
     @Test
     public void testReadFileToBytesNonExistentFile() {
-        final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
-        System.setErr(new PrintStream(outContent));
-
-        SslUtils.readFileToBytes("non_existent_file.crt");
-        assertTrue(outContent.toString().contains("File not found:"));
-
-        System.setErr(System.err);
+        byte[] bytes = SslUtils.readFileToBytes("non_existent_file.crt");
+        assertNull(bytes, "Expected null when file does not exist");
     }
 
     @Test
