@@ -44,7 +44,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.Assert.assertThrows;
-import static org.mockito.Mockito.doThrow;
 
 public class JwtAuthTest {
 
@@ -138,18 +137,19 @@ public class JwtAuthTest {
 
         HttpHeaders requestHeaders = HttpHeaders.newBuilder().setHeaders(headerMap).build();
 
+        // Prepare a response builder
         ProcessingResponse.Builder responseBuilder = ProcessingResponse.newBuilder();
 
-        doThrow(new StatusRuntimeException(Status.PERMISSION_DENIED.withDescription("Authorization token is invalid")))
-                .when(server).onRequestHeaders(responseBuilder, requestHeaders);
-
+        // Call the service method
         StatusRuntimeException exception = assertThrows(StatusRuntimeException.class, () -> {
             server.onRequestHeaders(responseBuilder, requestHeaders);
         });
 
+        // Assert the error code and message
         Truth.assertThat(exception.getStatus().getCode())
                 .isEqualTo(Status.PERMISSION_DENIED.getCode());
-        Truth.assertThat("Authorization token is invalid").isEqualTo(exception.getStatus().getDescription());
+        Truth.assertThat("Authorization token is invalid")
+                .isEqualTo(exception.getStatus().getDescription());
     }
 
     private void stopServer() throws Exception {
