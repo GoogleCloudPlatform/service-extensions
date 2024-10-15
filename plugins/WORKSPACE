@@ -8,13 +8,22 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 # --- PLUGIN + TEST RUNNER DEPENDENCIES ---
 
-# Abseil for base libs. Updated to work with latest Emscripten and STANDALONE_WASM
-# Waiting on https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/pull/157
+# Platforms update for @platforms//os:emscripten
 http_archive(
-    name = "com_google_absl",  # 2024-03-06
-    sha256 = "bb5e84fc74362c546ab4193eeafd440a26487f4adf80587d2f2576f03c439c4b",
-    strip_prefix = "abseil-cpp-53e6dae02bf0d9a5a1d304a3d637c083376b86a1",
-    urls = ["https://github.com/abseil/abseil-cpp/archive/53e6dae02bf0d9a5a1d304a3d637c083376b86a1.zip"],
+    name = "platforms",
+    sha256 = "218efe8ee736d26a3572663b374a253c012b716d8af0c07e842e82f238a0a7ee",
+    urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.10/platforms-0.0.10.tar.gz",
+        "https://github.com/bazelbuild/platforms/releases/download/0.0.10/platforms-0.0.10.tar.gz",
+    ],
+)
+
+# Abseil for base libs. Updated to work with latest Emscripten and STANDALONE_WASM.
+http_archive(
+    name = "com_google_absl",
+    sha256 = "95e90be7c3643e658670e0dd3c1b27092349c34b632c6e795686355f67eca89f",
+    strip_prefix = "abseil-cpp-20240722.0",
+    urls = ["https://github.com/abseil/abseil-cpp/archive/20240722.0.zip"],
 )
 
 # RE2 for C++ regex.
@@ -101,9 +110,9 @@ http_archive(
 
 # --- PLUGIN DEPENDENCIES ---
 
-PROXY_WASM_CPP_HOST_COMMIT = "04dfb94747e6462b65f7ed694e2d9c78ab207e11"  # 2024-04-29
+PROXY_WASM_CPP_HOST_COMMIT = "3212034ee6e75d54cbf91b65cc659772166442f4"  # 2024-09-29
 
-PROXY_WASM_CPP_HOST_SHA256 = "9c6da146d86f9b03d98b975f89c1762fc1b7f179da6775134c66e68c79eec4d1"
+PROXY_WASM_CPP_HOST_SHA256 = "2633ec772da7b0e51500328989a99a02570dbfdfe5ff74cbf83fa2d39b6e8cea"
 
 http_archive(
     name = "proxy_wasm_cpp_host",
@@ -112,9 +121,9 @@ http_archive(
     url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/" + PROXY_WASM_CPP_HOST_COMMIT + ".tar.gz",
 )
 
-PROXY_WASM_CPP_SDK_COMMIT = "921039ae983ce053bf5cba78a85a3c08ff9791e5"  # 2023-05-01
+PROXY_WASM_CPP_SDK_COMMIT = "d505642df1fc9d3c5e593c1e3b43ed1a971bdb2a"  # PR #173
 
-PROXY_WASM_CPP_SDK_SHA256 = "a11adfe4e6346d3318ff72643aa5569dc8439d7e8927ed148f93226fa255cc7a"
+PROXY_WASM_CPP_SDK_SHA256 = "b61be4e975867900df2dba5fb7607847f6e6ed0a3f0ca3b4cf50bbb46a55ab2b"
 
 http_archive(
     name = "proxy_wasm_cpp_sdk",
@@ -125,6 +134,7 @@ http_archive(
 
 # Duplicate the ProxyWasm WORKSPACE files (dependencies)
 # Consider adopting bzlmod for this: https://docs.bazel.build/versions/5.0.0/bzlmod.html
+
 load("@proxy_wasm_cpp_host//bazel:repositories.bzl", "proxy_wasm_cpp_host_repositories")
 
 proxy_wasm_cpp_host_repositories()
@@ -132,6 +142,14 @@ proxy_wasm_cpp_host_repositories()
 load("@proxy_wasm_cpp_host//bazel:dependencies.bzl", "proxy_wasm_cpp_host_dependencies")
 
 proxy_wasm_cpp_host_dependencies()
+
+load("@proxy_wasm_cpp_host//bazel:dependencies_python.bzl", "proxy_wasm_cpp_host_dependencies_python")
+
+proxy_wasm_cpp_host_dependencies_python()
+
+load("@proxy_wasm_cpp_host//bazel:dependencies_import.bzl", "proxy_wasm_cpp_host_dependencies_import")
+
+proxy_wasm_cpp_host_dependencies_import()
 
 load("@proxy_wasm_cpp_sdk//bazel:repositories.bzl", "proxy_wasm_cpp_sdk_repositories")
 
