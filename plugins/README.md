@@ -66,6 +66,9 @@ for your own plugin. Extend them to fit your particular use case.
 *   [Block request with particular header](samples/block_request): Check whether
     the client's Referer header matches an expected domain. If not, generate a 403
     Forbidden response.
+*   [Overwrite origin response error code](samples/overwrite_errcode): Overwrites
+    error code served from origin from 5xx error to 4xx error class.
+*   [Perform a HTTP redirect](samples/redirect): Redirect a given URL to another URL.
 
 # Samples tests
 

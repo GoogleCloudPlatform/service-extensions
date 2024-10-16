@@ -66,9 +66,9 @@ http_archive(
 
 # For testing, GoogleURL is a Quiche dependency.
 http_archive(
-    name = "com_google_googleurl",  # 2022-11-03
-    sha256 = "59f14d4fb373083b9dc8d389f16bbb817b5f936d1d436aa67e16eb6936028a51",
-    urls = ["https://storage.googleapis.com/quiche-envoy-integration/dd4080fec0b443296c0ed0036e1e776df8813aa7.tar.gz"],
+    name = "com_google_googleurl",  # 2024-10-09
+    sha256 = "3db90606ea9ca123d11f85c6fa3627a1e1e403d38c7fd1854a628cf1da3be5e2",
+    urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl-9cdb1f4d1a365ebdbcbf179dadf7f8aa5ee802e7.tar.gz"],
 )
 
 # --- PLUGIN DEPENDENCIES ---
