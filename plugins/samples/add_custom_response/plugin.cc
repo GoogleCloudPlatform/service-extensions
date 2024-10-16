@@ -17,7 +17,7 @@
 #include "proxy_wasm_intrinsics.h"
 
 constexpr std::string_view redirect_page =
-    "http://storage.googleapis.com/www.example.com/server-error.html";
+    "https://storage.googleapis.com/www.example.com/server-error.html";
 
 class MyHttpContext : public Context {
  public:
@@ -30,8 +30,8 @@ class MyHttpContext : public Context {
     if (response_status &&
         absl::SimpleAtoi(response_status->view(), &response_code) &&
         (response_code / 100 == 5)) {
-      sendLocalResponse(301, "", "",
-                        {{"Orign-Status", response_status->toString()},
+      sendLocalResponse(302, "", "",
+                        {{"Origin-Status", response_status->toString()},
                          {"Location", std::string{redirect_page}}});
       return FilterHeadersStatus::ContinueAndEndStream;
     }

@@ -13,9 +13,9 @@ test {
   response_headers {
     input { header { key: ":status" value: "501" } } 
     result { 
-      immediate { http_status: 301 details: "" }
-      has_header { key: "Location" value: "http://storage.googleapis.com/www.example.com/server-error.html" }
-      has_header { key: "Orign-Status" value: "501" }
+      immediate { http_status: 302 details: "" }
+      has_header { key: "Location" value: "https://storage.googleapis.com/www.example.com/server-error.html" }
+      has_header { key: "Origin-Status" value: "501" }
     }
   }
 }
