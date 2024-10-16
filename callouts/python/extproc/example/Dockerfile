@@ -47,10 +47,12 @@ ARG run_module
 # Copy over example specific files.
 COPY $copy_path ./
 
+# Install any example-specific packages if included. 
+RUN [ -f requirements-example.txt ] && pip install -r additional-requirements.txt --break-system-packages --root-user-action=ignore || echo "No example-specific requirements found."
+
 # Set up communication ports.
 EXPOSE 443
 EXPOSE 80
-# Un-secured debugging port. Can be removed once integrated into a final project.
 EXPOSE 8080
 
 # Apply the module setting to the local enviorment.
