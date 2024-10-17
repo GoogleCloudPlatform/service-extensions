@@ -1,0 +1,54 @@
+# This workflow will install Java dependencies, run tests and lint with a single version of Java
+
+name: Callouts test Java SDK
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - callouts/java/**
+      - docs/java/**
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - callouts/java/**
+
+# Default permissions are read-only.
+permissions: read-all
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      # Workflow can publish documentation
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: maven
+
+      - name: Install dependencies (Maven)
+        run: mvn install --no-transfer-progress
+
+      - name: Run Tests (Maven)
+        run: mvn test --no-transfer-progress
+
+      - name: Generate Javadocs
+        run: mvn javadoc:javadoc
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        with:
+          publish_branch: gh-pages
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: target/site/apidocs
+          force_orphan: true
