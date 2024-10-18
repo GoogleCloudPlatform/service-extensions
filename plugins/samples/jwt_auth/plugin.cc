@@ -31,16 +31,16 @@ class MyRootContext : public RootContext {
 
     // Read the RSA key from the config file.
     const std::string rsa_key = config_->toString();
-    jwks = google::jwt_verify::Jwks::createFrom(
+    jwks_ = google::jwt_verify::Jwks::createFrom(
         rsa_key, google::jwt_verify::Jwks::Type::PEM);
-    return jwks->getStatus() == google::jwt_verify::Status::Ok;
+    return jwks_->getStatus() == google::jwt_verify::Status::Ok;
   }
 
-  const google::jwt_verify::JwksPtr& getJwks() const { return jwks; }
+  const google::jwt_verify::JwksPtr& jwks() const { return jwks_; }
 
  private:
   WasmDataPtr config_;
-  google::jwt_verify::JwksPtr jwks;
+  google::jwt_verify::JwksPtr jwks_;
 };
 
 class MyHttpContext : public Context {
@@ -71,7 +71,7 @@ class MyHttpContext : public Context {
       }
 
       // Check if the JWT is allowed.
-      const auto status = google::jwt_verify::verifyJwt(jwt, *root_->getJwks());
+      const auto status = google::jwt_verify::verifyJwt(jwt, *root_->jwks());
       if (status != google::jwt_verify::Status::Ok) {
         LOG_INFO("Access forbidden - " +
                  google::jwt_verify::getStatusString(status));
