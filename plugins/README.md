@@ -71,6 +71,9 @@ for your own plugin. Extend them to fit your particular use case.
 *   [Perform a HTTP redirect](samples/redirect): Redirect a given URL to another URL.
 *   [Custom error page](samples/add_custom_response) For a certain class of origin
     errors, redirect to a custom error page hosted on GCS.
+*   [Validate client JWT for authorization](samples/jwt_auth): Ensures user
+    authentication by verifying an RS256-signed JWT token in the query string
+    and subsequently removing it.
 
 # Samples tests
 
