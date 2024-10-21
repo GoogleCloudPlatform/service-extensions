@@ -63,11 +63,19 @@ for your own plugin. Extend them to fit your particular use case.
 *   [Normalize a HTTP header on request](samples/normalize_header): Creates a new
     HTTP header (client-device-type) to shard requests based on device according
     to the existence of HTTP Client Hints or User-Agent header values.
+*   [Block request with particular header](samples/block_request): Check whether
+    the client's Referer header matches an expected domain. If not, generate a 403
+    Forbidden response.
 *   [Overwrite origin response error code](samples/overwrite_errcode): Overwrites
     error code served from origin from 5xx error to 4xx error class.
 *   [Perform a HTTP redirect](samples/redirect): Redirect a given URL to another URL.
 *   [Set a cookie for a given client request](samples/set_cookie): Set cookie on
     HTTP response for a particular client request.
+*   [Custom error page](samples/add_custom_response) For a certain class of origin
+    errors, redirect to a custom error page hosted on GCS.
+*   [Validate client JWT for authorization](samples/jwt_auth): Ensures user
+    authentication by verifying an RS256-signed JWT token in the query string
+    and subsequently removing it.
 
 # Samples tests
 
