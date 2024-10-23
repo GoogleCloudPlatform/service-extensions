@@ -13,7 +13,6 @@
 // limitations under the License.
 
 // [START serviceextensions_plugin_set_cookie]
-#include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "proxy_wasm_intrinsics.h"
