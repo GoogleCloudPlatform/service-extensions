@@ -14,26 +14,65 @@
 
 // [START serviceextensions_plugin_set_cookie]
 #include "absl/strings/numbers.h"
+#include "absl/strings/str_split.h"
 #include "proxy_wasm_intrinsics.h"
 
+// This plugin verifies if a session ID cookie is present in the current
+// request. If no such cookie is found, a new session ID cookie is created.
 class MyHttpContext : public Context {
  public:
   explicit MyHttpContext(uint32_t id, RootContext* root) : Context(id, root) {}
 
+  FilterHeadersStatus onRequestHeaders(uint32_t headers,
+                                       bool end_of_stream) override {
+    session_id_ = getSessionIdFromCookie();
+
+    return FilterHeadersStatus::Continue;
+  }
+
   FilterHeadersStatus onResponseHeaders(uint32_t headers,
                                         bool end_of_stream) override {
-    const WasmDataPtr response_status = getResponseHeader(":status");
-    int response_code;
-    // Check if response status is part of the success range (2XX).
-    if (response_status &&
-        absl::SimpleAtoi(response_status->view(), &response_code) &&
-        (response_code / 100 == 2)) {
-      // Change the new cookie according to your needs.
-      addResponseHeader("Set-Cookie",
-                        "your_cookie_name=cookie_value; Path=/; HttpOnly");
+    if (session_id_.has_value()) {
+      LOG_INFO("This current request is for the existing session ID: " +
+               session_id_.value());
+    } else {
+      const std::string new_session_id = generateSessionId();
+      LOG_INFO("New session ID created for the current request: " +
+               new_session_id);
+      addResponseHeader("Set-Cookie", "my_cookie_session_id=" + new_session_id +
+                                          "; Path=/; HttpOnly");
     }
 
     return FilterHeadersStatus::Continue;
+  }
+
+ private:
+  std::optional<std::string> session_id_;
+
+  // Try to get the session ID from the Cookie header.
+  static std::optional<std::string> getSessionIdFromCookie() {
+    const auto cookies = getRequestHeader("Cookie")->toString();
+    std::map<std::string, std::string> m;
+    for (absl::string_view sp : absl::StrSplit(cookies, "; ")) {
+      m.insert(absl::StrSplit(sp, absl::MaxSplits('=', 1)));
+    }
+
+    const auto token = m.find("my_cookie_session_id");
+    if (token == m.end()) {
+      return std::nullopt;
+    }
+
+    return token->second;
+  }
+
+  // Generate a unique random session ID.
+  static std::string generateSessionId() {
+    // Wasm VM does not support the random generation
+    // that involves a file system operation.
+    using namespace std::chrono_literals;
+    const auto ts = std::chrono::high_resolution_clock::now();
+    const auto ns = ts.time_since_epoch() / 1ns;
+    return std::to_string(ns);
   }
 };
 

@@ -1,21 +1,27 @@
+env {
+  time_secs: 123456789  # set clock
+}
 test {
-  name: "Wih200StatusCodeCookieSet"
+  name: "WihSessionIdSetKeepTheSameAndLog"
+  request_headers {
+    input { header { key: "Cookie" value: "some-cookie=some-value; my_cookie_session_id=999999999" } }
+  }
   response_headers {
-    input { header { key: ":status" value: "200" } }
-    result { has_header { key: "Set-Cookie" value: "your_cookie_name=cookie_value; Path=/; HttpOnly" } }
+    result { 
+      no_header { key: "Set-Cookie" }
+      log { regex: ".+This current request is for the existing session ID: 999999999" }
+    }
   }
 }
 test {
-  name: "Wih202StatusCodeCookieSet"
-  response_headers {
-    input { header { key: ":status" value: "202" } }
-    result { has_header { key: "Set-Cookie" value: "your_cookie_name=cookie_value; Path=/; HttpOnly" } }
+  name: "WihNoSessionIdCreateOneAndLog"
+  request_headers {
+    input { header { key: "Cookie" value: "some-cookie=some-value; other-cookie=other-value" } }
   }
-}
-test {
-  name: "Wih401StatusCodeNoCookieSet"
   response_headers {
-    input { header { key: ":status" value: "401" } }
-    result { no_header { key: "Set-Cookie" } }
+    result { 
+      has_header { key: "Set-Cookie" value: "my_cookie_session_id=123456789000000000; Path=/; HttpOnly" }
+      log { regex: ".+New session ID created for the current request: 123456789000000000" }
+    }
   }
 }
