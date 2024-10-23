@@ -56,15 +56,14 @@ class MyHttpContext : public Context {
     const auto cookies = getRequestHeader("Cookie")->toString();
     std::map<std::string, std::string> m;
     for (absl::string_view sp : absl::StrSplit(cookies, "; ")) {
-      m.insert(absl::StrSplit(sp, absl::MaxSplits('=', 1)));
+      const std::pair<std::string, std::string> cookie =
+          absl::StrSplit(sp, absl::MaxSplits('=', 1));
+      if (cookie.first == "Authorization") {
+        return cookie.second;
+      }
     }
 
-    const auto token = m.find("Authorization");
-    if (token == m.end()) {
-      return std::nullopt;
-    }
-
-    return token->second;
+    return std::nullopt;
   }
 
   // Helper function to convert binary data to a hexadecimal string.
