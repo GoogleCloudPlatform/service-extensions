@@ -34,13 +34,13 @@ class MyHttpContext : public Context {
                                         bool end_of_stream) override {
     if (session_id_.has_value()) {
       LOG_INFO("This current request is for the existing session ID: " +
-               session_id_.value());
+               *session_id_);
     } else {
       const std::string new_session_id = generateSessionId();
       LOG_INFO("New session ID created for the current request: " +
                new_session_id);
-      addResponseHeader("Set-Cookie", "my_cookie_session_id=" + new_session_id +
-                                          "; Path=/; HttpOnly");
+      addResponseHeader("Set-Cookie",
+                        "my_cookie=" + new_session_id + "; Path=/; HttpOnly");
     }
 
     return FilterHeadersStatus::Continue;
@@ -54,15 +54,14 @@ class MyHttpContext : public Context {
     const auto cookies = getRequestHeader("Cookie")->toString();
     std::map<std::string, std::string> m;
     for (absl::string_view sp : absl::StrSplit(cookies, "; ")) {
-      m.insert(absl::StrSplit(sp, absl::MaxSplits('=', 1)));
+      const std::pair<std::string, std::string> cookie =
+          absl::StrSplit(sp, absl::MaxSplits('=', 1));
+      if (cookie.first == "my_cookie") {
+        return cookie.second;
+      }
     }
 
-    const auto token = m.find("my_cookie_session_id");
-    if (token == m.end()) {
-      return std::nullopt;
-    }
-
-    return token->second;
+    return std::nullopt;
   }
 
   // Generate a unique random session ID.

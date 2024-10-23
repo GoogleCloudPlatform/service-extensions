@@ -4,7 +4,7 @@ env {
 test {
   name: "WihSessionIdSetKeepTheSameAndLog"
   request_headers {
-    input { header { key: "Cookie" value: "some-cookie=some-value; my_cookie_session_id=999999999" } }
+    input { header { key: "Cookie" value: "some-cookie=some-value; my_cookie=999999999" } }
   }
   response_headers {
     result { 
@@ -20,7 +20,7 @@ test {
   }
   response_headers {
     result { 
-      has_header { key: "Set-Cookie" value: "my_cookie_session_id=123456789000000000; Path=/; HttpOnly" }
+      has_header { key: "Set-Cookie" value: "my_cookie=123456789000000000; Path=/; HttpOnly" }
       log { regex: ".+New session ID created for the current request: 123456789000000000" }
     }
   }
