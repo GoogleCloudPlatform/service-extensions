@@ -14,8 +14,11 @@
 
 // [START serviceextensions_plugin_set_cookie]
 #include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "proxy_wasm_intrinsics.h"
+
+constexpr absl::string_view kCookieName = "my_cookie";
 
 // This plugin verifies if a session ID cookie is present in the current
 // request. If no such cookie is found, a new session ID cookie is created.
@@ -39,8 +42,9 @@ class MyHttpContext : public Context {
       const std::string new_session_id = generateSessionId();
       LOG_INFO("New session ID created for the current request: " +
                new_session_id);
-      addResponseHeader("Set-Cookie",
-                        "my_cookie=" + new_session_id + "; Path=/; HttpOnly");
+      addResponseHeader(
+          "Set-Cookie",
+          absl::StrCat(kCookieName, "=", new_session_id, "; Path=/; HttpOnly"));
     }
 
     return FilterHeadersStatus::Continue;
@@ -56,7 +60,7 @@ class MyHttpContext : public Context {
     for (absl::string_view sp : absl::StrSplit(cookies, "; ")) {
       const std::pair<std::string, std::string> cookie =
           absl::StrSplit(sp, absl::MaxSplits('=', 1));
-      if (cookie.first == "my_cookie") {
+      if (cookie.first == kCookieName) {
         return cookie.second;
       }
     }
