@@ -65,6 +65,22 @@ for your own plugin. Extend them to fit your particular use case.
     to the existence of HTTP Client Hints or User-Agent header values.
 *   [Validate client token using HMAC with cookie](samples/hmac_authcookie): Check
     the client request for a valid token signed using HMAC provided via a cookie.
+*   [Block request with particular header](samples/block_request): Check whether
+    the client's Referer header matches an expected domain. If not, generate a 403
+    Forbidden response.
+*   [Overwrite origin response error code](samples/overwrite_errcode): Overwrites
+    error code served from origin from 5xx error to 4xx error class.
+*   [Perform a HTTP redirect](samples/redirect): Redirect a given URL to another URL.
+*   [Set a cookie for a given client request](samples/set_cookie): Set cookie on
+    HTTP response for a particular client request.
+*   [A/B decisioning based on query param](samples/ab_testing): Showcase A/B testing
+    in action, 50% chance a user is served file A and 50% chance they are
+    served file B.
+*   [Custom error page](samples/add_custom_response) For a certain class of origin
+    errors, redirect to a custom error page hosted on GCS.
+*   [Validate client JWT for authorization](samples/jwt_auth): Ensures user
+    authentication by verifying an RS256-signed JWT token in the query string
+    and subsequently removing it.
 
 # Samples tests
 
