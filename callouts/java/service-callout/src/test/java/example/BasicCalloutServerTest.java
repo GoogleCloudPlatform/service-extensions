@@ -15,11 +15,10 @@
  */
 package example;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.truth.Truth;
 import com.google.common.truth.extensions.proto.ProtoTruth;
 import com.google.protobuf.ByteString;
+import io.envoyproxy.envoy.config.core.v3.HeaderMap;
 import io.envoyproxy.envoy.config.core.v3.HeaderValue;
 import io.envoyproxy.envoy.config.core.v3.HeaderValueOption;
 import io.envoyproxy.envoy.service.ext_proc.v3.BodyMutation;
@@ -34,7 +33,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import service.ServiceCallout;
-import service.ServiceCalloutTools;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -46,11 +44,11 @@ import java.util.concurrent.TimeUnit;
 
 public class BasicCalloutServerTest {
 
-    private TestServiceCallout server;
+    private BasicCalloutServer server;
 
     @Before
     public void setUp() throws IOException {
-        server = new TestServiceCallout.Builder()
+        server = new BasicCalloutServer.Builder()
                 .setHealthCheckPort(8000)
                 .setHealthCheckPath("/health")
                 .setSeparateHealthCheck(true)
@@ -64,81 +62,23 @@ public class BasicCalloutServerTest {
         stopServer();
     }
 
-    private static class TestServiceCallout extends ServiceCallout {
-
-        public TestServiceCallout(TestServiceCallout.Builder builder) {
-            super(builder);
-        }
-
-        public static class Builder extends ServiceCallout.Builder<Builder> {
-            @Override
-            public TestServiceCallout build() {
-                return new TestServiceCallout(this);
-            }
-
-            @Override
-            protected Builder self() {
-                return this;
-            }
-        }
-
-        @Override
-        public void onRequestHeaders(ProcessingResponse.Builder processingResponseBuilder, HttpHeaders headers) {
-            // Example mutation: Add specific headers and clear route cache
-            ServiceCalloutTools.addHeaderMutations(
-                    processingResponseBuilder.getRequestHeadersBuilder(),
-                    ImmutableMap.of("test-request-header", "test-value", "x", "y").entrySet(),
-                    null, // No headers to remove
-                    true, // Clear route cache
-                    null  // No append action
-            );
-        }
-
-        @Override
-        public void onResponseHeaders(ProcessingResponse.Builder processingResponseBuilder, HttpHeaders headers) {
-            // Example mutation: Add and remove headers without clearing route cache
-            ServiceCalloutTools.addHeaderMutations(
-                    processingResponseBuilder.getResponseHeadersBuilder(),
-                    ImmutableMap.of("test-response-header", "response-value").entrySet(),
-                    ImmutableList.of("remove-header"),
-                    false, // Do not clear route cache
-                    null   // No append action
-            );
-        }
-
-        @Override
-        public void onRequestBody(ProcessingResponse.Builder processingResponseBuilder, HttpBody body) {
-            // Example mutation: Append "-added-body" to the request body
-            String originalBody = body.getBody().toStringUtf8();
-            String modifiedBody = originalBody + "-added-body";
-            ServiceCalloutTools.addBodyMutations(
-                    processingResponseBuilder.getRequestBodyBuilder(),
-                    modifiedBody,
-                    null,
-                    null
-            );
-        }
-
-        @Override
-        public void onResponseBody(ProcessingResponse.Builder processingResponseBuilder, HttpBody body) {
-            // Example mutation: Replace response body with "test-replaced-body"
-            ServiceCalloutTools.addBodyMutations(
-                    processingResponseBuilder.getResponseBodyBuilder(),
-                    "test-replaced-body",
-                    null,
-                    null
-            );
-        }
-    }
-
     @Test
     public void testOnRequestHeaders() {
         // Create a ProcessingResponse.Builder
         ProcessingResponse.Builder processingResponseBuilder = ProcessingResponse.newBuilder();
 
-        // Create a sample HttpHeaders object
+        // Manually build HeaderMap with desired headers
+        HeaderMap headerMap = HeaderMap.newBuilder()
+                .addHeaders(HeaderValue.newBuilder()
+                        .setKey("original-header")
+                        .setValue("original-value")
+                        .build())
+                .build();
+
+        // Create a sample HttpHeaders
         HttpHeaders requestHeaders = HttpHeaders.newBuilder()
                 .setEndOfStream(false)
+                .setHeaders(headerMap)
                 .build();
 
         // Invoke the onRequestHeaders method
@@ -157,14 +97,14 @@ public class BasicCalloutServerTest {
                                                         HeaderMutation.newBuilder()
                                                                 .addSetHeaders(HeaderValueOption.newBuilder()
                                                                         .setHeader(HeaderValue.newBuilder()
-                                                                                .setKey("test-request-header")
-                                                                                .setRawValue(ByteString.copyFromUtf8("test-value"))
+                                                                                .setKey("request-header")
+                                                                                .setRawValue(ByteString.copyFromUtf8("added-request"))
                                                                                 .build())
                                                                         .build())
                                                                 .addSetHeaders(HeaderValueOption.newBuilder()
                                                                         .setHeader(HeaderValue.newBuilder()
-                                                                                .setKey("x")
-                                                                                .setRawValue(ByteString.copyFromUtf8("y"))
+                                                                                .setKey("c")
+                                                                                .setRawValue(ByteString.copyFromUtf8("d"))
                                                                                 .build())
                                                                         .build())
                                                 )
@@ -182,9 +122,18 @@ public class BasicCalloutServerTest {
         // Create a ProcessingResponse.Builder
         ProcessingResponse.Builder processingResponseBuilder = ProcessingResponse.newBuilder();
 
-        // Create a sample HttpHeaders object
+        // Manually build HeaderMap with desired headers
+        HeaderMap headerMap = HeaderMap.newBuilder()
+                .addHeaders(HeaderValue.newBuilder()
+                        .setKey("original-header")
+                        .setValue("original-value")
+                        .build())
+                .build();
+
+        // Create a sample HttpHeaders
         HttpHeaders responseHeaders = HttpHeaders.newBuilder()
                 .setEndOfStream(false)
+                .setHeaders(headerMap)
                 .build();
 
         // Invoke the onResponseHeaders method
@@ -203,11 +152,17 @@ public class BasicCalloutServerTest {
                                                         HeaderMutation.newBuilder()
                                                                 .addSetHeaders(HeaderValueOption.newBuilder()
                                                                         .setHeader(HeaderValue.newBuilder()
-                                                                                .setKey("test-response-header")
-                                                                                .setRawValue(ByteString.copyFromUtf8("response-value"))
+                                                                                .setKey("response-header")
+                                                                                .setRawValue(ByteString.copyFromUtf8("added-response"))
                                                                                 .build())
                                                                         .build())
-                                                                .addRemoveHeaders("remove-header")
+                                                                .addSetHeaders(HeaderValueOption.newBuilder()
+                                                                        .setHeader(HeaderValue.newBuilder()
+                                                                                .setKey("c")
+                                                                                .setRawValue(ByteString.copyFromUtf8("d"))
+                                                                                .build())
+                                                                        .build())
+                                                                .addRemoveHeaders("foo")
                                                 )
                                                 .setClearRouteCache(false)
                                 )
@@ -247,6 +202,7 @@ public class BasicCalloutServerTest {
                                                 .setBodyMutation(
                                                         BodyMutation.newBuilder()
                                                                 .setBody(ByteString.copyFromUtf8(originalBody + "-added-body"))
+                                                                .build()
                                                 )
                                                 .setClearRouteCache(false)
                                 )
@@ -282,7 +238,8 @@ public class BasicCalloutServerTest {
                                         CommonResponse.newBuilder()
                                                 .setBodyMutation(
                                                         BodyMutation.newBuilder()
-                                                                .setBody(ByteString.copyFromUtf8("test-replaced-body"))
+                                                                .setBody(ByteString.copyFromUtf8("body replaced"))
+                                                                .build()
                                                 )
                                                 .setClearRouteCache(false)
                                 )
