@@ -121,9 +121,9 @@ http_archive(
     url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/" + PROXY_WASM_CPP_HOST_COMMIT + ".tar.gz",
 )
 
-PROXY_WASM_CPP_SDK_COMMIT = "81c472c5b8cd39df155bb3e3f3c4783ff1ffe8ca"  # PR #173
+PROXY_WASM_CPP_SDK_COMMIT = "a982ad089d1962f1b92f4343c910c0be6b6e6280"  # 2024-10-28
 
-PROXY_WASM_CPP_SDK_SHA256 = "992b8918cf93575adea66513b50cd0df8926fe98d2019700f69502c19787f01b"
+PROXY_WASM_CPP_SDK_SHA256 = "4cdbee65d7c3c491ba42dcc3b201144ac781031f8b1e40cb0b9244ffca9c5d3e"
 
 http_archive(
     name = "proxy_wasm_cpp_sdk",
