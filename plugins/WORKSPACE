@@ -46,6 +46,15 @@ load("@com_github_nelhage_rules_boost//:boost/boost.bzl", "boost_deps")
 
 boost_deps()
 
+# Update boringssl to pick up fix for strdup build issue:
+# https://boringssl-review.googlesource.com/c/boringssl/+/64047
+http_archive(
+    name = "boringssl", # 2024-04-29
+    sha256 = "cd240bf27450f75cd5f41c512a06297c00646cdbac9f87b604e9312771db15a6",
+    strip_prefix = "boringssl-2db0eb3f96a5756298dcd7f9319e56a98585bd10",
+    url = "https://github.com/google/boringssl/archive/2db0eb3f96a5756298dcd7f9319e56a98585bd10.tar.gz",
+)
+
 # JWT verification lib for C++.
 http_archive(
     name = "jwt_verify_lib",
