@@ -12,9 +12,15 @@ proxy_wasm_plugin_cpp(
         "@boost//:url",
     ],
     linkopts = [
-        # To avoid the error:
-        # library_pthread.js:26: #error "STANDALONE_WASM does not support shared memories yet".
-        # Disabling the pthreads avoids the inclusion of the library_pthread.js.
+        # BoringSSL crypto assumes -pthread is OK to use:
+        # https://github.com/google/boringssl/blob/9ac494a171014fa0f06dbf2b0e08abf1d7ec85aa/BUILD.bazel#L87
+        #
+        # Using -pthread results in linker errors like:
+        # "error: --shared-memory is disallowed by lto.tmp because it was not
+        # compiled with 'atomics' or 'bulk-memory' features."
+        #
+        # Override the -pthread option to avoid the error.
+        # Consider moving this to ProxyWasmCppSdk.
         "-sUSE_PTHREADS=0",
     ],
 )
