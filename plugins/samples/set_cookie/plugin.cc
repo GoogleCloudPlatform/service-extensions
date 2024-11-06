@@ -13,17 +13,30 @@
 // limitations under the License.
 
 // [START serviceextensions_plugin_set_cookie]
+#include "absl/random/random.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "proxy_wasm_intrinsics.h"
 
 constexpr absl::string_view kCookieName = "my_cookie";
 
+class MyRootContext : public RootContext {
+ public:
+  explicit MyRootContext(uint32_t id, std::string_view root_id)
+      : RootContext(id, root_id) {}
+
+  uint64_t generateRandom() { return absl::Uniform<uint64_t>(bitgen_); }
+
+ private:
+  absl::BitGen bitgen_;
+};
+
 // This plugin verifies if a session ID cookie is present in the current
 // request. If no such cookie is found, a new session ID cookie is created.
 class MyHttpContext : public Context {
  public:
-  explicit MyHttpContext(uint32_t id, RootContext* root) : Context(id, root) {}
+  explicit MyHttpContext(uint32_t id, RootContext* root)
+      : Context(id, root), root_(static_cast<MyRootContext*>(root)) {}
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
@@ -38,7 +51,8 @@ class MyHttpContext : public Context {
       LOG_INFO("This current request is for the existing session ID: " +
                *session_id_);
     } else {
-      const std::string new_session_id = generateSessionId();
+      const std::string new_session_id =
+          std::to_string(root_->generateRandom());
       LOG_INFO("New session ID created for the current request: " +
                new_session_id);
       addResponseHeader(
@@ -67,17 +81,9 @@ class MyHttpContext : public Context {
     return std::nullopt;
   }
 
-  // Generate a unique random session ID.
-  static std::string generateSessionId() {
-    // Wasm VM does not support the random generation
-    // that involves a file system operation.
-    using namespace std::chrono_literals;
-    const auto ts = std::chrono::high_resolution_clock::now();
-    const auto ns = ts.time_since_epoch() / 1ns;
-    return std::to_string(ns);
-  }
+  MyRootContext* root_;
 };
 
 static RegisterContextFactory register_StaticContext(
-    CONTEXT_FACTORY(MyHttpContext), ROOT_FACTORY(RootContext));
+    CONTEXT_FACTORY(MyHttpContext), ROOT_FACTORY(MyRootContext));
 // [END serviceextensions_plugin_set_cookie]
