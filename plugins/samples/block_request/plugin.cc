@@ -15,23 +15,36 @@
 // [START serviceextensions_plugin_block_request]
 #include <string>
 
+#include "absl/random/random.h"
 #include "absl/strings/match.h"
 #include "proxy_wasm_intrinsics.h"
 
 constexpr absl::string_view kAllowedReferer = "safe-site.com";
 
+class MyRootContext : public RootContext {
+ public:
+  explicit MyRootContext(uint32_t id, std::string_view root_id)
+      : RootContext(id, root_id) {}
+
+  uint64_t generateRandom() { return absl::Uniform<uint64_t>(bitgen_); }
+
+ private:
+  absl::BitGen bitgen_;
+};
+
 // Checks whether the client's Referer header matches an expected domain. If
 // not, generate a 403 Forbidden response.
 class MyHttpContext : public Context {
  public:
-  explicit MyHttpContext(uint32_t id, RootContext* root) : Context(id, root) {}
+  explicit MyHttpContext(uint32_t id, RootContext* root)
+      : Context(id, root), root_(static_cast<MyRootContext*>(root)) {}
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
     const auto referer = getRequestHeader("Referer");
     // Check if referer match with the expected domain.
     if (!referer || !absl::StrContains(referer->view(), kAllowedReferer)) {
-      const auto requestId = generateRandomRequestId();
+      const auto requestId = std::to_string(root_->generateRandom());
       sendLocalResponse(403, "", "Forbidden - Request ID: " + requestId, {});
       LOG_INFO("Forbidden - Request ID: " + requestId);
       return FilterHeadersStatus::ContinueAndEndStream;
@@ -43,17 +56,9 @@ class MyHttpContext : public Context {
   }
 
  private:
-  // Generate a unique random request ID.
-  static std::string generateRandomRequestId() {
-    // Wasm VM does not support the random generation
-    // that involves a file system operation.
-    using namespace std::chrono_literals;
-    const auto ts = std::chrono::high_resolution_clock::now();
-    const auto ns = ts.time_since_epoch() / 1ns;
-    return std::to_string(ns);
-  }
+  MyRootContext* root_;
 };
 
 static RegisterContextFactory register_StaticContext(
-    CONTEXT_FACTORY(MyHttpContext), ROOT_FACTORY(RootContext));
+    CONTEXT_FACTORY(MyHttpContext), ROOT_FACTORY(MyRootContext));
 // [END serviceextensions_plugin_block_request]
