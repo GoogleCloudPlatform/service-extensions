@@ -40,11 +40,7 @@ impl HttpContext for MyHttpContext {
 
         // Check "User-Agent" header for mobile substring (case insensitive)
         let user_agent = self.get_http_request_header("User-Agent");
-        if user_agent
-            .unwrap_or_default()
-            .to_lowercase()
-            .contains(DEVICE_TYPE_VALUE)
-        {
+        if user_agent.map_or(false, |s| s.to_lowercase().contains(DEVICE_TYPE_VALUE)) {
             self.add_http_request_header(DEVICE_TYPE_KEY, DEVICE_TYPE_VALUE);
             return Action::Continue;
         }
