@@ -79,7 +79,7 @@ for your own plugin. Extend them to fit your particular use case.
 *   [Validate client JWT for authorization](samples/jwt_auth): Ensures user
     authentication by verifying an RS256-signed JWT token in the query string
     and subsequently removing it.
-    [Check for PII on response](samples/check_pii): Checks the response http headers,
+*   [Check for PII on response](samples/check_pii): Checks the response http headers,
     and the response body for the presence of credit card numbers. If found, the
     initial numbers will be masked.
 
