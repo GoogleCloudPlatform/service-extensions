@@ -23,7 +23,8 @@ class MyRootContext : public RootContext {
 
   bool onConfigure(size_t) override {
     // Credit card numbers in a 19 character hyphenated format.
-    // Compile the regex expression at plugin setup time.
+    // Compile the regex expression at plugin setup time, so that this expensive
+    // operation is only performed once, and not repeated with each request.
     card_match.emplace("\\d{4}-\\d{4}-\\d{4}-(\\d{4})");
     return card_match->ok();
   }
@@ -33,6 +34,9 @@ class MyRootContext : public RootContext {
 
 // Checks the response http headers, and the response body for the presence of
 // credit card numbers. Mask the initial numbers case found.
+// Note that for illustrative purposes, this example is kept simple and does not
+// handle the case of credit card numbers that are split across multiple
+// onResponseBody() calls.
 class MyHttpContext : public Context {
  public:
   explicit MyHttpContext(uint32_t id, RootContext* root)
