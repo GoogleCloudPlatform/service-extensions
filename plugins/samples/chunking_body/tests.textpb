@@ -1,0 +1,14 @@
+test{
+  name: "NumChunk"
+  num_chunks: 5
+  request_body {
+    input {
+      file: "request_body.data"
+    }
+    result {
+      body {
+        exact: "12foo34foo56foo78foo90foo"
+      }
+    }
+  }
+}

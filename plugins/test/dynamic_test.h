@@ -80,6 +80,9 @@ class DynamicTest : public DynamicFixture {
   // Helper to generate Headers struct from proto, string, or file.
   absl::StatusOr<TestHttpContext::Headers> ParseHeaders(const pb::Input& input,
                                                         bool is_request);
+
+  // Helper to generate Body chunks from proto, string, or file.
+  absl::StatusOr<std::string> ParseBodyInput(const pb::Input& input);
   // Helper to read data from a path which may be relative to the test config.
   absl::StatusOr<std::string> ReadContent(const std::string& path);
 
