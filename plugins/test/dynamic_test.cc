@@ -178,34 +178,43 @@ void DynamicTest::TestBody() {
     CheckPhaseResults("request_headers", invoke.result(), stream, res);
   }
   if (cfg_.request_body_size() > 0) {
-    if (cfg_.request_body_size() > 1 &&
-        cfg_.chunking_plan_case() !=
-            pb::Test::ChunkingPlanCase::CHUNKING_PLAN_NOT_SET) {
-      FAIL() << "Cannot specify chunking_plan with multiple request_body "
-                "invocations";
-    }
-    if (cfg_.has_num_chunks()) {
-      absl::StatusOr<std::string> complete_input_body =
-          ParseBodyInput(cfg_.request_body(0).input());
-      ASSERT_TRUE(complete_input_body.ok()) << complete_input_body.status();
-      int chunk_length = complete_input_body->size() / cfg_.num_chunks();
-      std::vector<std::string> input_body_chunks = absl::StrSplit(
-          *complete_input_body,
-          absl::MaxSplits(absl::ByLength(chunk_length), cfg_.num_chunks()));
+    // if (cfg_.request_body_size() > 1 &&
+    //     cfg_.chunking_plan_case() !=
+    //         pb::Test::ChunkingPlanCase::CHUNKING_PLAN_NOT_SET) {
+    //   FAIL() << "Cannot specify chunking_plan with multiple request_body "
+    //             "invocations";
+    // }
 
-      TestHttpContext::Result body_result = TestHttpContext::Result{};
-      for (std::string body_chunk : input_body_chunks) {
-        auto res = stream.SendRequestBody(std::move(body_chunk));
-        ASSERT_VM_HEALTH("request_body", handle, stream);
-        body_result.body = body_result.body.append(res.body);
-      }
-      CheckPhaseResults("request_body", cfg_.request_body(0).result(), stream,
-                        body_result);
-    } else if (cfg_.has_chunk_size()) {
-      // Todo
-    } else {
-      // Todo
+    for (auto& invoke : *cfg_.mutable_request_body()) {
+      auto res = stream.SendRequestBody(std::move(
+          *absl::WrapUnique(invoke.mutable_input()->release_content())));
+      ASSERT_VM_HEALTH("request_body", handle, stream);
+      CheckPhaseResults("request_body", invoke.result(), stream, res);
     }
+    // if (cfg_.has_num_chunks()) {
+    //   absl::StatusOr<std::string> complete_input_body =
+    //       ParseBodyInput(cfg_.request_body(0).input());
+    //   std::string body = std::string(*complete_input_body);
+    //   // ASSERT_TRUE(complete_input_body.ok()) << complete_input_body.status();
+    //   // int chunk_length = complete_input_body->size() / cfg_.num_chunks();
+    //   // std::vector<std::string> input_body_chunks = absl::StrSplit(
+    //   //     *complete_input_body,
+    //   //     absl::MaxSplits(absl::ByLength(chunk_length), cfg_.num_chunks()));
+
+    //   TestHttpContext::Result body_result = TestHttpContext::Result{};
+    //   // for (std::string body_chunk : input_body_chunks) {
+    //     auto res = stream.SendRequestBody(std::move(body));
+    //     std::cout << "output_body " << res.body;
+    //     ASSERT_VM_HEALTH("request_body", handle, stream);
+    //     // body_result.body = body_result.body.append(res.body);
+    //   // }
+    //   CheckPhaseResults("request_body", cfg_.request_body(0).result(), stream,
+    //                     body_result);
+    // } else if (cfg_.has_chunk_size()) {
+    //   // Todo
+    // } else {
+    //   // Todo
+    // }
   }
   if (cfg_.has_response_headers()) {
     const auto& invoke = cfg_.response_headers();
@@ -309,35 +318,38 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
     response_headers = *headers;
   }
   std::vector<std::string> request_body_chunks;
-  if (cfg_.request_body_size() > 0) {
-    if (cfg_.request_body_size() > 1 &&
-        cfg_.chunking_plan_case() !=
-            pb::Test::ChunkingPlanCase::CHUNKING_PLAN_NOT_SET) {
-      FAIL() << "Cannot specify chunking_plan with multiple request_body "
-                "invocations";
-    }
-    if (cfg_.has_num_chunks()) {
-      auto complete_body = ParseBodyInput(cfg_.request_body(0).input());
-      BM_RETURN_IF_ERROR(complete_body.status());
-      int chunk_length = complete_body->size() / cfg_.num_chunks();
-      auto body_chunks = absl::StrSplit(
-          *complete_body,
-          absl::MaxSplits(absl::ByLength(chunk_length), cfg_.num_chunks()));
-      request_body_chunks = std::move(body_chunks);
-    } else if (cfg_.has_chunk_size()) {
-      auto complete_body = ParseBodyInput(cfg_.request_body(0).input());
-      BM_RETURN_IF_ERROR(complete_body.status());
-      auto body_chunks =
-          absl::StrSplit(*complete_body, absl::ByLength(cfg_.num_chunks()));
-      request_body_chunks = std::move(body_chunks);
-    } else {
-      for (const auto& request_body : cfg_.request_body()) {
-        auto body_chunk = ParseBodyInput(request_body.input());
-        BM_RETURN_IF_ERROR(body_chunk.status());
-        request_body_chunks.emplace_back(*body_chunk);
-      }
-    }
+  for (const auto& request_body : cfg_.request_body()) {
+    request_body_chunks.emplace_back(request_body.input().content());
   }
+  // if (cfg_.request_body_size() > 0) {
+  //   if (cfg_.request_body_size() > 1 &&
+  //       cfg_.chunking_plan_case() !=
+  //           pb::Test::ChunkingPlanCase::CHUNKING_PLAN_NOT_SET) {
+  //     FAIL() << "Cannot specify chunking_plan with multiple request_body "
+  //               "invocations";
+  //   }
+  //   if (cfg_.has_num_chunks()) {
+  //     auto complete_body = ParseBodyInput(cfg_.request_body(0).input());
+  //     BM_RETURN_IF_ERROR(complete_body.status());
+  //     int chunk_length = complete_body->size() / cfg_.num_chunks();
+  //     auto body_chunks = absl::StrSplit(
+  //         *complete_body,
+  //         absl::MaxSplits(absl::ByLength(chunk_length), cfg_.num_chunks()));
+  //     request_body_chunks = std::move(body_chunks);
+  //   } else if (cfg_.has_chunk_size()) {
+  //     auto complete_body = ParseBodyInput(cfg_.request_body(0).input());
+  //     BM_RETURN_IF_ERROR(complete_body.status());
+  //     auto body_chunks =
+  //         absl::StrSplit(*complete_body, absl::ByLength(cfg_.num_chunks()));
+  //     request_body_chunks = std::move(body_chunks);
+  //   } else {
+  //     for (const auto& request_body : cfg_.request_body()) {
+  //       auto body_chunk = ParseBodyInput(request_body.input());
+  //       BM_RETURN_IF_ERROR(body_chunk.status());
+  //       request_body_chunks.emplace_back(*body_chunk);
+  //     }
+  //   }
+  // }
   std::vector<std::string> response_body_chunks;
   for (const auto& response_body : cfg_.response_body()) {
     response_body_chunks.emplace_back(response_body.input().content());
@@ -571,7 +583,7 @@ absl::StatusOr<TestHttpContext::Headers> DynamicTest::ParseHeaders(
 }
 absl::StatusOr<std::string> DynamicTest::ParseBodyInput(
     const pb::Input& input) {
-  std::string complete_body;
+  // std::string complete_body;
   if (!input.file().empty()) {
     // Handle file input.
     return ReadContent(input.file());
