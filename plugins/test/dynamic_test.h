@@ -77,8 +77,11 @@ class DynamicTest : public DynamicFixture {
                   const pb::StringMatcher& expect,
                   const std::vector<std::string>& contents);
 
-  // Helper to generate Headers struct from proto.
-  TestHttpContext::Headers GenHeaders(const pb::Input& input);
+  // Helper to generate Headers struct from proto, string, or file.
+  absl::StatusOr<TestHttpContext::Headers> ParseHeaders(const pb::Input& input,
+                                                        bool is_request);
+  // Helper to read data from a path which may be relative to the test config.
+  absl::StatusOr<std::string> ReadContent(const std::string& path);
 
   std::string engine_;
   pb::Env env_;

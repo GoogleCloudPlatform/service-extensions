@@ -44,10 +44,10 @@ After installing Java, you need to set the `JAVA_HOME` environment variable to p
 
 This project is using the maven build system.
 
-From this directory, build with:
+From the main directory, build with:
 
 ```
-mvn install
+mvn clean package
 ```
 
 ## Running a Specific Class Locally
@@ -57,10 +57,136 @@ Before running the command, ensure that you have configured Java correctly and s
 java -version
 ```
 
-To run a specific class inside the `example` package (which contains various use cases), you can use the `mvn exec:java` command. For instance, to run the `BasicCalloutServer` class, use the following command:
+To run a specific class inside the `example` package (which contains various use cases), you can use the `java` command. For instance, to run the `BasicCalloutServer` class, use the following command:
 
 ```sh
-mvn exec:java -Dexec.mainClass="example.BasicCalloutServer"
+java -cp target/service-callout-1.0-SNAPSHOT-jar-with-dependencies.jar example.BasicCalloutServer
+```
+
+## Docker
+
+### Build the Docker Image
+
+Execute the following command to build the Docker image. Replace `service-callout:1.0-SNAPSHOT` with your preferred image name and tag if necessary.
+
+```sh
+docker build -t service-callout:1.0-SNAPSHOT .
+```
+
+### Running the Docker Container
+
+To run the BasicCalloutServer class for example, use the following command:
+
+```sh
+docker run -p 8000:8000 -p 8443:8443 service-callout:1.0-SNAPSHOT example.BasicCalloutServer
+```
+
+### Running with JVM Options
+
+If you need to pass JVM options (e.g., setting the maximum heap size), use the -e JAVA_OPTS flag:
+
+```sh
+docker run -p 8000:8000 -p 8443:8443 \
+ -e JAVA_OPTS="-Xmx512m" \
+ service-callout:1.0-SNAPSHOT example.BasicCalloutServer
+```
+
+### Available Examples
+
+- AddBody
+- AddHeader
+- BasicCalloutServer
+- JwtAuth
+- Redirect
+
+
+## Developing Callouts
+This repository provides the following files to be extended to fit the needs of the user:
+
+[ServiceCallout](src/main/java/service/ServiceCallout.java): Baseline service callout server.
+
+[ServiceCalloutTools](src/main/java/service/ServiceCalloutTools.java): Common functions used in many callout server code paths.
+
+### Making a New Server
+
+Create a new Java file Example.java and import the ``ServiceCallout`` class from service.ServiceCallout:
+
+```java
+import service.ServiceCallout;
+```
+### Extend the CalloutServer:
+
+Create a custom class extending ``ServiceCallout``:
+
+```java
+public class Example extends ServiceCallout {}
+```
+
+Create the constructor for the superclass constructor
+
+```java
+// Constructor that calls the superclass constructor
+public Example(Example.Builder builder) {
+super(builder);
+}
+```
+
+Add the Builder for your example
+
+```java
+// Builder specific to Example
+public static class Builder extends ServiceCallout.Builder<Example.Builder> {
+
+        @Override
+        public Example build() {
+            return new Example(this);
+        }
+
+        @Override
+        protected Example.Builder self() {
+            return this;
+        }
+    }
+```
+
+Add the method you are going to override for your custom processing  (e.g: Request Headers):
+```java
+
+@Override
+public void onRequestHeaders(ProcessingResponse.Builder processingResponseBuilder,
+                             HttpHeaders headers) {
+}
+```
+
+### Run the Server:
+
+Create an instance of your custom server and call the start method:
+
+```java
+public static void main(String[] args) throws Exception {
+        // Create a builder for ServiceCallout with custom configuration
+        Example server = new Example.Builder()
+                .build();
+
+        // Start the server and block until shutdown
+        server.start();
+        server.blockUntilShutdown();
+    }
+```
+
+Custom configuration is also enabled, so it is possible to change the default ip and port for example:
+```java
+public static void main(String[] args) throws Exception {
+        // Create a builder for ServiceCallout with custom configuration
+        Example server = new Example.Builder()
+                .setIp("111.222.333.444")       // Customize IP
+                .setPort(8443)                  // Set the port for secure communication
+                .build();
+
+        // Start the server and block until shutdown
+        server.start();
+        server.blockUntilShutdown();
+    }
 ```
 
 ## Documentation

@@ -27,6 +27,7 @@ cc_library(
     deps = [
         ":framework",
         ":runner_cc_proto",
+        "@com_github_google_quiche//quiche:balsa",
         "@com_google_benchmark//:benchmark",
         "@com_google_googletest//:gtest",
         "@com_google_protobuf//:protobuf",

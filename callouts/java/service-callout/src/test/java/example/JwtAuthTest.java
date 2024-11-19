@@ -44,7 +44,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.Assert.assertThrows;
-import static org.mockito.Mockito.doThrow;
 
 public class JwtAuthTest {
 

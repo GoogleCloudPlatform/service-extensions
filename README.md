@@ -36,8 +36,8 @@ the [LICENSE](/LICENSE) file for more detailed terms and conditions.
 
 # Code of Conduct
 
-For our code of conduct, see [Code of Conduct](/docs/CODE_OF_CONDUCT.md).
+For our code of conduct, see [Code of Conduct](/CODE_OF_CONDUCT.md).
 
 # Contributing
 
-Contributions welcome! See the [Contributing Guide](/docs/CONTRIBUTING.md).
+Contributions welcome! See the [Contributing Guide](/CONTRIBUTING.md).
