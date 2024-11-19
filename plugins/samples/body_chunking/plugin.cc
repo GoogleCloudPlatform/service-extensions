@@ -19,42 +19,27 @@ class MyHttpContext : public Context {
  public:
   explicit MyHttpContext(uint32_t id, RootContext* root) : Context(id, root) {}
 
-  FilterHeadersStatus onRequestHeaders(uint32_t headers,
-                                       bool end_of_stream) override {
-    // Always be a friendly proxy.
-    addRequestHeader("Message", "hello");
-    replaceRequestHeader("Welcome", "warm");
-    return FilterHeadersStatus::Continue;
-  }
-
-  FilterDataStatus onRequestBody(size_t body_buffer_length, bool end_of_stream) override {
-    const auto body = getBufferBytes(WasmBufferType::HttpRequestBody, 0, body_buffer_length);
+  // Add foo onto the end of each request body chunk
+  FilterDataStatus onRequestBody(size_t body_buffer_length,
+                                 bool end_of_stream) override {
+    const auto body =
+        getBufferBytes(WasmBufferType::HttpRequestBody, 0, body_buffer_length);
     std::string body_string = body->toString();
     body_string.append("foo");
     setBuffer(WasmBufferType::HttpRequestBody, 0, body_buffer_length,
-                  body_string);
+              body_string);
     return FilterDataStatus::Continue;
   }
 
-  FilterHeadersStatus onResponseHeaders(uint32_t headers,
-                                        bool end_of_stream) override {
-    // Conditionally add to a header value.
-    auto msg = getResponseHeader("Message");
-    if (msg && msg->view() == "foo") {
-      addResponseHeader("Message", "bar");
-    }
-    // Unconditionally remove a header.
-    removeResponseHeader("Welcome");
-    return FilterHeadersStatus::Continue;
-  }
-
-  FilterDataStatus onResponseBody(size_t body_buffer_length, bool end_of_stream) override {
-    const auto body = getBufferBytes(WasmBufferType::HttpResponseBody, 0,
-                                       body_buffer_length);
+  // Add bar onto the end of each response body chunk
+  FilterDataStatus onResponseBody(size_t body_buffer_length,
+                                  bool end_of_stream) override {
+    const auto body =
+        getBufferBytes(WasmBufferType::HttpResponseBody, 0, body_buffer_length);
     std::string body_string = body->toString();
     body_string.append("bar");
     setBuffer(WasmBufferType::HttpResponseBody, 0, body_buffer_length,
-                  body_string);
+              body_string);
     return FilterDataStatus::Continue;
   }
 };

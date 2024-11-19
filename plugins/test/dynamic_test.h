@@ -86,8 +86,6 @@ class DynamicTest : public DynamicFixture {
   // Helper to break body down into chunks
   std::vector<std::string> ChunkBody(const std::string& complete_body,
                                      const pb::Test& test);
-  // Helper to read data from a path which may be relative to the test config.
-  absl::StatusOr<std::string> ReadContent(const std::string& path);
 
   std::string engine_;
   pb::Env env_;

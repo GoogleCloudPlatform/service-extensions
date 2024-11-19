@@ -1,0 +1,44 @@
+test {
+  name: "NumChunkWithFileInput"
+  num_chunks: 5
+  request_body {
+    input { file: "request_body.data" }
+    result { body { exact: "12foo34foo56foo78foo90foo" } }
+  }
+  response_body {
+    input { file: "response_body.data" }
+    result { body { exact: "09bar87bar65bar43bar21bar" } }
+  }
+}
+test {
+  name: "NumChunkWithFileInputFileOutput"
+  num_chunks: 5
+  request_body {
+    input { file: "request_body.data" }
+    result { body { file: "expected_request_body.data" } }
+  }
+}
+test {
+  name: "NumChunkWithContentInput"
+  num_chunks: 5
+  request_body {
+    input { content: "1234567890" }
+    result { body { exact: "12foo34foo56foo78foo90foo" } }
+  }
+}
+test {
+  name: "ChunkSizeWithFileInput"
+  chunk_size: 2
+  request_body {
+    input { file: "request_body.data" }
+    result { body { exact: "12foo34foo56foo78foo90foo" } }
+  }
+}
+test {
+  name: "ChunkSizeWithContentInput"
+  chunk_size: 2
+  request_body {
+    input { content: "1234567890" }
+    result { body { exact: "12foo34foo56foo78foo90foo" } }
+  }
+}

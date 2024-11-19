@@ -34,15 +34,37 @@
 
 namespace service_extensions_samples {
 
+// Helper to read data from a path which may be relative to the test config.
+absl::StatusOr<std::string> ReadContent(const std::string& path,
+                                        const pb::Env& env) {
+  boost::filesystem::path in(path);
+  boost::filesystem::path cfg(env.test_path());
+  // If relative path, resolve relative to test config file.
+  if (!in.is_absolute()) {
+    in = cfg.parent_path() / in;
+  }
+  return ReadDataFile(in.string());
+}
+
 // Helper class to support string/regex positive/negative matching.
 class StringMatcher {
  public:
   // Factory method. Creates a matcher or returns invalid argument status.
-  static absl::StatusOr<StringMatcher> Create(const pb::StringMatcher& expect) {
+  static absl::StatusOr<StringMatcher> Create(const pb::StringMatcher& expect,
+                                              const pb::Env& env) {
     StringMatcher sm;
     sm.invert_ = expect.invert();
     if (expect.has_exact()) {
       sm.exact_ = expect.exact();
+    } else if (expect.has_file()) {
+      absl::StatusOr<std::string> file_content =
+          ReadContent(expect.file(), env);
+      if (file_content.ok()) {
+        sm.exact_ = *file_content;
+      } else {
+        return absl::InvalidArgumentError(
+            absl::StrCat("Bad file: ", file_content.status()));
+      }
     } else if (expect.has_regex()) {
       sm.re_ = std::make_unique<RE2>(expect.regex(), RE2::Quiet);
       if (!sm.re_->ok()) {
@@ -64,6 +86,8 @@ class StringMatcher {
     }
     return invert_;
   };
+
+  std::string getExact() { return exact_; }
 
  private:
   StringMatcher() = default;
@@ -215,11 +239,32 @@ void DynamicTest::TestBody() {
     CheckPhaseResults("response_headers", invoke.result(), stream, res);
   }
   if (cfg_.response_body_size() > 0) {
-    for (auto& invoke : *cfg_.mutable_response_body()) {
-      auto res = stream.SendResponseBody(std::move(
-          *absl::WrapUnique(invoke.mutable_input()->release_content())));
-      ASSERT_VM_HEALTH("response_body", handle, stream);
-      CheckPhaseResults("response_body", invoke.result(), stream, res);
+    if (cfg_.chunking_plan_case() !=
+        pb::Test::ChunkingPlanCase::CHUNKING_PLAN_NOT_SET) {
+      if (cfg_.response_body_size() > 1) {
+        FAIL() << "Cannot specify chunking_plan with multiple response_body "
+                  "invocations";
+      }
+      absl::StatusOr<std::string> complete_input_body =
+          ParseBodyInput(cfg_.response_body(0).input());
+      ASSERT_TRUE(complete_input_body.ok()) << complete_input_body.status();
+      std::vector<std::string> input_body_chunks =
+          ChunkBody(*complete_input_body, cfg_);
+      TestHttpContext::Result body_result = TestHttpContext::Result{};
+      for (std::string& body_chunk : input_body_chunks) {
+        auto res = stream.SendResponseBody(std::move(body_chunk));
+        ASSERT_VM_HEALTH("response_body", handle, stream);
+        body_result.body = body_result.body.append(res.body);
+      }
+      CheckPhaseResults("response_body", cfg_.response_body(0).result(), stream,
+                        body_result);
+    } else {
+      for (auto& invoke : *cfg_.mutable_response_body()) {
+        auto res = stream.SendResponseBody(std::move(
+            *absl::WrapUnique(invoke.mutable_input()->release_content())));
+        ASSERT_VM_HEALTH("response_body", handle, stream);
+        CheckPhaseResults("response_body", invoke.result(), stream, res);
+      }
     }
   }
 
@@ -328,8 +373,24 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
     }
   }
   std::vector<std::string> response_body_chunks;
-  for (const auto& response_body : cfg_.response_body()) {
-    response_body_chunks.emplace_back(response_body.input().content());
+  if (cfg_.response_body_size() > 0) {
+    if (cfg_.chunking_plan_case() !=
+        pb::Test::ChunkingPlanCase::CHUNKING_PLAN_NOT_SET) {
+      if (cfg_.response_body_size() > 1) {
+        FAIL() << "Cannot specify chunking_plan with multiple response_body "
+                  "invocations";
+      } else {
+        auto complete_body = ParseBodyInput(cfg_.response_body(0).input());
+        BM_RETURN_IF_ERROR(complete_body.status());
+        response_body_chunks = ChunkBody(*complete_body, cfg_);
+      }
+    } else {
+      for (const auto& response_body : cfg_.response_body()) {
+        auto body_chunk = ParseBodyInput(response_body.input());
+        BM_RETURN_IF_ERROR(body_chunk.status());
+        response_body_chunks.emplace_back(*body_chunk);
+      }
+    }
   }
   std::optional<TestHttpContext> stream;
   for (auto _ : state) {
@@ -460,7 +521,7 @@ void DynamicTest::CheckPhaseResults(const std::string& phase,
 void DynamicTest::FindString(const std::string& phase, const std::string& type,
                              const pb::StringMatcher& expect,
                              const std::vector<std::string>& contents) {
-  auto matcher = StringMatcher::Create(expect);
+  auto matcher = StringMatcher::Create(expect, env_);
   if (!matcher.ok()) {
     ADD_FAILURE() << absl::Substitute("[$0] $1", phase,
                                       matcher.status().ToString());
@@ -471,7 +532,7 @@ void DynamicTest::FindString(const std::string& phase, const std::string& type,
         "[$0] expected $1 of $2 $3: '$4', actual: \n$5", phase,
         expect.invert() ? "absence" : "presence",
         expect.has_regex() ? "regex" : "exact", type,
-        expect.has_regex() ? expect.regex() : expect.exact(),
+        expect.has_regex() ? expect.regex() : matcher->getExact(),
         absl::StrJoin(contents, "\n"));
   }
 }
@@ -542,7 +603,7 @@ absl::StatusOr<TestHttpContext::Headers> DynamicTest::ParseHeaders(
 
   if (!input.file().empty()) {
     // Handle file input.
-    auto content = ReadContent(input.file());
+    auto content = ReadContent(input.file(), env_);
     if (!content.ok()) return content.status();
     auto parse = ParseHTTP1Headers(*content, is_request, hdrs);
     if (!parse.ok()) return parse;
@@ -560,10 +621,9 @@ absl::StatusOr<TestHttpContext::Headers> DynamicTest::ParseHeaders(
 }
 absl::StatusOr<std::string> DynamicTest::ParseBodyInput(
     const pb::Input& input) {
-  // std::string complete_body;
   if (!input.file().empty()) {
     // Handle file input.
-    return ReadContent(input.file());
+    return ReadContent(input.file(), env_);
   } else {
     return input.content();
   }
@@ -579,19 +639,9 @@ std::vector<std::string> DynamicTest::ChunkBody(
     return body_chunks;
   } else {
     std::vector<std::string> body_chunks =
-        absl::StrSplit(complete_body, absl::ByLength(test.num_chunks()));
+        absl::StrSplit(complete_body, absl::ByLength(test.chunk_size()));
     return body_chunks;
   }
-}
-
-absl::StatusOr<std::string> DynamicTest::ReadContent(const std::string& path) {
-  boost::filesystem::path in(path);
-  boost::filesystem::path cfg(env_.test_path());
-  // If relative path, resolve relative to test config file.
-  if (!in.is_absolute()) {
-    in = cfg.parent_path() / in;
-  }
-  return ReadDataFile(in.string());
 }
 
 }  // namespace service_extensions_samples

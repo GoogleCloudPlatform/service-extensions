@@ -96,9 +96,10 @@ message Test {
   string name = 1;
   // Whether to run benchmarks, in addition to verifying any expectations.
   bool benchmark = 2;
-  // If a chunking_plan is set, body invocations will be treated as the complete body
-  // and will broken into chunks according to specified plan. Expectations will
-  // be evaluated against the reconstructed complete body after processing and not as individual chunks.
+  // If a chunking_plan is set, body invocations will be treated as the complete
+  // body and will broken into chunks according to specified plan. Expectations
+  // will be evaluated against the reconstructed complete body after processing
+  // and not as individual chunks.
   oneof chunking_plan {
     int32 num_chunks = 10;
     int64 chunk_size = 11;

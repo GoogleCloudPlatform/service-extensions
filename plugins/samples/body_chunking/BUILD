@@ -15,6 +15,8 @@ proxy_wasm_tests(
     name = "tests",
     data = [
       ":request_body.data",
+      ":response_body.data",
+      ":expected_request_body.data",
     ],
     plugins = [
         ":plugin_cpp.wasm",
