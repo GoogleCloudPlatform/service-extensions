@@ -33,6 +33,7 @@ class MyHttpContext : public Context {
     body_string.append("foo");
     setBuffer(WasmBufferType::HttpRequestBody, 0, body_buffer_length,
                   body_string);
+    return FilterDataStatus::Continue;
   }
 
   FilterHeadersStatus onResponseHeaders(uint32_t headers,
@@ -54,6 +55,7 @@ class MyHttpContext : public Context {
     body_string.append("bar");
     setBuffer(WasmBufferType::HttpResponseBody, 0, body_buffer_length,
                   body_string);
+    return FilterDataStatus::Continue;
   }
 };
 

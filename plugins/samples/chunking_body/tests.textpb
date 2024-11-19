@@ -3,11 +3,11 @@ test{
   num_chunks: 5
   request_body {
     input {
-      content: "1234567890\n"
+      file: "request_body.data"
     }
     result {
       body {
-        exact: "12234567890\n"
+        exact: "12foo34foo56foo78foo90\nfoo"
       }
     }
   }
