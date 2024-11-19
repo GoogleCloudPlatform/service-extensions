@@ -42,7 +42,7 @@ build:clang-xsan --copt -fno-omit-frame-pointer
 build:clang-xsan --copt -fno-optimize-sibling-calls
 build:clang-xsan --copt -fno-sanitize-recover=all
 build:clang-xsan --linkopt -fsanitize-link-c++-runtime
-# build:clang-xsan --linkopt -fuse-ld=lld
+build:clang-xsan --linkopt -fuse-ld=lld
 build:clang-xsan --linkopt -rtlib=compiler-rt
 build:clang-xsan --linkopt --unwindlib=libgcc
 
