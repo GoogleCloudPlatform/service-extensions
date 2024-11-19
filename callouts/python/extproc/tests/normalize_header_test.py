@@ -14,6 +14,8 @@
 from __future__ import print_function
 
 from extproc.service import callout_tools
+from envoy.config.core.v3.base_pb2 import HeaderMap
+from envoy.config.core.v3.base_pb2 import HeaderValue
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from envoy.service.ext_proc.v3 import external_processor_pb2_grpc as service_pb2_grpc
 import pytest
@@ -23,28 +25,38 @@ from extproc.example.normalize_header.service_callout_example import (
 from extproc.tests.basic_grpc_test import (
     make_request,
     setup_server,
-    insecure_kwargs,
-    get_insecure_channel,
+    get_plaintext_channel,
+    default_kwargs
 )
 
 # Import the setup server test fixture.
 _ = setup_server
-_local_test_args = {"kwargs": insecure_kwargs, "test_class": CalloutServerTest}
+_local_test_args = {"kwargs": default_kwargs, "test_class": CalloutServerTest}
+
 
 @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
 def test_normalize_header(server: CalloutServerTest) -> None:
   """Test the request and response functionality of the server."""
-  with get_insecure_channel(server) as channel:
+  with get_plaintext_channel(server) as channel:
     stub = service_pb2_grpc.ExternalProcessorStub(channel)
 
-    headers = service_pb2.HttpHeaders(end_of_stream=False)
+    def make_test_headers(host_value: bytes) -> service_pb2.HttpHeaders:
+      return service_pb2.HttpHeaders(headers=HeaderMap(
+          headers=[HeaderValue(key=":authority", raw_value=host_value)]),
+                                     end_of_stream=False)
+
+    mobile_headers = make_test_headers(b"m.example.com")
+    tablet_headers = make_test_headers(b"t.example.com")
+    desktop_headers = make_test_headers(b"www.example.com")
     end_headers = service_pb2.HttpHeaders(end_of_stream=True)
 
-    value = make_request(stub, request_headers=headers)
-    assert value.HasField('request_headers')
-    assert value.request_headers == callout_tools.normalize_header_mutation(
-        headers=headers,
-        clear_route_cache=True,
-    )
-
+    value = make_request(stub, request_headers=mobile_headers)
+    assert value.request_headers == callout_tools.add_header_mutation(
+        [('client-device-type', 'mobile')], clear_route_cache=True)
+    value = make_request(stub, request_headers=tablet_headers)
+    assert value.request_headers == callout_tools.add_header_mutation(
+        [('client-device-type', 'tablet')], clear_route_cache=True)
+    value = make_request(stub, request_headers=desktop_headers)
+    assert value.request_headers == callout_tools.add_header_mutation(
+        [('client-device-type', 'desktop')], clear_route_cache=True)
     make_request(stub, request_headers=end_headers)

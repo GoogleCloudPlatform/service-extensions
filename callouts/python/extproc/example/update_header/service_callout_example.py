@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from envoy.config.core.v3.base_pb2 import HeaderValueOption
 from grpc import ServicerContext
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
@@ -21,20 +22,30 @@ actions = HeaderValueOption.HeaderAppendAction
 class CalloutServerExample(callout_server.CalloutServer):
   """Example callout server.
 
-  Provides a non-comprehensive set of responses for each of the possible
-  callout interactions.
-
   For request header callouts we provide a mutation to update a header
   '{header-request: request}', and to clear the route cache.
 
   On response header callouts, we respond with a mutation to update
   the header '{header-response: response}'.
+
+  Usage:
+    To use this example callout server, instantiate the CalloutServerExample
+    class and run the gRPC service.
   """
 
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders,
       context: ServicerContext) -> service_pb2.HeadersResponse:
-    """Custom processor on request headers."""
+    """Custom processor on request headers.
+    
+    Args:
+      headers (service_pb2.HttpHeaders): The HTTP headers received in the request.
+      context (ServicerContext): The context object for the gRPC service.
+
+    Returns:
+      service_pb2.HeadersResponse: The response containing the mutations to be applied
+      to the request headers.
+    """
     return callout_tools.add_header_mutation(
         add=[('header-request', 'request-new-value')],
         append_action=actions.OVERWRITE_IF_EXISTS_OR_ADD,
@@ -43,12 +54,22 @@ class CalloutServerExample(callout_server.CalloutServer):
   def on_response_headers(
       self, headers: service_pb2.HttpHeaders,
       context: ServicerContext) -> service_pb2.HeadersResponse:
-    """Custom processor on response headers."""
+    """Custom processor on response headers.
+    
+    Args:
+      headers (service_pb2.HttpHeaders): The HTTP headers received in the response.
+      context (ServicerContext): The context object for the gRPC service.
+
+    Returns:
+      service_pb2.HeadersResponse: The response containing the mutations to be applied
+      to the response headers.
+    """
     return callout_tools.add_header_mutation(
         add=[('header-response', 'response-new-value')],
         append_action=actions.OVERWRITE_IF_EXISTS_OR_ADD)
 
 
 if __name__ == '__main__':
+  logging.basicConfig(level=logging.DEBUG)
   # Run the gRPC service
   CalloutServerExample().run()

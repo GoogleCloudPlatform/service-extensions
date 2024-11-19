@@ -33,7 +33,7 @@ import pytest
 
 from extproc.example.basic_callout_server import (BasicCalloutServer as
                                                   CalloutServerTest)
-from extproc.service.callout_server import CalloutServer, addr_to_str
+from extproc.service.callout_server import CalloutServer, _addr_to_str
 from extproc.service.callout_tools import add_body_mutation, add_header_mutation
 
 
@@ -47,27 +47,26 @@ class NoResponseError(Exception):
 
 # Replace the default ports of the server so that they do not clash with running programs.
 default_kwargs: dict = {
-    'address': ('0.0.0.0', 8443),
-    'health_check_address': ('0.0.0.0', 8080)
+    'address': ('localhost', 8443),
+    'health_check_address': ('localhost', 8000)
 }
-# Arguments for running an insecure server alongside the secure grpc.
-insecure_kwargs: dict = default_kwargs | {'insecure_address': ('0.0.0.0', 8000)}
+# Arguments for running a custom CalloutServer with testing parameters.
 _local_test_args: dict = {
-    "kwargs": insecure_kwargs,
+    "kwargs": default_kwargs,
     "test_class": CalloutServerTest
 }
 
 
-def get_insecure_channel(server: CalloutServer) -> grpc.Channel:
-  """From a CalloutServer get the insecure address and create a grpc channel to it.
+def get_plaintext_channel(server: CalloutServer) -> grpc.Channel:
+  """From a CalloutServer, obtain the plaintext address and create a grpc channel pointing to it.
 
   Args:
-      server : Server to connect to.
+      server: Server to connect to.
   Returns:
       grpc.Channel: Open channel to the server.
   """
-  addr = server.insecure_address
-  return grpc.insecure_channel(addr_to_str(addr) if addr else '')
+  addr = server.plaintext_address
+  return grpc.insecure_channel(_addr_to_str(addr) if addr else '')
 
 
 def wait_till_server(server_check: Callable[[], bool], timeout: int = 10):
@@ -77,8 +76,8 @@ def wait_till_server(server_check: Callable[[], bool], timeout: int = 10):
   Times out after a given time.
 
   Args:
-      server_check : Function to check.
-      timeout : Wait time. Defaults to 10.
+      server_check: Function to check.
+      timeout: Wait time. Defaults to 10.
   """
   expiration = datetime.datetime.now() + datetime.timedelta(seconds=timeout)
   while not server_check() and datetime.datetime.now() < expiration:
@@ -149,18 +148,12 @@ class TestBasicServer(object):
   @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
   def test_basic_server_capabilites(self, server: CalloutServerTest) -> None:
     """Test the request and response functionality of the server."""
-    root_cert: bytes = b''
-    with open('./extproc/ssl_creds/root.crt', 'rb') as file:
-      root_cert = file.read()
-      file.close()
-    creds = grpc.ssl_channel_credentials(root_cert)
-    options = ((
-        'grpc.ssl_target_name_override',
-        'localhost',
-    ),)
-    with grpc.secure_channel(f'{addr_to_str(server.address)}',
-                             creds,
-                             options=options) as channel:
+    chain_cert: bytes = b''
+    with open('./extproc/ssl_creds/chain.pem', 'rb') as file:
+      chain_cert = file.read()
+    creds = grpc.ssl_channel_credentials(chain_cert)
+    with grpc.secure_channel(f'{_addr_to_str(server.address)}',
+                             creds) as channel:
       stub = ExternalProcessorStub(channel)
 
       body = HttpBody(end_of_stream=False)
@@ -169,12 +162,11 @@ class TestBasicServer(object):
 
       value = make_request(stub, request_body=body)
       assert value.HasField('request_body')
-      assert value.request_body == add_body_mutation(body='-added-body')
+      assert value.request_body == add_body_mutation(body='replaced-body')
 
       value = make_request(stub, response_body=body)
       assert value.HasField('response_body')
-      assert value.response_body == add_body_mutation(body='new-body',
-                                                      clear_body=True)
+      assert value.response_body == add_body_mutation(clear_body=True)
 
       value = make_request(stub, response_headers=headers)
       assert value.HasField('response_headers')
@@ -184,26 +176,25 @@ class TestBasicServer(object):
       value = make_request(stub, request_headers=headers)
       assert value.HasField('request_headers')
       assert value.request_headers == add_header_mutation(
-          add=[(':host', 'service-extensions.com'), (':path', '/'),
+          add=[(':authority', 'service-extensions.com'), (':path', '/'),
                ('header-request', 'request')],
           clear_route_cache=True,
           remove=['foo'])
 
       make_request(stub, request_headers=end_headers)
-      channel.close()
 
   @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
   def test_basic_server_health_check(self, server: CalloutServerTest) -> None:
     """Test that the health check sub server returns the expected 200 code."""
     assert server.health_check_address is not None
     response = urllib.request.urlopen(
-        f'http://{addr_to_str(server.health_check_address)}')
+        f'http://{_addr_to_str(server.health_check_address)}')
     assert not response.read()
     assert response.getcode() == 200
 
 
 _secure_test_args: dict = {
-    "kwargs": insecure_kwargs | {
+    "kwargs": default_kwargs | {
         'secure_health_check': True
     },
     "test_class": CalloutServerTest
@@ -218,7 +209,7 @@ def test_https_health_check(server: CalloutServerTest) -> None:
   ssl_context.check_hostname = False
   ssl_context.verify_mode = ssl.CERT_NONE
   response = urllib.request.urlopen(
-      f'https://{addr_to_str(server.health_check_address)}',
+      f'https://{_addr_to_str(server.health_check_address)}',
       context=ssl_context)
   assert not response.read()
   assert response.getcode() == 200
@@ -230,12 +221,12 @@ def test_custom_server_config() -> None:
   try:
     ip = '0.0.0.0'
     port = 8444
-    insecure_port = 8081
+    plaintext_port = 8081
     health_check_port = 8001
 
     server = test_server = CalloutServerTest(
         address=(ip, port),
-        insecure_address=(ip, insecure_port),
+        plaintext_address=(ip, plaintext_port),
         health_check_address=(ip, health_check_port))
     # Start the server in a background thread
     thread = threading.Thread(target=test_server.run)
@@ -247,7 +238,7 @@ def test_custom_server_config() -> None:
     assert response.read() == b''
     assert response.getcode() == 200
 
-    with grpc.insecure_channel(f'{ip}:{insecure_port}') as channel:
+    with grpc.insecure_channel(f'{ip}:{plaintext_port}') as channel:
       stub = ExternalProcessorStub(channel)
       value = make_request(stub,
                            response_headers=HttpHeaders(end_of_stream=True))
@@ -266,7 +257,7 @@ def test_custom_server_config() -> None:
 
 
 _no_health_args: dict = {
-    "kwargs": insecure_kwargs | {
+    "kwargs": default_kwargs | {
         'combined_health_check': True
     },
     "test_class": CalloutServerTest

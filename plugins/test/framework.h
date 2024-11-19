@@ -18,9 +18,11 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem/path.hpp>
+#include <string>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 #include "include/proxy-wasm/exports.h"
 #include "include/proxy-wasm/wasm.h"
@@ -28,10 +30,45 @@
 
 namespace service_extensions_samples {
 
+// Parameters to customize Context behaviors.
+struct ContextOptions {
+  // Wasm logging output file.
+  std::ofstream log_file;
+  // Static time returned to wasm.
+  absl::Time clock_time = absl::UnixEpoch();
+};
+
+// Buffer class to handle copying to and from an individual BODY chunk.
+class Buffer : public proxy_wasm::BufferBase {
+ public:
+  Buffer() = default;
+
+  // proxy_wasm::BufferInterface
+  size_t size() const override;
+  proxy_wasm::WasmResult copyTo(proxy_wasm::WasmBase* wasm, size_t start,
+                                size_t length, uint64_t ptr_ptr,
+                                uint64_t size_ptr) const override;
+  proxy_wasm::WasmResult copyFrom(size_t start, size_t length,
+                                  std::string_view data) override;
+
+  // proxy_wasm::BufferBase
+  void clear() override {
+    proxy_wasm::BufferBase::clear();
+    owned_string_buffer_ = "";
+  }
+
+  void setOwned(std::string data) {
+    clear();
+    owned_string_buffer_ = std::move(data);
+  }
+  std::string release() { return std::move(owned_string_buffer_); }
+
+ private:
+  // Buffer for a body chunk.
+  std::string owned_string_buffer_;
+};
+
 // TestContext is GCP-like ProxyWasm context (shared for VM + Root + Stream).
-//
-// NOTE: the base class implements logging. This derived class primarily
-// implements serving plugin configuration.
 class TestContext : public proxy_wasm::TestContext {
  public:
   // VM Context constructor.
@@ -68,6 +105,8 @@ class TestContext : public proxy_wasm::TestContext {
   // --- BEGIN Testing facilities ---
   // Unsafe access to logs. Not thread safe w.r.t. plugin execution.
   const std::vector<std::string>& phase_logs() const { return phase_logs_; }
+  // Options to customize context behavior.
+  ContextOptions& options() const;
   // --- END   Testing facilities ---
 
  protected:
@@ -110,6 +149,8 @@ class TestHttpContext : public TestContext {
   }
 
   // --- BEGIN Wasm facing API ---
+  proxy_wasm::BufferInterface* getBuffer(
+      proxy_wasm::WasmBufferType type) override;
   proxy_wasm::WasmResult getHeaderMapSize(proxy_wasm::WasmHeaderMapType type,
                                           uint32_t* result) override;
   proxy_wasm::WasmResult getHeaderMapValue(proxy_wasm::WasmHeaderMapType type,
@@ -142,19 +183,31 @@ class TestHttpContext : public TestContext {
 
   // Case insensitive string comparator.
   struct caseless_compare {
-    bool operator()(const std::string& a, const std::string& b) const {
+    bool operator()(absl::string_view a, absl::string_view b) const {
       return boost::ilexicographical_compare(a, b);
     }
   };
 
   // Key-sorted header map with case-insensitive key comparison.
-  using Headers = std::map<std::string, std::string, caseless_compare>;
+  class Headers : public std::map<std::string, std::string, caseless_compare> {
+   public:
+    void InsertOrAppend(absl::string_view key, absl::string_view value) {
+      auto& val = operator[](std::string(key));
+      if (val.empty()) {
+        val = std::string(value);
+      } else {
+        val = absl::StrCat(val, ", ", value);  // RFC 9110 Field Order
+      }
+    }
+  };
 
   struct Result {
-    // Filter status returned by handler.
-    proxy_wasm::FilterHeadersStatus status;
+    // Filter status for headers returned by handler.
+    proxy_wasm::FilterHeadersStatus header_status;
     // Mutated headers, also used for immediate response.
     Headers headers = {};
+    // Filter status for body returned by handler.
+    proxy_wasm::FilterDataStatus body_status;
     // Mutated body, also used for immediate response.
     std::string body = "";
     // Immediate response parameters.
@@ -165,7 +218,17 @@ class TestHttpContext : public TestContext {
 
   // Testing helpers. Use these instead of direct on*Headers methods.
   Result SendRequestHeaders(Headers headers);
+  Result SendRequestBody(std::string body);
   Result SendResponseHeaders(Headers headers);
+  Result SendResponseBody(std::string body);
+
+  enum CallbackType {
+    None,
+    RequestHeaders,
+    RequestBody,
+    ResponseHeaders,
+    ResponseBody,
+  };
 
  private:
   // Ensure that we invoke teardown handlers just once.
@@ -173,21 +236,20 @@ class TestHttpContext : public TestContext {
   // State tracked during a headers call. Invalid otherwise.
   proxy_wasm::WasmHeaderMapType phase_;
   Result result_;
+
+  Buffer body_buffer_;
+  CallbackType current_callback_;
 };
 
 // TestWasm is a light wrapper enabling custom TestContext.
-// TODO set allowed_capabilities
 class TestWasm : public proxy_wasm::WasmBase {
  public:
-  TestWasm(std::unique_ptr<proxy_wasm::WasmVm> vm)
+  TestWasm(std::unique_ptr<proxy_wasm::WasmVm> vm, ContextOptions options)
       : proxy_wasm::WasmBase(std::move(vm), /*vm_id=*/"",
                              /*vm_configuration=*/"",
                              /*vm_key=*/"", /*envs=*/{},
-                             /*allowed_capabilities=*/{}) {}
-
-  TestWasm(const std::shared_ptr<proxy_wasm::WasmHandleBase>& base_wasm_handle,
-           const proxy_wasm::WasmVmFactory& factory)
-      : proxy_wasm::WasmBase(base_wasm_handle, factory) {}
+                             /*allowed_capabilities=*/{}),
+        options_(std::move(options)) {}
 
   proxy_wasm::ContextBase* createVmContext() override {
     return new TestContext(this);
@@ -197,6 +259,11 @@ class TestWasm : public proxy_wasm::WasmBase {
       const std::shared_ptr<proxy_wasm::PluginBase>& plugin) override {
     return new TestContext(this, plugin);
   }
+
+  ContextOptions& options() { return options_; }
+
+ private:
+  ContextOptions options_;
 };
 
 // Helper to read a file from disk.
@@ -208,7 +275,8 @@ std::vector<std::string> FindPlugins();
 // Helper to create a VM and load wasm.
 absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>> CreatePluginVm(
     const std::string& engine, const std::string& wasm_bytes,
-    const std::string& plugin_config, proxy_wasm::LogLevel min_log_level);
+    const std::string& plugin_config, proxy_wasm::LogLevel min_log_level,
+    ContextOptions options);
 
 // Helper to initialize a plugin.
 absl::Status InitializePlugin(

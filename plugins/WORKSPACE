@@ -6,44 +6,27 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 # To override with local branches, pass `--override_repository=REPO=/local/path` to Bazel
 # or persist the option in `.bazelrc`.
 
-PROXY_WASM_HOST_COMMIT = "04dfb94747e6462b65f7ed694e2d9c78ab207e11"  # 2024-04-29
-PROXY_WASM_HOST_SHA256 = "9c6da146d86f9b03d98b975f89c1762fc1b7f179da6775134c66e68c79eec4d1"
+# --- PLUGIN + TEST RUNNER DEPENDENCIES ---
 
+# Platforms update for @platforms//os:emscripten
 http_archive(
-    name = "proxy_wasm_cpp_host",
-    sha256 = PROXY_WASM_HOST_SHA256,
-    strip_prefix = "proxy-wasm-cpp-host-" + PROXY_WASM_HOST_COMMIT,
-    url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/" + PROXY_WASM_HOST_COMMIT + ".tar.gz",
+    name = "platforms",
+    sha256 = "218efe8ee736d26a3572663b374a253c012b716d8af0c07e842e82f238a0a7ee",
+    urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.10/platforms-0.0.10.tar.gz",
+        "https://github.com/bazelbuild/platforms/releases/download/0.0.10/platforms-0.0.10.tar.gz",
+    ],
 )
 
-PROXY_WASM_CPP_COMMIT = "921039ae983ce053bf5cba78a85a3c08ff9791e5"  # 2023-05-01
-PROXY_WASM_CPP_SHA256 = "a11adfe4e6346d3318ff72643aa5569dc8439d7e8927ed148f93226fa255cc7a"
-
+# Abseil for base libs. Updated to work with latest Emscripten and STANDALONE_WASM.
 http_archive(
-    name = "proxy_wasm_cpp_sdk",
-    sha256 = PROXY_WASM_CPP_SHA256,
-    strip_prefix = "proxy-wasm-cpp-sdk-" + PROXY_WASM_CPP_COMMIT,
-    url = "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/" + PROXY_WASM_CPP_COMMIT + ".tar.gz",
+    name = "com_google_absl",
+    sha256 = "95e90be7c3643e658670e0dd3c1b27092349c34b632c6e795686355f67eca89f",
+    strip_prefix = "abseil-cpp-20240722.0",
+    urls = ["https://github.com/abseil/abseil-cpp/archive/20240722.0.zip"],
 )
 
-http_archive(
-  name = "com_google_benchmark",
-  sha256 = "6bc180a57d23d4d9515519f92b0c83d61b05b5bab188961f36ac7b06b0d9e9ce",
-  urls = ["https://github.com/google/benchmark/archive/refs/tags/v1.8.3.tar.gz"],
-  strip_prefix = "benchmark-1.8.3",
-)
-
-# rules_boost on 2023-06-29, boost @ 1.80.0
-http_archive(
-    name = "com_github_nelhage_rules_boost",
-    url = "https://github.com/nelhage/rules_boost/archive/0598ab9aa992d6ad45088b480e1bf4526ef4ad04.tar.gz",
-    strip_prefix = "rules_boost-0598ab9aa992d6ad45088b480e1bf4526ef4ad04",
-    sha256 = "1404ffb9f3f7253927c97bc2e05ef6b4a2a5089b76d00cef0f6b7d5a678fad88",
-)
-load("@com_github_nelhage_rules_boost//:boost/boost.bzl", "boost_deps")
-boost_deps()
-
-# Include Google RE2.
+# RE2 for C++ regex.
 http_archive(
     name = "com_google_re2",
     sha256 = "18cf85922e27fad3ed9c96a27733037da445f35eb1a2744c306a37c6d11e95c4",
@@ -51,50 +34,166 @@ http_archive(
     url = "https://github.com/google/re2/archive/2023-07-01.tar.gz",
 )
 
-# Upgrade Abseil to work with latest Emscripten and STANDALONE_WASM
+# Boost for C++ URL parsing.
 http_archive(
-    name = "com_google_absl",  # 2023-04-06T14:42:25Z
-    sha256 = "a50452f02402262f9a61a8eedda60f76dda6b9538d36b34b55bce9f74a4d5ef8",
-    strip_prefix = "abseil-cpp-e73b9139ee9b853a4bd7812531442c138da09084",
-    urls = ["https://github.com/abseil/abseil-cpp/archive/e73b9139ee9b853a4bd7812531442c138da09084.zip"],
+    name = "com_github_nelhage_rules_boost",  # 2023-06-29, boost @ 1.80.0
+    sha256 = "1404ffb9f3f7253927c97bc2e05ef6b4a2a5089b76d00cef0f6b7d5a678fad88",
+    strip_prefix = "rules_boost-0598ab9aa992d6ad45088b480e1bf4526ef4ad04",
+    url = "https://github.com/nelhage/rules_boost/archive/0598ab9aa992d6ad45088b480e1bf4526ef4ad04.tar.gz",
 )
 
-# Duplicate ProxyWasm WORKSPACE files (dependencies)
+load("@com_github_nelhage_rules_boost//:boost/boost.bzl", "boost_deps")
+
+boost_deps()
+
+# Update boringssl to pick up fix for strdup build issue:
+# https://boringssl-review.googlesource.com/c/boringssl/+/64047
+http_archive(
+    name = "boringssl", # 2024-04-29
+    sha256 = "cd240bf27450f75cd5f41c512a06297c00646cdbac9f87b604e9312771db15a6",
+    strip_prefix = "boringssl-2db0eb3f96a5756298dcd7f9319e56a98585bd10",
+    url = "https://github.com/google/boringssl/archive/2db0eb3f96a5756298dcd7f9319e56a98585bd10.tar.gz",
+)
+
+# JWT verification lib for C++.
+http_archive(
+    name = "jwt_verify_lib",
+    sha256 = "637e4983506c4f26bbe2808ae4e1944e46cbb2277d34ff0b8a3b72bdac3c4b91",
+    strip_prefix = "jwt_verify_lib-b59e8075d4a4f975ba6f109e1916d6e60aeb5613",
+    url = "https://github.com/google/jwt_verify_lib/archive/b59e8075d4a4f975ba6f109e1916d6e60aeb5613.tar.gz",
+)
+bind(
+    name = "abseil_strings",
+    actual = "@com_google_absl//absl/strings:strings",
+)
+bind(
+    name = "abseil_flat_hash_set",
+    actual = "@com_google_absl//absl/container:flat_hash_set",
+)
+bind(
+    name = "abseil_time",
+    actual = "@com_google_absl//absl/time:time",
+)
+bind(
+    name = "protobuf",
+    actual = "@com_google_protobuf//:protobuf",
+)
+bind(
+    name = "ssl",
+    actual = "@boringssl//:ssl",
+)
+
+# --- TEST RUNNER DEPENDENCIES ---
+
+# Testing frameworks.
+http_archive(
+    name = "com_google_benchmark",
+    sha256 = "6bc180a57d23d4d9515519f92b0c83d61b05b5bab188961f36ac7b06b0d9e9ce",
+    strip_prefix = "benchmark-1.8.3",
+    urls = ["https://github.com/google/benchmark/archive/refs/tags/v1.8.3.tar.gz"],
+)
+
+http_archive(
+    name = "com_google_googletest",
+    sha256 = "8ad598c73ad796e0d8280b082cebd82a630d73e73cd3c70057938a6501bba5d7",
+    strip_prefix = "googletest-1.14.0",
+    urls = ["https://github.com/google/googletest/archive/refs/tags/v1.14.0.tar.gz"],
+)
+
+# For testing, include Quiche for its Balsa header library.
+http_archive(
+    name = "com_github_google_quiche",  # 2024-05-16
+    patch_args = ["-p1"],
+    patches = ["//:quiche.patch"],
+    sha256 = "ae33ab0056fd5119d9aae15abfcb69e5d6f021ec5e18e77535ec0fe0c49dfa66",
+    strip_prefix = "quiche-1397c94d55af0bfc142ac7dda923cf2726857755",
+    urls = ["https://github.com/google/quiche/archive/1397c94d55af0bfc142ac7dda923cf2726857755.tar.gz"],
+)
+
+# For testing, GoogleURL is a Quiche dependency.
+http_archive(
+    name = "com_google_googleurl",  # 2024-10-09
+    sha256 = "3db90606ea9ca123d11f85c6fa3627a1e1e403d38c7fd1854a628cf1da3be5e2",
+    urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl-9cdb1f4d1a365ebdbcbf179dadf7f8aa5ee802e7.tar.gz"],
+)
+
+# --- PLUGIN DEPENDENCIES ---
+
+PROXY_WASM_CPP_HOST_COMMIT = "3212034ee6e75d54cbf91b65cc659772166442f4"  # 2024-09-29
+
+PROXY_WASM_CPP_HOST_SHA256 = "2633ec772da7b0e51500328989a99a02570dbfdfe5ff74cbf83fa2d39b6e8cea"
+
+http_archive(
+    name = "proxy_wasm_cpp_host",
+    sha256 = PROXY_WASM_CPP_HOST_SHA256,
+    strip_prefix = "proxy-wasm-cpp-host-" + PROXY_WASM_CPP_HOST_COMMIT,
+    url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/" + PROXY_WASM_CPP_HOST_COMMIT + ".tar.gz",
+)
+
+PROXY_WASM_CPP_SDK_COMMIT = "a982ad089d1962f1b92f4343c910c0be6b6e6280"  # 2024-10-28
+
+PROXY_WASM_CPP_SDK_SHA256 = "4cdbee65d7c3c491ba42dcc3b201144ac781031f8b1e40cb0b9244ffca9c5d3e"
+
+http_archive(
+    name = "proxy_wasm_cpp_sdk",
+    sha256 = PROXY_WASM_CPP_SDK_SHA256,
+    strip_prefix = "proxy-wasm-cpp-sdk-" + PROXY_WASM_CPP_SDK_COMMIT,
+    url = "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/" + PROXY_WASM_CPP_SDK_COMMIT + ".tar.gz",
+)
+
+# Duplicate the ProxyWasm WORKSPACE files (dependencies)
 # Consider adopting bzlmod for this: https://docs.bazel.build/versions/5.0.0/bzlmod.html
 
 load("@proxy_wasm_cpp_host//bazel:repositories.bzl", "proxy_wasm_cpp_host_repositories")
+
 proxy_wasm_cpp_host_repositories()
 
 load("@proxy_wasm_cpp_host//bazel:dependencies.bzl", "proxy_wasm_cpp_host_dependencies")
+
 proxy_wasm_cpp_host_dependencies()
 
+load("@proxy_wasm_cpp_host//bazel:dependencies_python.bzl", "proxy_wasm_cpp_host_dependencies_python")
+
+proxy_wasm_cpp_host_dependencies_python()
+
+load("@proxy_wasm_cpp_host//bazel:dependencies_import.bzl", "proxy_wasm_cpp_host_dependencies_import")
+
+proxy_wasm_cpp_host_dependencies_import()
+
 load("@proxy_wasm_cpp_sdk//bazel:repositories.bzl", "proxy_wasm_cpp_sdk_repositories")
+
 proxy_wasm_cpp_sdk_repositories()
 
 load("@proxy_wasm_cpp_sdk//bazel:dependencies.bzl", "proxy_wasm_cpp_sdk_dependencies")
+
 proxy_wasm_cpp_sdk_dependencies()
 
 load("@proxy_wasm_cpp_sdk//bazel:dependencies_extra.bzl", "proxy_wasm_cpp_sdk_dependencies_extra")
+
 proxy_wasm_cpp_sdk_dependencies_extra()
 
-# Cargo for Bazel via crate_universe:
+# Cargo for Bazel to define Rust dependencies.
 # http://bazelbuild.github.io/rules_rust/crate_universe.html
+# Depends on rules_rust imported by ProxyWasm.
 load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
+
 crate_universe_dependencies(bootstrap = True)
 
 # Regenerate: $ CARGO_BAZEL_REPIN=1 bazelisk build //...
 load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
+
 crates_repository(
     name = "crate_index",
     cargo_lockfile = "//:Cargo.lock",
+    # See https://github.com/GoogleCloudPlatform/service-extensions/issues/31
+    generate_target_compatible_with = False,
     generator = "@cargo_bazel_bootstrap//:cargo-bazel",
     lockfile = "//:Cargo.Bazel.lock",
     manifests = ["//:Cargo.toml"],
     supported_platform_triples = ["wasm32-wasi"],
-    # See https://github.com/GoogleCloudPlatform/service-extensions-samples/issues/31
-    generate_target_compatible_with = False,
 )
 
 # Reference: @crate_index//:proxy-wasm (etc)
 load("@crate_index//:defs.bzl", "crate_repositories")
+
 crate_repositories()
