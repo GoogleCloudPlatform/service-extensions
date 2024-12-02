@@ -38,21 +38,23 @@ Tips:
 -   Optionally specify plugin config data using the `--config=<path>` flag.
 
 # Building Plugins
+
 To build your plugin using bazel, run:
 
 ```
-bazelisk build <BUILD Target>
+$ bazelisk build <target>
 ```
-For example, to build the sample add_header plugin in C++, from the `plugins/` subdirectory of this repository, run:
+For example, to build the sample C++ plugin in the `plugins/add_header` subdirectory, run:
 
 ```
 bazelisk build //samples/add_header:plugin_cpp.wasm
 ```
-If attempts to build fail due to errors in dependencies, you may need to add ```--config=clang``` or ```--config=gcc``` to the build command.
+If attempts to build fail due to errors in dependencies, you may need to add `--config=clang` or `--config=gcc` to the build command.
 
-Most of our documention will assume that bazel is being used. However, plugins can be built using various different build systems. For info on other systems see:
+Most of our documention assumes that bazel is being used. However, plugins can be built using various different build systems. For info on other systems see:
 -   https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/blob/main/docs/building.md
 -   https://github.com/proxy-wasm/proxy-wasm-rust-sdk/tree/main/examples/hello_world
+
 # Samples & Recipes
 
 The [samples](samples/) folder contains Samples & Recipes to use as a reference
@@ -112,7 +114,7 @@ When running benchmarks, be sure to add `--config=bench`:
 
 `$ bazelisk test --test_output=all --config=bench //samples/add_header/...`
 
-These commands build both the tester and v8 from scratch, so compilation times may be long. For faster tests please use docker command from [Getting Started](#getting-started) to test plugins.
+These commands build both the tester and the V8 runtime from scratch, so compilation times may be long. For faster tests please use docker command from [Getting Started](#getting-started) to test plugins.
 
 # Feature set / ABI
 
