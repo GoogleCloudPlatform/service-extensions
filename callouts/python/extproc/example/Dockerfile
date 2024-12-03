@@ -48,7 +48,7 @@ ARG run_module
 COPY $copy_path ./
 
 # Install any example-specific packages if included. 
-RUN [ -f requirements-example.txt ] && pip install -r additional-requirements.txt --break-system-packages --root-user-action=ignore || echo "No example-specific requirements found."
+RUN [ -f additional-requirements.txt ] && pip install -r additional-requirements.txt --break-system-packages --root-user-action=ignore || echo "No example-specific requirements found."
 
 # Set up communication ports.
 EXPOSE 443
