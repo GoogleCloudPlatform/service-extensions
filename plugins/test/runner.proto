@@ -27,6 +27,8 @@ message StringMatcher {
     bytes exact = 2;
     // Regex expectation (RE2 full-match).
     string regex = 3;
+    // File exact match expectation
+    string file = 4;
   }
 }
 
@@ -49,7 +51,9 @@ message Input {
   bytes content = 2;
 
   // Serialized HTTP content, but provided via a separate file.
-  // File path can be absolute or relative to the test config file.
+  // For body input, don't include any content other than the body you would
+  // like to test. File path can be absolute or relative to the test
+  // config file.
   string file = 3;
 }
 
@@ -92,14 +96,25 @@ message Test {
   string name = 1;
   // Whether to run benchmarks, in addition to verifying any expectations.
   bool benchmark = 2;
-
+  // If a chunking_plan is set, body invocations will be treated as the complete
+  // body and will broken into chunks according to specified plan. Expectations
+  // will be evaluated against the reconstructed complete body after processing
+  // and not as individual chunks.
+  oneof body_chunking_plan {
+    int32 num_chunks = 10;
+    int64 chunk_size = 11;
+  }
   // Wasm invocations of various HTTP phases. If multiple phases are provided,
   // they are executed in sequence on the same HttpContext. Each phase specifies
   // its own expectations. If any phase results in an immediate response,
   // further phases are not executed, and later expectations will fail.
   Invocation request_headers = 3;
+  // Only add one request_body invocation if using a chunking_plan. If multiple
+  // request_body invocations are present, tests will fail.
   repeated Invocation request_body = 4;
   Invocation response_headers = 5;
+  // Only add one request_body invocation if using a chunking_plan. If multiple
+  // response_body invocations are present, tests will fail.
   repeated Invocation response_body = 6;
 
   // Expectations for plugin and stream lifecycle. Useful for testing side
