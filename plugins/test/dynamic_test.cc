@@ -33,7 +33,52 @@
 #include "test/runner.pb.h"
 
 namespace service_extensions_samples {
+absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>>
+DynamicTest::LoadWasm(bool benchmark) {
+  // Set log level. Default to INFO. Disable in benchmarks.
+  auto ll = env_.log_level();
+  if (ll == pb::Env::UNDEFINED) {
+    ll = pb::Env::INFO;
+  }
+  if (benchmark) {
+    ll = pb::Env::CRITICAL;  // disable logs in benchmarks
+  }
+  auto log_level = proxy_wasm::LogLevel(ll - 1);  // enum conversion, yuck
 
+  // Load wasm bytes.
+  auto wasm = ReadDataFile(env_.wasm_path());
+  if (!wasm.ok()) return wasm.status();
+
+  // Load plugin config from disk, if configured.
+  std::string plugin_config = "";
+  if (!env_.config_path().empty()) {
+    auto config = ReadDataFile(env_.config_path());
+    if (!config.ok()) return config.status();
+    plugin_config = *config;
+  }
+
+  // Context options: logging to file, setting the clock.
+  ContextOptions opt;
+  if (!benchmark && !env_.log_path().empty()) {
+    opt.log_file.open(env_.log_path(), std::ofstream::out | std::ofstream::app);
+  }
+  if (env_.time_secs()) {
+    opt.clock_time = absl::FromUnixSeconds(env_.time_secs());
+  }
+
+  // Create VM and load wasm.
+  return CreatePluginVm(engine_, *wasm, plugin_config, log_level,
+                        std::move(opt));
+}
+
+// Macro to stop test execution if the VM has failed.
+// Includes logs in the output so that panic reasons are printed.
+#define ASSERT_VM_HEALTH(phase, handle, context)                           \
+  if (handle->wasm()->isFailed()) {                                        \
+    FAIL() << absl::Substitute("[$0] Wasm VM failed! Logs: \n$1\n", phase, \
+                               absl::StrJoin(context.phase_logs(), "\n")); \
+  }
+namespace {
 // Helper to read data from a path which may be relative to the test config.
 absl::StatusOr<std::string> ReadContent(const std::string& path,
                                         const pb::Env& env) {
@@ -97,53 +142,6 @@ class StringMatcher {
   std::unique_ptr<RE2> re_ = nullptr;
 };
 
-absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>>
-DynamicTest::LoadWasm(bool benchmark) {
-  // Set log level. Default to INFO. Disable in benchmarks.
-  auto ll = env_.log_level();
-  if (ll == pb::Env::UNDEFINED) {
-    ll = pb::Env::INFO;
-  }
-  if (benchmark) {
-    ll = pb::Env::CRITICAL;  // disable logs in benchmarks
-  }
-  auto log_level = proxy_wasm::LogLevel(ll - 1);  // enum conversion, yuck
-
-  // Load wasm bytes.
-  auto wasm = ReadDataFile(env_.wasm_path());
-  if (!wasm.ok()) return wasm.status();
-
-  // Load plugin config from disk, if configured.
-  std::string plugin_config = "";
-  if (!env_.config_path().empty()) {
-    auto config = ReadDataFile(env_.config_path());
-    if (!config.ok()) return config.status();
-    plugin_config = *config;
-  }
-
-  // Context options: logging to file, setting the clock.
-  ContextOptions opt;
-  if (!benchmark && !env_.log_path().empty()) {
-    opt.log_file.open(env_.log_path(), std::ofstream::out | std::ofstream::app);
-  }
-  if (env_.time_secs()) {
-    opt.clock_time = absl::FromUnixSeconds(env_.time_secs());
-  }
-
-  // Create VM and load wasm.
-  return CreatePluginVm(engine_, *wasm, plugin_config, log_level,
-                        std::move(opt));
-}
-
-// Macro to stop test execution if the VM has failed.
-// Includes logs in the output so that panic reasons are printed.
-#define ASSERT_VM_HEALTH(phase, handle, context)                           \
-  if (handle->wasm()->isFailed()) {                                        \
-    FAIL() << absl::Substitute("[$0] Wasm VM failed! Logs: \n$1\n", phase, \
-                               absl::StrJoin(context.phase_logs(), "\n")); \
-  }
-
-namespace {
 // Helper to add some logging at construction and teardown.
 class LogTestBounds {
  public:
@@ -201,35 +199,47 @@ void DynamicTest::TestBody() {
     ASSERT_VM_HEALTH("request_headers", handle, stream);
     CheckPhaseResults("request_headers", invoke.result(), stream, res);
   }
-  if (cfg_.request_body_size() > 0) {
-    if (cfg_.chunking_plan_case() !=
-        pb::Test::ChunkingPlanCase::CHUNKING_PLAN_NOT_SET) {
-      if (cfg_.request_body_size() > 1) {
-        FAIL() << "Cannot specify chunking_plan with multiple request_body "
-                  "invocations";
-      }
-      absl::StatusOr<std::string> complete_input_body =
-          ParseBodyInput(cfg_.request_body(0).input());
-      ASSERT_TRUE(complete_input_body.ok()) << complete_input_body.status();
-      std::vector<std::string> input_body_chunks =
-          ChunkBody(*complete_input_body, cfg_);
+  auto run_body_test = [&handle, &stream, this](
+                           std::string phase,
+                           google::protobuf::RepeatedPtrField<pb::Invocation>
+                               invocations,
+                           auto invoke_wasm) {
+    if (invocations.size() == 0) return;
+    auto body_chunking_plan = cfg_.body_chunking_plan_case();
+    if (invocations.size() != 1 &&
+        body_chunking_plan !=
+            pb::Test::BodyChunkingPlanCase::BODY_CHUNKING_PLAN_NOT_SET) {
+      FAIL()
+          << "Cannot specify body_chunking_plan with multiple body invocations";
+      return;
+    }
+    for (const pb::Invocation& invocation : invocations) {
       TestHttpContext::Result body_result = TestHttpContext::Result{};
-      for (std::string& body_chunk : input_body_chunks) {
-        auto res = stream.SendRequestBody(std::move(body_chunk));
-        ASSERT_VM_HEALTH("request_body", handle, stream);
+      auto complete_input_body = ParseBodyInput(invocation.input());
+      if (!complete_input_body.ok()) {
+        FAIL() << complete_input_body.status();
+      }
+
+      std::vector<std::string> chunks;
+      if (body_chunking_plan !=
+          pb::Test::BodyChunkingPlanCase::BODY_CHUNKING_PLAN_NOT_SET) {
+        chunks = ChunkBody(*complete_input_body, cfg_);
+      } else {
+        chunks = {*complete_input_body};
+      }
+      for (std::string& body_chunk : chunks) {
+        auto res = invoke_wasm(std::move(body_chunk));
+        ASSERT_VM_HEALTH(phase, handle, stream);
         body_result.body = body_result.body.append(res.body);
       }
-      CheckPhaseResults("request_body", cfg_.request_body(0).result(), stream,
-                        body_result);
-    } else {
-      for (auto& invoke : *cfg_.mutable_request_body()) {
-        auto res = stream.SendRequestBody(std::move(
-            *absl::WrapUnique(invoke.mutable_input()->release_content())));
-        ASSERT_VM_HEALTH("request_body", handle, stream);
-        CheckPhaseResults("request_body", invoke.result(), stream, res);
-      }
+      CheckPhaseResults(phase, invocation.result(), stream, body_result);
     }
-  }
+  };
+
+  ASSERT_NO_FATAL_FAILURE(run_body_test(
+      "request_body", cfg_.request_body(),
+      [&stream](std::string chunk) { return stream.SendRequestBody(chunk); }));
+
   if (cfg_.has_response_headers()) {
     const auto& invoke = cfg_.response_headers();
     auto headers = ParseHeaders(invoke.input(), /*is_request=*/false);
@@ -238,35 +248,10 @@ void DynamicTest::TestBody() {
     ASSERT_VM_HEALTH("response_headers", handle, stream);
     CheckPhaseResults("response_headers", invoke.result(), stream, res);
   }
-  if (cfg_.response_body_size() > 0) {
-    if (cfg_.chunking_plan_case() !=
-        pb::Test::ChunkingPlanCase::CHUNKING_PLAN_NOT_SET) {
-      if (cfg_.response_body_size() > 1) {
-        FAIL() << "Cannot specify chunking_plan with multiple response_body "
-                  "invocations";
-      }
-      absl::StatusOr<std::string> complete_input_body =
-          ParseBodyInput(cfg_.response_body(0).input());
-      ASSERT_TRUE(complete_input_body.ok()) << complete_input_body.status();
-      std::vector<std::string> input_body_chunks =
-          ChunkBody(*complete_input_body, cfg_);
-      TestHttpContext::Result body_result = TestHttpContext::Result{};
-      for (std::string& body_chunk : input_body_chunks) {
-        auto res = stream.SendResponseBody(std::move(body_chunk));
-        ASSERT_VM_HEALTH("response_body", handle, stream);
-        body_result.body = body_result.body.append(res.body);
-      }
-      CheckPhaseResults("response_body", cfg_.response_body(0).result(), stream,
-                        body_result);
-    } else {
-      for (auto& invoke : *cfg_.mutable_response_body()) {
-        auto res = stream.SendResponseBody(std::move(
-            *absl::WrapUnique(invoke.mutable_input()->release_content())));
-        ASSERT_VM_HEALTH("response_body", handle, stream);
-        CheckPhaseResults("response_body", invoke.result(), stream, res);
-      }
-    }
-  }
+
+  ASSERT_NO_FATAL_FAILURE(run_body_test(
+      "response_body", cfg_.response_body(),
+      [&stream](std::string chunk) { return stream.SendResponseBody(chunk); }));
 
   // Tear down HTTP context.
   stream.TearDown();
@@ -352,46 +337,13 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
     BM_RETURN_IF_ERROR(headers.status());
     response_headers = *headers;
   }
-  std::vector<std::string> request_body_chunks;
-  if (cfg_.request_body_size() > 0) {
-    if (cfg_.chunking_plan_case() !=
-        pb::Test::ChunkingPlanCase::CHUNKING_PLAN_NOT_SET) {
-      if (cfg_.request_body_size() > 1) {
-        FAIL() << "Cannot specify chunking_plan with multiple request_body "
-                  "invocations";
-      } else {
-        auto complete_body = ParseBodyInput(cfg_.request_body(0).input());
-        BM_RETURN_IF_ERROR(complete_body.status());
-        request_body_chunks = ChunkBody(*complete_body, cfg_);
-      }
-    } else {
-      for (const auto& request_body : cfg_.request_body()) {
-        auto body_chunk = ParseBodyInput(request_body.input());
-        BM_RETURN_IF_ERROR(body_chunk.status());
-        request_body_chunks.emplace_back(*body_chunk);
-      }
-    }
-  }
-  std::vector<std::string> response_body_chunks;
-  if (cfg_.response_body_size() > 0) {
-    if (cfg_.chunking_plan_case() !=
-        pb::Test::ChunkingPlanCase::CHUNKING_PLAN_NOT_SET) {
-      if (cfg_.response_body_size() > 1) {
-        FAIL() << "Cannot specify chunking_plan with multiple response_body "
-                  "invocations";
-      } else {
-        auto complete_body = ParseBodyInput(cfg_.response_body(0).input());
-        BM_RETURN_IF_ERROR(complete_body.status());
-        response_body_chunks = ChunkBody(*complete_body, cfg_);
-      }
-    } else {
-      for (const auto& response_body : cfg_.response_body()) {
-        auto body_chunk = ParseBodyInput(response_body.input());
-        BM_RETURN_IF_ERROR(body_chunk.status());
-        response_body_chunks.emplace_back(*body_chunk);
-      }
-    }
-  }
+  auto request_body_chunks =
+      PrepBodyCallbackBenchmark(cfg_, cfg_.request_body());
+  BM_RETURN_IF_ERROR(request_body_chunks.status());
+  auto response_body_chunks =
+      PrepBodyCallbackBenchmark(cfg_, cfg_.response_body());
+  BM_RETURN_IF_ERROR(response_body_chunks.status());
+
   std::optional<TestHttpContext> stream;
   for (auto _ : state) {
     // Pausing timing here is not recommended. One way we could avoid it:
@@ -399,8 +351,9 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
     // - don't hand ownership of body chunks to stream context
     state.PauseTiming();
     stream.emplace(handle);  // create/destroy TestHttpContext
-    std::vector<std::string> request_body_chunks_copies = request_body_chunks;
-    std::vector<std::string> response_body_chunks_copies = response_body_chunks;
+    std::vector<std::string> request_body_chunks_copies = *request_body_chunks;
+    std::vector<std::string> response_body_chunks_copies =
+        *response_body_chunks;
     state.ResumeTiming();
 
     if (request_headers) {
@@ -642,6 +595,33 @@ std::vector<std::string> DynamicTest::ChunkBody(
         absl::StrSplit(complete_body, absl::ByLength(test.chunk_size()));
     return body_chunks;
   }
+}
+
+absl::StatusOr<std::vector<std::string>> DynamicTest::PrepBodyCallbackBenchmark(
+    const pb::Test& test,
+    google::protobuf::RepeatedPtrField<pb::Invocation> invocations) {
+  if (invocations.size() == 0) return absl::OkStatus();
+  auto body_chunking_plan = test.body_chunking_plan_case();
+  if (invocations.size() != 1 &&
+      body_chunking_plan !=
+          pb::Test::BodyChunkingPlanCase::BODY_CHUNKING_PLAN_NOT_SET) {
+    return absl::InvalidArgumentError(
+        "Cannot specify body_chunking_plan with multiple body invocations");
+  }
+  std::vector<std::string> chunks;
+  for (const pb::Invocation& invocation : invocations) {
+    auto complete_input_body = ParseBodyInput(invocation.input());
+    if (!complete_input_body.ok()) {
+      return complete_input_body.status();
+    }
+    if (body_chunking_plan !=
+        pb::Test::BodyChunkingPlanCase::BODY_CHUNKING_PLAN_NOT_SET) {
+      chunks = ChunkBody(*complete_input_body, cfg_);
+    } else {
+      chunks.emplace_back(*complete_input_body);
+    }
+  }
+  return chunks;
 }
 
 }  // namespace service_extensions_samples

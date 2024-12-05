@@ -20,26 +20,16 @@ class MyHttpContext : public Context {
   explicit MyHttpContext(uint32_t id, RootContext* root) : Context(id, root) {}
 
   // Add foo onto the end of each request body chunk
-  FilterDataStatus onRequestBody(size_t body_buffer_length,
+  FilterDataStatus onRequestBody(size_t chunk_len,
                                  bool end_of_stream) override {
-    const auto body =
-        getBufferBytes(WasmBufferType::HttpRequestBody, 0, body_buffer_length);
-    std::string body_string = body->toString();
-    body_string.append("foo");
-    setBuffer(WasmBufferType::HttpRequestBody, 0, body_buffer_length,
-              body_string);
+    setBuffer(WasmBufferType::HttpRequestBody, chunk_len, 0, "foo");
     return FilterDataStatus::Continue;
   }
 
   // Add bar onto the end of each response body chunk
-  FilterDataStatus onResponseBody(size_t body_buffer_length,
+  FilterDataStatus onResponseBody(size_t chunk_len,
                                   bool end_of_stream) override {
-    const auto body =
-        getBufferBytes(WasmBufferType::HttpResponseBody, 0, body_buffer_length);
-    std::string body_string = body->toString();
-    body_string.append("bar");
-    setBuffer(WasmBufferType::HttpResponseBody, 0, body_buffer_length,
-              body_string);
+    setBuffer(WasmBufferType::HttpResponseBody, chunk_len, 0, "bar");
     return FilterDataStatus::Continue;
   }
 };

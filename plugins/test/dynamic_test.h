@@ -83,9 +83,15 @@ class DynamicTest : public DynamicFixture {
 
   // Helper to generate body string from test config
   absl::StatusOr<std::string> ParseBodyInput(const pb::Input& input);
+
   // Helper to break body down into chunks
   std::vector<std::string> ChunkBody(const std::string& complete_body,
                                      const pb::Test& test);
+
+  // Helper to prep body callbacks for benchmarking
+  absl::StatusOr<std::vector<std::string>> PrepBodyCallbackBenchmark(
+      const pb::Test& test,
+      google::protobuf::RepeatedPtrField<pb::Invocation> invocations);
 
   std::string engine_;
   pb::Env env_;

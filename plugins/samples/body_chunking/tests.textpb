@@ -42,3 +42,37 @@ test {
     result { body { exact: "12foo34foo56foo78foo90foo" } }
   }
 }
+
+test {
+  name: "NoChunking"
+  request_body{
+    input {
+      content: "12"
+    }
+    result {
+      body {
+        exact: "12foo"
+      }
+    }
+  }
+  request_body{
+    input {
+      content: "34"
+    }
+    result {
+      body {
+        exact: "34foo"
+      }
+    }
+  }
+  request_body{
+    input {
+      content: "56"
+    }
+    result {
+      body {
+        exact: "56foo"
+      }
+    }
+  }
+}
