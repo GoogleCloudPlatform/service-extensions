@@ -1,9 +1,8 @@
 test {
-  name: "WithRunCheckHeaderOverwriteCardNumberOnResponseHeader"
+  name: "OverwriteCardNumberOnResponseHeader"
   response_headers {
     input { 
       header { key: "x-card-number" value: "1234-5678-9123-4567"}
-      header { key: "google-run-pii-check" value: "true"}
     }
     result { 
       has_header { key: "x-card-number" value: "XXXX-XXXX-XXXX-4567" }
@@ -11,57 +10,156 @@ test {
   }
 }
 test {
-  name: "WithoutRunCheckHeaderKeepTheOriginalHeaders"
-  response_headers {
-    input { 
-      header { key: "x-card-number" value: "1234-5678-9123-4567"}
-      header { key: "google-run-pii-check" value: "false"}
-    }
-    result { 
-      has_header { key: "x-card-number" value: "1234-5678-9123-4567" }
-    }
-  }
-}
-test {
-  name: "WithRunCheckHeaderOverwriteCardNumberOnBody"
-  response_headers {
-    input { 
-      header { key: "google-run-pii-check" value: "true"}
-    }
-  }
+  name: "OverwriteCardNumberOnBody"
   response_body {
     input {
-      content: "dsddssds dsdsod dsds dsds dsdssds"
-      "sdsds 1234-5678-9123-4567 sdsds dfdfsdssds"
+      content: "dsddssds dsdsod dsds dsds dsdssds "
+      "sdsds 1234-5678-9123-4567 sdsds dfdfsdssds "
       "gfgfgfgf fdfdfdfd 1234-4567-9123-8886 dsds"
     }
     result { 
       body {
-        exact: "dsddssds dsdsod dsds dsds dsdssds"
-        "sdsds XXXX-XXXX-XXXX-4567 sdsds dfdfsdssds"
+        exact: "dsddssds dsdsod dsds dsds dsdssds "
+        "sdsds XXXX-XXXX-XXXX-4567 sdsds dfdfsdssds "
         "gfgfgfgf fdfdfdfd XXXX-XXXX-XXXX-8886 dsds"
       }
     }
   }
 }
 test {
-  name: "WithoutRunCheckHeaderKeepTheOriginalBody"
+  name: "Overwrite10DigitCodeOnResponseHeader"
   response_headers {
-    input { 
-      header { key: "google-run-pii-check" value: "false"}
+    input {
+      header { key: "x-10-digit-code" value: "1234567890"}
+    }
+    result {
+      has_header { key: "x-10-digit-code" value: "XXXXXXX890" }
+    }
+  }
+}
+test {
+  name: "Overwrite10DigitCodeOnResponseBody"
+  response_body {
+    input {
+      content: "dsddssds dsdsod dsds dsds dsdssdsa "
+      "sdsds asdf-qwed-vcxa-eert sdsds dfdfsdssds "
+      "gfgfgfgf fdfdfdfd yuio-hjkl-asdf-xcvb dsds "
+      "dsadsad: 9876543210 dsadsa dsadas dsadasdd"
+    }
+    result {
+      body {
+        exact: "dsddssds dsdsod dsds dsds dsdssdsa "
+        "sdsds asdf-qwed-vcxa-eert sdsds dfdfsdssds "
+        "gfgfgfgf fdfdfdfd yuio-hjkl-asdf-xcvb dsds "
+        "dsadsad: XXXXXXX210 dsadsa dsadas dsadasdd"
+      }
+    }
+  }
+}
+test {
+  name: "OverwritePIIOnResponseBody"
+  response_body {
+    input {
+      content: "dsddssds dsdsod dsds dsds dsdssds "
+      "sdsds 1234-5678-9123-4567 sdsds dfdfsdssds "
+      "gfgfgfgf fdfdfdfd 1234-4567-9123-8886 dsds "
+      "dsadsad: 9876543210 dsadsa dsadas dsadasdd"
+    }
+    result {
+      body {
+        exact: "dsddssds dsdsod dsds dsds dsdssds "
+        "sdsds XXXX-XXXX-XXXX-4567 sdsds dfdfsdssds "
+        "gfgfgfgf fdfdfdfd XXXX-XXXX-XXXX-8886 dsds "
+        "dsadsad: XXXXXXX210 dsadsa dsadas dsadasdd"
+      }
+    }
+  }
+}
+test {
+  name: "OverwriteMultiplePIIInHeadersAndBody"
+  response_headers {
+    input {
+      header { key: "x-card-number" value: "1234-5678-9123-4567"}
+      header { key: "x-10-digit-code" value: "0987654321"}
+    }
+    result {
+      has_header { key: "x-card-number" value: "XXXX-XXXX-XXXX-4567" }
+      has_header { key: "x-10-digit-code" value: "XXXXXXX321" }
     }
   }
   response_body {
     input {
-      content: "dsddssds dsdsod dsds dsds dsdssds"
-      "sdsds 1234-5678-9123-4567 sdsds dfdfsdssds"
-      "gfgfgfgf fdfdfdfd 1234-4567-9123-8886 dsds"
+      content:  "dsddssds dsdsod dsds dsds dsdssds "
+      "fwqfqw: 1234-5678-9123-4567 fwqfqw "
+      "asdasd: 0987654321 dsadsad dsadas"
     }
-    result { 
+    result {
       body {
-        exact: "dsddssds dsdsod dsds dsds dsdssds"
-        "sdsds 1234-5678-9123-4567 sdsds dfdfsdssds"
-        "gfgfgfgf fdfdfdfd 1234-4567-9123-8886 dsds"
+        exact: "dsddssds dsdsod dsds dsds dsdssds "
+        "fwqfqw: XXXX-XXXX-XXXX-4567 fwqfqw "
+        "asdasd: XXXXXXX321 dsadsad dsadas"
+      }
+    }
+  }
+}
+test {
+  name: "EnsureNonPIIDataRemainsUnchanged"
+  response_headers {
+    input {
+      header { key: "content-type" value: "application/json"}
+      header { key: "server" value: "nginx"}
+    }
+    result {
+      has_header { key: "content-type" value: "application/json" }
+      has_header { key: "server" value: "nginx" }
+    }
+  }
+  response_body {
+    input {
+      content: "This response does not contain any PII."
+    }
+    result {
+      body {
+        exact: "This response does not contain any PII."
+      }
+    }
+  }
+}
+test {
+  name: "OverwriteMultiple10DigitCodesInBody"
+  response_body {
+    input {
+      content: "Codes: 1234567890, 0987654321, and 1122334455 are all valid."
+    }
+    result {
+      body {
+        exact: "Codes: XXXXXXX890, XXXXXXX321, and XXXXXXX455 are all valid."
+      }
+    }
+  }
+}
+test {
+  name: "Overwrite10DigitCodesAdjacentToOtherCharacters"
+  response_body {
+    input {
+      content: "Order1234567890completed."
+    }
+    result {
+      body {
+        exact: "OrderXXXXXXX890completed."
+      }
+    }
+  }
+}
+test {
+  name: "OverwritePIIDataAdjacentToOtherCharacters"
+  response_body {
+    input {
+      content: "Order1234567890completed using card1234-5678-9123-4567and card9876-5432-1234-5678."
+    }
+    result {
+      body {
+        exact: "OrderXXXXXXX890completed using cardXXXX-XXXX-XXXX-4567and cardXXXX-XXXX-XXXX-5678."
       }
     }
   }
