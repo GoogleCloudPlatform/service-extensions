@@ -1,3 +1,5 @@
+<a name="docs"></a>
+
 # Google Cloud Service Extension Plugins Samples
 
 Code samples and tools for developing
