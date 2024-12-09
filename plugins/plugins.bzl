@@ -1,21 +1,22 @@
-# Copyright 2023 Google LLC
+#Copyright 2023 Google LLC
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+#Licensed under the Apache License, Version 2.0(the "License");
+#you may not use this file except in compliance with the License.
+#You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#http:  // www.apache.org/licenses/LICENSE-2.0
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
+#limitations under the License.
 
 """Plugin build wrappers."""
 
 load("@proxy_wasm_cpp_host//bazel:wasm.bzl", "wasm_rust_binary")
 load("@proxy_wasm_cpp_sdk//bazel:defs.bzl", "proxy_wasm_cc_binary")
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
 load("@rules_cc//cc:defs.bzl", "cc_test")
 
 def proxy_wasm_plugin_rust(**kwargs):
@@ -34,6 +35,22 @@ def proxy_wasm_plugin_cpp(**kwargs):
         **kwargs
     )
 
+def cmake_dep(name,
+        cache_entries = {},
+        default_cache_entries = {"CMAKE_BUILD_TYPE": "Bazel"},
+        lib_source = "",
+        targets = ["", "install"],
+        **kwargs):
+
+    cache_entries.update(default_cache_entries)
+    cmake(
+        name = name,
+        cache_entries = cache_entries,
+        lib_source = lib_source,
+        targets = targets,
+        generate_crosstool_file = False,
+        **kwargs,
+    )
 def proxy_wasm_tests(
         name,
         tests,
