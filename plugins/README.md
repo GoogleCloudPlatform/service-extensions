@@ -1,3 +1,5 @@
+<a name="docs"></a>
+
 # Google Cloud Service Extension Plugins Samples
 
 Code samples and tools for developing
@@ -13,7 +15,8 @@ We recommend the following process:
 
 1.  Using the [samples](samples/) and
     [Proxy-Wasm](https://github.com/proxy-wasm) SDKs as a starting point, write
-    a wasm plugin in a language of your choice. Get it building.
+    a wasm plugin in a language of your choice.
+1.  [Build](#building-plugins) the plugin.
 1.  Write a plugin test file (textproto) to specify the plugin's functional
     expectations ([example](samples/testing/tests.textpb)). Consult the plugin
     tester [proto API](test/runner.proto) as needed.
@@ -35,6 +38,24 @@ Tips:
 -   To see plugin-emitted logs on the console, add `--logfile=/dev/stdout`.
 -   To see a trace of logs and wasm ABI calls, add `--loglevel=TRACE`.
 -   Optionally specify plugin config data using the `--config=<path>` flag.
+
+# Building Plugins
+
+To build your plugin using bazel, run:
+
+```
+$ bazelisk build <target>
+```
+For example, to build the sample C++ plugin in the `plugins/add_header` subdirectory, run:
+
+```
+bazelisk build //samples/add_header:plugin_cpp.wasm
+```
+If attempts to build fail due to errors in dependencies, you may need to add `--config=clang` or `--config=gcc` to the build command.
+
+Most of our documention assumes that bazel is being used. However, plugins can be built using various different build systems. For info on other systems see:
+-   https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/blob/main/docs/building.md
+-   https://github.com/proxy-wasm/proxy-wasm-rust-sdk/tree/main/examples/hello_world
 
 # Samples & Recipes
 
@@ -94,6 +115,8 @@ Build all plugins and run all plugin tests:
 When running benchmarks, be sure to add `--config=bench`:
 
 `$ bazelisk test --test_output=all --config=bench //samples/add_header/...`
+
+These commands build both the tester and the V8 runtime from scratch, so compilation times may be long. For faster tests please use docker command from [Getting Started](#getting-started) to test plugins.
 
 # Feature set / ABI
 
