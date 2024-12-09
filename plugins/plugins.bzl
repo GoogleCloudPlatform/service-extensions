@@ -30,8 +30,9 @@ def proxy_wasm_plugin_rust(**kwargs):
         **kwargs
     )
 
-def proxy_wasm_plugin_cpp(**kwargs):
+def proxy_wasm_plugin_cpp(copts = [], **kwargs):
     proxy_wasm_cc_binary(
+        copts = copts + ["-Werror=return-type"],
         **kwargs
     )
 

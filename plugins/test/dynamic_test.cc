@@ -33,51 +33,6 @@
 #include "test/runner.pb.h"
 
 namespace service_extensions_samples {
-absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>>
-DynamicTest::LoadWasm(bool benchmark) {
-  // Set log level. Default to INFO. Disable in benchmarks.
-  auto ll = env_.log_level();
-  if (ll == pb::Env::UNDEFINED) {
-    ll = pb::Env::INFO;
-  }
-  if (benchmark) {
-    ll = pb::Env::CRITICAL;  // disable logs in benchmarks
-  }
-  auto log_level = proxy_wasm::LogLevel(ll - 1);  // enum conversion, yuck
-
-  // Load wasm bytes.
-  auto wasm = ReadDataFile(env_.wasm_path());
-  if (!wasm.ok()) return wasm.status();
-
-  // Load plugin config from disk, if configured.
-  std::string plugin_config = "";
-  if (!env_.config_path().empty()) {
-    auto config = ReadDataFile(env_.config_path());
-    if (!config.ok()) return config.status();
-    plugin_config = *config;
-  }
-
-  // Context options: logging to file, setting the clock.
-  ContextOptions opt;
-  if (!benchmark && !env_.log_path().empty()) {
-    opt.log_file.open(env_.log_path(), std::ofstream::out | std::ofstream::app);
-  }
-  if (env_.time_secs()) {
-    opt.clock_time = absl::FromUnixSeconds(env_.time_secs());
-  }
-
-  // Create VM and load wasm.
-  return CreatePluginVm(engine_, *wasm, plugin_config, log_level,
-                        std::move(opt));
-}
-
-// Macro to stop test execution if the VM has failed.
-// Includes logs in the output so that panic reasons are printed.
-#define ASSERT_VM_HEALTH(phase, handle, context)                           \
-  if (handle->wasm()->isFailed()) {                                        \
-    FAIL() << absl::Substitute("[$0] Wasm VM failed! Logs: \n$1\n", phase, \
-                               absl::StrJoin(context.phase_logs(), "\n")); \
-  }
 namespace {
 // Helper to read data from a path which may be relative to the test config.
 absl::StatusOr<std::string> ReadContent(const std::string& path,
@@ -165,6 +120,52 @@ class LogTestBounds {
 };
 }  // namespace
 
+absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>>
+DynamicTest::LoadWasm(bool benchmark) {
+  // Set log level. Default to INFO. Disable in benchmarks.
+  auto ll = env_.log_level();
+  if (ll == pb::Env::UNDEFINED) {
+    ll = pb::Env::INFO;
+  }
+  if (benchmark) {
+    ll = pb::Env::CRITICAL;  // disable logs in benchmarks
+  }
+  auto log_level = proxy_wasm::LogLevel(ll - 1);  // enum conversion, yuck
+
+  // Load wasm bytes.
+  auto wasm = ReadDataFile(env_.wasm_path());
+  if (!wasm.ok()) return wasm.status();
+
+  // Load plugin config from disk, if configured.
+  std::string plugin_config = "";
+  if (!env_.config_path().empty()) {
+    auto config = ReadDataFile(env_.config_path());
+    if (!config.ok()) return config.status();
+    plugin_config = *config;
+  }
+
+  // Context options: logging to file, setting the clock.
+  ContextOptions opt;
+  if (!benchmark && !env_.log_path().empty()) {
+    opt.log_file.open(env_.log_path(), std::ofstream::out | std::ofstream::app);
+  }
+  if (env_.time_secs()) {
+    opt.clock_time = absl::FromUnixSeconds(env_.time_secs());
+  }
+
+  // Create VM and load wasm.
+  return CreatePluginVm(engine_, *wasm, plugin_config, log_level,
+                        std::move(opt));
+}
+
+// Macro to stop test execution if the VM has failed.
+// Includes logs in the output so that panic reasons are printed.
+#define ASSERT_VM_HEALTH(phase, handle, context)                           \
+  if (handle->wasm()->isFailed()) {                                        \
+    FAIL() << absl::Substitute("[$0] Wasm VM failed! Logs: \n$1\n", phase, \
+                               absl::StrJoin(context.phase_logs(), "\n")); \
+  }
+
 void DynamicTest::TestBody() {
   // Initialize VM.
   auto load_wasm = LoadWasm(/*benchmark=*/false);
@@ -215,7 +216,7 @@ void DynamicTest::TestBody() {
     }
     for (const pb::Invocation& invocation : invocations) {
       TestHttpContext::Result body_result = TestHttpContext::Result{};
-      auto complete_input_body = ParseBodyInput(invocation.input());
+      absl::StatusOr<std::string> complete_input_body = ParseBodyInput(invocation.input());
       if (!complete_input_body.ok()) {
         FAIL() << complete_input_body.status();
       }
@@ -228,7 +229,7 @@ void DynamicTest::TestBody() {
         chunks = {*complete_input_body};
       }
       for (std::string& body_chunk : chunks) {
-        auto res = invoke_wasm(std::move(body_chunk));
+        TestHttpContext::Result res = invoke_wasm(std::move(body_chunk));
         ASSERT_VM_HEALTH(phase, handle, stream);
         body_result.body = body_result.body.append(res.body);
       }
@@ -337,10 +338,10 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
     BM_RETURN_IF_ERROR(headers.status());
     response_headers = *headers;
   }
-  auto request_body_chunks =
+  absl::StatusOr<std::vector<std::string>> request_body_chunks =
       PrepBodyCallbackBenchmark(cfg_, cfg_.request_body());
   BM_RETURN_IF_ERROR(request_body_chunks.status());
-  auto response_body_chunks =
+  absl::StatusOr<std::vector<std::string>> response_body_chunks =
       PrepBodyCallbackBenchmark(cfg_, cfg_.response_body());
   BM_RETURN_IF_ERROR(response_body_chunks.status());
 
@@ -610,7 +611,7 @@ absl::StatusOr<std::vector<std::string>> DynamicTest::PrepBodyCallbackBenchmark(
   }
   std::vector<std::string> chunks;
   for (const pb::Invocation& invocation : invocations) {
-    auto complete_input_body = ParseBodyInput(invocation.input());
+    absl::StatusOr<std::string> complete_input_body = ParseBodyInput(invocation.input());
     if (!complete_input_body.ok()) {
       return complete_input_body.status();
     }
