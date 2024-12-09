@@ -600,7 +600,7 @@ std::vector<std::string> DynamicTest::ChunkBody(
 absl::StatusOr<std::vector<std::string>> DynamicTest::PrepBodyCallbackBenchmark(
     const pb::Test& test,
     google::protobuf::RepeatedPtrField<pb::Invocation> invocations) {
-  if (invocations.size() == 0) return absl::OkStatus();
+  if (invocations.size() == 0) return std::vector<std::string> {};
   auto body_chunking_plan = test.body_chunking_plan_case();
   if (invocations.size() != 1 &&
       body_chunking_plan !=
