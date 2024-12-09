@@ -215,7 +215,7 @@ void DynamicTest::TestBody() {
     }
     for (const pb::Invocation& invocation : invocations) {
       TestHttpContext::Result body_result = TestHttpContext::Result{};
-      auto complete_input_body = ParseBodyInput(invocation.input());
+      absl::StatusOr<std::string> complete_input_body = ParseBodyInput(invocation.input());
       if (!complete_input_body.ok()) {
         FAIL() << complete_input_body.status();
       }
@@ -228,7 +228,7 @@ void DynamicTest::TestBody() {
         chunks = {*complete_input_body};
       }
       for (std::string& body_chunk : chunks) {
-        auto res = invoke_wasm(std::move(body_chunk));
+        TestHttpContext::Result res = invoke_wasm(std::move(body_chunk));
         ASSERT_VM_HEALTH(phase, handle, stream);
         body_result.body = body_result.body.append(res.body);
       }
@@ -337,10 +337,10 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
     BM_RETURN_IF_ERROR(headers.status());
     response_headers = *headers;
   }
-  auto request_body_chunks =
+  absl::StatusOr<std::vector<std::string>> request_body_chunks =
       PrepBodyCallbackBenchmark(cfg_, cfg_.request_body());
   BM_RETURN_IF_ERROR(request_body_chunks.status());
-  auto response_body_chunks =
+  absl::StatusOr<std::vector<std::string>> response_body_chunks =
       PrepBodyCallbackBenchmark(cfg_, cfg_.response_body());
   BM_RETURN_IF_ERROR(response_body_chunks.status());
 
@@ -610,7 +610,7 @@ absl::StatusOr<std::vector<std::string>> DynamicTest::PrepBodyCallbackBenchmark(
   }
   std::vector<std::string> chunks;
   for (const pb::Invocation& invocation : invocations) {
-    auto complete_input_body = ParseBodyInput(invocation.input());
+    absl::StatusOr<std::string> complete_input_body = ParseBodyInput(invocation.input());
     if (!complete_input_body.ok()) {
       return complete_input_body.status();
     }
