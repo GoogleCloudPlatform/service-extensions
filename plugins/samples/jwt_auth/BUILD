@@ -2,6 +2,18 @@ load("//:plugins.bzl", "proxy_wasm_plugin_cpp", "proxy_wasm_plugin_rust", "proxy
 
 licenses(["notice"])  # Apache 2
 
+proxy_wasm_plugin_rust(
+    name = "plugin_rust.wasm",
+    srcs = ["plugin.rs"],
+    crate_features = ["jwt-compact/rsa"],
+    deps = [
+        "@crate_index//:proxy-wasm",
+        "@crate_index//:url",
+        "@crate_index//:rsa",
+        "@crate_index//:jwt-compact",
+    ],
+)
+
 proxy_wasm_plugin_cpp(
     name = "plugin_cpp.wasm",
     srcs = ["plugin.cc"],
@@ -32,4 +44,13 @@ proxy_wasm_tests(
         ":plugin_cpp.wasm",
     ],
     tests = ":tests.textpb",
+)
+
+proxy_wasm_tests(
+    name = "tests_rust",
+    config = ":publickey.pem",
+    plugins = [
+        ":plugin_rust.wasm",
+    ],
+    tests = ":tests_rust.textpb",
 )

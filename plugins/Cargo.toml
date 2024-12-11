@@ -10,6 +10,8 @@ proxy-wasm = "0.2.1"
 log = "0.4"
 regex = "1.9"
 url = "2.4"
+jwt-compact = { version = "0.8.0", default-features = false, features = ["std", "rsa"] }
+rsa = "0.9.6"
 
 [lib]
 crate-type = ["cdylib"]

@@ -1,0 +1,77 @@
+# With JWT valid token, request allowed and token removed from :path.
+test {
+  name: "WithValidJwt"
+  request_headers {
+    input {
+      header { key: ":path" value: "/admin?jwt=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.NHVaYe26MbtOYhSKkoKYdFVomg4i8ZJd8_-RU8VNbftc4TSMb4bXP3l3YlNWACwyXPGffz5aXHc6lty1Y2t4SWRqGteragsVdZufDn5BlnJl9pdR_kdVFUsra2rWKEofkZeIC4yWytE58sMIihvo9H1ScmmVwBcQP6XETqYd0aSHp1gOa9RdUPDvoXQ5oqygTqVtxaDr6wUFKrKItgBMzWIdNZ6y7O9E0DhEPTbE9rfBo6KTFsHAZnMg4k68CDp2woYIaXbmYTWcvbzIuHO7_37GT79XdIwkm95QJ7hYC9RiwrV7mesbY4PAahERJawntho0my942XheVLmGwLMBkQ&param=value" }
+    }
+    result { 
+      has_header { key: ":path" value: "/admin?param=value" }
+    }
+  }
+}
+# No JWT set, forbidden request.
+test {
+  name: "NoJwt"
+  request_headers {
+    input {
+      header { key: ":path" value: "/admin" }
+    }
+    result { 
+      immediate { http_status: 403 details: "" }
+      body { exact: "Access forbidden - missing token.\n" }
+    }
+  }
+}
+# invalid token, forbidden request.
+test {
+  name: "InvalidJwt"
+  request_headers {
+    input {
+      header { key: ":path" value: "/admin?jwt=ddssdsds.ddfdffd.dsssd" }
+    }
+    result { 
+      immediate { http_status: 403 details: "" }
+      body { exact: "Access forbidden - invalid token." }
+    }
+  }
+}
+# Expired token, forbidden request.
+test {
+  name: "ExpiredJwt"
+  request_headers {
+    input {
+      header { key: ":path" value: "/admin?jwt=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwiZXhwIjoxNTE2MjQyNjIyfQ.NHVaYe26MbtOYhSKkoKYdFVomg4i8ZJd8_-RU8VNbftc4TSMb4bXP3l3YlNWACwyXPGffz5aXHc6lty1Y2t4SWRqGteragsVdZufDn5BlnJl9pdR_kdVFUsra2rWKEofkZeIC4yWytE58sMIihvo9H1ScmmVwBcQP6XETqYd0aSHp1gOa9RdUPDvoXQ5oqygTqVtxaDr6wUFKrKItgBMzWIdNZ6y7O9E0DhEPTbE9rfBo6KTFsHAZnMg4k68CDp2woYIaXbmYTWcvbzIuHO7_37GT79XdIwkm95QJ7hYC9RiwrV7mesbY4PAahERJawntho0my942XheVLmGwLMBkQ" }
+    }
+    result {
+      immediate { http_status: 403 details: "" }
+      body { exact: "Access forbidden - Jwt verification fails." }
+    }
+  }
+}
+# No :path header, forbidden request.
+test {
+  name: "NoPathHeader"
+  request_headers {
+    input {
+      header { key: ":notpath" value: "/admin?jwt=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwiZXhwIjoxNTE2MjQyNjIyfQ.NHVaYe26MbtOYhSKkoKYdFVomg4i8ZJd8_-RU8VNbftc4TSMb4bXP3l3YlNWACwyXPGffz5aXHc6lty1Y2t4SWRqGteragsVdZufDn5BlnJl9pdR_kdVFUsra2rWKEofkZeIC4yWytE58sMIihvo9H1ScmmVwBcQP6XETqYd0aSHp1gOa9RdUPDvoXQ5oqygTqVtxaDr6wUFKrKItgBMzWIdNZ6y7O9E0DhEPTbE9rfBo6KTFsHAZnMg4k68CDp2woYIaXbmYTWcvbzIuHO7_37GT79XdIwkm95QJ7hYC9RiwrV7mesbY4PAahERJawntho0my942XheVLmGwLMBkQ" }
+    }
+    result {
+      immediate { http_status: 403 details: "" }
+      body { exact: "Access forbidden - missing :path header.\n" }
+    }
+  }
+}
+# Invalid URL, forbidden request.
+test {
+  name: "InvalidURL"
+  request_headers {
+    input {
+      header { key: ":path" value: "invalid path with spaces" }
+    }
+    result {
+      immediate { http_status: 403 details: "" }
+      body { exact: "Access forbidden - invalid URL.\n" }
+    }
+  }
+}
