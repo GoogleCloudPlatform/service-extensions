@@ -14,7 +14,6 @@
 
 use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
-use std::string::String;
 
 const OLD_PATH_PREFIX: &str = "/foo/";
 const NEW_PATH_PREFIX: &str = "/bar/";
@@ -46,20 +45,9 @@ impl HttpContext for MyHttpContext {
     }
 }
 
-// Root context definition.
-struct MyRootContext;
-
-impl Context for MyRootContext {}
-
-impl RootContext for MyRootContext {
-    fn on_configure(&mut self, _configuration_size: usize) -> bool {
-        true
-    }
-}
-
 // Register the context factory.
 proxy_wasm::main! {
-    (|root_context_id| {
-        proxy_wasm::set_root_context(root_context_id, MyRootContext);
+    proxy_wasm::set_http_context(|_, _| -> Box<dyn HttpContext> {
+        Box::new(MyHttpContext)
     });
 }
