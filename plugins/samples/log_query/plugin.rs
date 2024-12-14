@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [START serviceextensions_plugin_query_log]
 // [START serviceextensions_plugin_log_query]
 use log::info;
 use proxy_wasm::traits::*;
@@ -50,4 +49,3 @@ impl HttpContext for MyHttpContext {
     }
 }
 // [END serviceextensions_plugin_log_query]
-// [END serviceextensions_plugin_query_log]
