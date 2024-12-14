@@ -64,7 +64,7 @@ for your own plugin. Extend them to fit your particular use case.
 
 *   [Testing examples](samples/testing): A demonstration of our test framework
     capabilities (sending inputs and checking results).
-*   [Log each Wasm call](samples/noop_logs): Don't change anything about the
+*   [Log each Wasm call](samples/log_calls): Don't change anything about the
     traffic (noop plugin). Log each wasm invocation, including lifecycle
     callbacks.
 *   [Add HTTP request & response headers](samples/add_header): Add a header on
@@ -73,9 +73,11 @@ for your own plugin. Extend them to fit your particular use case.
 *   [Plugin config with a list of tokens to deny](samples/config_denylist): Deny
     a request whenever it contains a known bad token. Bad tokens are loaded at
     plugin initialization time from plugin configuration.
-*   [Log the value of a query parameter](samples/query_log): Emit a custom
+*   [Log the value of a query parameter](samples/log_query): Emit a custom
     variable to Cloud Logging. Demonstrate a standard way to parse query string
     values from the request.
+*   [Set or update query parameter](samples/set_query): Change the path, and
+    specifically query string values.
 *   [Rewrite the path using regex](samples/regex_rewrite): Remove a piece of the
     URI using regex replacement. Demonstrate a standard way to use regular
     expressions, compiling them at plugin initialization.
