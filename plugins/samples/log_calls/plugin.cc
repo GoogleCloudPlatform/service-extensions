@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [START serviceextensions_plugin_example_noop_logs]
+// [START serviceextensions_plugin_log_calls]
 #include "proxy_wasm_intrinsics.h"
 
 class MyRootContext : public RootContext {
@@ -59,4 +59,4 @@ class MyHttpContext : public Context {
 
 static RegisterContextFactory register_StaticContext(
     CONTEXT_FACTORY(MyHttpContext), ROOT_FACTORY(MyRootContext));
-// [END serviceextensions_plugin_example_noop_logs]
+// [END serviceextensions_plugin_log_calls]
