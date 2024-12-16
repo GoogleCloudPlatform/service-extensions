@@ -85,7 +85,7 @@ impl HttpContext for MyHttpContext {
         }
 
         self.set_http_request_header(":path", Some(&new_path_with_query));
-        return Action::Continue;
+        Action::Continue
     }
 }
 
