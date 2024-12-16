@@ -13,7 +13,7 @@ accompanying unit test that verifies both.
 
 We recommend the following process:
 
-1.  Write a wasm plugin using the [samples](samples/) and SDKs as a starting
+1.  Write a wasm plugin using the [samples](#samples) and SDKs as a starting
     point: [C++](https://github.com/proxy-wasm/proxy-wasm-cpp-sdk),
     [Rust](https://github.com/proxy-wasm/proxy-wasm-rust-sdk). See also the
     [best practices](https://cloud.google.com/service-extensions/docs/plugin-best-practices).
@@ -32,7 +32,7 @@ prefer to use language-native toolchains, see the SDK-specific instructions:
 -   Rust supports
     [Cargo](https://github.com/proxy-wasm/proxy-wasm-rust-sdk/tree/main/examples/hello_world)
 
-All SDKs support Bazel; we recommend the
+All languages also support Bazel; we recommend the
 [Bazelisk](https://github.com/bazelbuild/bazelisk#installation) wrapper which
 provides support for multiple Bazel versions:
 
@@ -40,7 +40,7 @@ provides support for multiple Bazel versions:
 # A target is defined using BUILD files. Dependencies are in WORKSPACE.
 $ bazelisk build <target>
 
-# For example, to build the add_header sample in C++ and Rust:
+# For example, to build a sample in C++ and Rust, from the plugins/ directory:
 $ bazelisk build //samples/add_header:plugin_cpp.wasm
 $ bazelisk build //samples/add_header:plugin_rust.wasm
 ```
@@ -51,7 +51,7 @@ C++ builds may require a specific toolchain: `--config=clang` or `--config=gcc`.
 
 # Testing and benchmarking
 
-1.  Write a plugin test file (textproto) to specify the plugin's functional
+1.  Write a plugin test file (text proto) to specify the plugin's functional
     expectations ([example](samples/testing/tests.textpb)). Consult the plugin
     tester [proto API](test/runner.proto) as needed.
 1.  Add `benchmark: true` to tests that exemplify common wasm operations
@@ -72,15 +72,17 @@ Tips:
 -   To see plugin-emitted logs on the console, add `--logfile=/dev/stdout`.
 -   To see a trace of logs and wasm ABI calls, add `--loglevel=TRACE`.
 -   To disable benchmarking for faster iteration, add `--nobench`.
--   Optionally specify plugin config data using the `--config=<path>` flag.
+-   To optionally specify plugin config data, add `--config=<path>`.
 
-You can also run tests using Bazel. This is **much slower** because this builds
-both the tester and the V8 runtime from scratch. Use the Docker command above
-for a better experience.
+You can also run tests using Bazel. This is **much slower** the first time,
+because this builds both the tester and the V8 runtime from scratch. Use the
+Docker command above for a better experience.
 
 ```bash
 bazelisk test --config=bench --test_output=all //samples/...
 ```
+
+<a name="samples"></a>
 
 # Samples & Recipes
 
@@ -173,7 +175,7 @@ Support will grow over time. The current feature set includes:
 In support of unit testing, this repo contains an `HttpTest` fixture with a
 `TestWasm` host implementation and `TestHttpContext` stream handler. These
 minimal implementations loosely match GCP Service Extension execution
-environment. The contexts implement the ABI / feature set described below
+environment. The contexts implement the ABI / feature set described above
 (mainly HTTP headers and logging), but often in a simple way (behaviors may not
 match GCP exactly).
 
