@@ -1,0 +1,31 @@
+test {
+  name: "BasicFullBody"
+  request_body{
+    input {
+      content: "<!DOCTYPE html>"
+      "<html>"
+      "<title>HTML Tutorial</title>"
+      "<body>"
+
+      "<h1>This is a heading</h1>"
+      "<p>This is a paragraph.</p>"
+
+      "</body>"
+      "</html>"
+    }
+    result {
+      body {
+        exact: "<!DOCTYPE html>"
+        "<html>"
+        "<title>HTML Tutorial</title>"
+        "<body>"
+
+        "<h1>This is a heading</h1>"
+        "<p>This is a paragraph.</p>"
+
+        "</body>"
+        "</html>"
+      }
+    }
+  }
+}
