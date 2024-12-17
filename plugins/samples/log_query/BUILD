@@ -18,7 +18,6 @@ proxy_wasm_plugin_cpp(
     deps = [
         "//:boost_exception",
         "@boost//:url",
-        "@proxy_wasm_cpp_sdk//contrib:contrib_lib",
     ],
 )
 
