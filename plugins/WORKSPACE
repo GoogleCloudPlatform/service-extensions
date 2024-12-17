@@ -61,11 +61,11 @@ filegroup(
 )
 """
 http_archive(
-  name = "libsxg",
+  name = "org_gnome_gitlab_libxml2",
   build_file_content = _ALL_CONTENT,
-  sha256 = "56581905e9cc254ba555de2b2a1cfb98e119d8d6168d4b4799a721929226498b",
-  strip_prefix = "libsxg-59735d785330a01331bce42b1bad9210b85d4a57",
-  url = "https://github.com/google/libsxg/archive/59735d785330a01331bce42b1bad9210b85d4a57.tar.gz",
+  sha256 = "3066f82bc151dcf8e340db0c51089972dbbb46b29de26e2dff58f061bd37bfe9",
+  strip_prefix = "libxml2-2.13",
+  url = "https://gitlab.gnome.org/GNOME/libxml2/-/archive/2.13/libxml2-2.13.tar.gz",
 )
 http_archive(
   name = "com_github_lexbor",

@@ -16,7 +16,7 @@
 
 load("@proxy_wasm_cpp_host//bazel:wasm.bzl", "wasm_rust_binary")
 load("@proxy_wasm_cpp_sdk//bazel:defs.bzl", "proxy_wasm_cc_binary")
-load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake", "configure_make")
 load("@rules_cc//cc:defs.bzl", "cc_test")
 
 def proxy_wasm_plugin_rust(**kwargs):
@@ -52,6 +52,14 @@ def cmake_dep(name,
         generate_crosstool_file = False,
         **kwargs,
     )
+def configure_make_dep(
+  name, lib_source, **kwargs
+  ):
+  configure_make(name = name,
+  lib_source = lib_source,
+  **kwargs,
+  )
+
 def proxy_wasm_tests(
         name,
         tests,
