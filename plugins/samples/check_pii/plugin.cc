@@ -22,20 +22,24 @@ class MyRootContext : public RootContext {
       : RootContext(id, root_id) {}
 
   bool onConfigure(size_t) override {
-    // Credit card numbers in a 16 character hyphenated format.
+    // Credit card numbers in a 16-digit hyphenated format.
     // Compile the regex expression at plugin setup time, so that this expensive
     // operation is only performed once, and not repeated with each request.
-    card_match.emplace("\\d{4}-\\d{4}-\\d{4}-(\\d{4})");
+    card_matcher_.emplace("\\d{4}-\\d{4}-\\d{4}-(\\d{4})");
 
     // Compile the regex for 10-digit numeric codes.
-    code10_match.emplace("\\d{7}(\\d{3})");
+    code10_matcher_.emplace("\\d{7}(\\d{3})");
 
     // Ensure both regex patterns compiled successfully.
-    return card_match->ok() && code10_match->ok();
+    return card_matcher_->ok() && code10_matcher_->ok();
   }
 
-  std::optional<re2::RE2> card_match;
-  std::optional<re2::RE2> code10_match;
+  const re2::RE2& card_matcher() const { return *card_matcher_; }
+  const re2::RE2& code10_matcher() const { return *code10_matcher_; }
+
+  private:
+    std::optional<re2::RE2> card_matcher_;
+    std::optional<re2::RE2> code10_matcher_;
 };
 
 // Checks the response HTTP headers and the response body for the presence of
@@ -54,15 +58,32 @@ class MyHttpContext : public Context {
   explicit MyHttpContext(uint32_t id, RootContext* root)
       : Context(id, root), root_(static_cast<MyRootContext*>(root)) {}
 
+  FilterHeadersStatus onRequestHeaders(uint32_t headers,
+                                         bool end_of_stream) override {
+      // One current limitation is that this plugin won't strip PII as intended if the server response is compressed,
+      // since in that case the bytes returned by getBufferBytes() will be compressed rather than plaintext data.
+      // The simplest workaround is to disallow the server from using response compression.
+      // This is achieved by setting "Accept-Encoding: identity" in request headers.
+      replaceRequestHeader("accept-encoding", "identity");
+      return FilterHeadersStatus::Continue;
+    }
+
   FilterHeadersStatus onResponseHeaders(uint32_t headers,
                                         bool end_of_stream) override {
     const auto result = getResponseHeaderPairs();
-    const auto pairs = result->pairs();
-    for (auto& p : pairs) {
-      std::string header_value = std::string(p.second);  // mutable copy
-      if (maskPII(header_value)) {
-        replaceResponseHeader(p.first, header_value);
-      }
+    const auto orig_pairs = result->pairs();
+
+    HeaderStringPairs new_headers;
+    bool changed = false;
+
+    for (auto& [k, v] : orig_pairs) {
+      std::string key(k.data(), k.size());
+      std::string value(v.data(), v.size()); // mutable copy
+      changed = maskPII(value) || changed;
+      new_headers.emplace_back(key, value);
+    }
+    if (changed) {
+      setResponseHeaderPairs(new_headers);
     }
     return FilterHeadersStatus::Continue;
   }
@@ -87,13 +108,13 @@ class MyHttpContext : public Context {
     bool modified = false;
 
     // Mask credit card numbers: XXXX-XXXX-XXXX-1234
-    if (re2::RE2::GlobalReplace(&value, *(root_->card_match),
+    if (re2::RE2::GlobalReplace(&value, root_->card_matcher(),
                                  "XXXX-XXXX-XXXX-\\1") > 0) {
       modified = true;
     }
 
     // Mask 10-digit codes: XXXXXXX123
-    if (re2::RE2::GlobalReplace(&value, *(root_->code10_match),
+    if (re2::RE2::GlobalReplace(&value, root_->code10_matcher(),
                                  "XXXXXXX\\1") > 0) {
       modified = true;
     }

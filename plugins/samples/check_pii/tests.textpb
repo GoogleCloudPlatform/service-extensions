@@ -164,3 +164,14 @@ test {
     }
   }
 }
+test {
+  name: "OverwriteAcceptEncodingRequestHeader"
+  request_headers {
+    input {
+      header { key: "Accept-Encoding" value: "gzip, deflate" }
+    }
+    result {
+      has_header { key: "Accept-Encoding" value: "identity" }
+    }
+  }
+}
