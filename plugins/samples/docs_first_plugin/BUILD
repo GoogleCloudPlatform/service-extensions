@@ -8,18 +8,12 @@ proxy_wasm_plugin_rust(
     deps = [
         "@crate_index//:log",
         "@crate_index//:proxy-wasm",
-        "@crate_index//:url",
     ],
 )
 
 proxy_wasm_plugin_cpp(
     name = "plugin_cpp.wasm",
     srcs = ["plugin.cc"],
-    deps = [
-        "//:boost_exception",
-        "@boost//:url",
-        "@proxy_wasm_cpp_sdk//contrib:contrib_lib",
-    ],
 )
 
 proxy_wasm_tests(
