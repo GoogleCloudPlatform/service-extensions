@@ -37,7 +37,7 @@ RUN openssl s_client -showcerts -connect github.com:443 \
 RUN update-ca-certificates
 
 # Install bazelisk
-RUN go install github.com/bazelbuild/bazelisk@latest
+RUN go install github.com/bazelbuild/bazelisk@v1.21.0
 ENV PATH="${PATH}:/root/go/bin"
 
 # Debug environment
