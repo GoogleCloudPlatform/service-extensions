@@ -58,7 +58,7 @@ public class ServiceCallout {
     private String healthCheckIp;
     private int healthCheckPort;
     private String healthCheckPath;
-    private boolean separateHealthCheck;
+    private boolean combinedHealthCheck;
     private byte[] cert;
     private String certPath;
     private byte[] certKey;
@@ -68,12 +68,12 @@ public class ServiceCallout {
 
     protected ServiceCallout(Builder<?> builder) {
         this.ip = Optional.ofNullable(builder.ip).orElse("0.0.0.0");
-        this.port = Optional.ofNullable(builder.port).orElse(8443);
-        this.insecurePort = Optional.ofNullable(builder.insecurePort).orElse(8443);
+        this.port = Optional.ofNullable(builder.port).orElse(443);
+        this.insecurePort = Optional.ofNullable(builder.insecurePort).orElse(8080);
         this.healthCheckIp = Optional.ofNullable(builder.healthCheckIp).orElse("0.0.0.0");
-        this.healthCheckPort = Optional.ofNullable(builder.healthCheckPort).orElse(8000);
+        this.healthCheckPort = Optional.ofNullable(builder.healthCheckPort).orElse(80);
         this.healthCheckPath = Optional.ofNullable(builder.healthCheckPath).orElse("/");
-        this.separateHealthCheck = Optional.ofNullable(builder.separateHealthCheck).orElse(false);
+        this.combinedHealthCheck = Optional.ofNullable(builder.combinedHealthCheck).orElse(true);
 
         // Handle cert path and cert data
         this.certPath = Optional.ofNullable(builder.certPath).orElse("certs/server.crt");
@@ -89,7 +89,7 @@ public class ServiceCallout {
         this.enableInsecurePort = Optional.ofNullable(builder.enableInsecurePort).orElse(true);
 
         // Initialize health check server if enabled
-        if (this.separateHealthCheck) {
+        if (!this.combinedHealthCheck) {
             try {
                 initHealthCheckServer();
             } catch (IOException e) {
@@ -107,7 +107,7 @@ public class ServiceCallout {
         private String healthCheckIp;
         private Integer healthCheckPort;
         private String healthCheckPath;
-        private Boolean separateHealthCheck;
+        private Boolean combinedHealthCheck;
         private byte[] cert;
         private String certPath;
         private byte[] certKey;
@@ -145,8 +145,8 @@ public class ServiceCallout {
             return self();
         }
 
-        public T setSeparateHealthCheck(Boolean separateHealthCheck) {
-            this.separateHealthCheck = separateHealthCheck;
+        public T setCombinedHealthCheck(Boolean combinedHealthCheck) {
+            this.combinedHealthCheck = combinedHealthCheck;
             return self();
         }
 
@@ -229,7 +229,7 @@ public class ServiceCallout {
         logger.info("Server started, listening on " + port);
 
         // Start Health Check Server if enabled
-        if (separateHealthCheck) {
+        if (!combinedHealthCheck) {
             healthCheckServer.start();
             logger.info("Health Check Server started, listening on " + healthCheckIp + ":" + healthCheckPort + " at path " + healthCheckPath);
         }
@@ -256,7 +256,7 @@ public class ServiceCallout {
             server.shutdown().awaitTermination(30, TimeUnit.SECONDS);
         }
 
-        if (separateHealthCheck && healthCheckServer != null) {
+        if (!combinedHealthCheck && healthCheckServer != null) {
             healthCheckServer.stop(0); // 0 delay for immediate stop
             logger.info("Health Check Server stopped.");
         }

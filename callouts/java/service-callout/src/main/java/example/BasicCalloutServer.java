@@ -157,7 +157,7 @@ public class BasicCalloutServer extends ServiceCallout {
         BasicCalloutServer server = new BasicCalloutServer.Builder()
                 .setHealthCheckPort(8000)
                 .setHealthCheckPath("/health")
-                .setSeparateHealthCheck(true)
+                .setCombinedHealthCheck(false)
                 .build();
 
         // Start the server
