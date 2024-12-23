@@ -51,7 +51,7 @@ public class BasicCalloutServerTest {
         server = new BasicCalloutServer.Builder()
                 .setHealthCheckPort(8000)
                 .setHealthCheckPath("/health")
-                .setSeparateHealthCheck(true)
+                .setCombinedHealthCheck(false)
                 .build();
 
         server.start();

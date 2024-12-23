@@ -20,7 +20,9 @@ import com.google.common.truth.extensions.proto.ProtoTruth;
 import com.google.protobuf.ByteString;
 import io.envoyproxy.envoy.config.core.v3.HeaderValue;
 import io.envoyproxy.envoy.config.core.v3.HeaderValueOption;
+import io.envoyproxy.envoy.service.ext_proc.v3.HttpHeaders;
 import io.envoyproxy.envoy.service.ext_proc.v3.ImmediateResponse;
+import io.envoyproxy.envoy.service.ext_proc.v3.ProcessingResponse;
 import io.envoyproxy.envoy.type.v3.HttpStatus;
 import io.envoyproxy.envoy.type.v3.StatusCode;
 import org.junit.After;
@@ -71,6 +73,34 @@ public class RedirectTest {
 
         // Verify that the "Location" header is set correctly.
         ProtoTruth.assertThat(response.getHeaders().getSetHeadersList())
+                .containsExactly(
+                        HeaderValueOption.newBuilder()
+                                .setHeader(HeaderValue.newBuilder()
+                                        .setKey("Location")
+                                        .setRawValue(ByteString.copyFromUtf8("http://service-extensions.com/redirect"))
+                                        .build())
+                                .build()
+                );
+    }
+
+    @Test
+    public void testOnRequestHeaders_Returns301Redirect() {
+        // Set up a ProcessingResponse Builder and empty HttpHeaders
+        ProcessingResponse.Builder processingResponseBuilder = ProcessingResponse.newBuilder();
+        HttpHeaders headers = HttpHeaders.newBuilder().build();
+
+        // Call the onRequestHeaders method directly
+        server.onRequestHeaders(processingResponseBuilder, headers);
+
+        // Build the ProcessingResponse
+        ProcessingResponse response = processingResponseBuilder.build();
+
+        // Verify that the status is set to 301
+        ProtoTruth.assertThat(response.getImmediateResponse().getStatus())
+                .isEqualTo(HttpStatus.newBuilder().setCode(StatusCode.forNumber(301)).build());
+
+        // Verify that the "Location" header is set as expected
+        ProtoTruth.assertThat(response.getImmediateResponse().getHeaders().getSetHeadersList())
                 .containsExactly(
                         HeaderValueOption.newBuilder()
                                 .setHeader(HeaderValue.newBuilder()

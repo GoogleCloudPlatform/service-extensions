@@ -115,6 +115,9 @@ public class AddBodyTest {
                 .isEqualTo(ByteString.copyFromUtf8("body replaced"));
     }
 
+    /**
+     * This test verifies body mutations by directly calling the utility method without running through the server.
+     */
     @Test
     public void testOnRequestBody_ClearBody() {
         ProcessingResponse.Builder processingResponseBuilder = ProcessingResponse.newBuilder();

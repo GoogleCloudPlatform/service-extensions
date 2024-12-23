@@ -22,6 +22,7 @@ import com.google.common.truth.extensions.proto.ProtoTruth;
 import com.google.protobuf.ByteString;
 import io.envoyproxy.envoy.config.core.v3.HeaderValue;
 import io.envoyproxy.envoy.config.core.v3.HeaderValueOption;
+import io.envoyproxy.envoy.service.ext_proc.v3.HttpHeaders;
 import io.envoyproxy.envoy.service.ext_proc.v3.ProcessingResponse;
 import org.junit.After;
 import org.junit.Before;
@@ -214,6 +215,68 @@ public class AddHeaderTest {
         Truth.assertThat(response.getRequestHeaders().getResponse().getHeaderMutation().getRemoveHeadersList()).isEmpty();
     }
 
+    @Test
+    public void testOnRequestHeaders_AddsExpectedHeaders() {
+        ProcessingResponse.Builder processingResponseBuilder = ProcessingResponse.newBuilder();
+        HttpHeaders headers = HttpHeaders.newBuilder().build(); // Empty headers for testing
+
+        // Call the AddHeader onRequestHeaders method directly
+        server.onRequestHeaders(processingResponseBuilder, headers);
+
+        ProcessingResponse response = processingResponseBuilder.build();
+
+        // Verify that "request-header" and "c" have been added
+        ProtoTruth.assertThat(response.getRequestHeaders().getResponse().getHeaderMutation().getSetHeadersList())
+                .containsAtLeast(
+                        HeaderValueOption.newBuilder()
+                                .setHeader(HeaderValue.newBuilder()
+                                        .setKey("request-header")
+                                        .setRawValue(ByteString.copyFromUtf8("added-request"))
+                                        .build())
+                                .build(),
+                        HeaderValueOption.newBuilder()
+                                .setHeader(HeaderValue.newBuilder()
+                                        .setKey("c")
+                                        .setRawValue(ByteString.copyFromUtf8("d"))
+                                        .build())
+                                .build()
+                );
+        // Check that route cache is cleared
+        Truth.assertThat(response.getRequestHeaders().getResponse().getClearRouteCache()).isTrue();
+    }
+
+    @Test
+    public void testOnResponseHeaders_AddsAndRemovesHeaders() {
+        ProcessingResponse.Builder processingResponseBuilder = ProcessingResponse.newBuilder();
+        HttpHeaders headers = HttpHeaders.newBuilder().build(); // Empty headers for testing
+
+        // Call the AddHeader onResponseHeaders method directly
+        server.onResponseHeaders(processingResponseBuilder, headers);
+
+        ProcessingResponse response = processingResponseBuilder.build();
+
+        // Verify that "response-header" and "c" have been added, and "foo" removed
+        ProtoTruth.assertThat(response.getResponseHeaders().getResponse().getHeaderMutation().getSetHeadersList())
+                .containsAtLeast(
+                        HeaderValueOption.newBuilder()
+                                .setHeader(HeaderValue.newBuilder()
+                                        .setKey("response-header")
+                                        .setRawValue(ByteString.copyFromUtf8("added-response"))
+                                        .build())
+                                .build(),
+                        HeaderValueOption.newBuilder()
+                                .setHeader(HeaderValue.newBuilder()
+                                        .setKey("c")
+                                        .setRawValue(ByteString.copyFromUtf8("d"))
+                                        .build())
+                                .build()
+                );
+        // Check that "foo" was removed
+        Truth.assertThat(response.getResponseHeaders().getResponse().getHeaderMutation().getRemoveHeadersList())
+                .contains("foo");
+        // Check that route cache is not cleared
+        Truth.assertThat(response.getResponseHeaders().getResponse().getClearRouteCache()).isFalse();
+    }
 
     private void stopServer() throws Exception {
         Method stopMethod = ServiceCallout.class.getDeclaredMethod("stop");
