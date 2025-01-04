@@ -10,6 +10,10 @@ proxy-wasm = "0.2.1"
 log = "0.4"
 regex = "1.9"
 url = "2.4"
+cookie = "0.18.1"
+sha2 = "0.10.8"
+hmac = "0.12.1"
+hex = "0.4.3"
 
 [lib]
 crate-type = ["cdylib"]
