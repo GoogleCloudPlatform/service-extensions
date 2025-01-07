@@ -19,8 +19,8 @@ RUN apk add git
 COPY ./buf.gen.yaml ./buf.gen.yaml
 RUN buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api --path envoy/service/ext_proc/v3/external_processor.proto --include-imports
 
-# Build the callout service. 
-FROM marketplace.gcr.io/google/debian12 as service-callout-common-python
+# Build the callout service.
+FROM launcher.gcr.io/google/debian12 as service-callout-common-python
 RUN apt-get update && apt-get upgrade -y
 RUN apt-get autoremove -y
 
