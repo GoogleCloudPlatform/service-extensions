@@ -25,10 +25,10 @@ jobs:
     strategy:
       matrix:
         include:
-        - image: 'basic-example-python'
+        - image: 'python-example-basic'
           dir: 'basic'
           module: 'service_callout_example'
-        - image: 'jwt-auth-example-python'
+        - image: 'python-example-jwt-auth'
           dir: 'jwt_auth'
           module: 'service_callout_example'
         - image: 'e2e-test-metadata'
