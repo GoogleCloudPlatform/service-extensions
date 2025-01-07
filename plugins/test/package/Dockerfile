@@ -14,13 +14,13 @@
 
 # Base build image
 FROM launcher.gcr.io/google/ubuntu2204 as build
-RUN apt update && apt upgrade -y
-RUN apt autoremove -y
+RUN apt-get update && apt-get upgrade -y
+RUN apt-get autoremove -y
 
 # Install go for bazelisk
 # Install git/py for v8
 # Install clang/stdc++ for c++
-RUN apt install -y \
+RUN apt-get install -y \
   ca-certificates \
   openssl \
   golang-go \

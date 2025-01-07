@@ -1,4 +1,4 @@
-name: Plugins publish wasm tester
+name: Callouts publish samples
 
 # Manually invoked. Permissions default to those with repo `write` access.
 # https://docs.github.com/en/actions/using-workflows/manually-running-a-workflow
@@ -11,23 +11,19 @@ permissions: read-all
 env:
   REGISTRY: us-docker.pkg.dev
   PROJECT: service-extensions-samples
-  REPOSITORY: ${{ github.repository_owner == 'GoogleCloudPlatform' && 'plugins-source' || 'plugins-testing-source' }}
-  IMAGE: wasm-tester
-  DOCKERFILE: test/package/Dockerfile
+  REPOSITORY: ${{ github.repository_owner == 'GoogleCloudPlatform' && 'callouts-source' || 'callouts-testing-source' }}
+
+  # TODO matrix
+  #IMAGE: wasm-tester
 
 jobs:
-  build-and-push-image:
-    name: Publish plugin tester
+  build-and-push-images:
+    name: Publish callouts samples
     runs-on: ubuntu-latest
 
     # Permissions granted to the `GITHUB_TOKEN` for the actions in this job.
     permissions:
       contents: read
-
-    # TODO add linux/arm64 (aarch64) build via matrix and cross-compile
-    # https://github.com/GoogleCloudPlatform/service-extensions/blob/main/.github/workflows/test.yml#L38
-    # https://github.com/proxy-wasm/proxy-wasm-cpp-host/blob/04dfb94747e6462b65f7ed694e2d9c78ab207e11/.bazelrc#L72
-    # https://github.com/docker/build-push-action/issues/529#issuecomment-1001080311
 
     steps:
       # Get latest repo.
@@ -48,13 +44,13 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}
+          images: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.REPOSITORY }}/add_header_test
           tags: |
             type=ref,event=branch
             type=sha,prefix=public-image-,format=short
           labels: |
-            org.opencontainers.image.title=Wasm Tester
-            org.opencontainers.image.description=Wasm plugin test runner
+            org.opencontainers.image.title=add_header
+            org.opencontainers.image.description=add_header callouts sample
 
       # Push Docker image: https://github.com/docker/build-push-action#about
       # Uses the `tags` and `labels` from the `meta` step.
@@ -62,10 +58,13 @@ jobs:
         id: push
         uses: docker/build-push-action@v5
         with:
-          context: ./plugins
-          file: ./plugins/${{ env.DOCKERFILE }}
+          context: ./callouts/python
+          file: ./callouts/python/extproc/example/Dockerfile
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            copy_path=extproc/example/add_header/
+            run_module=service_callout_example
 

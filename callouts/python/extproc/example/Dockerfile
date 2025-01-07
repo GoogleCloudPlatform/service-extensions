@@ -21,9 +21,11 @@ RUN buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api --path en
 
 # Build the callout service. 
 FROM marketplace.gcr.io/google/debian12 as service-callout-common-python
+RUN apt-get update && apt-get upgrade -y
+RUN apt-get autoremove -y
 
 # Install pip for package management.
-RUN apt-get update && apt-get install -y python3-pip --no-install-recommends --no-install-suggests
+RUN apt-get install -y python3-pip --no-install-recommends --no-install-suggests
 
 # Use pip to install requirements.
 COPY ./requirements.txt .
