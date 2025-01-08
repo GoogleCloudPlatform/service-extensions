@@ -25,11 +25,13 @@ import (
 
 func main() {}
 func init() {
-	proxywasm.SetVMContext(&context{})
+	proxywasm.SetVMContext(&vmContext{})
 }
 
-type context struct {
+type vmContext struct {
 	types.DefaultVMContext
+}
+type pluginContext struct {
 	types.DefaultPluginContext
 	creditCardRegex *regexp.Regexp
 }
@@ -39,12 +41,14 @@ type httpContext struct {
 	checkBody       bool
 }
 
-func (*context) NewPluginContext(contextID uint32) types.PluginContext {
-	return &context{creditCardRegex: regexp.MustCompile("\\d{4}-\\d{4}-\\d{4}-(\\d{4})")}
+func (*vmContext) NewPluginContext(contextID uint32) types.PluginContext {
+	return &pluginContext{creditCardRegex: regexp.MustCompile("\\d{4}-\\d{4}-\\d{4}-(\\d{4})")}
 }
-func (pluginContext *context) NewHttpContext(contextID uint32) types.HttpContext {
+
+func (pluginContext *pluginContext) NewHttpContext(contextID uint32) types.HttpContext {
 	return &httpContext{creditCardRegex: pluginContext.creditCardRegex}
 }
+
 func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) types.Action {
 	defer func() {
 		err := recover()
@@ -90,6 +94,10 @@ func (ctx *httpContext) OnHttpResponseBody(numBytes int, endOfStream bool) types
 	if err != nil {
 		panic(err)
 	}
+	// Note that for illustrative purposes, this example is kept simple and does
+	// not handle the case of credit card numbers that are split across multiple
+	// OnHttpResponseBody calls. It therefore does not mask PII spanning chunk
+	// boundaries.
 	bytes = ctx.creditCardRegex.ReplaceAll(bytes, []byte("XXXX-XXXX-XXXX-${1}"))
 	err = proxywasm.ReplaceHttpResponseBody(bytes)
 	if err != nil {
