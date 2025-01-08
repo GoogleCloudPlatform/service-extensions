@@ -49,6 +49,7 @@ public class BasicCalloutServerTest {
     @Before
     public void setUp() throws IOException {
         server = new BasicCalloutServer.Builder()
+                .setPort(8443)
                 .setHealthCheckPort(8000)
                 .setHealthCheckPath("/health")
                 .setCombinedHealthCheck(false)
