@@ -8,13 +8,22 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 # --- PLUGIN + TEST RUNNER DEPENDENCIES ---
 
-# Abseil for base libs. Updated to work with latest Emscripten and STANDALONE_WASM
-# Waiting on https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/pull/157
+# Platforms update for @platforms//os:emscripten
 http_archive(
-    name = "com_google_absl",  # 2024-03-06
-    sha256 = "bb5e84fc74362c546ab4193eeafd440a26487f4adf80587d2f2576f03c439c4b",
-    strip_prefix = "abseil-cpp-53e6dae02bf0d9a5a1d304a3d637c083376b86a1",
-    urls = ["https://github.com/abseil/abseil-cpp/archive/53e6dae02bf0d9a5a1d304a3d637c083376b86a1.zip"],
+    name = "platforms",
+    sha256 = "218efe8ee736d26a3572663b374a253c012b716d8af0c07e842e82f238a0a7ee",
+    urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.10/platforms-0.0.10.tar.gz",
+        "https://github.com/bazelbuild/platforms/releases/download/0.0.10/platforms-0.0.10.tar.gz",
+    ],
+)
+
+# Abseil for base libs. Updated to work with latest Emscripten and STANDALONE_WASM.
+http_archive(
+    name = "com_google_absl",
+    sha256 = "95e90be7c3643e658670e0dd3c1b27092349c34b632c6e795686355f67eca89f",
+    strip_prefix = "abseil-cpp-20240722.0",
+    urls = ["https://github.com/abseil/abseil-cpp/archive/20240722.0.zip"],
 )
 
 # RE2 for C++ regex.
@@ -36,6 +45,43 @@ http_archive(
 load("@com_github_nelhage_rules_boost//:boost/boost.bzl", "boost_deps")
 
 boost_deps()
+
+# Update boringssl to pick up fix for strdup build issue:
+# https://boringssl-review.googlesource.com/c/boringssl/+/64047
+http_archive(
+    name = "boringssl", # 2024-04-29
+    sha256 = "cd240bf27450f75cd5f41c512a06297c00646cdbac9f87b604e9312771db15a6",
+    strip_prefix = "boringssl-2db0eb3f96a5756298dcd7f9319e56a98585bd10",
+    url = "https://github.com/google/boringssl/archive/2db0eb3f96a5756298dcd7f9319e56a98585bd10.tar.gz",
+)
+
+# JWT verification lib for C++.
+http_archive(
+    name = "jwt_verify_lib",
+    sha256 = "637e4983506c4f26bbe2808ae4e1944e46cbb2277d34ff0b8a3b72bdac3c4b91",
+    strip_prefix = "jwt_verify_lib-b59e8075d4a4f975ba6f109e1916d6e60aeb5613",
+    url = "https://github.com/google/jwt_verify_lib/archive/b59e8075d4a4f975ba6f109e1916d6e60aeb5613.tar.gz",
+)
+bind(
+    name = "abseil_strings",
+    actual = "@com_google_absl//absl/strings:strings",
+)
+bind(
+    name = "abseil_flat_hash_set",
+    actual = "@com_google_absl//absl/container:flat_hash_set",
+)
+bind(
+    name = "abseil_time",
+    actual = "@com_google_absl//absl/time:time",
+)
+bind(
+    name = "protobuf",
+    actual = "@com_google_protobuf//:protobuf",
+)
+bind(
+    name = "ssl",
+    actual = "@boringssl//:ssl",
+)
 
 # --- TEST RUNNER DEPENDENCIES ---
 
@@ -66,16 +112,16 @@ http_archive(
 
 # For testing, GoogleURL is a Quiche dependency.
 http_archive(
-    name = "com_google_googleurl",  # 2022-11-03
-    sha256 = "59f14d4fb373083b9dc8d389f16bbb817b5f936d1d436aa67e16eb6936028a51",
-    urls = ["https://storage.googleapis.com/quiche-envoy-integration/dd4080fec0b443296c0ed0036e1e776df8813aa7.tar.gz"],
+    name = "com_google_googleurl",  # 2024-10-09
+    sha256 = "3db90606ea9ca123d11f85c6fa3627a1e1e403d38c7fd1854a628cf1da3be5e2",
+    urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl-9cdb1f4d1a365ebdbcbf179dadf7f8aa5ee802e7.tar.gz"],
 )
 
 # --- PLUGIN DEPENDENCIES ---
 
-PROXY_WASM_CPP_HOST_COMMIT = "04dfb94747e6462b65f7ed694e2d9c78ab207e11"  # 2024-04-29
+PROXY_WASM_CPP_HOST_COMMIT = "c4d7bb0fda912e24c64daf2aa749ec54cec99412"  # 2024-12-19
 
-PROXY_WASM_CPP_HOST_SHA256 = "9c6da146d86f9b03d98b975f89c1762fc1b7f179da6775134c66e68c79eec4d1"
+PROXY_WASM_CPP_HOST_SHA256 = "3ea005e85d2b37685149c794c6876fd6de7f632f0ad49dc2b3cd580e7e7a5525"
 
 http_archive(
     name = "proxy_wasm_cpp_host",
@@ -84,9 +130,9 @@ http_archive(
     url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/" + PROXY_WASM_CPP_HOST_COMMIT + ".tar.gz",
 )
 
-PROXY_WASM_CPP_SDK_COMMIT = "921039ae983ce053bf5cba78a85a3c08ff9791e5"  # 2023-05-01
+PROXY_WASM_CPP_SDK_COMMIT = "a982ad089d1962f1b92f4343c910c0be6b6e6280"  # 2024-10-28
 
-PROXY_WASM_CPP_SDK_SHA256 = "a11adfe4e6346d3318ff72643aa5569dc8439d7e8927ed148f93226fa255cc7a"
+PROXY_WASM_CPP_SDK_SHA256 = "4cdbee65d7c3c491ba42dcc3b201144ac781031f8b1e40cb0b9244ffca9c5d3e"
 
 http_archive(
     name = "proxy_wasm_cpp_sdk",
@@ -97,6 +143,7 @@ http_archive(
 
 # Duplicate the ProxyWasm WORKSPACE files (dependencies)
 # Consider adopting bzlmod for this: https://docs.bazel.build/versions/5.0.0/bzlmod.html
+
 load("@proxy_wasm_cpp_host//bazel:repositories.bzl", "proxy_wasm_cpp_host_repositories")
 
 proxy_wasm_cpp_host_repositories()
@@ -104,6 +151,14 @@ proxy_wasm_cpp_host_repositories()
 load("@proxy_wasm_cpp_host//bazel:dependencies.bzl", "proxy_wasm_cpp_host_dependencies")
 
 proxy_wasm_cpp_host_dependencies()
+
+load("@proxy_wasm_cpp_host//bazel:dependencies_python.bzl", "proxy_wasm_cpp_host_dependencies_python")
+
+proxy_wasm_cpp_host_dependencies_python()
+
+load("@proxy_wasm_cpp_host//bazel:dependencies_import.bzl", "proxy_wasm_cpp_host_dependencies_import")
+
+proxy_wasm_cpp_host_dependencies_import()
 
 load("@proxy_wasm_cpp_sdk//bazel:repositories.bzl", "proxy_wasm_cpp_sdk_repositories")
 
@@ -130,7 +185,7 @@ load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
 crates_repository(
     name = "crate_index",
     cargo_lockfile = "//:Cargo.lock",
-    # See https://github.com/GoogleCloudPlatform/service-extensions-samples/issues/31
+    # See https://github.com/GoogleCloudPlatform/service-extensions/issues/31
     generate_target_compatible_with = False,
     generator = "@cargo_bazel_bootstrap//:cargo-bazel",
     lockfile = "//:Cargo.Bazel.lock",

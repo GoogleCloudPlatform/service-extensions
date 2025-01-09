@@ -1,0 +1,34 @@
+name: Callouts Go SDK
+
+on:
+  push:
+    branches: [ "main"]
+    paths:
+      - callouts/go/**
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - callouts/go/**
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.22"
+      - name: Install dependencies
+        working-directory: ./callouts/go
+        run: |
+          go mod download
+      - name: Test with Go
+        working-directory: ./callouts/go
+        run: |
+          go test ./...
