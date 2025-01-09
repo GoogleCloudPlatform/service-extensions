@@ -25,6 +25,7 @@ import org.junit.Test;
 import service.ServiceCallout;
 import service.ServiceCalloutTools;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
 
 
@@ -33,9 +34,13 @@ public class AddBodyTest {
     private AddBody server;
 
     @Before
-    public void setUp(){
+    public void setUp() throws IOException {
         server = new AddBody.Builder()
+                .setPort(8443)
+                .setHealthCheckPort(8000)
                 .build();
+
+        server.start();
     }
 
     @After

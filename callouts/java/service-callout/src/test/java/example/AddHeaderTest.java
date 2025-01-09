@@ -30,6 +30,7 @@ import org.junit.Test;
 import service.ServiceCallout;
 import service.ServiceCalloutTools;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
 
 public class AddHeaderTest {
@@ -37,9 +38,13 @@ public class AddHeaderTest {
     private AddHeader server;
 
     @Before
-    public void setUp(){
+    public void setUp() throws IOException {
         server = new AddHeader.Builder()
+                .setPort(8443)
+                .setHealthCheckPort(8000)
                 .build();
+
+        server.start();
     }
 
     @After

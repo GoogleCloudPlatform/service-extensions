@@ -73,7 +73,7 @@ public class ServiceCallout {
         this.healthCheckIp = Optional.ofNullable(builder.healthCheckIp).orElse("0.0.0.0");
         this.healthCheckPort = Optional.ofNullable(builder.healthCheckPort).orElse(80);
         this.healthCheckPath = Optional.ofNullable(builder.healthCheckPath).orElse("/");
-        this.combinedHealthCheck = Optional.ofNullable(builder.combinedHealthCheck).orElse(true);
+        this.combinedHealthCheck = Optional.ofNullable(builder.combinedHealthCheck).orElse(false);
 
         // Handle cert path and cert data
         this.certPath = Optional.ofNullable(builder.certPath).orElse("certs/server.crt");
