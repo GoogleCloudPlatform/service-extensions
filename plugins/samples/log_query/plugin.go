@@ -74,4 +74,4 @@ func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) t
 	return types.ActionContinue
 }
 
-// [START serviceextensions_plugin_log_query]
+// [END serviceextensions_plugin_log_query]
