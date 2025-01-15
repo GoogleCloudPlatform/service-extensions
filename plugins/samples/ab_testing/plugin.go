@@ -98,4 +98,4 @@ func checkPercentile(user string) bool {
 	return int(hash%100) <= percentile
 }
 
-// [START serviceextensions_plugin_ab_testing]
+// [END serviceextensions_plugin_ab_testing]
