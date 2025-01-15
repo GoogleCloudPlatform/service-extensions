@@ -17,7 +17,6 @@ proxy_wasm_plugin_cpp(
     srcs = ["plugin.cc"],
     deps = [
         "@com_google_re2//:re2",
-        "@proxy_wasm_cpp_sdk//contrib:contrib_lib",
     ],
 )
 

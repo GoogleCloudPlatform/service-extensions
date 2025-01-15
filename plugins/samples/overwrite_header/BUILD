@@ -5,9 +5,6 @@ licenses(["notice"])  # Apache 2
 proxy_wasm_plugin_cpp(
     name = "plugin_cpp.wasm",
     srcs = ["plugin.cc"],
-    deps = [
-        "@proxy_wasm_cpp_sdk//contrib:contrib_lib",
-    ],
 )
 
 proxy_wasm_plugin_rust(
