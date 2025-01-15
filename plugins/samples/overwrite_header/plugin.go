@@ -90,4 +90,4 @@ func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) 
 	return types.ActionContinue
 }
 
-// [START serviceextensions_plugin_overwrite_header]
+// [END serviceextensions_plugin_overwrite_header]
