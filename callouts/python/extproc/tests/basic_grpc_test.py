@@ -31,8 +31,9 @@ from envoy.service.ext_proc.v3.external_processor_pb2_grpc import ExternalProces
 import grpc
 import pytest
 
-from extproc.example.basic_callout_server import (BasicCalloutServer as
-                                                  CalloutServerTest)
+from extproc.example.basic.service_callout_example import (
+  BasicCalloutServer as CalloutServerTest,
+)
 from extproc.service.callout_server import CalloutServer, _addr_to_str
 from extproc.service.callout_tools import add_body_mutation, add_header_mutation
 

@@ -1,0 +1,27 @@
+# Referer and Host match, expected allowed request.
+test {
+  name: "NoForbiddenReferer"
+  benchmark: false
+  request_headers {
+    input {
+      header { key: "Referer" value: "https://www.safe-site.com/somepage" }
+    }
+    result {has_header { key: "my-plugin-allowed" value: "true" } }
+  }
+}
+# Referer and Host not match, expected block request with 403 status code.
+test {
+  name: "WithForbiddenReferer"
+  benchmark: false
+  request_headers {
+    input {
+      header { key: "Referer" value: "https://www.forbidden-site.com/somepage" }
+    }
+    result {
+      immediate { http_status: 403 details: "" }
+      body { regex: "Forbidden - Request ID: \\d+" }
+      log { regex: ".+Forbidden - Request ID: \\d+" }
+      no_header { key: "my-plugin-allowed"}
+    }
+  }
+}
