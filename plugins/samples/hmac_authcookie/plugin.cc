@@ -1,4 +1,4 @@
-// Copyright 2024 Google LLC
+// Copyright 2025 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,10 +15,9 @@
 // [START serviceextensions_plugin_hmac_authcookie]
 #include <openssl/hmac.h>
 
-#include <iomanip>
-#include <sstream>
 #include <string>
 
+#include "absl/strings/escaping.h"
 #include "absl/strings/str_split.h"
 #include "proxy_wasm_intrinsics.h"
 
@@ -31,7 +30,7 @@ class MyHttpContext : public Context {
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
-    const auto token = getTokenFromCookie();
+    const std::optional<std::string> token = getTokenFromCookie();
     if (!token.has_value()) {
       LOG_INFO("Access forbidden - missing HMAC cookie.");
       sendLocalResponse(403, "", "Access forbidden - missing HMAC cookie.\n",
@@ -39,7 +38,7 @@ class MyHttpContext : public Context {
       return FilterHeadersStatus::ContinueAndEndStream;
     }
 
-    const auto path = getRequestHeader(":path")->toString();
+    const std::string path = getRequestHeader(":path")->toString();
     if (computeHmacSignature(path) != token.value()) {
       LOG_INFO("Access forbidden - invalid HMAC cookie.");
       sendLocalResponse(403, "", "Access forbidden - invalid HMAC cookie.\n",
@@ -53,7 +52,7 @@ class MyHttpContext : public Context {
  private:
   // Try to get the HMAC auth token from the Cookie header.
   std::optional<std::string> getTokenFromCookie() {
-    const auto cookies = getRequestHeader("Cookie")->toString();
+    const std::string cookies = getRequestHeader("Cookie")->toString();
     std::map<std::string, std::string> m;
     for (absl::string_view sp : absl::StrSplit(cookies, "; ")) {
       const std::pair<std::string, std::string> cookie =
@@ -66,15 +65,6 @@ class MyHttpContext : public Context {
     return std::nullopt;
   }
 
-  // Helper function to convert binary data to a hexadecimal string.
-  std::string toHexString(const unsigned char* data, size_t length) {
-    std::stringstream ss;
-    for (size_t i = 0; i < length; ++i) {
-      ss << std::hex << std::setw(2) << std::setfill('0') << (int)data[i];
-    }
-    return ss.str();
-  }
-
   // Function to compute the HMAC signature.
   std::string computeHmacSignature(const std::string& data) {
     unsigned char* result;
@@ -83,7 +73,7 @@ class MyHttpContext : public Context {
     result = HMAC(EVP_sha256(), kSecretKey.c_str(), kSecretKey.length(),
                   reinterpret_cast<const unsigned char*>(data.c_str()),
                   data.length(), nullptr, &len);
-    return toHexString(result, len);
+    return absl::BytesToHexString(reinterpret_cast<const char*>(result));
   }
 };
 

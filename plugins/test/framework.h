@@ -34,8 +34,9 @@ namespace service_extensions_samples {
 struct ContextOptions {
   // Wasm logging output file.
   std::ofstream log_file;
-  // Static time returned to wasm.
-  absl::Time clock_time = absl::UnixEpoch();
+  // Static time returned to wasm. Must be non-zero for Go plugin
+  // initialization.
+  absl::Time clock_time = absl::UnixEpoch() + absl::Milliseconds(1);
 };
 
 // Buffer class to handle copying to and from an individual BODY chunk.

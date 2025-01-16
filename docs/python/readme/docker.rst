@@ -8,23 +8,23 @@ Building Docker Images
 
 The basic Docker image contains arguments for pointing to and running python modules.
 
-For example, to build ``extproc/example/basic_callout_server.py`` run:
+For example, to build ``extproc/example/basic/service_callout_example.py`` run:
 
 .. code-block:: shell
 
     docker build \
         -f ./extproc/example/Dockerfile \
         -t service-callout-example-python \
-        --build-arg copy_path=extproc/example/basic_callout_server.py \
-        --build-arg run_module=basic_callout_server .
+        --build-arg copy_path=extproc/example/basic/ \
+        --build-arg run_module=service_callout_example .
 
 ``--build-arg`` specifies the following:
 
 * ``copy_path``: Required files to copy to the docker image.
 * ``run_module``: The python module to run on startup.
 
-The above example makes a copy of ``extproc/example/basic_callout_server.py`` 
-and sets up the image to run ``basic_callout_server.py`` on startup.
+The above example makes a copy of ``extproc/example/basic/service_callout_example.py``
+and sets up the image to run ``service_callout_example.py`` on startup.
 
 The image can then be run with:
 
@@ -38,8 +38,8 @@ Setting ``--network host`` tells docker to connect the image to the ``0.0.0.0`` 
 .. note::
 
     The docker image is set up to pass command line arguments to the module when specified.
-    This also requires that the example is set up to use command line arguments as well, 
-    like in ``basic_callout_server.py``
+    This also requires that the example is set up to use command line arguments as well,
+    like in ``basic/service_callout_example.py``
 
 For example:
 
@@ -48,7 +48,7 @@ For example:
     docker run -P -it --network host service-callout-example-python:latest \
         -- --combined_health_check
 
-Will run the health check for ``basic_callout_server`` combined with the main grpc server.
+Will run the health check for ``basic/service_callout_example.py`` combined with the main grpc server.
 
 
 Examples with unique dependencies
@@ -58,8 +58,7 @@ The ``cloud_log`` and ``jwt_auth`` examples require additional libraries to func
 For instance, the ``cloud_log`` example requires the ``google-cloud-logging`` library.
 In this case, we need more than just the python file.
 We copy ``additional-requirements.txt`` along with ``service_callout_example.py`` by
-specifying the folder ``extproc/example/cloud_log`` as the ``copy_path`` rather
-than the python file.
+specifying the folder ``extproc/example/cloud_log`` as the ``copy_path``.
 
 .. code-block:: shell
 
@@ -67,7 +66,7 @@ than the python file.
         -f ./extproc/example/Dockerfile \
         -t service-callout-example-python \
         --build-arg copy_path=extproc/example/cloud_log \
-        --build-arg run_module=basic_callout_server .
+        --build-arg run_module=service_callout_example .
 
 ``./extproc/example/Dockerfile`` is set up to detect additional dependencies when present,
 and install them.
