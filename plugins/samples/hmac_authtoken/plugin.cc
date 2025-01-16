@@ -33,6 +33,14 @@ class MyHttpContext : public Context {
                                        bool end_of_stream) override {
     boost::system::result<boost::urls::url> url =
         boost::urls::parse_relative_ref(getRequestHeader(":path")->toString());
+
+    if (!url) {
+      LOG_ERROR("Error parsing the :path HTTP header: " +
+                url.error().message());
+      sendLocalResponse(400, "", "Error parsing the :path HTTP header.\n", {});
+      return FilterHeadersStatus::ContinueAndEndStream;
+    }
+
     auto it = url->params().find("token");
     // Check if the HMAC token exists.
     if (it == url->params().end()) {
