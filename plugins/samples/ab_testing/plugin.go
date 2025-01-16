@@ -34,7 +34,7 @@ type vmContext struct {
 	types.DefaultVMContext
 }
 
-type puginContext struct {
+type pluginContext struct {
 	types.DefaultPluginContext
 }
 
@@ -43,10 +43,10 @@ type httpContext struct {
 }
 
 func (*vmContext) NewPluginContext(contextID uint32) types.PluginContext {
-	return &puginContext{}
+	return &pluginContext{}
 }
 
-func (*puginContext) NewHttpContext(uint32) types.HttpContext {
+func (*pluginContext) NewHttpContext(uint32) types.HttpContext {
 	return &httpContext{}
 }
 
