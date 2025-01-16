@@ -16,17 +16,33 @@ package main
 
 import (
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm"
+	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm/types"
 	"strings"
 )
 
-// MyHttpContext implements the Context interface.
-type MyHttpContext struct {
-	proxywasm.DefaultHttpContext
+func main() {}
+func init() {
+	proxywasm.SetVMContext(&vmContext{})
 }
 
-// NewMyHttpContext creates a new instance of MyHttpContext.
-func NewMyHttpContext(id uint32, root *proxywasm.RootContext) *MyHttpContext {
-	return &MyHttpContext{}
+type vmContext struct {
+	types.DefaultVMContext
+}
+
+type puginContext struct {
+	types.DefaultPluginContext
+}
+
+type httpContext struct {
+	types.DefaultHttpContext
+}
+
+func (*vmContext) NewPluginContext(contextID uint32) types.PluginContext {
+	return &puginContext{}
+}
+
+func (*puginContext) NewHttpContext(uint32) types.HttpContext {
+	return &httpContext{}
 }
 
 // OnRequestHeaders processes the incoming request headers.
