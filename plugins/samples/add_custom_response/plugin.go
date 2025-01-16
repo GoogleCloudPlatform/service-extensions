@@ -16,6 +16,7 @@
 package main
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm"
@@ -30,11 +31,17 @@ func init() {
 	proxywasm.SetVMContext(&vmContext{})
 }
 
-type (
-	vmContext     struct{ types.DefaultVMContext }
-	pluginContext struct{ types.DefaultPluginContext }
-	httpContext   struct{ types.DefaultHttpContext }
-)
+type vmContext struct {
+	types.DefaultVMContext
+}
+
+type pluginContext struct {
+	types.DefaultPluginContext
+}
+
+type httpContext struct {
+	types.DefaultHttpContext
+}
 
 func (*vmContext) NewPluginContext(contextID uint32) types.PluginContext {
 	return &pluginContext{}
@@ -45,6 +52,13 @@ func (*pluginContext) NewHttpContext(contextID uint32) types.HttpContext {
 }
 
 func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) types.Action {
+	defer func() {
+		err := recover()
+		if err != nil {
+			proxywasm.SendHttpResponse(500, [][2]string{}, []byte(fmt.Sprintf("%v", err)), 0)
+		}
+	}()
+
 	statusVal, err := proxywasm.GetHttpResponseHeader(":status")
 	if err != nil || statusVal == "" {
 		return types.ActionContinue
