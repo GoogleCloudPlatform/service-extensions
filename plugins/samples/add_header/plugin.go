@@ -35,7 +35,7 @@ type pluginContext struct {
 	types.DefaultPluginContext
 }
 
-type myHttpContext struct {
+type httpContext struct {
 	types.DefaultHttpContext
 }
 
@@ -44,10 +44,10 @@ func (vc *vmContext) NewPluginContext(contextID uint32) types.PluginContext {
 }
 
 func (pc *pluginContext) NewHttpContext(contextID uint32) types.HttpContext {
-	return &myHttpContext{}
+	return &httpContext{}
 }
 
-func (ctx *myHttpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) types.Action {
+func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) types.Action {
 	defer func() {
 		if err := recover(); err != nil {
 			proxywasm.SendHttpResponse(500, [][2]string{}, []byte(fmt.Sprintf("%v", err)), 0)
@@ -65,7 +65,7 @@ func (ctx *myHttpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool)
 	return types.ActionContinue
 }
 
-func (ctx *myHttpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) types.Action {
+func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) types.Action {
 	defer func() {
 		if err := recover(); err != nil {
 			proxywasm.SendHttpResponse(500, [][2]string{}, []byte(fmt.Sprintf("%v", err)), 0)
