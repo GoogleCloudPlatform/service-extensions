@@ -31,20 +31,20 @@ type vmContext struct {
 	types.DefaultVMContext
 }
 
-func (vc *vmContext) NewPluginContext(contextID uint32) types.PluginContext {
-	return &pluginContext{}
-}
-
 type pluginContext struct {
 	types.DefaultPluginContext
 }
 
-func (pc *pluginContext) NewHttpContext(contextID uint32) types.HttpContext {
-	return &myHttpContext{}
-}
-
 type myHttpContext struct {
 	types.DefaultHttpContext
+}
+
+func (vc *vmContext) NewPluginContext(contextID uint32) types.PluginContext {
+	return &pluginContext{}
+}
+
+func (pc *pluginContext) NewHttpContext(contextID uint32) types.HttpContext {
+	return &myHttpContext{}
 }
 
 func (ctx *myHttpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) types.Action {
@@ -61,6 +61,7 @@ func (ctx *myHttpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool)
 	if err := proxywasm.ReplaceHttpRequestHeader("Welcome", "warm"); err != nil {
 		panic(err)
 	}
+
 	return types.ActionContinue
 }
 
