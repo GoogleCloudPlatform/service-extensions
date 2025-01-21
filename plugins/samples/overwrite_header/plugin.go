@@ -35,6 +35,10 @@ type pluginContext struct {
 	types.DefaultPluginContext
 }
 
+// This sample replaces an HTTP header with the given key and value.
+// Unlike `AddHttpRequestHeader` which appends values to existing headers,
+// this plugin overwrites the entire value for the specified key if the
+// header already exists or create it with the new value.
 type httpContext struct {
 	types.DefaultHttpContext
 }
@@ -47,10 +51,7 @@ func (*pluginContext) NewHttpContext(uint32) types.HttpContext {
 	return &httpContext{}
 }
 
-// This sample replaces an HTTP header with the given key and value.
-// Unlike `addRequestHeader` which appends values to existing headers,
-// this plugin overwrites the entire value for the specified key if the
-// header already exists or create it with the new value.
+// It will only replace the header if it already exists.
 func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) types.Action {
 	defer func() {
 		err := recover()
@@ -75,7 +76,6 @@ func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) t
 
 // Unlike the previous example, the header will be added if it doesn't exist
 // or updated if it already does.
-// Change the key and value according to your needs.
 func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) types.Action {
 	defer func() {
 		err := recover()
@@ -83,6 +83,7 @@ func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) 
 			proxywasm.SendHttpResponse(500, [][2]string{}, []byte(fmt.Sprintf("%v", err)), 0)
 		}
 	}()
+	// Change the key and value according to your needs.
 	err := proxywasm.ReplaceHttpResponseHeader("ResponseHeader", "changed")
 	if err != nil {
 		panic(err)
