@@ -41,6 +41,16 @@ class MyRootContext : public RootContext {
   std::optional<re2::RE2> ip_match;
 };
 
+// Validates the HMAC HTTP cookie performing the following steps:
+//
+// 1. Obtains the client IP address and rejects the request if it is not
+// present.
+// 2. Obtains the HTTP cookie and rejects the request if it is not present.
+// 3. Verifies that the HMAC hash of the cookie matches its payload, rejecting
+// the request if there is no match.
+// 4. Ensures that the client IP address matches the IP in the cookie payload,
+// and that the current time is earlier than the expiration time specified in
+// the cookie payload.
 class MyHttpContext : public Context {
  public:
   explicit MyHttpContext(uint32_t id, RootContext* root)
@@ -137,7 +147,7 @@ class MyHttpContext : public Context {
   }
 
   // Try to parse the authorization cookie in the format
-  // "base64(payload).base64(HMAC-hash)".
+  // "base64(payload)" + "." + "base64(HMAC(payload))".
   std::optional<std::pair<std::string, std::string>> parseAuthorizationCookie(
       std::string_view cookie) {
     std::pair<std::string_view, std::string_view> payload_and_hash =
