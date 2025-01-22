@@ -67,14 +67,13 @@ class MyHttpContext : public Context {
 
  private:
   // Function to compute the HMAC signature.
-  std::string computeHmacSignature(const std::string& data) {
-    unsigned char* result;
-    unsigned int len = EVP_MAX_MD_SIZE;
-
-    result = HMAC(EVP_sha256(), kSecretKey.c_str(), kSecretKey.length(),
-                  reinterpret_cast<const unsigned char*>(data.c_str()),
-                  data.length(), nullptr, &len);
-    return absl::BytesToHexString(reinterpret_cast<const char*>(result));
+  std::string computeHmacSignature(std::string_view data) {
+    unsigned char result[EVP_MAX_MD_SIZE];
+    unsigned int len;
+    HMAC(EVP_sha256(), kSecretKey.c_str(), kSecretKey.length(),
+         reinterpret_cast<const unsigned char*>(std::string{data}.c_str()),
+         data.length(), result, &len);
+    return absl::BytesToHexString(std::string(result, result + len));
   }
 };
 
