@@ -135,6 +135,8 @@ for your own plugin. Extend them to fit your particular use case.
 *   [Check for PII on response](samples/check_pii): Checks the response HTTP
     headers and body for the presence of credit card numbers. If found, the
     initial numbers will be masked.
+*   [Validate client token on query string using HMAC](samples/hmac_authtoken):
+    Check the client request URL for a valid token signed using HMAC.
 
 # Feature set / ABI
 
