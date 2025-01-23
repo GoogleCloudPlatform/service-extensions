@@ -6,7 +6,6 @@ proxy_wasm_plugin_cpp(
     name = "plugin_cpp.wasm",
     srcs = ["plugin.cc"],
     deps = [
-        "@proxy_wasm_cpp_sdk//contrib:contrib_lib",
         "@com_google_absl//absl/random",
         "@com_google_absl//absl/strings",
     ],

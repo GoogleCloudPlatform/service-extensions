@@ -7,7 +7,7 @@ on: workflow_dispatch
 # Default permissions are read only.
 permissions: read-all
 
-# Variables. The workflow also depends on secrets.GAR_PLUGINS_TOKEN.
+# Variables. The workflow also depends on secrets.GAR_TOKEN.
 env:
   REGISTRY: us-docker.pkg.dev
   PROJECT: service-extensions-samples
@@ -40,7 +40,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: _json_key
-          password: ${{ secrets.GAR_PLUGINS_TOKEN }}
+          password: ${{ secrets.GAR_TOKEN }}
 
       # Get metadata: https://github.com/docker/metadata-action#about
       # The `images` value provides the base name for tags and labels.

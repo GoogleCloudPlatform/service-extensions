@@ -28,8 +28,8 @@ Welcome to the documentation pages for the Python Callouts. Here you will find d
    :maxdepth: 2
    :caption: Callouts Examples
 
-   extproc/basic_callout_server
    extproc/ext_proc_client
+   extproc/basic/service_callout_example
    extproc/e2e_tests/metadata_server
    extproc/e2e_tests/observability_server
    extproc/add_body/service_callout_example

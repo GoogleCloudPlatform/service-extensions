@@ -6,9 +6,9 @@ proxy_wasm_plugin_rust(
     name = "plugin_rust.wasm",
     srcs = ["plugin.rs"],
     deps = [
-        "@crate_index//:log",
-        "@crate_index//:proxy-wasm",
-        "@crate_index//:url",
+        "//bazel/cargo/remote:log",
+        "//bazel/cargo/remote:proxy-wasm",
+        "//bazel/cargo/remote:url",
     ],
 )
 
@@ -18,7 +18,6 @@ proxy_wasm_plugin_cpp(
     deps = [
         "//:boost_exception",
         "@boost//:url",
-        "@proxy_wasm_cpp_sdk//contrib:contrib_lib",
     ],
 )
 

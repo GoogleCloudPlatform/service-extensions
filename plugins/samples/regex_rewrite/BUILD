@@ -6,9 +6,9 @@ proxy_wasm_plugin_rust(
     name = "plugin_rust.wasm",
     srcs = ["plugin.rs"],
     deps = [
-        "@crate_index//:log",
-        "@crate_index//:proxy-wasm",
-        "@crate_index//:regex",
+        "//bazel/cargo/remote:log",
+        "//bazel/cargo/remote:proxy-wasm",
+        "//bazel/cargo/remote:regex",
     ],
 )
 
@@ -17,7 +17,6 @@ proxy_wasm_plugin_cpp(
     srcs = ["plugin.cc"],
     deps = [
         "@com_google_re2//:re2",
-        "@proxy_wasm_cpp_sdk//contrib:contrib_lib",
     ],
 )
 
