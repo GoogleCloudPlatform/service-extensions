@@ -43,7 +43,11 @@ impl HttpContext for MyHttpContext {
             Ok(url) => url,
             Err(e) => {
                 info!("Error parsing the :path HTTP header: {0}", e);
-                self.send_http_response(400, vec![], Some(b"Error parsing the :path HTTP header.\n"));
+                self.send_http_response(
+                    400,
+                    vec![],
+                    Some(b"Error parsing the :path HTTP header.\n"),
+                );
                 return Action::Pause;
             }
         };
