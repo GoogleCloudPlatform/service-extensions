@@ -101,4 +101,4 @@ func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) t
 	return types.ActionContinue
 }
 
-// [END serviceextensions_plugin_normalize_header]
+// [END serviceextensions_plugin_set_query]
