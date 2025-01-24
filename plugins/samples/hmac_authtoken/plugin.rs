@@ -15,6 +15,7 @@
 // [START serviceextensions_plugin_hmac_authtoken]
 use hex;
 use hmac::{Hmac, Mac};
+use log::error;
 use log::info;
 use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
@@ -42,7 +43,7 @@ impl HttpContext for MyHttpContext {
         let mut url = match url::Url::parse(&url_str) {
             Ok(url) => url,
             Err(e) => {
-                info!("Error parsing the :path HTTP header: {0}", e);
+                error!("Error parsing the :path HTTP header: {0}", e);
                 self.send_http_response(
                     400,
                     vec![],
