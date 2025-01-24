@@ -32,6 +32,18 @@ filegroup(
 
 # Workspace Member Dependencies
 alias(
+    name = "hex",
+    actual = "@cu__hex-0.4.3//:hex",
+    tags = ["manual"],
+)
+
+alias(
+    name = "hmac",
+    actual = "@cu__hmac-0.12.1//:hmac",
+    tags = ["manual"],
+)
+
+alias(
     name = "log",
     actual = "@cu__log-0.4.25//:log",
     tags = ["manual"],
@@ -46,6 +58,12 @@ alias(
 alias(
     name = "regex",
     actual = "@cu__regex-1.9.6//:regex",
+    tags = ["manual"],
+)
+
+alias(
+    name = "sha2",
+    actual = "@cu__sha2-0.10.8//:sha2",
     tags = ["manual"],
 )
 
