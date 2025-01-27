@@ -68,7 +68,8 @@ class ObservabilityServerExample(callout_server.CalloutServer):
     """Custom processor on the request body."""
     logging.info('on_request_body %s', body)
     with lock:
-      counters['request_body_count'] += 1
+      if (not body.end_of_stream or body.body):
+        counters['request_body_count'] += 1
     return BodyResponse()
 
   def on_response_headers(self, headers: HttpHeaders,
@@ -83,7 +84,8 @@ class ObservabilityServerExample(callout_server.CalloutServer):
     """Custom processor on the response body."""
     logging.info('on_response_body %s', body)
     with lock:
-      counters['response_body_count'] += 1
+      if (not body.end_of_stream or body.body):
+        counters['response_body_count'] += 1
     return BodyResponse()
 
 
@@ -109,4 +111,5 @@ if __name__ == '__main__':
   # Run the gRPC service.
   params = vars(args)
   # We are using the default plaintext address to provide observability data.
-  ObservabilityServerExample(disable_plaintext=True, **params).run()
+  params['disable_plaintext'] = True
+  ObservabilityServerExample(**params).run()
