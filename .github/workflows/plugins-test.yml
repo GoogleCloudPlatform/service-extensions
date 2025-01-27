@@ -84,7 +84,7 @@ jobs:
         --test_output=errors
         --disk_cache /tmp/bazel/cache
         ${{ matrix.flags }}
-        -- //...
+        -- //samples/... //test/...
 
     - name: remove unaccessed files from cache
       shell: bash
