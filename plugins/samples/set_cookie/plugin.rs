@@ -1,4 +1,4 @@
-// Copyright 2024 Google LLC
+// Copyright 2025 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,8 @@
 // [START serviceextensions_plugin_set_cookie]
 use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
-use rand::Rng;
+use rand::rngs::SmallRng;
+use rand::{RngCore, SeedableRng};
 
 // Define the cookie name as a constant
 const COOKIE_NAME: &str = "my_cookie";
@@ -106,7 +107,13 @@ impl MyHttpContext {
 
     /// Generates a random `u32` session ID.
     fn generate_random_session_id(&self) -> u32 {
-        rand::thread_rng().gen::<u32>()
+        let seed = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos() as u64;
+
+        let mut rng = SmallRng::seed_from_u64(seed);
+        rng.next_u32()
     }
 }
 // [END serviceextensions_plugin_set_cookie]

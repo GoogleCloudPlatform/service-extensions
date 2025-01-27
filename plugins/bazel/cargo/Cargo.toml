@@ -10,7 +10,7 @@ proxy-wasm = "0.2.1"
 log = "0.4"
 regex = "1.9"
 url = "2.4"
-rand = "0.8.5"
+rand = { version = "0.8", default-features = false, features = ["small_rng"] }
 
 [lib]
 crate-type = ["cdylib"]
