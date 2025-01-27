@@ -32,5 +32,5 @@ crates_vendor(
     repository_name = "cu",  # shorten generated paths for Windows...
     tags = ["manual"],
     vendor_path = "remote",
-    supported_platform_triples = ["wasm32-wasi"],
+    supported_platform_triples = ["x86_64-unknown-linux-gnu", "wasm32-wasi"],
 )
