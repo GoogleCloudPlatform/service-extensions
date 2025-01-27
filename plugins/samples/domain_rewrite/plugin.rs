@@ -25,14 +25,15 @@ proxy_wasm::main! {{
 }}
 
 struct MyHttpContext<'a> {
-    // Stores page as rewriter parses and modifies HTML.
+    // Stores HTML as rewriter parses and modifies HTML.
     // Only stores completed sections(e.g., when rewriter parses "<di", output
     // will be empty until the next chunk comes in. If the next chunk was
-    // "v> <h1>foo</h", the output will contain "<div><h1>foo" ).
+    // "v> <h1>foo</h", the output will then contain "<div><h1>foo").
     output: Rc<RefCell<Vec<u8>>>,
-    // HTML rewriter
+    // HTML rewriter. Member of MyHttpContext a.k.a "StreamContext" so that the
+    // rewriter persists across multiple body callbacks.
     rewriter: Option<HtmlRewriter<'a, Box<dyn FnMut(&[u8])>>>,
-    // True when plugin has finished its objective.
+    // True when plugin has modified first insance of <a href=...foo...>.
     completed: Rc<RefCell<bool>>,
 }
 
@@ -73,7 +74,8 @@ impl<'a> HttpContext for MyHttpContext<'a> {
 
     fn on_http_response_body(&mut self, body_size: usize, _: bool) -> Action {
         if *self.completed.borrow() == true {
-            // Return immediately if plugin is "done" to avoid unnecessary work and resource usage.
+            // Return immediately if plugin is "done" to avoid unnecessary work
+            // and resource usage.
             return Action::Continue;
         }
         if let Some(body_bytes) = self.get_http_response_body(0, body_size) {

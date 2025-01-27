@@ -1,5 +1,3 @@
-env{log_path: "/dev/stdout"
-log_level: INFO}
 test {
   name: "DomainRewrite"
   num_chunks: 6
