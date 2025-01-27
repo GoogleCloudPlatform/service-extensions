@@ -72,7 +72,7 @@ Example servers can be started from the `extproc/example/<...>` submodules.
 For example the grpc `service_callout_example` server can be started with:
 
 ```shell
-python -m extproc.example.grpc.service_callout_example
+python -m extproc.example.basic.service_callout_example
 ```
 
 The server will then run until interrupted, for example, by inputting `Ctrl-C`.
@@ -269,14 +269,14 @@ pytest
 
 The basic Docker image contains arguments for pointing to and running python modules.
 For example, to build
-[extproc/example/basic_callout_server.py](extproc/example/basic_callout_server.py) run:
+[extproc/example/basic/service_callout_example.py](extproc/example/basic/service_callout_example.py) run:
 
 ``` bash
 docker build \
   -f ./extproc/example/Dockerfile \
   -t service-callout-example-python \
-  --build-arg copy_path=extproc/example/basic_callout_server.py \
-  --build-arg run_module=basic_callout_server .
+  --build-arg copy_path=extproc/example/basic/ \
+  --build-arg run_module=service_callout_example .
 ```
 
 `--build-arg` specifies the following:
@@ -284,8 +284,8 @@ docker build \
 * `copy_path`: Required files to copy to the docker image.
 * `run_module`: The python module to run on startup.
 
-The above example makes a copy of `extproc/example/basic_callout_server.py`
-and sets up the image to run `basic_callout_server.py` on startup.
+The above example makes a copy of `extproc/example/basic/service_callout_example.py`
+and sets up the image to run `service_callout_example.py` on startup.
 
 The image can then be run with:
 
@@ -299,7 +299,7 @@ Setting `--network host` tells docker to connect the image to the `0.0.0.0` or `
 > [!NOTE]
 > The docker image is set up to pass command line arguments to the module when specified.
 > This also requires that the example is set up to use command line arguments as well,
-> like in [extproc/example/basic_callout_server.py](extproc/example/basic_callout_server.py)
+> like in [extproc/example/basic/service_callout_example.py](extproc/example/basic/service_callout_example.py)
 >
 > For example:
 >
@@ -308,7 +308,7 @@ Setting `--network host` tells docker to connect the image to the `0.0.0.0` or `
 >   -- --combined_health_check
 > ```
 >
-> Will run the health check for `basic_callout_server` combined with the main grpc server.
+> Will run the health check for `basic/service_callout_example.py` combined with the main grpc server.
 
 ## Examples with unique dependencies
 
@@ -317,15 +317,14 @@ For instance, the `cloud_log` example requires the `google-cloud-logging` librar
 
 In this case, we need more than just the python file.
 We copy `additional-requirements.txt` along with `service_callout_example.py` by
-specifying the folder `extproc/example/cloud_log` as the `copy_path` rather
-than the python file.
+specifying the folder `extproc/example/cloud_log` as the `copy_path`.
 
 ``` bash
 docker build \
   -f ./extproc/example/Dockerfile \
   -t service-callout-example-python \
   --build-arg copy_path=extproc/example/cloud_log \
-  --build-arg run_module=basic_callout_server .
+  --build-arg run_module=service_callout_example .
 ```
 
 `./extproc/example/Dockerfile` is set up to detect additional dependencies when present,

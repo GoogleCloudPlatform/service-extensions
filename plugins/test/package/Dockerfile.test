@@ -1,8 +1,8 @@
 # Empty version of Dockerfile for fast test "builds".
 
 FROM launcher.gcr.io/google/ubuntu2204 as empty
-RUN apt update && apt upgrade -y
-RUN apt autoremove -y
+RUN apt-get update && apt-get upgrade -y
+RUN apt-get autoremove -y
 
 COPY test/package/licenses/* /opt/licenses/
 ENTRYPOINT ["sh"]
