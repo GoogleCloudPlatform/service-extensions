@@ -1,0 +1,41 @@
+test {
+  name: "ContentInjection"
+  num_chunks: 6
+  response_body {
+    input { content:  "<!DOCTYPE html>"
+                      "<html>"
+                      "<head>"
+                      "<title>Page Title</title>"
+                      "</head>"
+                      "<body>"
+
+                      "<h1>This is a Heading</h1>"
+                      "<p>This is a paragraph.</p>"
+                      "<div>"
+                      "<a href=https://foo.com>website</a>"
+                      "</div>"
+                      "<a href=https://foo.com>website</a>"
+                      "</body>"
+                      "</html>"
+    }
+    result {
+      body { exact: "<!DOCTYPE html>"
+                    "<html>"
+                    "<head>"
+                    "<script src=\"https://www.foo.com/api.js\"></script>"
+                    "<title>Page Title</title>"
+                    "</head>"
+                    "<body>"
+
+                    "<h1>This is a Heading</h1>"
+                    "<p>This is a paragraph.</p>"
+                    "<div>"
+                    "<a href=https://foo.com>website</a>"
+                    "</div>"
+                    "<a href=https://foo.com>website</a>"
+                    "</body>"
+                    "</html>"
+      }
+    }
+  }
+}
