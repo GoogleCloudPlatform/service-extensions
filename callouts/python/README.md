@@ -72,7 +72,7 @@ Example servers can be started from the `extproc/example/<...>` submodules.
 For example the grpc `service_callout_example` server can be started with:
 
 ```shell
-python -m extproc.example.grpc.service_callout_example
+python -m extproc.example.basic.service_callout_example
 ```
 
 The server will then run until interrupted, for example, by inputting `Ctrl-C`.
