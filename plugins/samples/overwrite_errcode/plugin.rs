@@ -30,21 +30,11 @@ impl HttpContext for MyHttpContext {
         if let Some(status_val) = self.get_http_response_header(":status") {
             if let Ok(response_code) = status_val.parse::<i32>() {
                 if response_code / 100 == 5 {
-                    let new_status = map_response_code(response_code);
-                    self.set_http_response_header(":status", Some(&new_status.to_string()));
+                    self.set_http_response_header(":status", Some("404"));
                 }
             }
         }
         return Action::Continue;
-    }
-}
-
-// Function that remaps all 5xx responses to 404.
-fn map_response_code(response_code: i32) -> i32 {
-    if response_code / 100 == 5 {
-        404
-    } else {
-        response_code
     }
 }
 
