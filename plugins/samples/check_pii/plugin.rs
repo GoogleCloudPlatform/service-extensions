@@ -17,7 +17,7 @@ use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
 use regex::Regex;
 use std::borrow::Cow;
-use std::sync::Arc;
+use std::rc::Rc;
 
 proxy_wasm::main! {{
     proxy_wasm::set_log_level(LogLevel::Trace);
@@ -27,8 +27,8 @@ proxy_wasm::main! {{
 }}
 
 struct MyRootContext {
-    card_matcher: Option<Arc<Regex>>,
-    code10_matcher: Option<Arc<Regex>>,
+    card_matcher: Option<Rc<Regex>>,
+    code10_matcher: Option<Rc<Regex>>,
 }
 
 impl MyRootContext {
@@ -56,8 +56,8 @@ impl RootContext for MyRootContext {
             return false;
         }
 
-        self.card_matcher = Some(Arc::new(card_regex.unwrap()));
-        self.code10_matcher = Some(Arc::new(code10_regex.unwrap()));
+        self.card_matcher = Some(Rc::new(card_regex.unwrap()));
+        self.code10_matcher = Some(Rc::new(code10_regex.unwrap()));
 
         true
     }
@@ -75,14 +75,14 @@ impl RootContext for MyRootContext {
 }
 
 struct MyHttpContext {
-    card_matcher: Option<Arc<Regex>>,
-    code10_matcher: Option<Arc<Regex>>,
+    card_matcher: Option<Rc<Regex>>,
+    code10_matcher: Option<Rc<Regex>>,
 }
 
 impl MyHttpContext {
     fn new(
-        card_matcher: Option<Arc<Regex>>,
-        code10_matcher: Option<Arc<Regex>>,
+        card_matcher: Option<Rc<Regex>>,
+        code10_matcher: Option<Rc<Regex>>,
     ) -> Self {
         MyHttpContext {
             card_matcher,
