@@ -29,7 +29,7 @@ struct MyHttpContext<'a> {
     // Stores HTML as rewriter parses and modifies HTML.
     // Only stores completed sections(e.g., when rewriter parses "<di", output
     // will be empty until the next chunk comes in. If the next chunk was
-    // "v> <h1>foo</h", the output will then contain "<div><h1>foo" ).
+    // "v> <h1>foo</h", the output would then contain "<div><h1>foo" ).
     output: Rc<RefCell<Vec<u8>>>,
     // HTML rewriter. Member of MyHttpContext a.k.a "StreamContext" so that the
     // rewriter persists across multiple body callbacks.
@@ -77,7 +77,6 @@ impl<'a> HttpContext for MyHttpContext<'a> {
             return Action::Continue;
         }
         if let Some(body_bytes) = self.get_http_response_body(0, body_size) {
-            let existing_output = self.output.borrow().clone();
             // Parse/rewrite current chunk
             self.rewriter.as_mut().unwrap().write(&body_bytes).unwrap();
             if *self.completed.borrow() == true {
@@ -85,8 +84,9 @@ impl<'a> HttpContext for MyHttpContext<'a> {
                 // dump any unparsable inputs to output.
                 self.rewriter.take().expect("msg").end().unwrap();
             }
-            let diff = self.output.borrow().as_slice()[existing_output.len()..].to_vec();
-            self.set_http_response_body(0, body_size, diff.as_slice());
+            self.set_http_response_body(0, body_size, self.output.borrow().as_slice());
+            // Clear output after usage to avoid unnecessary memory growth.
+            self.output.borrow_mut().clear();
         }
         return Action::Continue;
     }

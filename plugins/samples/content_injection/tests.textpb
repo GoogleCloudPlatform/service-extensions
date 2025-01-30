@@ -1,6 +1,6 @@
 test {
   name: "ContentInjection"
-  num_chunks: 6
+  num_chunks: 10
   response_body {
     input { content:  "<!DOCTYPE html>"
                       "<html>"
