@@ -14,8 +14,10 @@ proxy_wasm_plugin_rust(
     name = "plugin_rust.wasm",
     srcs = ["plugin.rs"],
     deps = [
-        "@crate_index//:proxy-wasm",
+        "//bazel/cargo/remote:log",
+        "//bazel/cargo/remote:proxy-wasm",
     ],
+)
 
 proxy_wasm_plugin_go(
     name = "plugin_go.wasm",
