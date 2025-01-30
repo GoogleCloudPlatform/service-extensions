@@ -79,7 +79,6 @@ impl<'a> HttpContext for MyHttpContext<'a> {
             return Action::Continue;
         }
         if let Some(body_bytes) = self.get_http_response_body(0, body_size) {
-            let existing_output = self.output.borrow().clone();
             // Parse/rewrite current chunk
             self.rewriter.as_mut().unwrap().write(&body_bytes).unwrap();
             if *self.completed.borrow() == true {
@@ -87,8 +86,9 @@ impl<'a> HttpContext for MyHttpContext<'a> {
                 // dump any unparsable inputs to output.
                 self.rewriter.take().expect("msg").end().unwrap();
             }
-            let diff = self.output.borrow().as_slice()[existing_output.len()..].to_vec();
-            self.set_http_response_body(0, body_size, diff.as_slice());
+            self.set_http_response_body(0, body_size, self.output.borrow().as_slice());
+            // Clear output after usage to avoid unnecessary memory growth.
+            self.output.borrow_mut().clear();
         }
         return Action::Continue;
     }
