@@ -20,7 +20,7 @@ from envoy.service.ext_proc.v3.external_processor_pb2 import (
 from google.protobuf.json_format import MessageToJson
 import pytest
 
-from extproc.example.basic_callout_server import (
+from extproc.example.basic.service_callout_example import (
   BasicCalloutServer as CalloutServerTest,
 )
 
