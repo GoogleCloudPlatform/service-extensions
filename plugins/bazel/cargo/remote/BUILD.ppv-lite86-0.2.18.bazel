@@ -11,7 +11,7 @@ load("@rules_rust//rust:defs.bzl", "rust_library")
 package(default_visibility = ["//visibility:public"])
 
 rust_library(
-    name = "syn",
+    name = "ppv_lite86",
     srcs = glob(
         include = ["**/*.rs"],
         allow_empty = False,
@@ -29,15 +29,9 @@ rust_library(
         ],
     ),
     crate_features = [
-        "clone-impls",
         "default",
-        "derive",
-        "extra-traits",
-        "full",
-        "parsing",
-        "printing",
-        "proc-macro",
-        "visit",
+        "simd",
+        "std",
     ],
     crate_root = "src/lib.rs",
     edition = "2021",
@@ -46,15 +40,13 @@ rust_library(
     ],
     tags = [
         "cargo-bazel",
-        "crate-name=syn",
+        "crate-name=ppv-lite86",
         "manual",
         "noclippy",
         "norustfmt",
     ],
-    version = "2.0.96",
+    version = "0.2.18",
     deps = [
-        "@cu__proc-macro2-1.0.93//:proc_macro2",
-        "@cu__quote-1.0.38//:quote",
-        "@cu__unicode-ident-1.0.14//:unicode_ident",
+        "@cu__zerocopy-0.6.6//:zerocopy",
     ],
 )
