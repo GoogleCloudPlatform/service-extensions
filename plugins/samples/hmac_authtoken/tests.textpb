@@ -42,7 +42,7 @@ test {
   name: "InvalidPathHeader"
   request_headers {
     input {
-      header { key: ":path" value: "foo{}bar" }
+      header { key: ":path" value: "foo{:}bar" }
     }
     result { 
       immediate { http_status: 400 details: "" }
