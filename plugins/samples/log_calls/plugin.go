@@ -62,7 +62,6 @@ func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) t
 		}
 	}()
 
-	// Your code for normalizing headers goes here
 	proxywasm.LogInfo("http OnHttpRequestHeaders called")
 
 	config, err := proxywasm.GetPluginConfiguration()
@@ -94,7 +93,6 @@ func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) 
 	}()
 
 	proxywasm.LogInfo("http OnHttpResponseHeaders called")
-	// Your code for processing response headers can go here
 
 	return types.ActionContinue
 }
