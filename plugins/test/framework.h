@@ -143,6 +143,9 @@ class TestHttpContext : public TestContext {
   void TearDown() {
     if (!torn_down_) {
       phase_logs_.clear();
+      // For Golang Stream Contexts are only called on on_log, not on on_done. See:
+      // https://github.com/tetratelabs/proxy-wasm-go-sdk/blob/main/proxywasm/internal/abi_callback_lifecycle.go#L40
+      this->onLog();     // calls wasm if VM not failed
       this->onDone();    // calls wasm if VM not failed
       this->onDelete();  // calls wasm if VM not failed and create succeeded
       torn_down_ = true;
