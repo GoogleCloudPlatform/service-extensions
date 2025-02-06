@@ -20,7 +20,7 @@ from envoy.service.ext_proc.v3.external_processor_pb2 import (
 from google.protobuf.json_format import MessageToJson
 import pytest
 
-from extproc.example.basic_callout_server import (
+from extproc.example.basic.service_callout_example import (
   BasicCalloutServer as CalloutServerTest,
 )
 
@@ -77,7 +77,7 @@ def test_basic_callouts(server: CalloutServerTest) -> None:
   response = make_request(ProcessingRequest(request_headers=headers), addr)
   assert response.request_headers == add_header_mutation(
     add=[
-      (':host', 'service-extensions.com'),
+      (':authority', 'service-extensions.com'),
       (':path', '/'),
       ('header-request', 'request'),
     ],

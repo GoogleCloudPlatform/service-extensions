@@ -1,0 +1,23 @@
+[package]
+name = "service-extensions"
+version = "0.0.0"
+edition = "2018"
+
+# Regenerate: $ bazelisk run bazel/cargo:crates_vendor -- --repin
+# Reference: //bazel/cargo/remote:proxy-wasm (etc)
+[dependencies]
+proxy-wasm = "0.2.1"
+log = "0.4"
+regex = "1.9"
+url = "2.4"
+
+[lib]
+crate-type = ["cdylib"]
+path = "samples/.../plugin.rs"  # dummy value for Bazel
+
+[profile.release]
+lto = true
+opt-level = 3
+codegen-units = 1
+panic = "abort"
+strip = "debuginfo"

@@ -21,7 +21,7 @@ from envoy.service.ext_proc.v3.external_processor_pb2 import (
   ProcessingRequest,
   ProcessingResponse,
 )
-from extproc.tests.basic_grpc_test import _addr_to_str
+from extproc.service.callout_server import _addr_to_str
 from extproc.service.callout_tools import _addr
 from envoy.service.ext_proc.v3.external_processor_pb2_grpc import (
   ExternalProcessorStub,
@@ -44,12 +44,14 @@ def make_json_request(
   json_list: list[str], address: tuple[str, int], key: str | None = None
 ) -> Iterator[ProcessingResponse]:
   """Make requests to a callout service with ProcessingRequest json data.
+
   Args:
     json_list: A list of json strings representing ProcessingRequest data.
     address: ip address of the callout server.
-    key: Local filepath to a chain authenication certificate.
+    key: Local filepath to a chain authentication certificate.
+
   Returns:
-    An iterator containg each response.
+    An iterator containing each response.
   """
   callouts = [Parse(data, ProcessingRequest()) for data in json_list]
   with _make_channel(address, key) as channel:

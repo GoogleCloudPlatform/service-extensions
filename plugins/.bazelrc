@@ -2,6 +2,9 @@
 # edited to choose some sensible defaults. Consider moving copts and
 # linkopts into BUILD rules upstream.
 
+# Disable Bzlmod
+common --noenable_bzlmod
+
 # Default engine to execute when running bazel build/test. This engine can
 # be overridden by specifying a different engine on the command line:
 # `bazel test //... --define engine=wasmtime` for example.
