@@ -17,6 +17,7 @@ use lol_html::*;
 use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
 use std::cell::RefCell;
+use std::error::Error;
 use std::rc::Rc;
 
 proxy_wasm::main! {{
@@ -25,6 +26,11 @@ proxy_wasm::main! {{
 }}
 
 struct MyHttpContext<'a> {
+    // Some member variables need to be wrapped in Rc<Refcell<T>> so that we can
+    // modify the variable in multiple places as well as share ownership. By
+    // using Rc, we are commiting to not modfying the variable in multiple places
+    // simultaneously, otherwise the code will panic and plugin will crash.
+
     // Stores HTML as rewriter parses and modifies HTML.
     // Only stores completed sections(e.g., when rewriter parses "<di", output
     // will be empty until the next chunk comes in. If the next chunk was
@@ -33,17 +39,13 @@ struct MyHttpContext<'a> {
     // HTML rewriter. Member of MyHttpContext a.k.a "StreamContext" so that the
     // rewriter persists across multiple body callbacks.
     rewriter: Option<HtmlRewriter<'a, Box<dyn FnMut(&[u8])>>>,
-    // True when plugin has modified first insance of <a href=...foo...>.
-    completed: Rc<RefCell<bool>>,
 }
 
 impl<'a> MyHttpContext<'a> {
     pub fn new() -> Box<MyHttpContext<'a>> {
         let output = Rc::new(RefCell::new(Vec::new()));
-        let completed = Rc::new(RefCell::new(false));
         Box::new(MyHttpContext {
             output: output.clone(),
-            completed: completed.clone(),
             rewriter: Some(HtmlRewriter::new(
                 Settings {
                     element_content_handlers: vec![element!("a[href]", move |el| {
@@ -51,8 +53,6 @@ impl<'a> MyHttpContext<'a> {
                         let modified_href = href.replace("foo", "bar");
                         if modified_href != href {
                             el.set_attribute("href", &modified_href).unwrap();
-                            // Plugin has completed the planned domain rewrite.
-                            *completed.borrow_mut() = true;
                         }
 
                         Ok(())
@@ -62,6 +62,15 @@ impl<'a> MyHttpContext<'a> {
                 Box::new(move |c: &[u8]| output.borrow_mut().extend_from_slice(c)),
             )),
         })
+    }
+
+    fn parse_chunk(&mut self, body_bytes: Bytes) -> Result<(), Box<dyn Error>> {
+        // Parse/rewrite current chunk
+        self.rewriter
+            .as_mut()
+            .ok_or("Expected valid rewriter. Got None")?
+            .write(&body_bytes)?;
+        return Ok(());
     }
 }
 
@@ -73,23 +82,21 @@ impl<'a> HttpContext for MyHttpContext<'a> {
     }
 
     fn on_http_response_body(&mut self, body_size: usize, _: bool) -> Action {
-        if *self.completed.borrow() == true {
-            // Return immediately if plugin is "done" to avoid unnecessary work
-            // and resource usage.
-            return Action::Continue;
-        }
         if let Some(body_bytes) = self.get_http_response_body(0, body_size) {
-            // Parse/rewrite current chunk
-            self.rewriter.as_mut().unwrap().write(&body_bytes).unwrap();
-            if *self.completed.borrow() == true {
-                // Stop the rewriter after completing desired domain rewrite to
-                // dump any unparsable inputs to output.
-                self.rewriter.take().expect("msg").end().unwrap();
+            if let Err(e) = self.parse_chunk(body_bytes) {
+                self.send_http_response(
+                    500,
+                    vec![],
+                    Some(
+                        &format!("Error while writing to HtmlRewriter: {}", e.to_string())
+                            .into_bytes(),
+                    ),
+                );
             }
-            self.set_http_response_body(0, body_size, self.output.borrow().as_slice());
-            // Clear output after usage to avoid unnecessary memory growth.
-            self.output.borrow_mut().clear();
         }
+        self.set_http_response_body(0, body_size, self.output.borrow().as_slice());
+        // Clear output after usage to avoid unnecessary memory growth.
+        self.output.borrow_mut().clear();
         return Action::Continue;
     }
 }
