@@ -11,3 +11,8 @@ build --enable_platform_specific_config
 build:linux --cxxopt=-std=c++17
 build:macos --cxxopt=-std=c++17
 build:windows --cxxopt="/std:c++17"
+
+# Force Clang.
+build:clang --action_env=BAZEL_COMPILER=clang
+build:clang --action_env=CC=clang
+build:clang --action_env=CXX=clang++
