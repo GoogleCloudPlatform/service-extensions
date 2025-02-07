@@ -44,6 +44,12 @@ alias(
 )
 
 alias(
+    name = "rand",
+    actual = "@cu__rand-0.8.5//:rand",
+    tags = ["manual"],
+)
+
+alias(
     name = "regex",
     actual = "@cu__regex-1.9.6//:regex",
     tags = ["manual"],
