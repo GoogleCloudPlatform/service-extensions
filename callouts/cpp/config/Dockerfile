@@ -35,7 +35,7 @@ WORKDIR /app
 COPY . .
 
 # Build the C++ app
-RUN bazel build //:callout_service_cpp
+RUN bazel build --config=clang //:callout_service_cpp
 
 # Use the same image for the final stage
 FROM marketplace.gcr.io/google/debian12
