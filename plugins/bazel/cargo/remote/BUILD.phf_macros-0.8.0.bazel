@@ -6,12 +6,12 @@
 #     bazel run @//bazel/cargo:crates_vendor
 ###############################################################################
 
-load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_proc_macro")
 
 package(default_visibility = ["//visibility:public"])
 
-rust_library(
-    name = "syn",
+rust_proc_macro(
+    name = "phf_macros",
     srcs = glob(
         include = ["**/*.rs"],
         allow_empty = False,
@@ -28,33 +28,27 @@ rust_library(
             "WORKSPACE.bazel",
         ],
     ),
-    crate_features = [
-        "clone-impls",
-        "default",
-        "derive",
-        "extra-traits",
-        "full",
-        "parsing",
-        "printing",
-        "proc-macro",
-        "visit",
-    ],
     crate_root = "src/lib.rs",
-    edition = "2021",
+    edition = "2018",
+    proc_macro_deps = [
+        "@cu__proc-macro-hack-0.5.20-deprecated//:proc_macro_hack",
+    ],
     rustc_flags = [
         "--cap-lints=allow",
     ],
     tags = [
         "cargo-bazel",
-        "crate-name=syn",
+        "crate-name=phf_macros",
         "manual",
         "noclippy",
         "norustfmt",
     ],
-    version = "2.0.96",
+    version = "0.8.0",
     deps = [
+        "@cu__phf_generator-0.8.0//:phf_generator",
+        "@cu__phf_shared-0.8.0//:phf_shared",
         "@cu__proc-macro2-1.0.93//:proc_macro2",
         "@cu__quote-1.0.38//:quote",
-        "@cu__unicode-ident-1.0.14//:unicode_ident",
+        "@cu__syn-1.0.109//:syn",
     ],
 )
