@@ -11,7 +11,7 @@ load("@rules_rust//rust:defs.bzl", "rust_library")
 package(default_visibility = ["//visibility:public"])
 
 rust_library(
-    name = "syn",
+    name = "phf",
     srcs = glob(
         include = ["**/*.rs"],
         allow_empty = False,
@@ -29,32 +29,30 @@ rust_library(
         ],
     ),
     crate_features = [
-        "clone-impls",
         "default",
-        "derive",
-        "extra-traits",
-        "full",
-        "parsing",
-        "printing",
-        "proc-macro",
-        "visit",
+        "macros",
+        "phf_macros",
+        "proc-macro-hack",
+        "std",
     ],
     crate_root = "src/lib.rs",
-    edition = "2021",
+    edition = "2018",
+    proc_macro_deps = [
+        "@cu__phf_macros-0.8.0//:phf_macros",
+        "@cu__proc-macro-hack-0.5.20-deprecated//:proc_macro_hack",
+    ],
     rustc_flags = [
         "--cap-lints=allow",
     ],
     tags = [
         "cargo-bazel",
-        "crate-name=syn",
+        "crate-name=phf",
         "manual",
         "noclippy",
         "norustfmt",
     ],
-    version = "2.0.96",
+    version = "0.8.0",
     deps = [
-        "@cu__proc-macro2-1.0.93//:proc_macro2",
-        "@cu__quote-1.0.38//:quote",
-        "@cu__unicode-ident-1.0.14//:unicode_ident",
+        "@cu__phf_shared-0.8.0//:phf_shared",
     ],
 )
