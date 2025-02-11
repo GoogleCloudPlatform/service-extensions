@@ -1,0 +1,34 @@
+[package]
+name = "envoy-ext-proc"
+version = "0.1.0"
+edition = "2021"
+authors = ["author"]
+description = "Envoy External Processing Filter SDK in Rust"
+license = "Apache-2.0"
+
+[dependencies]
+tonic = { version = "0.10", features = ["tls", "transport"] }
+prost = "0.12"
+prost-types = "0.12"
+tokio = { version = "1.0", features = ["full"] }
+tokio-stream = "0.1"
+futures = "0.3"
+async-trait = "0.1"
+log = "0.4"
+env_logger = "0.10"
+thiserror = "1.0"
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[build-dependencies]
+tonic-build = { version = "0.10", features = ["prost"] }
+walkdir = "2.4"
+
+[[bin]]
+name = "ext-proc-server"
+path = "src/main.rs"
+
+[lib]
+name = "ext_proc"
+path = "src/lib.rs"
