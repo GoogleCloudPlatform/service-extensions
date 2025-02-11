@@ -12,41 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "basic.h"
+
 #include "absl/log/log.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
-#include "service/callout_server.h"
 
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
-class CustomEnvoyExtProcServer final : public EnvoyExtProcServer {
- public:
-  // Processes the incoming HTTP request headers.
-  void OnRequestHeader(ProcessingRequest* request,
-                       ProcessingResponse* response) {
-    AddRequestHeader(response, "add-header-request", "Value-request");
-    ReplaceRequestHeader(response, "replace-header-request", "Value-request");
-  }
+void CustomEnvoyExtProcServer::OnRequestHeader(ProcessingRequest* request,
+                                               ProcessingResponse* response) {
+  AddRequestHeader(response, "add-header-request", "Value-request");
+  ReplaceRequestHeader(response, "replace-header-request", "Value-request");
+}
 
-  // Processes the outgoing HTTP response headers.
-  void OnResponseHeader(ProcessingRequest* request,
-                        ProcessingResponse* response) {
-    AddResponseHeader(response, "add-header-response", "Value-response");
-    ReplaceResponseHeader(response, "replace-header-response",
-                          "Value-response");
-  }
+void CustomEnvoyExtProcServer::OnResponseHeader(ProcessingRequest* request,
+                                                ProcessingResponse* response) {
+  AddResponseHeader(response, "add-header-response", "Value-response");
+  ReplaceResponseHeader(response, "replace-header-response", "Value-response");
+}
 
-  // Processes the incoming HTTP request body.
-  void OnRequestBody(ProcessingRequest* request, ProcessingResponse* response) {
-    ReplaceRequestBody(response, "new-body-request");
-  }
+void CustomEnvoyExtProcServer::OnRequestBody(ProcessingRequest* request,
+                                             ProcessingResponse* response) {
+  ReplaceRequestBody(response, "new-body-request");
+}
 
-  // Processes the outgoing HTTP response body.
-  void OnResponseBody(ProcessingRequest* request,
-                      ProcessingResponse* response) {
-    ReplaceResponseBody(response, "new-body-response");
-  }
-};
+void CustomEnvoyExtProcServer::OnResponseBody(ProcessingRequest* request,
+                                              ProcessingResponse* response) {
+  ReplaceResponseBody(response, "new-body-response");
+}
 
 int main(int argc, char** argv) {
   std::string server_address("localhost:8080");

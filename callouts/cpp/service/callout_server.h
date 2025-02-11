@@ -167,7 +167,8 @@ class EnvoyExtProcServer : public ExternalProcessor::Service {
   }
 };
 
-void RunServer(std::string server_address, EnvoyExtProcServer& service) {
+std::unique_ptr<grpc::Server> RunServer(std::string server_address, EnvoyExtProcServer& service) {
+  grpc::EnableDefaultHealthCheckService(true);
   grpc::ServerBuilder builder;
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
   builder.RegisterService(&service);
@@ -176,4 +177,5 @@ void RunServer(std::string server_address, EnvoyExtProcServer& service) {
   LOG(INFO) << "Envoy Ext Proc server listening on " << server_address;
 
   server->Wait();
+  return server;
 }

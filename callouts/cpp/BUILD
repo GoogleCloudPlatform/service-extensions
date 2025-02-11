@@ -4,7 +4,7 @@ licenses(["notice"])  # Apache 2
 
 cc_library(
     name = "callout_service_cpp_lib",
-    srcs = glob(['service/callout_server.h']),
+    srcs = ['service/callout_server.h'],
     deps = [
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_absl//absl/log:log",
