@@ -22,15 +22,27 @@ class CustomEnvoyExtProcServer : public EnvoyExtProcServer {
  public:
   // Processes the incoming HTTP request headers.
   void OnRequestHeader(ProcessingRequest* request,
-                       ProcessingResponse* response);
+                       ProcessingResponse* response) {
+    AddRequestHeader(response, "add-header-request", "Value-request");
+    ReplaceRequestHeader(response, "replace-header-request", "Value-request");
+  }
 
   // Processes the outgoing HTTP response headers.
   void OnResponseHeader(ProcessingRequest* request,
-                        ProcessingResponse* response);
+                        ProcessingResponse* response) {
+    AddResponseHeader(response, "add-header-response", "Value-response");
+    ReplaceResponseHeader(response, "replace-header-response",
+                          "Value-response");
+  }
 
   // Processes the incoming HTTP request body.
-  void OnRequestBody(ProcessingRequest* request, ProcessingResponse* response);
+  void OnRequestBody(ProcessingRequest* request, ProcessingResponse* response) {
+    ReplaceRequestBody(response, "new-body-request");
+  }
 
   // Processes the outgoing HTTP response body.
-  void OnResponseBody(ProcessingRequest* request, ProcessingResponse* response);
+  void OnResponseBody(ProcessingRequest* request,
+                      ProcessingResponse* response) {
+    ReplaceResponseBody(response, "new-body-response");
+  }
 };

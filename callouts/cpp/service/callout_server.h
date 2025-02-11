@@ -20,7 +20,11 @@
 #include "envoy/service/ext_proc/v3/external_processor.grpc.pb.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
+using envoy::config::core::v3::HeaderValue;
+using envoy::config::core::v3::HeaderValueOption;
+using envoy::service::ext_proc::v3::BodyMutation;
 using envoy::service::ext_proc::v3::ExternalProcessor;
+using envoy::service::ext_proc::v3::HeaderMutation;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
@@ -29,12 +33,11 @@ class EnvoyExtProcServer : public ExternalProcessor::Service {
   // Adds a request header field.
   void AddRequestHeader(ProcessingResponse* response, std::string_view key,
                         std::string_view value) {
-    envoy::config::core::v3::HeaderValue* new_header =
-        response->mutable_request_headers()
-            ->mutable_response()
-            ->mutable_header_mutation()
-            ->add_set_headers()
-            ->mutable_header();
+    HeaderValue* new_header = response->mutable_request_headers()
+                                  ->mutable_response()
+                                  ->mutable_header_mutation()
+                                  ->add_set_headers()
+                                  ->mutable_header();
     new_header->set_key(key);
     new_header->set_value(value);
   }
@@ -42,15 +45,13 @@ class EnvoyExtProcServer : public ExternalProcessor::Service {
   // Replaces a request header field.
   void ReplaceRequestHeader(ProcessingResponse* response, std::string_view key,
                             std::string_view value) {
-    envoy::config::core::v3::HeaderValueOption* new_header_option =
-        response->mutable_request_headers()
-            ->mutable_response()
-            ->mutable_header_mutation()
-            ->add_set_headers();
+    HeaderValueOption* new_header_option = response->mutable_request_headers()
+                                               ->mutable_response()
+                                               ->mutable_header_mutation()
+                                               ->add_set_headers();
     new_header_option->set_append_action(
-        envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
-    envoy::config::core::v3::HeaderValue* new_header =
-        new_header_option->mutable_header();
+        HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+    HeaderValue* new_header = new_header_option->mutable_header();
     new_header->set_key(key);
     new_header->set_value(value);
   }
@@ -58,12 +59,11 @@ class EnvoyExtProcServer : public ExternalProcessor::Service {
   // Adds a response header field.
   void AddResponseHeader(ProcessingResponse* response, std::string_view key,
                          std::string_view value) {
-    envoy::config::core::v3::HeaderValue* new_header =
-        response->mutable_response_headers()
-            ->mutable_response()
-            ->mutable_header_mutation()
-            ->add_set_headers()
-            ->mutable_header();
+    HeaderValue* new_header = response->mutable_response_headers()
+                                  ->mutable_response()
+                                  ->mutable_header_mutation()
+                                  ->add_set_headers()
+                                  ->mutable_header();
     new_header->set_key(key);
     new_header->set_value(value);
   }
@@ -71,36 +71,32 @@ class EnvoyExtProcServer : public ExternalProcessor::Service {
   // Replaces a response header field.
   void ReplaceResponseHeader(ProcessingResponse* response, std::string_view key,
                              std::string_view value) {
-    envoy::config::core::v3::HeaderValueOption* new_header_option =
-        response->mutable_response_headers()
-            ->mutable_response()
-            ->mutable_header_mutation()
-            ->add_set_headers();
+    HeaderValueOption* new_header_option = response->mutable_response_headers()
+                                               ->mutable_response()
+                                               ->mutable_header_mutation()
+                                               ->add_set_headers();
     new_header_option->set_append_action(
-        envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
-    envoy::config::core::v3::HeaderValue* new_header =
-        new_header_option->mutable_header();
+        HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+    HeaderValue* new_header = new_header_option->mutable_header();
     new_header->set_key(key);
     new_header->set_value(value);
   }
 
   // Replaces a request body field.
   void ReplaceRequestBody(ProcessingResponse* response, std::string_view body) {
-    envoy::service::ext_proc::v3::BodyMutation* new_body =
-        response->mutable_request_body()
-            ->mutable_response()
-            ->mutable_body_mutation();
-    new_body->set_body(body);
+    response->mutable_request_body()
+        ->mutable_response()
+        ->mutable_body_mutation()
+        ->set_body(body);
   }
 
   // Replaces a response body field.
   void ReplaceResponseBody(ProcessingResponse* response,
                            std::string_view body) {
-    envoy::service::ext_proc::v3::BodyMutation* new_body =
-        response->mutable_response_body()
-            ->mutable_response()
-            ->mutable_body_mutation();
-    new_body->set_body(body);
+    response->mutable_response_body()
+        ->mutable_response()
+        ->mutable_body_mutation()
+        ->set_body(body);
   }
 
  public:
@@ -167,7 +163,9 @@ class EnvoyExtProcServer : public ExternalProcessor::Service {
   }
 };
 
-std::unique_ptr<grpc::Server> RunServer(std::string server_address, EnvoyExtProcServer& service) {
+std::unique_ptr<grpc::Server> RunServer(std::string server_address,
+                                        EnvoyExtProcServer& service,
+                                        bool wait = true) {
   grpc::EnableDefaultHealthCheckService(true);
   grpc::ServerBuilder builder;
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
@@ -176,6 +174,8 @@ std::unique_ptr<grpc::Server> RunServer(std::string server_address, EnvoyExtProc
   std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
   LOG(INFO) << "Envoy Ext Proc server listening on " << server_address;
 
-  server->Wait();
+  if (wait) {
+    server->Wait();
+  }
   return server;
 }
