@@ -15,6 +15,7 @@ We recommend the following process:
 
 1.  Write a wasm plugin using the [samples](#samples) and SDKs as a starting
     point: [C++](https://github.com/proxy-wasm/proxy-wasm-cpp-sdk),
+    [Go](https://github.com/proxy-wasm/proxy-wasm-go-sdk),
     [Rust](https://github.com/proxy-wasm/proxy-wasm-rust-sdk). See also the
     [best practices](https://cloud.google.com/service-extensions/docs/plugin-best-practices).
 1.  [Build](#build) the plugin.
