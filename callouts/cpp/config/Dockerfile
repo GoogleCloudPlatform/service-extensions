@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Global build type to be used on the stages
+ARG EXAMPLE_TYPE=basic
+
 # Use the Debian 9 Clang base image for both stages
 FROM marketplace.gcr.io/google/debian12 AS builder
 
@@ -30,7 +33,7 @@ ENV CC /usr/bin/clang
 
 #Set environment variable for runtine
 ARG EXAMPLE_TYPE
-ENV EXAMPLE_TYPE ${EXAMPLE_TYPE}
+ENV EXAMPLE_TYPE=${EXAMPLE_TYPE}
 
 # Set the Current Working Directory inside the container
 WORKDIR /app
@@ -44,6 +47,9 @@ RUN bazel build --config=clang //examples/${EXAMPLE_TYPE}:${EXAMPLE_TYPE}_cpp
 # Use the same image for the final stage
 FROM marketplace.gcr.io/google/debian12
 
+ARG EXAMPLE_TYPE
+ENV EXAMPLE_TYPE=${EXAMPLE_TYPE}
+
 # Copy the Pre-built binary file from the previous stage
 COPY --from=builder /app/bazel-bin .
 
@@ -54,4 +60,4 @@ COPY ssl_creds ./ssl_creds
 EXPOSE 8443 8181 8000
 
 # Command to run the executable
-CMD ["./examples/${EXAMPLE_TYPE}/${EXAMPLE_TYPE}_cpp"]
+CMD "./examples/${EXAMPLE_TYPE}/${EXAMPLE_TYPE}_cpp"
