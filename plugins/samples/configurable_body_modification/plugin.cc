@@ -23,6 +23,7 @@ class MyHttpContext : public Context {
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
+    // Check request headers for modifications to be made to request body
     WasmDataPtr request_body_start =
         getRequestHeader("Modify-Request-Body-Start");
     WasmDataPtr request_body_length =
@@ -56,7 +57,7 @@ class MyHttpContext : public Context {
     if (!request_body_data->view().empty()) {
       request_body_modifications_.data = request_body_data->view();
     }
-
+    // Check request headers for modifications to be made to response body
     WasmDataPtr response_body_start =
         getRequestHeader("Modify-Response-Body-Start");
     WasmDataPtr response_body_length =
@@ -116,7 +117,9 @@ class MyHttpContext : public Context {
     }
     return FilterDataStatus::Continue;
   }
+
  private:
+  // Store modifications in HttpContext to be accessed in body callbacks.
   struct BodyModificationsParams {
     size_t start = 0;
     size_t length = 0;

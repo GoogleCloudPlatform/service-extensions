@@ -82,3 +82,16 @@ test {
     result { body { exact: "Prepend body: Standard response body" } }
   }
 }
+test {
+  name: "InvalidModificationValue"
+  request_headers {
+    input {
+      header { key: "Modify-Response-Body-Start" value: "-1" }
+      header { key: "Modify-Response-Body-Length" value: "0" }
+      header { key: "Modify-Response-Body-Data" value: "Prepend body: "}
+    }
+    result {
+      immediate {http_status: 400 details: "Invalid Modify-Response-Body-Start: -1"}
+    }
+  }
+}
