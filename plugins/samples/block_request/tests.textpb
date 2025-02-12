@@ -19,8 +19,8 @@ test {
     }
     result {
       immediate { http_status: 403 details: "" }
-      body { regex: "Forbidden - Request ID: \\d+" }
-      log { regex: ".+Forbidden - Request ID: \\d+" }
+      body { regex: "Forbidden - Request ID: [[:xdigit:]]+" }
+      log { regex: ".*Forbidden - Request ID: [[:xdigit:]]+" }
       no_header { key: "my-plugin-allowed"}
     }
   }
