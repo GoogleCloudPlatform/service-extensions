@@ -2,10 +2,9 @@ use async_trait::async_trait;
 use ext_proc::{
     processor::{ExtProcessor, ProcessingError},
     envoy::service::ext_proc::v3::{ProcessingRequest, ProcessingResponse},
-    service::ExtProcService,
+    server::{CalloutServer, Config},
     utils::mutations,
 };
-use log::info;
 
 /// AddHeaderProcessor adds custom headers to both requests and responses
 #[derive(Clone)]
@@ -48,12 +47,20 @@ impl ExtProcessor for AddHeaderProcessor {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
-    let addr = "0.0.0.0:8080";
-    let processor = AddHeaderProcessor::new();
-    let service = ExtProcService::new(processor);
+    // Using default config but enabling insecure server
+    let mut config = Config::default();
+    config.enable_insecure_server = true;
 
-    info!("Starting add-header ext_proc service on {}", addr);
-    service.run(addr).await?;
+    let server = CalloutServer::new(config);
+    let processor = AddHeaderProcessor::new();
+
+    // Start all services
+    let secure = server.spawn_grpc(processor.clone()).await;
+    let insecure = server.spawn_insecure_grpc(processor.clone()).await;
+    let health = server.spawn_health_check().await;
+
+    // Wait for all services
+    let _ = tokio::try_join!(secure, insecure, health)?;
 
     Ok(())
 }
