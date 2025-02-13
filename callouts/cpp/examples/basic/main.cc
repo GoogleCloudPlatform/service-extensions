@@ -17,7 +17,7 @@
 int main(int argc, char** argv) {
   std::string server_address("localhost:8080");
 
-  CustomEnvoyExtProcServer service;
+  CustomCalloutServer service;
   RunServer(server_address, service);
 
   return 0;

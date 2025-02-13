@@ -28,7 +28,7 @@ using envoy::service::ext_proc::v3::HeaderMutation;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
-class EnvoyExtProcServer : public ExternalProcessor::Service {
+class CalloutServer : public ExternalProcessor::Service {
  protected:
   // Adds a request header field.
   void AddRequestHeader(ProcessingResponse* response, std::string_view key,
@@ -164,7 +164,7 @@ class EnvoyExtProcServer : public ExternalProcessor::Service {
 };
 
 std::unique_ptr<grpc::Server> RunServer(std::string server_address,
-                                        EnvoyExtProcServer& service,
+                                        CalloutServer& service,
                                         bool wait = true) {
   grpc::EnableDefaultHealthCheckService(true);
   grpc::ServerBuilder builder;

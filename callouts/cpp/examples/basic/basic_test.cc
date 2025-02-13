@@ -37,7 +37,7 @@ class BasicServerTest : public testing::Test {
 
   void TearDown() override { server->Shutdown(); }
 
-  CustomEnvoyExtProcServer service_;
+  CustomCalloutServer service_;
 };
 
 TEST_F(BasicServerTest, OnRequestHeader) {

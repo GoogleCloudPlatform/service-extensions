@@ -18,7 +18,7 @@
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
-class CustomEnvoyExtProcServer : public EnvoyExtProcServer {
+class CustomCalloutServer : public CalloutServer {
  public:
   // Processes the incoming HTTP request headers.
   void OnRequestHeader(ProcessingRequest* request,
