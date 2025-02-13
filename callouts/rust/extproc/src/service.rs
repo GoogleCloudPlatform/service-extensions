@@ -16,19 +16,14 @@ pub struct ExtProcService {
 }
 
 impl ExtProcService {
-    pub fn new<P: ExtProcessor>(processor: P) -> Self {
+    pub fn new<P: ExtProcessor + 'static>(processor: P) -> Self {
         Self {
             processor: Arc::new(processor),
         }
     }
 
-    pub async fn run(self, addr: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let addr = addr.parse()?;
-        tonic::transport::Server::builder()
-            .add_service(ExternalProcessorServer::new(self))
-            .serve(addr)
-            .await?;
-        Ok(())
+    pub fn into_server(self) -> ExternalProcessorServer<Self> {
+        ExternalProcessorServer::new(self)
     }
 }
 
