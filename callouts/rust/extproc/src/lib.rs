@@ -1,4 +1,3 @@
-// src/lib.rs
 mod gen;
 pub use gen::envoy;
 

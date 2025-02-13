@@ -1,4 +1,3 @@
-// src/service.rs
 use crate::envoy::service::ext_proc::v3::{
     external_processor_server::{ExternalProcessor, ExternalProcessorServer},
     ProcessingRequest, ProcessingResponse,

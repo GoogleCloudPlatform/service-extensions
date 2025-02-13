@@ -1,6 +1,4 @@
-// build.rs
 use std::process::Command;
-// use std::fs;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Download Envoy protos if they don't exist
@@ -30,13 +28,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &protos.iter().map(|p| format!("proto/{}", p)).collect::<Vec<_>>(),
             &["proto"],
         )?;
-
-    // Print generated files
-    // println!("Generated files in src/gen:");
-    // for entry in fs::read_dir("src/gen")? {
-    //     let entry = entry?;
-    //     println!("cargo:warning=Generated file: {}", entry.file_name().to_string_lossy());
-    // }
 
     println!("cargo:rerun-if-changed=proto");
     println!("cargo:rerun-if-changed=build.rs");
