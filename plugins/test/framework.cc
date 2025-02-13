@@ -36,6 +36,9 @@ proxy_wasm::WasmResult Buffer::copyTo(proxy_wasm::WasmBase* wasm, size_t start,
 
 proxy_wasm::WasmResult Buffer::copyFrom(size_t start, size_t length,
                                         std::string_view data) {
+  if (start > owned_string_buffer_.size()) {
+    start = owned_string_buffer_.size();
+  }
   owned_string_buffer_.replace(start, length, data);
   return proxy_wasm::WasmResult::Ok;
 }
