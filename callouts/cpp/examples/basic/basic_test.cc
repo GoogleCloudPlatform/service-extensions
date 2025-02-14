@@ -32,7 +32,7 @@ class BasicServerTest : public testing::Test {
  protected:
   void SetUp() override {
     std::string server_address("localhost:8080");
-    server = RunServer(server_address, service_, false);
+    server = CalloutServer::RunServer(server_address, service_, false);
   }
 
   void TearDown() override { server->Shutdown(); }

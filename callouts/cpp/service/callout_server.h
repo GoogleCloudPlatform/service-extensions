@@ -102,6 +102,23 @@ class CalloutServer : public ExternalProcessor::Service {
         ->set_body(body);
   }
 
+  static std::unique_ptr<grpc::Server> RunServer(std::string server_address,
+                                                 CalloutServer& service,
+                                                 bool wait = true) {
+    grpc::EnableDefaultHealthCheckService(true);
+    grpc::ServerBuilder builder;
+    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
+    builder.RegisterService(&service);
+
+    std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
+    LOG(INFO) << "Envoy Ext Proc server listening on " << server_address;
+
+    if (wait) {
+      server->Wait();
+    }
+    return server;
+  }
+
   grpc::Status Process(
       grpc::ServerContext* context,
       grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream)
@@ -164,20 +181,3 @@ class CalloutServer : public ExternalProcessor::Service {
     }
   }
 };
-
-std::unique_ptr<grpc::Server> RunServer(std::string server_address,
-                                        CalloutServer& service,
-                                        bool wait = true) {
-  grpc::EnableDefaultHealthCheckService(true);
-  grpc::ServerBuilder builder;
-  builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
-  builder.RegisterService(&service);
-
-  std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
-  LOG(INFO) << "Envoy Ext Proc server listening on " << server_address;
-
-  if (wait) {
-    server->Wait();
-  }
-  return server;
-}
