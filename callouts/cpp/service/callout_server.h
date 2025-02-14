@@ -135,21 +135,25 @@ class CalloutServer : public ExternalProcessor::Service {
     return grpc::Status::OK;
   }
 
+  // Handles request headers.
   virtual void OnRequestHeader(ProcessingRequest* request,
                                ProcessingResponse* response) {
     LOG(INFO) << "OnRequestHeader called.";
   }
 
+  // Handles response headers.
   virtual void OnResponseHeader(ProcessingRequest* request,
                                 ProcessingResponse* response) {
     LOG(INFO) << "OnResponseHeader called.";
   }
 
+  // Handles request bodies.
   virtual void OnRequestBody(ProcessingRequest* request,
                              ProcessingResponse* response) {
     LOG(INFO) << "OnRequestBody called.";
   }
 
+  // Handles response bodies.
   virtual void OnResponseBody(ProcessingRequest* request,
                               ProcessingResponse* response) {
     LOG(INFO) << "OnResponseBody called.";
