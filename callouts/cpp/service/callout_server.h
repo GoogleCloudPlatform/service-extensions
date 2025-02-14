@@ -29,10 +29,10 @@ using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
 class CalloutServer : public ExternalProcessor::Service {
- protected:
+ public:
   // Adds a request header field.
-  void AddRequestHeader(ProcessingResponse* response, std::string_view key,
-                        std::string_view value) {
+  static void AddRequestHeader(ProcessingResponse* response,
+                               std::string_view key, std::string_view value) {
     HeaderValue* new_header = response->mutable_request_headers()
                                   ->mutable_response()
                                   ->mutable_header_mutation()
@@ -43,8 +43,9 @@ class CalloutServer : public ExternalProcessor::Service {
   }
 
   // Replaces a request header field.
-  void ReplaceRequestHeader(ProcessingResponse* response, std::string_view key,
-                            std::string_view value) {
+  static void ReplaceRequestHeader(ProcessingResponse* response,
+                                   std::string_view key,
+                                   std::string_view value) {
     HeaderValueOption* new_header_option = response->mutable_request_headers()
                                                ->mutable_response()
                                                ->mutable_header_mutation()
@@ -57,8 +58,8 @@ class CalloutServer : public ExternalProcessor::Service {
   }
 
   // Adds a response header field.
-  void AddResponseHeader(ProcessingResponse* response, std::string_view key,
-                         std::string_view value) {
+  static void AddResponseHeader(ProcessingResponse* response,
+                                std::string_view key, std::string_view value) {
     HeaderValue* new_header = response->mutable_response_headers()
                                   ->mutable_response()
                                   ->mutable_header_mutation()
@@ -69,8 +70,9 @@ class CalloutServer : public ExternalProcessor::Service {
   }
 
   // Replaces a response header field.
-  void ReplaceResponseHeader(ProcessingResponse* response, std::string_view key,
-                             std::string_view value) {
+  static void ReplaceResponseHeader(ProcessingResponse* response,
+                                    std::string_view key,
+                                    std::string_view value) {
     HeaderValueOption* new_header_option = response->mutable_response_headers()
                                                ->mutable_response()
                                                ->mutable_header_mutation()
@@ -83,7 +85,8 @@ class CalloutServer : public ExternalProcessor::Service {
   }
 
   // Replaces a request body field.
-  void ReplaceRequestBody(ProcessingResponse* response, std::string_view body) {
+  static void ReplaceRequestBody(ProcessingResponse* response,
+                                 std::string_view body) {
     response->mutable_request_body()
         ->mutable_response()
         ->mutable_body_mutation()
@@ -91,15 +94,14 @@ class CalloutServer : public ExternalProcessor::Service {
   }
 
   // Replaces a response body field.
-  void ReplaceResponseBody(ProcessingResponse* response,
-                           std::string_view body) {
+  static void ReplaceResponseBody(ProcessingResponse* response,
+                                  std::string_view body) {
     response->mutable_response_body()
         ->mutable_response()
         ->mutable_body_mutation()
         ->set_body(body);
   }
 
- public:
   grpc::Status Process(
       grpc::ServerContext* context,
       grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream)

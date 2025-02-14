@@ -1,6 +1,8 @@
 # Service Extensions Samples (C++)
 
-This repository contains samples for service extensions using gRPC external processing in C++. It demonstrates how to set up and run different examples dynamically using Docker and Docker Compose.
+This repository contains samples for service extensions using gRPC external
+processing in C++. It demonstrates how to set up and run different examples
+dynamically using Docker and Docker Compose.
 
 ## Copyrights and Licenses
 
@@ -26,7 +28,9 @@ You can run the examples directly with Bazel and Clang without using Docker.
 
 ### Install Bazel
 
-The recommended way to install Bazel is from the [Bazelisk](https://bazel.build/install/bazelisk#installing_bazel) which can manage different Bazel versions.
+The recommended way to install Bazel is from the
+[Bazelisk](https://bazel.build/install/bazelisk#installing_bazel) which can manage different Bazel
+versions.
 
 ### Set Environment Variable
 
@@ -54,7 +58,8 @@ $env:EXAMPLE_TYPE="basic"
 
 Make sure you have Clang installed and then download and build the dependencies:
 
->**Note**: Given that on the C++ environment the dependencies should be compiled before linked, the compiling process may take a while in the first time.
+>**Note**: Given that on the C++ environment the dependencies should be compiled before linked,
+the compiling process may take a while in the first time.
 
 ```sh
 bazel build --config=clang //examples/${EXAMPLE_TYPE}:${EXAMPLE_TYPE}_cpp
@@ -68,7 +73,8 @@ bazel build --config=clang //examples/${EXAMPLE_TYPE}:${EXAMPLE_TYPE}_cpp
 
 ## Building and Running the Examples with Docker
 
-You can run different examples by setting the `EXAMPLE_TYPE` environment variable and using Docker Compose.
+You can run different examples by setting the `EXAMPLE_TYPE` environment variable and
+using Docker Compose.
 
 ### Building Basic Example
 
