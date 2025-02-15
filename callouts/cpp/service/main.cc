@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "basic.h"
+#include "custom_callout_server.h"
 
 int main(int argc, char** argv) {
-  std::string server_address("localhost:8181");
+  std::string server_address("0.0.0.0:8181");
 
   CustomCalloutServer service;
   CalloutServer::RunServer(server_address, service);

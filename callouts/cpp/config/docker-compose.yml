@@ -29,4 +29,4 @@ services:
       - EXAMPLE_TYPE=${EXAMPLE_TYPE}
     volumes:
       - .:/app
-    command: "./examples/${EXAMPLE_TYPE}/${EXAMPLE_TYPE}_cpp"
+    command: "./examples/${EXAMPLE_TYPE}/custom_callout_server_cpp"

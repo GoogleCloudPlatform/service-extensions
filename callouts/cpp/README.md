@@ -9,6 +9,7 @@ dynamically using Docker and Docker Compose.
 Files using Copyright 2025 Google LLC & Apache License Version 2.0:
 
 * [callout_server.h](./service/callout_server.h)
+* [main.cc](./service/main.cc)
 * [examples](./examples)
 
 ## Requirements
@@ -62,13 +63,13 @@ Make sure you have Clang installed and then download and build the dependencies:
 the compiling process may take a while in the first time.
 
 ```sh
-bazel build --config=clang //examples/${EXAMPLE_TYPE}:${EXAMPLE_TYPE}_cpp
+bazel build --config=clang //examples/${EXAMPLE_TYPE}:custom_callout_server_cpp
 ```
 
 ## Run the Application
 
 ```sh
-./bazel-bin/examples/${EXAMPLE_TYPE}/${EXAMPLE_TYPE}_cpp
+./bazel-bin/examples/${EXAMPLE_TYPE}/custom_callout_server_cpp
 ```
 
 ## Building and Running the Examples with Docker

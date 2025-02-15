@@ -2,6 +2,8 @@ package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])  # Apache 2
 
+exports_files(["service/main.cc"])
+
 cc_library(
     name = "callout_service_cpp_lib",
     srcs = ['service/callout_server.h'],

@@ -42,7 +42,7 @@ WORKDIR /app
 COPY . .
 
 # Build the C++ app
-RUN bazel build --config=clang //examples/${EXAMPLE_TYPE}:${EXAMPLE_TYPE}_cpp
+RUN bazel build --config=clang //examples/${EXAMPLE_TYPE}:custom_callout_server_cpp
 
 # Use the same image for the final stage
 FROM marketplace.gcr.io/google/debian12
@@ -60,4 +60,4 @@ COPY ssl_creds ./ssl_creds
 EXPOSE 8443 8181 8000
 
 # Command to run the executable
-CMD "./examples/${EXAMPLE_TYPE}/${EXAMPLE_TYPE}_cpp"
+CMD "./examples/${EXAMPLE_TYPE}/custom_callout_server_cpp"

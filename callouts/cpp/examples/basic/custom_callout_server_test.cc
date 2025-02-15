@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "basic.h"
+#include "custom_callout_server.h"
 
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "google/protobuf/util/message_differencer.h"
@@ -31,7 +31,7 @@ class BasicServerTest : public testing::Test {
 
  protected:
   void SetUp() override {
-    std::string server_address("localhost:8181");
+    std::string server_address("0.0.0.0:8181");
     server = CalloutServer::RunServer(server_address, service_, false);
   }
 
