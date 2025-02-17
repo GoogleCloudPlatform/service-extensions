@@ -14,6 +14,9 @@
 
 #include <grpcpp/grpcpp.h>
 
+#include <boost/asio.hpp>
+#include <boost/beast.hpp>
+
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
 #include "absl/log/log.h"
@@ -21,17 +24,47 @@
 
 ABSL_FLAG(std::string, server_address, "0.0.0.0:8443",
           "The gRPC server addess, like '0.0.0.0:8443'");
-ABSL_FLAG(std::string, health_check_address, "0.0.0.0:8080",
-          "The HTTP health check server addess, like '0.0.0.0:8080'");
+ABSL_FLAG(uint16_t, health_check_port, 8080,
+          "The HTTP health check server port addess, like '8080'");
 ABSL_FLAG(std::string, key_path, "ssl_creds/privatekey.pem",
           "The SSL private key file path");
 ABSL_FLAG(std::string, cert_path, "ssl_creds/chain.pem",
           "The SSL certificate file path");
 
+void StartHttpHealthCheckServer(uint16_t port) {
+  namespace beast = boost::beast;
+  namespace http = beast::http;
+  namespace asio = boost::asio;
+  using tcp = asio::ip::tcp;
+  boost::asio::io_context io_context;
+  tcp::acceptor acceptor(io_context, {tcp::v4(), port});
+
+  LOG(INFO) << "Health check service started on port: " << port;
+
+  while (true) {
+    tcp::socket socket(io_context);
+    acceptor.accept(socket);
+
+    beast::flat_buffer buffer;
+    http::request<http::string_body> request;
+    http::read(socket, buffer, request);
+
+    http::response<http::string_body> response;
+    response.version(request.version());
+    response.result(http::status::ok);
+    response.set(http::field::content_type, "text/plain");
+    response.body() = "";
+    response.prepare_payload();
+    http::write(socket, response);
+
+    socket.shutdown(tcp::socket::shutdown_send);
+  }
+}
+
 int main(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
   std::string server_address = absl::GetFlag(FLAGS_server_address);
-  std::string health_check_address = absl::GetFlag(FLAGS_health_check_address);
+  uint16_t health_check_port = absl::GetFlag(FLAGS_health_check_port);
   std::string key_path = absl::GetFlag(FLAGS_key_path);
   std::string cert_path = absl::GetFlag(FLAGS_cert_path);
 
@@ -50,8 +83,13 @@ int main(int argc, char** argv) {
     LOG(INFO) << "Envoy Ext Proc using insecure credentials";
   }
 
+  // Run the HTTP health check in a separated thread
+  std::thread http_thread(StartHttpHealthCheckServer, health_check_port);
+
   CustomCalloutServer service;
   CalloutServer::RunServer(server_address, service, secure_credentials, true);
+
+  http_thread.join();
 
   return 0;
 }
