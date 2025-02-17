@@ -16,6 +16,8 @@
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
 
+#include <fstream>
+
 #include "absl/log/log.h"
 #include "envoy/service/ext_proc/v3/external_processor.grpc.pb.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
@@ -102,12 +104,42 @@ class CalloutServer : public ExternalProcessor::Service {
         ->set_body(body);
   }
 
-  static std::unique_ptr<grpc::Server> RunServer(std::string server_address,
-                                                 CalloutServer& service,
-                                                 bool wait = true) {
+  // Creates the SSL secure server credentials given the key and cert path set.
+  static std::optional<std::shared_ptr<grpc::ServerCredentials>>
+  CreateSecureServerCredentials(std::string_view key_path,
+                                std::string_view cert_path) {
+    auto key = CalloutServer::ReadDataFile(key_path);
+    if (!key.ok()) {
+      LOG(ERROR) << "Error reading the private key file on " << key_path;
+      return std::nullopt;
+    }
+    auto cert = CalloutServer::ReadDataFile(cert_path);
+    if (!cert.ok()) {
+      LOG(ERROR) << "Error reading the certificate file on " << cert_path;
+      return std::nullopt;
+    }
+
+    grpc::SslServerCredentialsOptions::PemKeyCertPair key_cert_pair;
+    key_cert_pair.private_key = *key;
+    key_cert_pair.cert_chain = *cert;
+
+    grpc::SslServerCredentialsOptions ssl_options;
+    ssl_options.pem_key_cert_pairs.push_back(key_cert_pair);
+    return grpc::SslServerCredentials(ssl_options);
+  }
+
+  static std::unique_ptr<grpc::Server> RunServer(
+      std::string_view server_address, CalloutServer& service) {
+    return CalloutServer::RunServer(server_address, service,
+                                    grpc::InsecureServerCredentials(), false);
+  }
+
+  static std::unique_ptr<grpc::Server> RunServer(
+      std::string_view server_address, CalloutServer& service,
+      std::shared_ptr<grpc::ServerCredentials> credentials, bool wait) {
     grpc::EnableDefaultHealthCheckService(true);
     grpc::ServerBuilder builder;
-    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
+    builder.AddListeningPort(std::string{server_address}, credentials);
     builder.RegisterService(&service);
 
     std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
@@ -160,6 +192,17 @@ class CalloutServer : public ExternalProcessor::Service {
   }
 
  private:
+  static absl::StatusOr<std::string> ReadDataFile(std::string_view path) {
+    std::ifstream file(std::string{path}, std::ios::binary);
+    if (file.fail()) {
+      return absl::NotFoundError(
+          absl::StrCat("failed to open: ", path, ", error: ", strerror(errno)));
+    }
+    std::stringstream file_string_stream;
+    file_string_stream << file.rdbuf();
+    return file_string_stream.str();
+  }
+
   void ProcessRequest(ProcessingRequest* request,
                       ProcessingResponse* response) {
     switch (request->request_case()) {

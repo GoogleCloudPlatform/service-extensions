@@ -8,8 +8,10 @@ cc_library(
     name = "callout_service_cpp_lib",
     srcs = ['service/callout_server.h'],
     deps = [
-        "@com_github_grpc_grpc//:grpc++",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/flags:parse",
         "@com_google_absl//absl/log:log",
+        "@com_github_grpc_grpc//:grpc++",
         ":envoy_cpp",
     ],
 )
