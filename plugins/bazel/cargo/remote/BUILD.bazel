@@ -66,3 +66,9 @@ alias(
     actual = "@cu__url-2.4.1//:url",
     tags = ["manual"],
 )
+
+alias(
+    name = "uuid",
+    actual = "@cu__uuid-1.12.1//:uuid",
+    tags = ["manual"],
+)

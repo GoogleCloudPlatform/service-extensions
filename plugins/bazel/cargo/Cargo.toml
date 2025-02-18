@@ -12,6 +12,7 @@ regex = "1.9"
 url = "2.4"
 lol_html = "=2.0.0"
 ppv-lite86 = "=0.2.18"
+uuid = { version = "1.12.1", features = [ "v4" ] }
 
 [lib]
 crate-type = ["cdylib"]
