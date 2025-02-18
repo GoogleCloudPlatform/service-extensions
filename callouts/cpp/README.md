@@ -109,24 +109,69 @@ This repository provides the following files to be extended to fit the needs of 
 
 ### Making a New Server
 
-TODO
+The provided code defines a basic `CalloutServer` class that implements
+the `ExternalProcessor::Service` interface.
+This server listens for gRPC requests from Envoy and processes them.
+To create a new server, you'll generally extend this class.
 
 ### Extend the CalloutServer
 
-TODO
+To create your custom server, create a new class that inherits from `CalloutServer`.
+This allows you to leverage the existing infrastructure for handling gRPC
+communication and request processing.  The example below demonstrates this.
+
+```c++
+#include "envoy/service/ext_proc/v3/external_processor.pb.h"
+#include "service/callout_server.h"
+
+using envoy::service::ext_proc::v3::ProcessingRequest;
+using envoy::service::ext_proc::v3::ProcessingResponse;
+
+class CustomCalloutServer : public CalloutServer {
+public:
+  // ... overridden methods ...
+};
+```
 
 ### Override the callback methods
 
-TODO
+The `CalloutServer` class provides virtual callback methods for different
+stages of the _request/response_ lifecycle:
+`OnRequestHeader`, `OnResponseHeader`, `OnRequestBody`, and `OnResponseBody`.
+Override these methods in your custom class to implement your specific logic
+like in the example below.
+
+```c++
+// ... your CalloutServer class OnRequestHeader method implementation ...
+void OnRequestHeader(ProcessingRequest* request,
+                     ProcessingResponse* response) {
+  CalloutServer::AddRequestHeader(response, "your-header-key",
+                                  "your-header-value");
+}
+// ...
+```
 
 ### Run the Server
 
-TODO
+To start your custom server, you'll need to create an instance of your custom class
+and use a `grpc::ServerBuilder` to build and start the gRPC server.
 
-## Additional Details
+To make this process easier there is already a [main.cc](./service/main.cc) file which
+serve this purpose.
 
-TODO
+This _main_ file, in addition to initializing the gRPC server, also configures
+command line arguments and initializes the HTTP health check.
+
+An example of how this file can be used together with your custom service
+implementation can be found in this bazel [BUILD](./examples/basic/BUILD) file
+from the _basic_ example. Where it uses _bazel_ build to link this common core
+file during the build process, avoiding code duplication.
 
 ## Using the Proto Files
 
-TODO
+The provided code and this example rely on the Envoy External Processor proto definitions.
+These definitions can be found on the [external_processor.proto](https://github.com/envoyproxy/data-plane-api/blob/main/envoy/service/ext_proc/v3/external_processor.proto).
+
+This file defines the structure of the messages exchanged between Envoy and
+your external processor. Consult the Envoy documentation for details on how
+to generate these files from the `.proto` definitions.
