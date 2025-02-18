@@ -44,12 +44,6 @@ alias(
 )
 
 alias(
-    name = "ppv-lite86",
-    actual = "@cu__ppv-lite86-0.2.18//:ppv_lite86",
-    tags = ["manual"],
-)
-
-alias(
     name = "proxy-wasm",
     actual = "@cu__proxy-wasm-0.2.1//:proxy_wasm",
     tags = ["manual"],

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [START serviceextensions_plugin_domain_rewrite]
+// [START serviceextensions_plugin_html_domain_rewrite]
 use lol_html::*;
 use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
@@ -27,14 +27,20 @@ proxy_wasm::main! {{
 
 struct MyHttpContext<'a> {
     // Some member variables need to be wrapped in Rc<Refcell<T>> so that we can
-    // modify the variable in multiple places as well as share ownership. By
-    // using Rc, we are commiting to not modfying the variable in multiple places
-    // simultaneously, otherwise the code will panic and plugin will crash.
+    // modify the variable in multiple places as well as share ownership.
+    // By using Rc, we are allowing multiple references to the same obeject to
+    // exist at the same time.
+    // By using Refcell, we are evaluating borrow checks at runtime, thus we are
+    // commiting to not modfying the variable in multiple places simultaneously,
+    // otherwise the code will panic and plugin will crash.
 
     // Stores HTML as rewriter parses and modifies HTML.
     // Only stores completed sections(e.g., when rewriter parses "<di", output
     // will be empty until the next chunk comes in. If the next chunk was
     // "v> <h1>foo</h", the output will then contain "<div><h1>foo").
+    // Only stores sections of HTML that have not yet been seen back to client.
+    // After sending data to client, we clear output to avoid unnecessary memory
+    // growth.
     output: Rc<RefCell<Vec<u8>>>,
     // HTML rewriter. Member of MyHttpContext a.k.a "StreamContext" so that the
     // rewriter persists across multiple body callbacks.
@@ -50,7 +56,7 @@ impl<'a> MyHttpContext<'a> {
                 Settings {
                     element_content_handlers: vec![element!("a[href]", move |el| {
                         let href = el.get_attribute("href").unwrap();
-                        let modified_href = href.replace("foo", "bar");
+                        let modified_href = href.replace("foo.com", "bar.com");
                         if modified_href != href {
                             el.set_attribute("href", &modified_href).unwrap();
                         }
@@ -100,4 +106,4 @@ impl<'a> HttpContext for MyHttpContext<'a> {
         return Action::Continue;
     }
 }
-// [END serviceextensions_plugin_domain_rewrite]
+// [END serviceextensions_plugin_html_domain_rewrite]

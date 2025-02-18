@@ -297,7 +297,6 @@ _NORMAL_DEPENDENCIES = {
         _COMMON_CONDITION: {
             "log": Label("@cu__log-0.4.25//:log"),
             "lol_html": Label("@cu__lol_html-2.0.0//:lol_html"),
-            "ppv-lite86": Label("@cu__ppv-lite86-0.2.18//:ppv_lite86"),
             "proxy-wasm": Label("@cu__proxy-wasm-0.2.1//:proxy_wasm"),
             "regex": Label("@cu__regex-1.9.6//:regex"),
             "url": Label("@cu__url-2.4.1//:url"),
@@ -370,9 +369,6 @@ _CONDITIONS = {
     "cfg(target_os = \"emscripten\")": [],
     "cfg(target_os = \"wasi\")": ["@rules_rust//rust/platform:wasm32-wasi"],
     "cfg(unix)": ["@rules_rust//rust/platform:x86_64-unknown-linux-gnu"],
-    "cfg(not(all(target_arch = \"arm\", target_os = \"none\")))": ["@rules_rust//rust/platform:wasm32-wasi"],
-    "cfg(target_os = \"wasi\")": ["@rules_rust//rust/platform:wasm32-wasi"],
-    "cfg(unix)": [],
     "wasm32-wasi": ["@rules_rust//rust/platform:wasm32-wasi"],
     "x86_64-unknown-linux-gnu": ["@rules_rust//rust/platform:x86_64-unknown-linux-gnu"],
 }
@@ -543,6 +539,10 @@ def crate_repositories():
         urls = ["https://static.crates.io/crates/getrandom/0.1.16/download"],
         strip_prefix = "getrandom-0.1.16",
         build_file = Label("@//bazel/cargo/remote:BUILD.getrandom-0.1.16.bazel"),
+    )
+
+    maybe(
+        http_archive,
         name = "cu__getrandom-0.2.15",
         sha256 = "c4567c8db10ae91089c99af84c68c38da3ec2f087c3f82960bcdbf3656b6f4d7",
         type = "tar.gz",
@@ -1083,6 +1083,16 @@ def crate_repositories():
 
     maybe(
         http_archive,
+        name = "cu__wasi-0.11.0-wasi-snapshot-preview1",
+        sha256 = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423",
+        type = "tar.gz",
+        urls = ["https://static.crates.io/crates/wasi/0.11.0+wasi-snapshot-preview1/download"],
+        strip_prefix = "wasi-0.11.0+wasi-snapshot-preview1",
+        build_file = Label("@//bazel/cargo/remote:BUILD.wasi-0.11.0+wasi-snapshot-preview1.bazel"),
+    )
+
+    maybe(
+        http_archive,
         name = "cu__wasi-0.9.0-wasi-snapshot-preview1",
         sha256 = "cccddf32554fecc6acb585f82a32a72e28b48f8c4c1883ddfeeeaa96f7d8e519",
         type = "tar.gz",
@@ -1099,12 +1109,6 @@ def crate_repositories():
         urls = ["https://static.crates.io/crates/zerocopy/0.6.6/download"],
         strip_prefix = "zerocopy-0.6.6",
         build_file = Label("@//bazel/cargo/remote:BUILD.zerocopy-0.6.6.bazel"),
-        name = "cu__wasi-0.11.0-wasi-snapshot-preview1",
-        sha256 = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423",
-        type = "tar.gz",
-        urls = ["https://static.crates.io/crates/wasi/0.11.0+wasi-snapshot-preview1/download"],
-        strip_prefix = "wasi-0.11.0+wasi-snapshot-preview1",
-        build_file = Label("@//bazel/cargo/remote:BUILD.wasi-0.11.0+wasi-snapshot-preview1.bazel"),
     )
 
     maybe(
@@ -1140,7 +1144,6 @@ def crate_repositories():
     return [
         struct(repo = "cu__log-0.4.25", is_dev_dep = False),
         struct(repo = "cu__lol_html-2.0.0", is_dev_dep = False),
-        struct(repo = "cu__ppv-lite86-0.2.18", is_dev_dep = False),
         struct(repo = "cu__proxy-wasm-0.2.1", is_dev_dep = False),
         struct(repo = "cu__regex-1.9.6", is_dev_dep = False),
         struct(repo = "cu__url-2.4.1", is_dev_dep = False),
