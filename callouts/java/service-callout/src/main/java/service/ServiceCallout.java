@@ -51,10 +51,11 @@ public class ServiceCallout {
     private static final Logger logger = Logger.getLogger(ServiceCallout.class.getName());
 
     private Server server;
+    private Server plaintextServer;
     private HttpServer healthCheckServer;
     private String ip;
     private int port;
-    private int insecurePort;
+    private int plaintextPort;
     private String healthCheckIp;
     private int healthCheckPort;
     private String healthCheckPath;
@@ -64,12 +65,12 @@ public class ServiceCallout {
     private byte[] certKey;
     private String certKeyPath;
     private int serverThreadCount;
-    private boolean enableInsecurePort;
+    private boolean enablePlainTextPort;
 
     protected ServiceCallout(Builder<?> builder) {
         this.ip = Optional.ofNullable(builder.ip).orElse("0.0.0.0");
         this.port = Optional.ofNullable(builder.port).orElse(443);
-        this.insecurePort = Optional.ofNullable(builder.insecurePort).orElse(8080);
+        this.plaintextPort = Optional.ofNullable(builder.plaintextPort).orElse(8080);
         this.healthCheckIp = Optional.ofNullable(builder.healthCheckIp).orElse("0.0.0.0");
         this.healthCheckPort = Optional.ofNullable(builder.healthCheckPort).orElse(80);
         this.healthCheckPath = Optional.ofNullable(builder.healthCheckPath).orElse("/");
@@ -86,7 +87,7 @@ public class ServiceCallout {
                 .orElseGet(() -> readFileToBytes(this.certKeyPath)); // Read using final path
 
         this.serverThreadCount = Optional.ofNullable(builder.serverThreadCount).orElse(2);
-        this.enableInsecurePort = Optional.ofNullable(builder.enableInsecurePort).orElse(true);
+        this.enablePlainTextPort = Optional.ofNullable(builder.enablePlainTextPort).orElse(true);
 
         // Initialize health check server if enabled
         if (!this.combinedHealthCheck) {
@@ -103,7 +104,7 @@ public class ServiceCallout {
     public static class Builder<T extends Builder<T>> {
         private String ip;
         private Integer port;
-        private Integer insecurePort;
+        private Integer plaintextPort;
         private String healthCheckIp;
         private Integer healthCheckPort;
         private String healthCheckPath;
@@ -113,7 +114,7 @@ public class ServiceCallout {
         private byte[] certKey;
         private String certKeyPath;
         private Integer serverThreadCount;
-        private Boolean enableInsecurePort;
+        private Boolean enablePlainTextPort;
 
         public T setIp(String ip) {
             this.ip = ip;
@@ -125,8 +126,8 @@ public class ServiceCallout {
             return self();
         }
 
-        public T setInsecurePort(Integer insecurePort) {
-            this.insecurePort = insecurePort;
+        public T setPlaintextPort(Integer plaintextPort) {
+            this.plaintextPort = plaintextPort;
             return self();
         }
 
@@ -175,8 +176,8 @@ public class ServiceCallout {
             return self();
         }
 
-        public T setEnableInsecurePort(Boolean enableInsecurePort) {
-            this.enableInsecurePort = enableInsecurePort;
+        public T setEnablePlainTextPort(Boolean enablePlainTextPort) {
+            this.enablePlainTextPort = enablePlainTextPort;
             return self();
         }
 
@@ -209,24 +210,34 @@ public class ServiceCallout {
      * @throws IOException If an error occurs while starting the server.
      */
     public void start() throws IOException {
-        ServerBuilder<?> serverBuilder;
+        ExternalProcessorImpl processor = new ExternalProcessorImpl();
 
         if (cert != null && certKey != null) {
             logger.info("Secure server starting...");
-            serverBuilder = NettyServerBuilder.forPort(port)
-                    .sslContext(createSslContext(cert, certKey));
-        } else {
-            logger.info("Insecure server starting...");
-            serverBuilder = ServerBuilder.forPort(port);
+
+            server = NettyServerBuilder.forPort(port)
+                    .sslContext(createSslContext(cert, certKey))
+                    .addService(processor)
+                    .executor(Executors.newFixedThreadPool(serverThreadCount)) // Configurable thread pool
+                    .build()
+                    .start();
+
+            logger.info("Secure Server started, listening on " + port);
+
+        }
+        if (enablePlainTextPort) {
+            logger.info("Plaintext server starting...");
+
+            plaintextServer = ServerBuilder.forPort(plaintextPort)
+                    .addService(processor)
+                    .executor(Executors.newFixedThreadPool(serverThreadCount)) // Configurable thread pool
+                    .build()
+                    .start();
+
+            logger.info("Plaintext Server started, listening on " + plaintextPort);
         }
 
-        server = serverBuilder
-                .addService(new ExternalProcessorImpl())
-                .executor(Executors.newFixedThreadPool(serverThreadCount)) // Configurable thread pool
-                .build()
-                .start();
 
-        logger.info("Server started, listening on " + port);
 
         // Start Health Check Server if enabled
         if (!combinedHealthCheck) {
@@ -256,6 +267,10 @@ public class ServiceCallout {
             server.shutdown().awaitTermination(30, TimeUnit.SECONDS);
         }
 
+        if (plaintextServer != null) {
+            plaintextServer.shutdown().awaitTermination(30, TimeUnit.SECONDS);
+        }
+
         if (!combinedHealthCheck && healthCheckServer != null) {
             healthCheckServer.stop(0); // 0 delay for immediate stop
             logger.info("Health Check Server stopped.");
@@ -271,6 +286,10 @@ public class ServiceCallout {
     public void blockUntilShutdown() throws InterruptedException {
         if (server != null) {
             server.awaitTermination();
+        }
+
+        if (plaintextServer != null) {
+            plaintextServer.awaitTermination();
         }
     }
 

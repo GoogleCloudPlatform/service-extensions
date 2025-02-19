@@ -145,7 +145,7 @@ public class BasicCalloutServer extends ServiceCallout {
      * ServiceCallout.Builder builder = new ServiceCallout.Builder()
      *     .setIp("111.222.333.444")       // Customize IP
      *     .setPort(8443)                  // Set the port for secure communication
-     *     .setEnableInsecurePort(true)    // Enable an insecure communication port
+     *     .setEnablePlainTextPort(true)   // Enable an insecure communication port
      *     .setServerThreadCount(4);       // Set the number of server threads
      * }</pre>
      *
@@ -155,9 +155,6 @@ public class BasicCalloutServer extends ServiceCallout {
     public static void main(String[] args) throws Exception {
         // Create a builder for ServiceCallout with custom configuration
         BasicCalloutServer server = new BasicCalloutServer.Builder()
-                .setHealthCheckPort(8000)
-                .setHealthCheckPath("/health")
-                .setCombinedHealthCheck(false)
                 .build();
 
         // Start the server

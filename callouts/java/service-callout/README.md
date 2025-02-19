@@ -78,7 +78,7 @@ docker build -t service-callout:1.0-SNAPSHOT .
 To run the BasicCalloutServer class for example, use the following command:
 
 ```sh
-docker run -p 8000:8000 -p 8443:8443 service-callout:1.0-SNAPSHOT example.BasicCalloutServer
+docker run -p 80:80 -p 443:443 service-callout:1.0-SNAPSHOT example.BasicCalloutServer
 ```
 
 ### Running with JVM Options
@@ -86,7 +86,7 @@ docker run -p 8000:8000 -p 8443:8443 service-callout:1.0-SNAPSHOT example.BasicC
 If you need to pass JVM options (e.g., setting the maximum heap size), use the -e JAVA_OPTS flag:
 
 ```sh
-docker run -p 8000:8000 -p 8443:8443 \
+docker run -p 80:80 -p 443:443 \
  -e JAVA_OPTS="-Xmx512m" \
  service-callout:1.0-SNAPSHOT example.BasicCalloutServer
 ```

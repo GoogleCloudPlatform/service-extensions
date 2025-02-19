@@ -96,7 +96,7 @@ public class Redirect extends ServiceCallout {
      * ServiceCallout.Builder builder = new ServiceCallout.Builder()
      *     .setIp("111.222.333.444")       // Customize IP
      *     .setPort(8443)                  // Set the port for secure communication
-     *     .setEnableInsecurePort(true)    // Enable an insecure communication port
+     *     .setEnablePlainTextPort(true)   // Enable an insecure communication port
      *     .setServerThreadCount(4);       // Set the number of server threads
      * }</pre>
      *

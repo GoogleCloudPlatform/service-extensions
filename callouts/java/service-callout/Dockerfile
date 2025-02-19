@@ -48,7 +48,7 @@ COPY --from=builder /app/target/service-callout-1.0-SNAPSHOT-jar-with-dependenci
 COPY src/main/resources/certs ./certs
 
 # Expose necessary ports
-EXPOSE 8000 8443
+EXPOSE 80 443 8080
 
 # Environment variable for JVM options (optional)
 ENV JAVA_OPTS=""
