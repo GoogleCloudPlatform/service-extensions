@@ -179,21 +179,48 @@ load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencie
 
 crate_universe_dependencies(bootstrap = True)
 
-# Regenerate: $ CARGO_BAZEL_REPIN=1 bazelisk build //...
-load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
-
-crates_repository(
-    name = "crate_index",
-    cargo_lockfile = "//:Cargo.lock",
-    # See https://github.com/GoogleCloudPlatform/service-extensions/issues/31
-    generate_target_compatible_with = False,
-    generator = "@cargo_bazel_bootstrap//:cargo-bazel",
-    lockfile = "//:Cargo.Bazel.lock",
-    manifests = ["//:Cargo.toml"],
-    supported_platform_triples = ["wasm32-wasi"],
-)
-
-# Reference: @crate_index//:proxy-wasm (etc)
-load("@crate_index//:defs.bzl", "crate_repositories")
+# Regenerate: $ bazelisk run bazel/cargo:crates_vendor -- --repin
+# Reference: //bazel/cargo/remote:proxy-wasm (etc)
+load("//bazel/cargo/remote:crates.bzl", "crate_repositories")
 
 crate_repositories()
+
+http_archive(
+    name = "io_bazel_rules_go",
+    sha256 = "6b31d0956948082d918879d2fad0d6351f6471af113c4df363ead109419345ec",
+    strip_prefix = "rules_go-623f600f2907d02332d2519b96d1849c9d566bb6",
+    urls = [
+        "https://github.com/bazel-contrib/rules_go/archive/623f600f2907d02332d2519b96d1849c9d566bb6.zip",
+    ],
+)
+
+http_archive(
+    name = "bazel_gazelle",
+    sha256 = "aefbf2fc7c7616c9ed73aa3d51c77100724d5b3ce66cfa16406e8c13e87c8b52",
+    urls = [
+        "https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.41.0/bazel-gazelle-v0.41.0.tar.gz",
+    ],
+)
+
+load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
+load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
+
+go_repository(
+    name = "com_github_proxy_wasm_proxy_wasm_go_sdk",
+    importpath = "github.com/proxy-wasm/proxy-wasm-go-sdk",
+    sum = "h1:UiqUl6PLcIW4S93FkmbK9gK2r2veY0MI6nKEXMk/9Ws=",
+    version = "v0.0.0-20241219182957-23e5db51ea08",
+)
+
+go_repository(
+    name = "com_github_golang_jwt_jwt_v5",
+    importpath = "github.com/golang-jwt/jwt/v5",
+    sum = "h1:OuVbFODueb089Lh128TAcimifWaLhJwVflnrgM17wHk=",
+    version = "v5.2.1",
+)
+
+go_rules_dependencies()
+
+go_register_toolchains(version = "1.24rc1")
+
+gazelle_dependencies()

@@ -73,8 +73,7 @@ class MyHttpContext : public Context {
       // Check if the JWT is allowed.
       const auto status = google::jwt_verify::verifyJwt(jwt, *root_->jwks());
       if (status != google::jwt_verify::Status::Ok) {
-        LOG_INFO("Access forbidden - " +
-                 google::jwt_verify::getStatusString(status));
+        LOG_INFO("Access forbidden.");
         sendLocalResponse(403, "", "Access forbidden.\n", {});
         return FilterHeadersStatus::ContinueAndEndStream;
       }
