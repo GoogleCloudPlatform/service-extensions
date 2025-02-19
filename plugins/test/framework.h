@@ -234,6 +234,8 @@ class TestHttpContext : public TestContext {
  private:
   // Ensure that we invoke teardown handlers just once.
   bool torn_down_ = false;
+  // Prevent further modification of result if plugin sends response
+  bool immediate_response_ = false;
   // State tracked during a headers call. Invalid otherwise.
   proxy_wasm::WasmHeaderMapType phase_;
   Result result_;

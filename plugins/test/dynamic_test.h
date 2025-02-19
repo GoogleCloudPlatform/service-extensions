@@ -70,7 +70,8 @@ class DynamicTest : public DynamicFixture {
   void CheckPhaseResults(const std::string& phase,
                          const pb::Expectation& expect,
                          const TestContext& context,
-                         const TestHttpContext::Result& result);
+                         const TestHttpContext::Result& result,
+                         bool* immediate_response_sent);
 
   // Helper to match string expectations.
   void FindString(const std::string& phase, const std::string& type,

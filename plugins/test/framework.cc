@@ -78,6 +78,7 @@ ContextOptions& TestContext::options() const {
 
 proxy_wasm::BufferInterface* TestHttpContext::getBuffer(
     proxy_wasm::WasmBufferType type) {
+  if (immediate_response_) return nullptr;
   switch (type) {
     case proxy_wasm::WasmBufferType::PluginConfiguration:
       return TestContext::getBuffer(type);
@@ -99,6 +100,7 @@ proxy_wasm::BufferInterface* TestHttpContext::getBuffer(
 proxy_wasm::WasmResult TestHttpContext::getHeaderMapSize(
     proxy_wasm::WasmHeaderMapType type, uint32_t* result) {
   if (type != phase_) return proxy_wasm::WasmResult::BadArgument;
+  if (immediate_response_) return proxy_wasm::WasmResult::BadExpression;
   *result = result_.headers.size();
   return proxy_wasm::WasmResult::Ok;
 }
@@ -106,6 +108,7 @@ proxy_wasm::WasmResult TestHttpContext::getHeaderMapValue(
     proxy_wasm::WasmHeaderMapType type, std::string_view key,
     std::string_view* value) {
   if (type != phase_) return proxy_wasm::WasmResult::BadArgument;
+  if (immediate_response_) return proxy_wasm::WasmResult::BadExpression;
   auto it = result_.headers.find(std::string(key));
   if (it == result_.headers.end()) {
     return proxy_wasm::WasmResult::NotFound;
@@ -117,6 +120,7 @@ proxy_wasm::WasmResult TestHttpContext::addHeaderMapValue(
     proxy_wasm::WasmHeaderMapType type, std::string_view key,
     std::string_view value) {
   if (type != phase_) return proxy_wasm::WasmResult::BadArgument;
+  if (immediate_response_) return proxy_wasm::WasmResult::BadExpression;
   result_.headers.InsertOrAppend(key, value);
   return proxy_wasm::WasmResult::Ok;
 }
@@ -124,18 +128,21 @@ proxy_wasm::WasmResult TestHttpContext::replaceHeaderMapValue(
     proxy_wasm::WasmHeaderMapType type, std::string_view key,
     std::string_view value) {
   if (type != phase_) return proxy_wasm::WasmResult::BadArgument;
+  if (immediate_response_) return proxy_wasm::WasmResult::BadExpression;
   result_.headers[std::string(key)] = std::string(value);
   return proxy_wasm::WasmResult::Ok;
 }
 proxy_wasm::WasmResult TestHttpContext::removeHeaderMapValue(
     proxy_wasm::WasmHeaderMapType type, std::string_view key) {
   if (type != phase_) return proxy_wasm::WasmResult::BadArgument;
+  if (immediate_response_) return proxy_wasm::WasmResult::BadExpression;
   result_.headers.erase(std::string(key));
   return proxy_wasm::WasmResult::Ok;
 }
 proxy_wasm::WasmResult TestHttpContext::getHeaderMapPairs(
     proxy_wasm::WasmHeaderMapType type, proxy_wasm::Pairs* result) {
   if (type != phase_) return proxy_wasm::WasmResult::BadArgument;
+  if (immediate_response_) return proxy_wasm::WasmResult::BadExpression;
   for (const auto& [key, val] : result_.headers) {
     result->push_back({key, val});
   }
@@ -144,6 +151,7 @@ proxy_wasm::WasmResult TestHttpContext::getHeaderMapPairs(
 proxy_wasm::WasmResult TestHttpContext::setHeaderMapPairs(
     proxy_wasm::WasmHeaderMapType type, const proxy_wasm::Pairs& pairs) {
   if (type != phase_) return proxy_wasm::WasmResult::BadArgument;
+  if (immediate_response_) return proxy_wasm::WasmResult::BadExpression;
   result_.headers.clear();
   for (const auto& [key, val] : pairs) {
     addHeaderMapValue(type, key, val);
@@ -155,8 +163,9 @@ proxy_wasm::WasmResult TestHttpContext::sendLocalResponse(
     uint32_t response_code, std::string_view body_text,
     proxy_wasm::Pairs additional_headers, uint32_t grpc_status,
     std::string_view details) {
-  if (phase_ != proxy_wasm::WasmHeaderMapType::RequestHeaders &&
-      phase_ != proxy_wasm::WasmHeaderMapType::ResponseHeaders) {
+  if (current_callback_ != TestHttpContext::CallbackType::RequestHeaders &&
+      current_callback_ != TestHttpContext::CallbackType::RequestBody &&
+      current_callback_ != TestHttpContext::CallbackType::ResponseHeaders) {
     return proxy_wasm::WasmResult::BadArgument;
   }
   result_.http_code = response_code;
@@ -167,6 +176,7 @@ proxy_wasm::WasmResult TestHttpContext::sendLocalResponse(
   for (const auto& [key, val] : additional_headers) {
     result_.headers[std::string(key)] = std::string(val);
   }
+  immediate_response_ = true;
   return proxy_wasm::WasmResult::Ok;
 }
 
@@ -185,20 +195,30 @@ TestHttpContext::Result TestHttpContext::SendRequestHeaders(
 TestHttpContext::Result TestHttpContext::SendRequestBody(std::string body) {
   phase_logs_.clear();
   result_ = Result{};
-  body_buffer_.setOwned(std::move(body));
   current_callback_ = TestHttpContext::CallbackType::RequestBody;
+  // Don't invoke callbacks if immediate response has been sent.
+  if (immediate_response_) return std::move(result_);
+  body_buffer_.setOwned(std::move(body));
   result_.body_status =
       onRequestBody(body_buffer_.size(), /*end_of_stream=*/false);
-  result_.body = body_buffer_.release();
+  // Use body_buffer unless body was set via sendLocalResponse
+  if (result_.body == "") {
+    result_.body = body_buffer_.release();
+  }
   return std::move(result_);
 }
 
 TestHttpContext::Result TestHttpContext::SendResponseHeaders(
     TestHttpContext::Headers headers) {
   phase_logs_.clear();
-  result_ = Result{.headers = std::move(headers)};
   phase_ = proxy_wasm::WasmHeaderMapType::ResponseHeaders;
   current_callback_ = TestHttpContext::CallbackType::ResponseHeaders;
+  // Don't invoke callbacks if immediate response has been sent.
+  if (immediate_response_) {
+    result_ = Result{};
+    return std::move(result_);
+  }
+  result_ = Result{.headers = std::move(headers)};
   result_.header_status =
       onResponseHeaders(result_.headers.size(), /*end_of_stream=*/false);
   phase_ = proxy_wasm::WasmHeaderMapType(-1);  // ideally 0 would mean unset
@@ -208,8 +228,10 @@ TestHttpContext::Result TestHttpContext::SendResponseHeaders(
 TestHttpContext::Result TestHttpContext::SendResponseBody(std::string body) {
   phase_logs_.clear();
   result_ = Result{};
-  body_buffer_.setOwned(std::move(body));
   current_callback_ = TestHttpContext::CallbackType::ResponseBody;
+  // Don't invoke callbacks if immediate response has been sent.
+  if (immediate_response_) return std::move(result_);
+  body_buffer_.setOwned(std::move(body));
   result_.body_status =
       onResponseBody(body_buffer_.size(), /*end_of_stream=*/false);
   result_.body = body_buffer_.release();

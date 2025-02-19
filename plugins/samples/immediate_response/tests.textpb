@@ -1,0 +1,65 @@
+test {
+  name: "ImmediateResponseFromRequestHeaders"
+  request_headers {
+    input {
+      header { key: "Send-Immediate-Response" value: "true"}
+    }
+    result {
+      immediate {http_status: 500 details: "sent immediate response in onRequestHeaders"}
+      has_header { key: "ImmediateResponseHeaderKey" value: "Value" }
+    }
+  }
+}
+
+test {
+  name: "ImmediateResponseFromRequestBody"
+  request_headers {
+    input {
+      header { key: "Send-Immediate-Response" value: "false"}
+    }
+    result {
+      has_header { key: "Greeting" value: "hello" }
+      has_header { key: "Farewell" value: "goodbye" }
+    }
+  }
+  request_body {
+    input {
+      content: "Immediate response in onRequestBody"
+    }
+    result {
+      immediate {http_status: 500 details: "sent immediate response in onRequestBody"}
+      has_header { key: "ImmediateResponseHeaderKey" value: "Value" }
+      body { exact: "Immediate response body"}
+    }
+  }
+}
+
+test {
+  name: "ImmediateResponseFromResponseHeaders"
+  request_headers {
+    input {
+      header { key: "Send-Immediate-Response" value: "false"}
+    }
+    result {
+      has_header { key: "Greeting" value: "hello" }
+      has_header { key: "Farewell" value: "goodbye" }
+    }
+  }
+  request_body {
+    input {
+      content: "Hello"
+    }
+    result {
+      body { exact: "Hellofoo"}
+    }
+  }
+  response_headers {
+    input {
+      header { key: "immediate-response-response-headers" value: "true"}
+    }
+    result {
+      immediate {http_status: 500 details: "sent immediate response in onResponseHeaders"}
+      has_header { key: "ImmediateResponseHeaderKey" value: "Value" }
+    }
+  }
+}
