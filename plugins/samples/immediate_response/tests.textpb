@@ -55,7 +55,7 @@ test {
   }
   response_headers {
     input {
-      header { key: "immediate-response-response-headers" value: "true"}
+      header { key: "Send-Immediate-Response" value: "true"}
     }
     result {
       immediate {http_status: 500 details: "sent immediate response in onResponseHeaders"}
