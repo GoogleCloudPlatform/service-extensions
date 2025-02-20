@@ -15,6 +15,7 @@ We recommend the following process:
 
 1.  Write a wasm plugin using the [samples](#samples) and SDKs as a starting
     point: [C++](https://github.com/proxy-wasm/proxy-wasm-cpp-sdk),
+    [Go](https://github.com/proxy-wasm/proxy-wasm-go-sdk),
     [Rust](https://github.com/proxy-wasm/proxy-wasm-rust-sdk). See also the
     [best practices](https://cloud.google.com/service-extensions/docs/plugin-best-practices).
 1.  [Build](#build) the plugin.
@@ -135,6 +136,8 @@ for your own plugin. Extend them to fit your particular use case.
 *   [Check for PII on response](samples/check_pii): Checks the response HTTP
     headers and body for the presence of credit card numbers. If found, the
     initial numbers will be masked.
+*   [Validate client token on query string using HMAC](samples/hmac_authtoken):
+    Check the client request URL for a valid token signed using HMAC.
 
 # Feature set / ABI
 
