@@ -64,7 +64,7 @@ jobs:
       run: echo "CACHE_TAG=bazel-cache-${{ matrix.name }}-${{ hashFiles('WORKSPACE', '.bazelrc', '.bazelversion') }}" >> "$GITHUB_OUTPUT"
 
     - name: bazel cache
-      uses: actions/cache/restore@v3
+      uses: actions/cache/restore@v4
       with:
         path: /tmp/bazel/cache
         key: ${{ steps.vars.outputs.CACHE_TAG }}-${{ github.sha }}
