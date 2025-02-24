@@ -1,5 +1,6 @@
 test {
   name: "AddsRequestHeader"
+  benchmark: true
   request_headers {
     result {
       has_header { key: "Message" value: "hello" }
@@ -9,6 +10,7 @@ test {
 }
 test {
   name: "UpdatesRequestHeader"
+  benchmark: true
   request_headers {
     input {
       header { key: "Message" value: "hey" }
@@ -35,6 +37,7 @@ test {
 }
 test {
   name: "ExtendsResponseHeader"
+  benchmark: true
   response_headers {
     input { header { key: "Message" value: "foo" } }
     result { has_header { key: "Message" value: "foo, bar" } }
@@ -42,6 +45,7 @@ test {
 }
 test {
   name: "RemovesResponseHeader"
+  benchmark: true
   response_headers {
     input { header { key: "Welcome" value: "any" } }
     result { no_header { key: "Welcome" } }
@@ -50,6 +54,7 @@ test {
 # Behavior is independent of stream.
 test {
   name: "RequestAndResponse"
+  benchmark: true
   request_headers {
     result { has_header { key: "Message" value: "hello" } }
   }
