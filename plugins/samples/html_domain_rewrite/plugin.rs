@@ -22,8 +22,22 @@ use std::rc::Rc;
 
 proxy_wasm::main! {{
     proxy_wasm::set_log_level(LogLevel::Trace);
-    proxy_wasm::set_http_context(|_, _| -> Box<dyn HttpContext> { MyHttpContext::new()});
+    proxy_wasm::set_http_context(|_, _| -> Box<dyn HttpContext> { Box::new(MyHttpContext::new())});
 }}
+struct MyOutputSink {
+    // Stores HTML as the rewriter parses and modifies HTML.
+    // Only stores sections of HTML that have not yet been seen back to client.
+    // After sending data to client, we clear output to avoid unnecessary memory
+    // growth.
+    // See comment in MyHttpContext about use of Rc<RefCell<T>>.
+    output_sink: Rc<RefCell<Vec<u8>>>,
+}
+
+impl OutputSink for MyOutputSink {
+    fn handle_chunk(&mut self, chunk: &[u8]) {
+        self.output_sink.borrow_mut().extend_from_slice(chunk);
+    }
+}
 
 struct MyHttpContext<'a> {
     // Some member variables need to be wrapped in Rc<Refcell<T>> so that we can
@@ -34,23 +48,28 @@ struct MyHttpContext<'a> {
     // commiting to not modfying the variable in multiple places simultaneously,
     // otherwise the code will panic and plugin will crash.
 
-    // Stores HTML as rewriter parses and modifies HTML.
-    // Only stores completed sections(e.g., when rewriter parses "<di", output
-    // will be empty until the next chunk comes in. If the next chunk was
-    // "v> <h1>foo</h", the output will then contain "<div><h1>foo").
+    // Stores HTML as the rewriter parses and modifies HTML.
     // Only stores sections of HTML that have not yet been seen back to client.
     // After sending data to client, we clear output to avoid unnecessary memory
     // growth.
     output: Rc<RefCell<Vec<u8>>>,
-    // HTML rewriter. Member of MyHttpContext a.k.a "StreamContext" so that the
-    // rewriter persists across multiple body callbacks.
-    rewriter: Option<HtmlRewriter<'a, Box<dyn FnMut(&[u8])>>>,
+    // HtmlRewriter. Member of MyHttpContext a.k.a "StreamContext" so that the
+    // rewriter persists across multiple body callbacks.The rewriter parses
+    // and modifies chunks of Html. Behavior for Html modifications are defined
+    // via content_handlers. The rewriter only writes completed sections of Html to
+    // the output sink(e.g., when the rewriter parses "<di", nothing will be
+    // sent to the output sink. If the next chunk was "v> <h1>foo</h", the
+    // rewriter would then write "<div><h1>foo" to the output sink) unless
+    // HtmlRewriter::end() is called. HtmlRewriter::end() results in all
+    // uncompleted Html being buffered in rewriter to be sent to output sink as
+    // if it were plain text.
+    rewriter: Option<HtmlRewriter<'a, MyOutputSink>>,
 }
 
 impl<'a> MyHttpContext<'a> {
-    pub fn new() -> Box<MyHttpContext<'a>> {
+    pub fn new() -> MyHttpContext<'a> {
         let output = Rc::new(RefCell::new(Vec::new()));
-        Box::new(MyHttpContext {
+        MyHttpContext {
             output: output.clone(),
             rewriter: Some(HtmlRewriter::new(
                 Settings {
@@ -65,9 +84,11 @@ impl<'a> MyHttpContext<'a> {
                     })],
                     ..Settings::new()
                 },
-                Box::new(move |c: &[u8]| output.borrow_mut().extend_from_slice(c)),
+                MyOutputSink {
+                    output_sink: output,
+                },
             )),
-        })
+        }
     }
 
     fn parse_chunk(&mut self, body_bytes: Bytes) -> Result<(), Box<dyn Error>> {
@@ -100,6 +121,7 @@ impl<'a> HttpContext for MyHttpContext<'a> {
                 );
             }
         }
+        // Replace the entire chunk (0 to body_size) with the latest data emitted by the rewriter
         self.set_http_response_body(0, body_size, self.output.borrow().as_slice());
         // Clear output after usage to avoid unnecessary memory growth.
         self.output.borrow_mut().clear();
