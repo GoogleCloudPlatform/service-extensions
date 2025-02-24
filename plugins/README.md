@@ -138,8 +138,6 @@ for your own plugin. Extend them to fit your particular use case.
     initial numbers will be masked.
 *   [Validate client token on query string using HMAC](samples/hmac_authtoken):
     Check the client request URL for a valid token signed using HMAC.
-*   [Modify body based on request headers](samples/configurable_body_modification):
-    Check for specific request headers that set parameters for corresponding setBuffer calls in body callback.
 
 # Feature set / ABI
 
