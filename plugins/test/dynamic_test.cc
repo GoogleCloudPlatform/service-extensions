@@ -192,15 +192,17 @@ void DynamicTest::TestBody() {
   CheckSideEffects("stream_init", cfg_.stream_init(), stream);
 
   // Exercise phase tests in sequence.
+  bool immediate_response_sent = false;
   if (cfg_.has_request_headers()) {
     const auto& invoke = cfg_.request_headers();
     auto headers = ParseHeaders(invoke.input(), /*is_request=*/true);
     ASSERT_TRUE(headers.ok()) << headers.status();
     auto res = stream.SendRequestHeaders(*headers);
     ASSERT_VM_HEALTH("request_headers", handle, stream);
-    CheckPhaseResults("request_headers", invoke.result(), stream, res);
+    CheckPhaseResults("request_headers", invoke.result(), stream, res,
+                      &immediate_response_sent);
   }
-  auto run_body_test = [&handle, &stream, this](
+  auto run_body_test = [&handle, &stream, &immediate_response_sent, this](
                            std::string phase,
                            google::protobuf::RepeatedPtrField<pb::Invocation>
                                invocations,
@@ -216,7 +218,8 @@ void DynamicTest::TestBody() {
     }
     for (const pb::Invocation& invocation : invocations) {
       TestHttpContext::Result body_result = TestHttpContext::Result{};
-      absl::StatusOr<std::string> complete_input_body = ParseBodyInput(invocation.input());
+      absl::StatusOr<std::string> complete_input_body =
+          ParseBodyInput(invocation.input());
       if (!complete_input_body.ok()) {
         FAIL() << complete_input_body.status();
       }
@@ -231,9 +234,15 @@ void DynamicTest::TestBody() {
       for (std::string& body_chunk : chunks) {
         TestHttpContext::Result res = invoke_wasm(std::move(body_chunk));
         ASSERT_VM_HEALTH(phase, handle, stream);
+        if (res.http_code != 0 || res.grpc_code != 0) {
+          CheckPhaseResults(phase, invocation.result(), stream, res,
+                            &immediate_response_sent);
+          return;
+        }
         body_result.body = body_result.body.append(res.body);
       }
-      CheckPhaseResults(phase, invocation.result(), stream, body_result);
+      CheckPhaseResults(phase, invocation.result(), stream, body_result,
+                        &immediate_response_sent);
     }
   };
 
@@ -247,7 +256,8 @@ void DynamicTest::TestBody() {
     ASSERT_TRUE(headers.ok()) << headers.status();
     auto res = stream.SendResponseHeaders(*headers);
     ASSERT_VM_HEALTH("response_headers", handle, stream);
-    CheckPhaseResults("response_headers", invoke.result(), stream, res);
+    CheckPhaseResults("response_headers", invoke.result(), stream, res,
+                      &immediate_response_sent);
   }
 
   ASSERT_NO_FATAL_FAILURE(run_body_test(
@@ -392,7 +402,66 @@ void DynamicTest::CheckSideEffects(const std::string& phase,
 void DynamicTest::CheckPhaseResults(const std::string& phase,
                                     const pb::Expectation& expect,
                                     const TestContext& context,
-                                    const TestHttpContext::Result& result) {
+                                    const TestHttpContext::Result& result,
+                                    bool* immediate_response_sent) {
+  if (*immediate_response_sent &&
+      (expect.has_immediate() || expect.has_header_size() != 0 ||
+       expect.no_header_size() != 0 || expect.headers_size() != 0 ||
+       expect.body_size() != 0 || expect.log_size() != 0)) {
+    ADD_FAILURE() << absl::Substitute(
+        "[$0] Expected results after sending immediate response in previous "
+        "callback.",
+        phase);
+    return;
+  }
+  // Check immediate response.
+  bool is_continue_headers =
+      (result.header_status == proxy_wasm::FilterHeadersStatus::Continue ||
+       result.header_status ==
+           proxy_wasm::FilterHeadersStatus::ContinueAndEndStream);
+  bool is_continue_body =
+      result.body_status == proxy_wasm::FilterDataStatus::Continue;
+  if (expect.has_immediate() && (is_continue_headers && is_continue_body)) {
+    ADD_FAILURE() << absl::Substitute(
+        "[$0] Expected immediate reply (stop filters status), status is 0",
+        phase);
+  } else if (!expect.has_immediate() &&
+             !(is_continue_headers && is_continue_body)) {
+    if (!is_continue_headers) {
+      ADD_FAILURE() << absl::Substitute(
+          "[$0] Expected no immediate reply (HTTP code == 0), status is $1",
+          phase, result.header_status);
+    } else {
+      ADD_FAILURE() << absl::Substitute(
+          "[$0] Expected no immediate reply (HTTP code == 0), status is $1",
+          phase, result.body_status);
+    }
+  }
+  if (expect.has_immediate() == (result.http_code == 0)) {
+    ADD_FAILURE() << absl::Substitute(
+        "[$0] Expected $1, HTTP code is $2", phase,
+        expect.has_immediate() ? "immediate reply (HTTP code > 0)"
+                               : "no immediate reply (HTTP code == 0)",
+        result.http_code);
+  }
+  const auto& imm = expect.immediate();
+  if (imm.has_http_status() && imm.http_status() != result.http_code) {
+    ADD_FAILURE() << absl::Substitute("[$0] HTTP status is $1, expected $2",
+                                      phase, result.http_code,
+                                      imm.http_status());
+  }
+  if (imm.has_grpc_status() && imm.grpc_status() != result.grpc_code) {
+    ADD_FAILURE() << absl::Substitute("[$0] gRPC status is $1, expected $2",
+                                      phase, result.grpc_code,
+                                      imm.grpc_status());
+  }
+  if (imm.has_details() && imm.details() != result.details) {
+    ADD_FAILURE() << absl::Substitute("[$0] gRPC detail is $1, expected $2",
+                                      phase, result.details, imm.details());
+  }
+  if (result.http_code != 0 && !(is_continue_headers && is_continue_body)) {
+    *immediate_response_sent = true;
+  }
   // Check header values.
   for (const auto& header : expect.has_header()) {
     ASSERT_TRUE(!header.key().empty()) << absl::Substitute(
@@ -431,40 +500,6 @@ void DynamicTest::CheckPhaseResults(const std::string& phase,
   // Check body content.
   for (const auto& match : expect.body()) {
     FindString(phase, "body", match, {result.body});
-  }
-  // Check immediate response.
-  bool is_continue =
-      result.header_status == proxy_wasm::FilterHeadersStatus::Continue ||
-      result.header_status ==
-          proxy_wasm::FilterHeadersStatus::ContinueAndEndStream;
-  if (expect.has_immediate() == is_continue) {
-    ADD_FAILURE() << absl::Substitute(
-        "[$0] Expected $1, status is $2", phase,
-        expect.has_immediate() ? "immediate reply (stop filters status)"
-                               : "no immediate reply (continue status)",
-        result.header_status);
-  }
-  if (expect.has_immediate() == (result.http_code == 0)) {
-    ADD_FAILURE() << absl::Substitute(
-        "[$0] Expected $1, HTTP code is $2", phase,
-        expect.has_immediate() ? "immediate reply (HTTP code > 0)"
-                               : "no immediate reply (HTTP code == 0)",
-        result.http_code);
-  }
-  const auto& imm = expect.immediate();
-  if (imm.has_http_status() && imm.http_status() != result.http_code) {
-    ADD_FAILURE() << absl::Substitute("[$0] HTTP status is $1, expected $2",
-                                      phase, result.http_code,
-                                      imm.http_status());
-  }
-  if (imm.has_grpc_status() && imm.grpc_status() != result.grpc_code) {
-    ADD_FAILURE() << absl::Substitute("[$0] gRPC status is $1, expected $2",
-                                      phase, result.grpc_code,
-                                      imm.grpc_status());
-  }
-  if (imm.has_details() && imm.details() != result.details) {
-    ADD_FAILURE() << absl::Substitute("[$0] gRPC detail is $1, expected $2",
-                                      phase, result.details, imm.details());
   }
   // Check logging.
   for (const auto& match : expect.log()) {
@@ -601,7 +636,7 @@ std::vector<std::string> DynamicTest::ChunkBody(
 absl::StatusOr<std::vector<std::string>> DynamicTest::PrepBodyCallbackBenchmark(
     const pb::Test& test,
     google::protobuf::RepeatedPtrField<pb::Invocation> invocations) {
-  if (invocations.size() == 0) return std::vector<std::string> {};
+  if (invocations.size() == 0) return std::vector<std::string>{};
   auto body_chunking_plan = test.body_chunking_plan_case();
   if (invocations.size() != 1 &&
       body_chunking_plan !=
@@ -611,7 +646,8 @@ absl::StatusOr<std::vector<std::string>> DynamicTest::PrepBodyCallbackBenchmark(
   }
   std::vector<std::string> chunks;
   for (const pb::Invocation& invocation : invocations) {
-    absl::StatusOr<std::string> complete_input_body = ParseBodyInput(invocation.input());
+    absl::StatusOr<std::string> complete_input_body =
+        ParseBodyInput(invocation.input());
     if (!complete_input_body.ok()) {
       return complete_input_body.status();
     }
