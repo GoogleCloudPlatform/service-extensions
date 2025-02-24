@@ -14,6 +14,8 @@
 
 #include "custom_callout_server.h"
 
+#include <google/protobuf/arena.h>
+
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "google/protobuf/util/message_differencer.h"
 #include "gtest/gtest.h"
@@ -42,8 +44,11 @@ class BasicServerTest : public testing::Test {
 
 TEST_F(BasicServerTest, OnRequestHeader) {
   // Initialize the service paremeters
-  ProcessingRequest* request = ProcessingRequest::default_instance().New();
-  ProcessingResponse* response = ProcessingResponse::default_instance().New();
+  google::protobuf::Arena arena;
+  ProcessingRequest* request =
+      google::protobuf::Arena::Create<ProcessingRequest>(&arena);
+  ProcessingResponse* response =
+      google::protobuf::Arena::Create<ProcessingResponse>(&arena);
 
   // Call the OnRequestHeader method
   service_.OnRequestHeader(request, response);
@@ -75,8 +80,11 @@ TEST_F(BasicServerTest, OnRequestHeader) {
 
 TEST_F(BasicServerTest, OnResponseHeader) {
   // Initialize the service paremeters
-  ProcessingRequest* request = ProcessingRequest::default_instance().New();
-  ProcessingResponse* response = ProcessingResponse::default_instance().New();
+  google::protobuf::Arena arena;
+  ProcessingRequest* request =
+      google::protobuf::Arena::Create<ProcessingRequest>(&arena);
+  ProcessingResponse* response =
+      google::protobuf::Arena::Create<ProcessingResponse>(&arena);
 
   // Call the OnResponseHeader method
   service_.OnResponseHeader(request, response);
@@ -109,8 +117,11 @@ TEST_F(BasicServerTest, OnResponseHeader) {
 
 TEST_F(BasicServerTest, OnRequestBody) {
   // Initialize the service paremeters
-  ProcessingRequest* request = ProcessingRequest::default_instance().New();
-  ProcessingResponse* response = ProcessingResponse::default_instance().New();
+  google::protobuf::Arena arena;
+  ProcessingRequest* request =
+      google::protobuf::Arena::Create<ProcessingRequest>(&arena);
+  ProcessingResponse* response =
+      google::protobuf::Arena::Create<ProcessingResponse>(&arena);
 
   // Call the OnRequestBody method
   service_.OnRequestBody(request, response);
@@ -132,8 +143,11 @@ TEST_F(BasicServerTest, OnRequestBody) {
 
 TEST_F(BasicServerTest, OnResponseBody) {
   // Initialize the service paremeters
-  ProcessingRequest* request = ProcessingRequest::default_instance().New();
-  ProcessingResponse* response = ProcessingResponse::default_instance().New();
+  google::protobuf::Arena arena;
+  ProcessingRequest* request =
+      google::protobuf::Arena::Create<ProcessingRequest>(&arena);
+  ProcessingResponse* response =
+      google::protobuf::Arena::Create<ProcessingResponse>(&arena);
 
   // Call the OnResponseBody method
   service_.OnResponseBody(request, response);
