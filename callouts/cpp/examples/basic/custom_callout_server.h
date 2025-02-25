@@ -22,7 +22,7 @@ class CustomCalloutServer : public CalloutServer {
  public:
   // Processes the incoming HTTP request headers.
   void OnRequestHeader(ProcessingRequest* request,
-                       ProcessingResponse* response) {
+                       ProcessingResponse* response) override {
     CalloutServer::AddRequestHeader(response, "add-header-request",
                                     "Value-request");
     CalloutServer::ReplaceRequestHeader(response, "replace-header-request",
@@ -31,7 +31,7 @@ class CustomCalloutServer : public CalloutServer {
 
   // Processes the outgoing HTTP response headers.
   void OnResponseHeader(ProcessingRequest* request,
-                        ProcessingResponse* response) {
+                        ProcessingResponse* response) override {
     CalloutServer::AddResponseHeader(response, "add-header-response",
                                      "Value-response");
     CalloutServer::ReplaceResponseHeader(response, "replace-header-response",
@@ -39,13 +39,14 @@ class CustomCalloutServer : public CalloutServer {
   }
 
   // Processes the incoming HTTP request body.
-  void OnRequestBody(ProcessingRequest* request, ProcessingResponse* response) {
+  void OnRequestBody(ProcessingRequest* request,
+                     ProcessingResponse* response) override {
     CalloutServer::ReplaceRequestBody(response, "new-body-request");
   }
 
   // Processes the outgoing HTTP response body.
   void OnResponseBody(ProcessingRequest* request,
-                      ProcessingResponse* response) {
+                      ProcessingResponse* response) override {
     CalloutServer::ReplaceResponseBody(response, "new-body-response");
   }
 };
