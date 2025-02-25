@@ -11,7 +11,7 @@ load("@rules_rust//rust:defs.bzl", "rust_library")
 package(default_visibility = ["//visibility:public"])
 
 rust_library(
-    name = "getrandom",
+    name = "phf",
     srcs = glob(
         include = ["**/*.rs"],
         allow_empty = False,
@@ -28,28 +28,31 @@ rust_library(
             "WORKSPACE.bazel",
         ],
     ),
+    crate_features = [
+        "default",
+        "macros",
+        "phf_macros",
+        "proc-macro-hack",
+        "std",
+    ],
     crate_root = "src/lib.rs",
     edition = "2018",
+    proc_macro_deps = [
+        "@cu__phf_macros-0.8.0//:phf_macros",
+        "@cu__proc-macro-hack-0.5.20-deprecated//:proc_macro_hack",
+    ],
     rustc_flags = [
         "--cap-lints=allow",
     ],
     tags = [
         "cargo-bazel",
-        "crate-name=getrandom",
+        "crate-name=phf",
         "manual",
         "noclippy",
         "norustfmt",
     ],
-    version = "0.2.15",
+    version = "0.8.0",
     deps = [
-        "@cu__cfg-if-1.0.0//:cfg_if",
-    ] + select({
-        "@rules_rust//rust/platform:wasm32-wasi": [
-            "@cu__wasi-0.11.0-wasi-snapshot-preview1//:wasi",  # cfg(target_os = "wasi")
-        ],
-        "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [
-            "@cu__libc-0.2.169//:libc",  # cfg(unix)
-        ],
-        "//conditions:default": [],
-    }),
+        "@cu__phf_shared-0.8.0//:phf_shared",
+    ],
 )
