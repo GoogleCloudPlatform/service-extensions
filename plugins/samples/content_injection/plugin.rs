@@ -71,23 +71,33 @@ impl<'a> HttpContext for MyHttpContext<'a> {
     }
 
     fn on_http_response_body(&mut self, body_size: usize, _: bool) -> Action {
+        let chunk_size = 500;
         if *self.completed.borrow() == true {
             // Return immediately if plugin is "done" to avoid unnecessary work
             // and resource usage.
             return Action::Continue;
         }
-        if let Some(body_bytes) = self.get_http_response_body(0, body_size) {
-            // Parse/rewrite current chunk
-            self.rewriter.as_mut().unwrap().write(&body_bytes).unwrap();
-            if *self.completed.borrow() == true {
-                // Stop the rewriter after completing desired domain rewrite to
-                // dump any unparsable inputs to output.
-                self.rewriter.take().expect("msg").end().unwrap();
+        for start_index in (0..body_size).step_by(chunk_size) {
+            if let Some(body_bytes) = self.get_http_response_body(start_index, chunk_size) {
+                self.rewriter.as_mut().unwrap().write(&body_bytes).unwrap();
+                if *self.completed.borrow() == true {
+                    // Stop the rewriter after completing desired domain rewrite to
+                    // dump any unparsable inputs to output.
+                    self.rewriter.take().expect("msg").end().unwrap();
+                    self.set_http_response_body(
+                        0,
+                        start_index + chunk_size,
+                        self.output.borrow().as_slice(),
+                    );
+                    self.output.borrow_mut().clear();
+                    return Action::Continue;
+                }
+            } else {
+                break;
             }
-            self.set_http_response_body(0, body_size, self.output.borrow().as_slice());
-            // Clear output after usage to avoid unnecessary memory growth.
-            self.output.borrow_mut().clear();
         }
+        self.set_http_response_body(0, body_size, self.output.borrow().as_slice());
+        self.output.borrow_mut().clear();
         return Action::Continue;
     }
 }

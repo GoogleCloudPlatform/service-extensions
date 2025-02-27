@@ -39,3 +39,41 @@ test {
     }
   }
 }
+test {
+  name: "1Chunks"
+  num_chunks:1
+  benchmark: true
+  response_body {
+    input { file: "response_body100.data" }
+    result { body { file: "expected_response_body100.data" } }
+  }
+}
+test {
+  name: "10Chunks"
+  num_chunks:10
+  benchmark: true
+  response_body {
+    input { file: "response_body100.data" }
+    result { body { file: "expected_response_body100.data" } }
+  }
+}
+
+test {
+  name: "50Chunks"
+  num_chunks:50
+  benchmark: true
+  response_body {
+    input { file: "response_body100.data" }
+    result { body { file: "expected_response_body100.data" } }
+  }
+}
+
+test {
+  name: "100Chunks"
+  num_chunks:100
+  benchmark: true
+  response_body {
+    input { file: "response_body100.data" }
+    result { body { file: "expected_response_body100.data" } }
+  }
+}
