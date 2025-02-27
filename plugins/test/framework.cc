@@ -162,14 +162,15 @@ proxy_wasm::WasmResult TestHttpContext::sendLocalResponse(
       phase_ != proxy_wasm::WasmHeaderMapType::ResponseHeaders) {
     return proxy_wasm::WasmResult::BadArgument;
   }
-  result_.http_code = response_code;
-  result_.body = body_text;
-  result_.grpc_code = grpc_status;
-  result_.details = details;
-  result_.headers.clear();
+  result_.immediate_response = ImmediateResponse{};
+  result_.immediate_response->body = body_text;
+  result_.immediate_response->http_code = response_code;
+  result_.immediate_response->grpc_code = grpc_status;
+  result_.immediate_response->details = details;
   for (const auto& [key, val] : additional_headers) {
-    result_.headers[std::string(key)] = std::string(val);
+    result_.immediate_response->headers[std::string(key)] = std::string(val);
   }
+  immediate_response_ = true;
   return proxy_wasm::WasmResult::Ok;
 }
 
@@ -188,8 +189,9 @@ TestHttpContext::Result TestHttpContext::SendRequestHeaders(
 TestHttpContext::Result TestHttpContext::SendRequestBody(std::string body) {
   phase_logs_.clear();
   result_ = Result{};
-  body_buffer_.setOwned(std::move(body));
   current_callback_ = TestHttpContext::CallbackType::RequestBody;
+  if (immediate_response_) return Result{};
+  body_buffer_.setOwned(std::move(body));
   result_.body_status =
       onRequestBody(body_buffer_.size(), /*end_of_stream=*/false);
   result_.body = body_buffer_.release();
@@ -199,9 +201,11 @@ TestHttpContext::Result TestHttpContext::SendRequestBody(std::string body) {
 TestHttpContext::Result TestHttpContext::SendResponseHeaders(
     TestHttpContext::Headers headers) {
   phase_logs_.clear();
-  result_ = Result{.headers = std::move(headers)};
+  result_ = Result{};
   phase_ = proxy_wasm::WasmHeaderMapType::ResponseHeaders;
   current_callback_ = TestHttpContext::CallbackType::ResponseHeaders;
+  if (immediate_response_) return Result{};
+  result_.headers = std::move(headers);
   result_.header_status =
       onResponseHeaders(result_.headers.size(), /*end_of_stream=*/false);
   phase_ = proxy_wasm::WasmHeaderMapType(-1);  // ideally 0 would mean unset
@@ -211,8 +215,9 @@ TestHttpContext::Result TestHttpContext::SendResponseHeaders(
 TestHttpContext::Result TestHttpContext::SendResponseBody(std::string body) {
   phase_logs_.clear();
   result_ = Result{};
-  body_buffer_.setOwned(std::move(body));
   current_callback_ = TestHttpContext::CallbackType::ResponseBody;
+  if (immediate_response_) return Result{};
+  body_buffer_.setOwned(std::move(body));
   result_.body_status =
       onResponseBody(body_buffer_.size(), /*end_of_stream=*/false);
   result_.body = body_buffer_.release();

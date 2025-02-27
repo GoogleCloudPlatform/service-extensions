@@ -72,6 +72,17 @@ class DynamicTest : public DynamicFixture {
                          const TestContext& context,
                          const TestHttpContext::Result& result);
 
+  // Helper to check header expectations.
+  void CheckHeaderExpectations(const std::string& phase,
+                               const pb::Expectation& expect,
+                               const TestHttpContext::Headers& headers);
+
+  // Helper to check ImmediateResponse expectations against outputs.
+  void CheckImmediateResponse(
+      const std::string& phase,
+      const pb::Expectation::Immediate& expected_response,
+      const TestHttpContext::ImmediateResponse& immediate_response);
+
   // Helper to match string expectations.
   void FindString(const std::string& phase, const std::string& type,
                   const pb::StringMatcher& expect,

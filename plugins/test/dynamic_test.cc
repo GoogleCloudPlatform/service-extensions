@@ -216,7 +216,8 @@ void DynamicTest::TestBody() {
     }
     for (const pb::Invocation& invocation : invocations) {
       TestHttpContext::Result body_result = TestHttpContext::Result{};
-      absl::StatusOr<std::string> complete_input_body = ParseBodyInput(invocation.input());
+      absl::StatusOr<std::string> complete_input_body =
+          ParseBodyInput(invocation.input());
       if (!complete_input_body.ok()) {
         FAIL() << complete_input_body.status();
       }
@@ -393,41 +394,7 @@ void DynamicTest::CheckPhaseResults(const std::string& phase,
                                     const pb::Expectation& expect,
                                     const TestContext& context,
                                     const TestHttpContext::Result& result) {
-  // Check header values.
-  for (const auto& header : expect.has_header()) {
-    ASSERT_TRUE(!header.key().empty()) << absl::Substitute(
-        "[$0] Missing has_header.key: '$1'", phase, header.ShortDebugString());
-    auto it = result.headers.find(header.key());
-    if (it == result.headers.end()) {
-      ADD_FAILURE() << absl::Substitute("[$0] Missing header '$1'", phase,
-                                        header.key());
-    } else if (it->second != header.value()) {
-      ADD_FAILURE() << absl::Substitute(
-          "[$0] Header '$1' value is '$2', expected '$3'", phase, header.key(),
-          it->second, header.value());
-    }
-  }
-  // Check header removals.
-  for (const auto& header : expect.no_header()) {
-    ASSERT_TRUE(!header.key().empty()) << absl::Substitute(
-        "[$0] Missing no_header.key: '$1'", phase, header.ShortDebugString());
-    auto it = result.headers.find(header.key());
-    if (it != result.headers.end()) {
-      ADD_FAILURE() << absl::Substitute(
-          "[$0] Header '$1' value is '$2', expected removed", phase,
-          header.key(), it->second);
-    }
-  }
-  // Check serialized headers.
-  if (expect.headers_size() > 0) {
-    std::vector<std::string> headers;
-    for (const auto& kv : result.headers) {
-      headers.emplace_back(absl::StrCat(kv.first, ": ", kv.second));
-    }
-    for (const auto& match : expect.headers()) {
-      FindString(phase, "header", match, headers);
-    }
-  }
+  CheckHeaderExpectations(phase, expect, result.headers);
   // Check body content.
   for (const auto& match : expect.body()) {
     FindString(phase, "body", match, {result.body});
@@ -437,38 +404,126 @@ void DynamicTest::CheckPhaseResults(const std::string& phase,
       result.header_status == proxy_wasm::FilterHeadersStatus::Continue ||
       result.header_status ==
           proxy_wasm::FilterHeadersStatus::ContinueAndEndStream;
-  if (expect.has_immediate() == is_continue) {
+  if (!is_continue && !result.immediate_response) {
     ADD_FAILURE() << absl::Substitute(
-        "[$0] Expected $1, status is $2", phase,
-        expect.has_immediate() ? "immediate reply (stop filters status)"
-                               : "no immediate reply (continue status)",
-        result.header_status);
+        "[$0] Got stop filters status without immediate response, status is $1",
+        phase, result.header_status);
   }
-  if (expect.has_immediate() == (result.http_code == 0)) {
+  if (expect.has_immediate() != result.immediate_response.has_value()) {
     ADD_FAILURE() << absl::Substitute(
-        "[$0] Expected $1, HTTP code is $2", phase,
-        expect.has_immediate() ? "immediate reply (HTTP code > 0)"
-                               : "no immediate reply (HTTP code == 0)",
-        result.http_code);
+        "[$0] Expected $1", phase,
+        expect.has_immediate()
+            ? "immediate response, no immediate response present"
+            : "no immediate response, got immediate response");
   }
-  const auto& imm = expect.immediate();
-  if (imm.has_http_status() && imm.http_status() != result.http_code) {
-    ADD_FAILURE() << absl::Substitute("[$0] HTTP status is $1, expected $2",
-                                      phase, result.http_code,
-                                      imm.http_status());
-  }
-  if (imm.has_grpc_status() && imm.grpc_status() != result.grpc_code) {
-    ADD_FAILURE() << absl::Substitute("[$0] gRPC status is $1, expected $2",
-                                      phase, result.grpc_code,
-                                      imm.grpc_status());
-  }
-  if (imm.has_details() && imm.details() != result.details) {
-    ADD_FAILURE() << absl::Substitute("[$0] gRPC detail is $1, expected $2",
-                                      phase, result.details, imm.details());
+  if (expect.has_immediate() && result.immediate_response) {
+    CheckImmediateResponse(phase, expect.immediate(),
+                           *result.immediate_response);
   }
   // Check logging.
   for (const auto& match : expect.log()) {
     FindString(phase, "log", match, context.phase_logs());
+  }
+}
+
+void DynamicTest::CheckHeaderExpectations(
+    const std::string& phase, const pb::Expectation& expect,
+    const TestHttpContext::Headers& headers) {
+  // Check for header values.
+  for (const auto& header : expect.has_header()) {
+    ASSERT_TRUE(!header.key().empty()) << absl::Substitute(
+        "[$0] Missing has_header.key: '$1'", phase, header.ShortDebugString());
+    auto it = headers.find(header.key());
+    if (it == headers.end()) {
+      ADD_FAILURE() << absl::Substitute("[$0] Missing header '$1'", phase,
+                                        header.key());
+    } else if (it->second != header.value()) {
+      ADD_FAILURE() << absl::Substitute(
+          "[$0] Header '$1' value is '$2', expected '$3'", phase, header.key(),
+          it->second, header.value());
+    }
+  }
+  // Check absence of headers
+  for (const auto& header : expect.no_header()) {
+    ASSERT_TRUE(!header.key().empty()) << absl::Substitute(
+        "[$0] Missing no_header.key: '$1'", phase, header.ShortDebugString());
+    auto it = headers.find(header.key());
+    if (it != headers.end()) {
+      ADD_FAILURE() << absl::Substitute(
+          "[$0] Header '$1' value is '$2', expected removed", phase,
+          header.key(), it->second);
+    }
+  }
+  // Check serialized headers.
+  if (expect.headers_size() > 0) {
+    std::vector<std::string> headers_kv;
+    for (const auto& kv : headers) {
+      headers_kv.emplace_back(absl::StrCat(kv.first, ": ", kv.second));
+    }
+    for (const auto& match : expect.headers()) {
+      FindString(phase, "header", match, headers_kv);
+    }
+  }
+}
+
+void DynamicTest::CheckImmediateResponse(
+    const std::string& phase,
+    const pb::Expectation::Immediate& expected_response,
+    const TestHttpContext::ImmediateResponse& immediate_response) {
+  if (expected_response.has_http_status() &&
+      expected_response.http_status() != immediate_response.http_code) {
+    ADD_FAILURE() << absl::Substitute("[$0] HTTP status is $1, expected $2",
+                                      phase, immediate_response.http_code,
+                                      expected_response.http_status());
+  }
+  if (expected_response.has_grpc_status() &&
+      expected_response.grpc_status() != immediate_response.grpc_code) {
+    ADD_FAILURE() << absl::Substitute("[$0] gRPC status is $1, expected $2",
+                                      phase, immediate_response.grpc_code,
+                                      expected_response.grpc_status());
+  }
+  if (expected_response.has_details() &&
+      expected_response.details() != immediate_response.details) {
+    ADD_FAILURE() << absl::Substitute("[$0] gRPC detail is $1, expected $2",
+                                      phase, immediate_response.details,
+                                      expected_response.details());
+  }
+
+  // Check immediate response header expectations
+  // Check for header values
+  for (const auto& header : expected_response.has_header()) {
+    ASSERT_TRUE(!header.key().empty()) << absl::Substitute(
+        "[$0] Missing has_header.key: '$1'", phase, header.ShortDebugString());
+    auto it = immediate_response.headers.find(header.key());
+    if (it == immediate_response.headers.end()) {
+      ADD_FAILURE() << absl::Substitute("[$0] Missing header '$1'", phase,
+                                        header.key());
+    } else if (it->second != header.value()) {
+      ADD_FAILURE() << absl::Substitute(
+          "[$0] Immediate response header '$1' value is '$2', expected '$3'",
+          phase, header.key(), it->second, header.value());
+    }
+  }
+  // Check absence of headers
+  for (const auto& header : expected_response.no_header()) {
+    ASSERT_TRUE(!header.key().empty()) << absl::Substitute(
+        "[$0] Missing no_header.key: '$1'", phase, header.ShortDebugString());
+    auto it = immediate_response.headers.find(header.key());
+    if (it != immediate_response.headers.end()) {
+      ADD_FAILURE() << absl::Substitute(
+          "[$0] Immediate response header '$1' value is '$2', expected removed",
+          phase, header.key(), it->second);
+    }
+  }
+  // Check serialized headers.
+  if (expected_response.headers_size() > 0) {
+    std::vector<std::string> headers_kv;
+    for (const auto& kv : immediate_response.headers) {
+      headers_kv.emplace_back(absl::StrCat(kv.first, ": ", kv.second));
+    }
+    for (const auto& match : expected_response.headers()) {
+      FindString(phase, "header", match, headers_kv);
+    }
   }
 }
 
@@ -601,7 +656,7 @@ std::vector<std::string> DynamicTest::ChunkBody(
 absl::StatusOr<std::vector<std::string>> DynamicTest::PrepBodyCallbackBenchmark(
     const pb::Test& test,
     google::protobuf::RepeatedPtrField<pb::Invocation> invocations) {
-  if (invocations.size() == 0) return std::vector<std::string> {};
+  if (invocations.size() == 0) return std::vector<std::string>{};
   auto body_chunking_plan = test.body_chunking_plan_case();
   if (invocations.size() != 1 &&
       body_chunking_plan !=
@@ -611,7 +666,8 @@ absl::StatusOr<std::vector<std::string>> DynamicTest::PrepBodyCallbackBenchmark(
   }
   std::vector<std::string> chunks;
   for (const pb::Invocation& invocation : invocations) {
-    absl::StatusOr<std::string> complete_input_body = ParseBodyInput(invocation.input());
+    absl::StatusOr<std::string> complete_input_body =
+        ParseBodyInput(invocation.input());
     if (!complete_input_body.ok()) {
       return complete_input_body.status();
     }

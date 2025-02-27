@@ -202,19 +202,27 @@ class TestHttpContext : public TestContext {
     }
   };
 
-  struct Result {
-    // Filter status for headers returned by handler.
-    proxy_wasm::FilterHeadersStatus header_status;
-    // Mutated headers, also used for immediate response.
+  struct ImmediateResponse {
+    // Headers in immediate response.
     Headers headers = {};
-    // Filter status for body returned by handler.
-    proxy_wasm::FilterDataStatus body_status;
-    // Mutated body, also used for immediate response.
+    // Body in immediate response.
     std::string body = "";
-    // Immediate response parameters.
     uint32_t http_code = 0;    // sent to user via proxy
     uint32_t grpc_code = 0;    // sent to proxy
     std::string details = "";  // sent to proxy
+  };
+
+  struct Result {
+    // Filter status for headers returned by handler.
+    proxy_wasm::FilterHeadersStatus header_status;
+    // Mutated headers
+    Headers headers = {};
+    // Filter status for body returned by handler.
+    proxy_wasm::FilterDataStatus body_status;
+    // Mutated body
+    std::string body = "";
+    // Immediate response parameters.
+    std::optional<ImmediateResponse> immediate_response;
   };
 
   // Testing helpers. Use these instead of direct on*Headers methods.
@@ -234,6 +242,8 @@ class TestHttpContext : public TestContext {
  private:
   // Ensure that we invoke teardown handlers just once.
   bool torn_down_ = false;
+  // Prevent addional callbacks if plugin sends immediate response
+  bool immediate_response_ = false;
   // State tracked during a headers call. Invalid otherwise.
   proxy_wasm::WasmHeaderMapType phase_;
   Result result_;
