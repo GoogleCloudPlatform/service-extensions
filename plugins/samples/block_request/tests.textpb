@@ -18,10 +18,13 @@ test {
       header { key: "Referer" value: "https://www.forbidden-site.com/somepage" }
     }
     result {
-      immediate { http_status: 403 details: "" }
-      body { regex: "Forbidden - Request ID: [[:xdigit:]]+" }
+      immediate {
+        http_status: 403
+        details: ""
+        no_header { key: "my-plugin-allowed"}
+        body { regex: "Forbidden - Request ID: [[:xdigit:]]+" }
+      }
       log { regex: ".*Forbidden - Request ID: [[:xdigit:]]+" }
-      no_header { key: "my-plugin-allowed"}
     }
   }
 }
