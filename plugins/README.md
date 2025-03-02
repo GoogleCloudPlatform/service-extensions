@@ -75,6 +75,7 @@ Tips:
 -   To see plugin-emitted logs on the console, add `--logfile=/dev/stdout`.
 -   To see a trace of logs and wasm ABI calls, add `--loglevel=TRACE`.
 -   To disable benchmarking for faster iteration, add `--nobench`.
+-   To disable unit testing for cleaner output, add `--notest`.
 -   To optionally specify plugin config data, add `--config=<path>`.
 
 You can also run tests using Bazel. This is **much slower** the first time,
