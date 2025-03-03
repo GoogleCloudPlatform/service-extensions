@@ -128,7 +128,7 @@ for your own plugin. Extend them to fit your particular use case.
 *   [A/B decisioning based on query param](samples/ab_testing): Showcase A/B
     testing in action, 50% chance a user is served file A and 50% chance they
     are served file B.
-*   [Custom error page](samples/add_custom_response) For a certain class of
+*   [Custom error page](samples/add_custom_response): For a certain class of
     origin errors, redirect to a custom error page hosted on GCS.
 *   [Validate client JWT for authorization](samples/jwt_auth): Ensures user
     authentication by verifying an RS256-signed JWT token in the query string
