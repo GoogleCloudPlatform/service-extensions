@@ -456,12 +456,12 @@ void DynamicTest::CheckHeaderExpectations(
   }
   // Check serialized headers.
   if (expect.headers_size() > 0) {
-    std::vector<std::string> headers_kv;
+    std::vector<std::string> header_lines;
     for (const auto& kv : headers) {
-      headers_kv.emplace_back(absl::StrCat(kv.first, ": ", kv.second));
+      header_lines.emplace_back(absl::StrCat(kv.first, ": ", kv.second));
     }
     for (const auto& match : expect.headers()) {
-      FindString(phase, "header", match, headers_kv);
+      FindString(phase, "header", match, header_lines);
     }
   }
 }
@@ -517,12 +517,12 @@ void DynamicTest::CheckImmediateResponse(
   }
   // Check serialized headers.
   if (expected_response.headers_size() > 0) {
-    std::vector<std::string> headers_kv;
+    std::vector<std::string> header_lines;
     for (const auto& kv : immediate_response.headers) {
-      headers_kv.emplace_back(absl::StrCat(kv.first, ": ", kv.second));
+      header_lines.emplace_back(absl::StrCat(kv.first, ": ", kv.second));
     }
     for (const auto& match : expected_response.headers()) {
-      FindString(phase, "header", match, headers_kv);
+      FindString(phase, "header", match, header_lines);
     }
   }
 }
