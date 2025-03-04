@@ -1,0 +1,8 @@
+test {
+  name: "Enable reCAPTCHA challenge"
+  num_chunks:10
+  response_body {
+    input { file: "response_body.data" }
+    result { body { file: "expected_response_body.data" } }
+  }
+}

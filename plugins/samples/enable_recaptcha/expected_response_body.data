@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="https://www.google.com/recaptcha/api.js"></script>
+<script>function onLogin(token) {document.getElementById("login-form").submit();}</script>
+<title>Page Title</title>
+</head>
+<body>
+
+<form action="do_something" id="login-form">
+  <label for="username">Username:</label><br>
+  <input type="text" id="username" name="username"><br>
+  <label for="password">Password:</label><br>
+  <input type="text" id="password" name="password"><br>
+  <br>
+</form>
+
+<button class="g-recaptcha" data-sitekey="reCAPTCHA_site_key" data-callback="onLogin" data-action="login">Login</button>
+
+
+</body>
+</html>
