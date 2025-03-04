@@ -16,8 +16,11 @@ test {
   request_headers {
     input { header { key: "User-Token" value: "bad-user" } }
     result {
-      immediate { http_status: 403 details: "" }
-      body { exact: "Access forbidden.\n" }
+      immediate {
+        http_status: 403
+        details: ""
+        body { exact: "Access forbidden.\n" }
+      }
     }
   }
 }
@@ -25,8 +28,11 @@ test {
   name: "DeniesMissingToken"
   request_headers {
     result {
-      immediate { http_status: 403 details: "" }
-      body { exact: "Access forbidden - token missing.\n" }
+      immediate {
+        http_status: 403
+        details: ""
+        body { exact: "Access forbidden - token missing.\n" }
+      }
     }
   }
 }

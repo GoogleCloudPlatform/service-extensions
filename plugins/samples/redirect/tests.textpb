@@ -3,8 +3,8 @@ test {
   name: "NoRedirect"
   benchmark: false
   request_headers {
-    input { header { key: ":path" value: "/main/somepage/otherpage" } } 
-    result { 
+    input { header { key: ":path" value: "/main/somepage/otherpage" } }
+    result {
       has_header { key: ":path" value: "/main/somepage/otherpage" }
       no_header { key: "Location" }
     }
@@ -16,10 +16,13 @@ test {
   name: "DoRedirect"
   benchmark: false
   request_headers {
-    input { header { key: ":path" value: "/foo/images/picture.png" } } 
-    result { 
-      immediate { http_status: 301 details: "" }
-      has_header { key: "Location" value: "/bar/images/picture.png" }
+    input { header { key: ":path" value: "/foo/images/picture.png" } }
+    result {
+      immediate {
+        http_status: 301
+        details: ""
+        has_header { key: "Location" value: "/bar/images/picture.png" }
+      }
     }
   }
 }
@@ -28,8 +31,8 @@ test {
   name: "DoRedirect"
   benchmark: false
   request_headers {
-    input { header { key: ":path" value: "/main/foo/images/picture.png" } } 
-    result { 
+    input { header { key: ":path" value: "/main/foo/images/picture.png" } }
+    result {
       has_header { key: ":path" value: "/main/foo/images/picture.png" }
       no_header { key: "Location" }
     }

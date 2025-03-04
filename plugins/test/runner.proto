@@ -64,8 +64,7 @@ message Expectation {
   repeated Header no_header = 2;
   // Generalized header matching against serialized "key: value" lines.
   repeated StringMatcher headers = 3;
-
-  // Content accompanying an immediate response or body invocation result.
+  // Content accompanying a body invocation result.
   repeated StringMatcher body = 4;
 
   // Immediate response to the end user. No further invocations after this.
@@ -76,6 +75,14 @@ message Expectation {
     optional uint32 grpc_status = 2;
     // Reason for immediate response. Used for error or debug logging.
     optional string details = 3;
+    // Immediate response headers expected in the output.
+    repeated Header has_header = 5;
+    // Immediate response headers expected to be missing. Values are ignored.
+    repeated Header no_header = 6;
+    // Generalized header matching against serialized "key: value" lines.
+    repeated StringMatcher headers = 7;
+    // Content accompanying an immediate response result.
+    repeated StringMatcher body = 8;
   }
   Immediate immediate = 5;
 

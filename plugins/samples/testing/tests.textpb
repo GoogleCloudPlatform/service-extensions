@@ -29,10 +29,12 @@ test {
     }
     result {
       # Immediate response matches.
-      immediate { http_status: 500 }
-      body { exact: "fake error" }
-      has_header { key: "error" value: "goaway" }
-      no_header { key: "server-message" }
+      immediate {
+        http_status: 500
+        body { exact: "fake error" }
+        has_header { key: "error" value: "goaway" }
+        no_header { key: "server-message" }
+      }
       # Log matches showing frozen time behavior.
       log { regex: ".*time 1: 123456789000000000" }
       log { regex: ".*time 2: 123456789000000000" }
