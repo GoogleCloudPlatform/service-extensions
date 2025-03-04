@@ -19,8 +19,7 @@
 // validates a configured set of expectations about output and side effects.
 //
 // TODO Future features
-// - Publish test runner as Docker image
-// - Structured output (JSON), then convert into product guidance
+// - Structured output (JSON), adding product guidance in output
 // - YAML config input support (--yaml instead of --proto)
 // - Support wasm profiling (https://v8.dev/docs/profile)
 // - Tune v8 compiler (v8_flags.liftoff_only, precompile, etc)
@@ -43,7 +42,8 @@ ABSL_FLAG(std::string, logfile, "", "Emit plugin logs to disk or stdio.");
 ABSL_FLAG(service_extensions_samples::pb::Env::LogLevel, loglevel,
           service_extensions_samples::pb::Env::UNDEFINED,
           "Override log_level.");
-ABSL_FLAG(bool, bench, true, "Option to disable test-requested benchmarks.");
+ABSL_FLAG(bool, test, true, "Option to disable config-requested tests.");
+ABSL_FLAG(bool, bench, true, "Option to disable config-requested benchmarks.");
 
 namespace service_extensions_samples {
 
@@ -144,7 +144,12 @@ absl::Status RunTests(const pb::TestSuite& cfg) {
   }
 
   // Run functional tests.
-  bool tests_ok = RUN_ALL_TESTS() == 0;
+  bool tests_ok = true;
+  if (absl::GetFlag(FLAGS_test)) {
+    tests_ok = RUN_ALL_TESTS() == 0;
+  } else {
+    std::cout << "Skipping tests due to --test=false" << std::endl;
+  }
 
   // Run performance benchmarks.
   if (have_benchmarks) {

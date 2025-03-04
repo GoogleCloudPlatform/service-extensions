@@ -62,28 +62,28 @@ class DynamicTest : public DynamicFixture {
   absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>> LoadWasm(
       bool benchmark);
 
-  // Helper to check lifecycle phase side effects (e.g. logging).
+  // Test helper to check lifecycle phase side effects (e.g. logging).
   void CheckSideEffects(const std::string& phase, const pb::Expectation& expect,
                         const TestContext& context);
 
-  // Helper to check phase expectations against outputs.
+  // Test helper to check phase expectations against outputs.
   void CheckPhaseResults(const std::string& phase,
                          const pb::Expectation& expect,
                          const TestContext& context,
                          const TestHttpContext::Result& result);
 
-  // Helper to check header expectations.
+  // Test helper to check header expectations.
   void CheckHeaderExpectations(const std::string& phase,
                                const pb::Expectation& expect,
                                const TestHttpContext::Headers& headers);
 
-  // Helper to check ImmediateResponse expectations against outputs.
+  // Test helper to check ImmediateResponse expectations against outputs.
   void CheckImmediateResponse(
       const std::string& phase,
       const pb::Expectation::Immediate& expected_response,
       const TestHttpContext::ImmediateResponse& immediate_response);
 
-  // Helper to match string expectations.
+  // Test helper to match string expectations.
   void FindString(const std::string& phase, const std::string& type,
                   const pb::StringMatcher& expect,
                   const std::vector<std::string>& contents);
@@ -92,17 +92,21 @@ class DynamicTest : public DynamicFixture {
   absl::StatusOr<TestHttpContext::Headers> ParseHeaders(const pb::Input& input,
                                                         bool is_request);
 
-  // Helper to generate body string from test config
+  // Helper to generate body string from test config.
   absl::StatusOr<std::string> ParseBodyInput(const pb::Input& input);
 
-  // Helper to break body down into chunks
+  // Helper to break body down into chunks.
   std::vector<std::string> ChunkBody(const std::string& complete_body,
                                      const pb::Test& test);
 
-  // Helper to prep body callbacks for benchmarking
+  // Helper to prep body callbacks for benchmarking.
   absl::StatusOr<std::vector<std::string>> PrepBodyCallbackBenchmark(
       const pb::Test& test,
       google::protobuf::RepeatedPtrField<pb::Invocation> invocations);
+
+  // Bench helper to emit custom stats.
+  void EmitStats(benchmark::State& state, proxy_wasm::PluginHandleBase& handle,
+                 const TestContext& context);
 
   std::string engine_;
   pb::Env env_;

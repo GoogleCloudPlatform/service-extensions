@@ -75,6 +75,7 @@ Tips:
 -   To see plugin-emitted logs on the console, add `--logfile=/dev/stdout`.
 -   To see a trace of logs and wasm ABI calls, add `--loglevel=TRACE`.
 -   To disable benchmarking for faster iteration, add `--nobench`.
+-   To disable unit testing for cleaner output, add `--notest`.
 -   To optionally specify plugin config data, add `--config=<path>`.
 
 You can also run tests using Bazel. This is **much slower** the first time,
@@ -138,6 +139,9 @@ for your own plugin. Extend them to fit your particular use case.
     initial numbers will be masked.
 *   [Validate client token on query string using HMAC](samples/hmac_authtoken):
     Check the client request URL for a valid token signed using HMAC.
+*   [Rewrite domains in html response body](samples/html_domain_rewrite/): Parse
+    html in response body chunks and replace insances of "foo.com" with
+    "bar.com" in `<a href=***>`.
 
 # Feature set / ABI
 
