@@ -28,6 +28,17 @@ rust_library(
             "WORKSPACE.bazel",
         ],
     ),
+    crate_features = [
+        "clone-impls",
+        "default",
+        "derive",
+        "extra-traits",
+        "full",
+        "parsing",
+        "printing",
+        "proc-macro",
+        "visit",
+    ],
     crate_root = "src/lib.rs",
     edition = "2021",
     rustc_flags = [

@@ -15,6 +15,7 @@ We recommend the following process:
 
 1.  Write a wasm plugin using the [samples](#samples) and SDKs as a starting
     point: [C++](https://github.com/proxy-wasm/proxy-wasm-cpp-sdk),
+    [Go](https://github.com/proxy-wasm/proxy-wasm-go-sdk),
     [Rust](https://github.com/proxy-wasm/proxy-wasm-rust-sdk). See also the
     [best practices](https://cloud.google.com/service-extensions/docs/plugin-best-practices).
 1.  [Build](#build) the plugin.
@@ -74,6 +75,7 @@ Tips:
 -   To see plugin-emitted logs on the console, add `--logfile=/dev/stdout`.
 -   To see a trace of logs and wasm ABI calls, add `--loglevel=TRACE`.
 -   To disable benchmarking for faster iteration, add `--nobench`.
+-   To disable unit testing for cleaner output, add `--notest`.
 -   To optionally specify plugin config data, add `--config=<path>`.
 
 You can also run tests using Bazel. This is **much slower** the first time,
@@ -127,7 +129,7 @@ for your own plugin. Extend them to fit your particular use case.
 *   [A/B decisioning based on query param](samples/ab_testing): Showcase A/B
     testing in action, 50% chance a user is served file A and 50% chance they
     are served file B.
-*   [Custom error page](samples/add_custom_response) For a certain class of
+*   [Custom error page](samples/add_custom_response): For a certain class of
     origin errors, redirect to a custom error page hosted on GCS.
 *   [Validate client JWT for authorization](samples/jwt_auth): Ensures user
     authentication by verifying an RS256-signed JWT token in the query string
@@ -139,6 +141,9 @@ for your own plugin. Extend them to fit your particular use case.
     Check the client request URL for a valid token signed using HMAC.
 *   [Validate client token using HMAC with cookie](samples/hmac_authcookie): Check
     the client request for a valid token signed using HMAC provided via a cookie.
+*   [Rewrite domains in html response body](samples/html_domain_rewrite/): Parse
+    html in response body chunks and replace insances of "foo.com" with
+    "bar.com" in `<a href=***>`.
 
 # Feature set / ABI
 
