@@ -32,6 +32,16 @@ message StringMatcher {
   }
 }
 
+// Generalized header matcher specification.enum
+message HeaderMatcher {
+    // Headers expected in the output.
+    repeated Header has_header = 1;
+    // Headers expected to be missing. Values are ignored.
+    repeated Header no_header = 2;
+    // Generalized header matching against serialized "key: value" lines.
+    repeated StringMatcher headers_serialized = 3;
+}
+
 message Header {
   string key = 1;
   bytes value = 2;
@@ -59,11 +69,7 @@ message Input {
 
 message Expectation {
   // Headers expected in the output.
-  repeated Header has_header = 1;
-  // Headers expected to be missing. Values are ignored.
-  repeated Header no_header = 2;
-  // Generalized header matching against serialized "key: value" lines.
-  repeated StringMatcher headers = 3;
+  optional HeaderMatcher headers = 1;
   // Content accompanying a body invocation result.
   repeated StringMatcher body = 4;
 
@@ -75,12 +81,8 @@ message Expectation {
     optional uint32 grpc_status = 2;
     // Reason for immediate response. Used for error or debug logging.
     optional string details = 3;
-    // Immediate response headers expected in the output.
-    repeated Header has_header = 5;
-    // Immediate response headers expected to be missing. Values are ignored.
-    repeated Header no_header = 6;
-    // Generalized header matching against serialized "key: value" lines.
-    repeated StringMatcher headers = 7;
+    // Headers for immediate response.
+    optional HeaderMatcher headers = 4;
     // Content accompanying an immediate response result.
     repeated StringMatcher body = 8;
   }

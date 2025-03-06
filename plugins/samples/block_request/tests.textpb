@@ -6,7 +6,11 @@ test {
     input {
       header { key: "Referer" value: "https://www.safe-site.com/somepage" }
     }
-    result {has_header { key: "my-plugin-allowed" value: "true" } }
+    result {
+      headers {
+        has_header { key: "my-plugin-allowed" value: "true" }
+      }
+    }
   }
 }
 # Referer and Host not match, expected block request with 403 status code.
@@ -21,7 +25,9 @@ test {
       immediate {
         http_status: 403
         details: ""
-        no_header { key: "my-plugin-allowed"}
+        headers {
+          no_header { key: "my-plugin-allowed"}
+        }
         body { regex: "Forbidden - Request ID: [[:xdigit:]]+" }
       }
       log { regex: ".*Forbidden - Request ID: [[:xdigit:]]+" }

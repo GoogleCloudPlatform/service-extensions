@@ -8,6 +8,10 @@ test {
   name: "AllowsBadToken"
   request_headers {
     input { header { key: "User-Token" value: "bad-user" } }
-    result { has_header { key: "User-Token" value: "bad-user" } }
+    result {
+      headers {
+        has_header { key: "User-Token" value: "bad-user" }
+      }
+    }
   }
 }

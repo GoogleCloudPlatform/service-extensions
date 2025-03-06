@@ -5,7 +5,9 @@ test {
   request_headers {
     input { header { key: ":path" value: "/somepage/otherpage?param1=value1&param2=value2&token=48277f04685e364e0e3f3c4bfa78cb91293d304bbf196829334cb1c4a741d6b0" } }
     result {
-      has_header { key: ":path" value: "/somepage/otherpage?param1=value1&param2=value2" }
+      headers {
+        has_header { key: ":path" value: "/somepage/otherpage?param1=value1&param2=value2" }
+      }
     }
   }
 }

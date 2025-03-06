@@ -394,7 +394,7 @@ void DynamicTest::CheckPhaseResults(const std::string& phase,
                                     const pb::Expectation& expect,
                                     const TestContext& context,
                                     const TestHttpContext::Result& result) {
-  CheckHeaderExpectations(phase, expect, result.headers);
+  CheckHeaderExpectations(phase, expect.headers(), result.headers);
   // Check body content.
   for (const auto& match : expect.body()) {
     FindString(phase, "body", match, {result.body});
@@ -427,7 +427,7 @@ void DynamicTest::CheckPhaseResults(const std::string& phase,
 }
 
 void DynamicTest::CheckHeaderExpectations(
-    const std::string& phase, const pb::Expectation& expect,
+    const std::string& phase, const pb::HeaderMatcher& expect,
     const TestHttpContext::Headers& headers) {
   // Check for header values.
   for (const auto& header : expect.has_header()) {
@@ -455,12 +455,12 @@ void DynamicTest::CheckHeaderExpectations(
     }
   }
   // Check serialized headers.
-  if (expect.headers_size() > 0) {
+  if (expect.headers_serialized_size() > 0) {
     std::vector<std::string> header_lines;
     for (const auto& kv : headers) {
       header_lines.emplace_back(absl::StrCat(kv.first, ": ", kv.second));
     }
-    for (const auto& match : expect.headers()) {
+    for (const auto& match : expect.headers_serialized()) {
       FindString(phase, "header", match, header_lines);
     }
   }
@@ -490,41 +490,7 @@ void DynamicTest::CheckImmediateResponse(
   }
 
   // Check immediate response header expectations
-  // Check for header values
-  for (const auto& header : expected_response.has_header()) {
-    ASSERT_TRUE(!header.key().empty()) << absl::Substitute(
-        "[$0] Missing has_header.key: '$1'", phase, header.ShortDebugString());
-    auto it = immediate_response.headers.find(header.key());
-    if (it == immediate_response.headers.end()) {
-      ADD_FAILURE() << absl::Substitute("[$0] Missing header '$1'", phase,
-                                        header.key());
-    } else if (it->second != header.value()) {
-      ADD_FAILURE() << absl::Substitute(
-          "[$0] Immediate response header '$1' value is '$2', expected '$3'",
-          phase, header.key(), it->second, header.value());
-    }
-  }
-  // Check absence of headers
-  for (const auto& header : expected_response.no_header()) {
-    ASSERT_TRUE(!header.key().empty()) << absl::Substitute(
-        "[$0] Missing no_header.key: '$1'", phase, header.ShortDebugString());
-    auto it = immediate_response.headers.find(header.key());
-    if (it != immediate_response.headers.end()) {
-      ADD_FAILURE() << absl::Substitute(
-          "[$0] Immediate response header '$1' value is '$2', expected removed",
-          phase, header.key(), it->second);
-    }
-  }
-  // Check serialized headers.
-  if (expected_response.headers_size() > 0) {
-    std::vector<std::string> header_lines;
-    for (const auto& kv : immediate_response.headers) {
-      header_lines.emplace_back(absl::StrCat(kv.first, ": ", kv.second));
-    }
-    for (const auto& match : expected_response.headers()) {
-      FindString(phase, "header", match, header_lines);
-    }
-  }
+  CheckHeaderExpectations(phase, expected_response.headers(), immediate_response.headers);
 }
 
 void DynamicTest::FindString(const std::string& phase, const std::string& type,

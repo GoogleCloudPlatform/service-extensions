@@ -6,20 +6,32 @@ test {
   name: "AddToken"
   request_headers {
     input { header { key: ":path" value: "/foo?a=b" } }
-    result { has_header { key: ":path" value: "/foo?a=b&key=new+val" } }
+    result {
+      headers {
+        has_header { key: ":path" value: "/foo?a=b&key=new+val" }
+      }
+    }
   }
 }
 test {
   name: "ReplaceToken"
   request_headers {
     input { header { key: ":path" value: "/foo?key=val&a=b" } }
-    result { has_header { key: ":path" value: "/foo?a=b&key=new+val" } }
+    result {
+      headers {
+        has_header { key: ":path" value: "/foo?a=b&key=new+val" }
+      }
+    }
   }
 }
 test {
   name: "PreserveFragment"
   request_headers {
     input { header { key: ":path" value: "/foo?a=b&c=d#e" } }
-    result { has_header { key: ":path" value: "/foo?a=b&c=d&key=new+val#e" } }
+    result {
+      headers {
+        has_header { key: ":path" value: "/foo?a=b&c=d&key=new+val#e" }
+      }
+    }
   }
 }

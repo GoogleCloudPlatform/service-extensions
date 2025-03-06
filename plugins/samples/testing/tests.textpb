@@ -11,12 +11,14 @@ test {
       header { key: ":method" value: "GET" }
     }
     result {
-      # Positive header matches (two ways).
-      has_header { key: ":method" value: "GET" }
-      headers { exact: ":method: GET" }
-      # Negative header matches (two ways).
-      no_header { key: ":scheme" }
-      headers { regex: ":scheme:.*" invert: true }
+      headers {
+        # Positive header matches (two ways).
+        has_header { key: ":method" value: "GET" }
+        headers_serialized { exact: ":method: GET" }
+        # Negative header matches (two ways).
+        no_header { key: ":scheme" }
+        headers_serialized { regex: ":scheme:.*" invert: true }
+      }
       # Logging matches.
       log { regex: ".*request headers.*" }
       log { regex: ".*response headers.*" invert: true }
@@ -32,8 +34,10 @@ test {
       immediate {
         http_status: 500
         body { exact: "fake error" }
-        has_header { key: "error" value: "goaway" }
-        no_header { key: "server-message" }
+        headers {
+          has_header { key: "error" value: "goaway" }
+          no_header { key: "server-message" }
+        }
       }
       # Log matches showing frozen time behavior.
       log { regex: ".*time 1: 123456789000000000" }
@@ -54,11 +58,13 @@ test {
         "MyHeader: MyVal2\n"
     }
     result {
-      has_header { key: ":method" value: "GET" }
-      has_header { key: ":path" value: "/my/path?foo=bar" }
-      has_header { key: ":authority" value: "myhost.com" }
-      no_header { key: "Host" }
-      has_header { key: "MyHeader" value: "MyVal1, MyVal2" }
+      headers {
+        has_header { key: ":method" value: "GET" }
+        has_header { key: ":path" value: "/my/path?foo=bar" }
+        has_header { key: ":authority" value: "myhost.com" }
+        no_header { key: "Host" }
+        has_header { key: "MyHeader" value: "MyVal1, MyVal2" }
+      }
     }
   }
   response_headers {
@@ -71,8 +77,10 @@ test {
         "MyHeader: MyVal2\n"
     }
     result {
-      has_header { key: ":status" value: "200" }
-      has_header { key: "MyHeader" value: "MyVal1, MyVal2" }
+      headers {
+        has_header { key: ":status" value: "200" }
+        has_header { key: "MyHeader" value: "MyVal1, MyVal2" }
+      }
     }
   }
 }
@@ -88,12 +96,14 @@ test {
       file: "request_headers.data"
     }
     result {
-      has_header { key: ":method" value: "GET" }
-      has_header { key: ":path" value: "/my/path?foo=bar" }
-      has_header { key: ":scheme" value: "https" }
-      has_header { key: ":authority" value: "example.com:8080" }
-      no_header { key: "Host" }
-      has_header { key: "MyHeader" value: "MyVal1, MyVal2" }
+      headers {
+        has_header { key: ":method" value: "GET" }
+        has_header { key: ":path" value: "/my/path?foo=bar" }
+        has_header { key: ":scheme" value: "https" }
+        has_header { key: ":authority" value: "example.com:8080" }
+        no_header { key: "Host" }
+        has_header { key: "MyHeader" value: "MyVal1, MyVal2" }
+      }
     }
   }
   response_headers {
@@ -105,8 +115,10 @@ test {
       file: "response_headers.data"
     }
     result {
-      has_header { key: ":status" value: "403" }
-      has_header { key: "MyHeader" value: "MyVal1, MyVal2" }
+      headers {
+        has_header { key: ":status" value: "403" }
+        has_header { key: "MyHeader" value: "MyVal1, MyVal2" }
+      }
     }
   }
 }

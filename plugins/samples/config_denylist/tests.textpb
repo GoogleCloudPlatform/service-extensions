@@ -8,7 +8,11 @@ test {
   name: "AllowsGoodToken"
   request_headers {
     input { header { key: "User-Token" value: "good-user" } }
-    result { has_header { key: "User-Token" value: "good-user" } }
+    result {
+      headers {
+        has_header { key: "User-Token" value: "good-user" }
+      }
+    }
   }
 }
 test {

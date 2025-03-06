@@ -4,7 +4,11 @@ test {
   benchmark: true
   request_headers {
     input { header { key: ":path" value: "/one/two?three=four" } }
-    result { has_header { key: ":path" value: "/one/two?three=four" } }
+    result {
+      headers {
+        has_header { key: ":path" value: "/one/two?three=four" }
+      }
+    }
   }
 }
 # Expect the plugin to replace the first "foo-" path fragment.
@@ -13,6 +17,10 @@ test {
   benchmark: true
   request_headers {
     input { header { key: ":path" value: "/pre/foo-one/foo-two/post?a=b" } }
-    result { has_header { key: ":path" value: "/pre/one/foo-two/post?a=b" } }
+    result {
+      headers {
+        has_header { key: ":path" value: "/pre/one/foo-two/post?a=b" }
+      }
+    }
   }
 }

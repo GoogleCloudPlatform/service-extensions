@@ -1,31 +1,35 @@
 test {
   name: "WithRunCheckHeaderOverwriteCardNumberOnResponseHeader"
   response_headers {
-    input { 
+    input {
       header { key: "x-card-number" value: "1234-5678-9123-4567"}
       header { key: "google-run-pii-check" value: "true"}
     }
-    result { 
-      has_header { key: "x-card-number" value: "XXXX-XXXX-XXXX-4567" }
+    result {
+      headers {
+        has_header { key: "x-card-number" value: "XXXX-XXXX-XXXX-4567" }
+      }
     }
   }
 }
 test {
   name: "WithoutRunCheckHeaderKeepTheOriginalHeaders"
   response_headers {
-    input { 
+    input {
       header { key: "x-card-number" value: "1234-5678-9123-4567"}
       header { key: "google-run-pii-check" value: "false"}
     }
-    result { 
-      has_header { key: "x-card-number" value: "1234-5678-9123-4567" }
+    result {
+      headers {
+        has_header { key: "x-card-number" value: "1234-5678-9123-4567" }
+      }
     }
   }
 }
 test {
   name: "WithRunCheckHeaderOverwriteCardNumberOnBody"
   response_headers {
-    input { 
+    input {
       header { key: "google-run-pii-check" value: "true"}
     }
   }
@@ -35,7 +39,7 @@ test {
       "sdsds 1234-5678-9123-4567 sdsds dfdfsdssds"
       "gfgfgfgf fdfdfdfd 1234-4567-9123-8886 dsds"
     }
-    result { 
+    result {
       body {
         exact: "dsddssds dsdsod dsds dsds dsdssds"
         "sdsds XXXX-XXXX-XXXX-4567 sdsds dfdfsdssds"
@@ -47,7 +51,7 @@ test {
 test {
   name: "WithoutRunCheckHeaderKeepTheOriginalBody"
   response_headers {
-    input { 
+    input {
       header { key: "google-run-pii-check" value: "false"}
     }
   }
@@ -57,7 +61,7 @@ test {
       "sdsds 1234-5678-9123-4567 sdsds dfdfsdssds"
       "gfgfgfgf fdfdfdfd 1234-4567-9123-8886 dsds"
     }
-    result { 
+    result {
       body {
         exact: "dsddssds dsdsod dsds dsds dsdssds"
         "sdsds 1234-5678-9123-4567 sdsds dfdfsdssds"
