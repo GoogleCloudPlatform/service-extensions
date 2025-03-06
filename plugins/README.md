@@ -139,6 +139,8 @@ for your own plugin. Extend them to fit your particular use case.
     initial numbers will be masked.
 *   [Validate client token on query string using HMAC](samples/hmac_authtoken):
     Check the client request URL for a valid token signed using HMAC.
+*   [Validate client token using HMAC with cookie](samples/hmac_authcookie): Check
+    the client request for a valid token signed using HMAC provided via a cookie.
 *   [Rewrite domains in html response body](samples/html_domain_rewrite/): Parse
     html in response body chunks and replace insances of "foo.com" with
     "bar.com" in `<a href=***>`.
