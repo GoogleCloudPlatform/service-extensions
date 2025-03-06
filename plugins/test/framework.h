@@ -106,12 +106,14 @@ class TestContext : public proxy_wasm::TestContext {
   // --- BEGIN Testing facilities ---
   // Unsafe access to logs. Not thread safe w.r.t. plugin execution.
   const std::vector<std::string>& phase_logs() const { return phase_logs_; }
+  const uint64_t logging_bytes() const { return logging_bytes_; }
   // Options to customize context behavior.
   ContextOptions& options() const;
   // --- END   Testing facilities ---
 
  protected:
   std::vector<std::string> phase_logs_;
+  uint64_t logging_bytes_ = 0;
 
  private:
   proxy_wasm::BufferBase plugin_config_;
