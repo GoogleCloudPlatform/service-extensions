@@ -39,7 +39,6 @@ from envoy.service.ext_proc.v3.external_processor_pb2_grpc import (
 from envoy.service.ext_proc.v3.external_processor_pb2_grpc import (
     ExternalProcessorServicer,)
 import grpc
-from google.protobuf.struct_pb2 import Struct
 from grpc import ServicerContext
 
 
@@ -228,8 +227,6 @@ class CalloutServer:
     """
     if callout.HasField('request_headers'):
       match self.on_request_headers(callout.request_headers, context):
-        case ProcessingResponse() as processing_response:
-          return processing_response
         case ImmediateResponse() as immediate_headers:
           return ProcessingResponse(immediate_response=immediate_headers)
         case HeadersResponse() | None as header_response:
@@ -256,7 +253,7 @@ class CalloutServer:
       self,
       headers: HttpHeaders,  # pylint: disable=unused-argument
       context: ServicerContext  # pylint: disable=unused-argument
-  ) -> Union[None, HeadersResponse, ImmediateResponse, ProcessingResponse]:
+  ) -> Union[None, HeadersResponse, ImmediateResponse]:
     """Process incoming request headers.
 
     Args:
@@ -264,7 +261,7 @@ class CalloutServer:
       context: RPC context of the incoming callout.
 
     Returns:
-      Optional header modification object or a complete response.
+      Optional header modification object.
     """
     return None
 
