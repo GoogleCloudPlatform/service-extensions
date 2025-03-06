@@ -5,7 +5,9 @@ test {
       header { key: ":path" value: "/v1/file.png?user=user1" }
     }
     result {
-      has_header { key: ":path" value: "/v2/file.png?user=user1" }
+      headers {
+        has_header { key: ":path" value: "/v2/file.png?user=user1" }
+      }
     }
   }
 }
@@ -16,7 +18,9 @@ test {
       header { key: ":path" value: "/v1/file.png?user=user1&param=value" }
     }
     result {
-      has_header { key: ":path" value: "/v2/file.png?user=user1&param=value" }
+      headers {
+        has_header { key: ":path" value: "/v2/file.png?user=user1&param=value" }
+      }
     }
   }
 }
@@ -27,29 +31,35 @@ test {
       header { key: ":path" value: "/v1/file.png?user=userAAA" }
     }
     result {
-      has_header { key: ":path" value: "/v1/file.png?user=userAAA" }
+      headers {
+        has_header { key: ":path" value: "/v1/file.png?user=userAAA" }
+      }
     }
   }
 }
 test {
   name: "WithAnotherPathKeepTheSame"
   request_headers {
-    input { 
+    input {
       header { key: ":path" value: "/v1alpha/file.png?user=user1" }
     }
     result {
-      has_header { key: ":path" value: "/v1alpha/file.png?user=user1" }
+      headers {
+        has_header { key: ":path" value: "/v1alpha/file.png?user=user1" }
+      }
     }
   }
 }
 test {
   name: "WithoutUserKeepTheSame"
   request_headers {
-    input { 
+    input {
       header { key: ":path" value: "/v1/file.png" }
     }
     result {
-      has_header { key: ":path" value: "/v1/file.png" }
+      headers {
+        has_header { key: ":path" value: "/v1/file.png" }
+      }
     }
   }
 }
