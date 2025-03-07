@@ -30,7 +30,7 @@ class CalloutServerExample(callout_server.CalloutServer):
   def on_request_headers(
       self, headers: service_pb2.HttpHeaders, context: ServicerContext
   ) -> service_pb2.ProcessingResponse:
-    """Custom processor on request headers. Returns dynamic forwarding metadate with
+    """Custom processor on request headers. Returns dynamic forwarding metadata with
     one of the three predefined addresses. Addresses can be selected by the user.
     First two addresses can be selected by a request header. If that is not correct
     or not present 3rd address will be selected.
