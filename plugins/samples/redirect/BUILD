@@ -17,6 +17,7 @@ proxy_wasm_plugin_rust(
         "//bazel/cargo/remote:log",
         "//bazel/cargo/remote:proxy-wasm",
     ],
+    data = ["config.data"],
 )
 
 proxy_wasm_plugin_go(
@@ -28,8 +29,15 @@ proxy_wasm_tests(
     name = "tests",
     plugins = [
         ":plugin_cpp.wasm",
-        ":plugin_rust.wasm",
         ":plugin_go.wasm",
     ],
     tests = ":tests.textpb",
+)
+
+proxy_wasm_tests(
+    name = "domains_tests",
+    plugins = [
+        ":plugin_rust.wasm",
+    ],
+    tests = ":tests_domains.textpb",
 )
