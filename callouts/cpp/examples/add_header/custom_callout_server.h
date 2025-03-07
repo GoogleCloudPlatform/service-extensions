@@ -34,9 +34,6 @@ class CustomCalloutServer : public CalloutServer {
     CalloutServer::AddResponseHeader(response, "header-response", "response");
     
     // Remove "foo" header via mutation
-    auto* headers_mutation = response->mutable_response_headers()
-                                ->mutable_response()
-                                ->mutable_header_mutation();
-    headers_mutation->add_remove_headers("foo");
+    CalloutServer::RemoveResponseHeader(response, "foo");
   }
 };

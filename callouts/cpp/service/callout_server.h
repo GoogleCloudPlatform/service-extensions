@@ -86,6 +86,15 @@ class CalloutServer : public ExternalProcessor::Service {
     new_header->set_value(value);
   }
 
+  // Removes a response header field.
+  static void RemoveResponseHeader(ProcessingResponse* response,
+                                   std::string_view header_name) {
+    auto* headers_mutation = response->mutable_response_headers()
+                                 ->mutable_response()
+                                 ->mutable_header_mutation();
+    headers_mutation->add_remove_headers(header_name);
+  }
+
   // Replaces a request body field.
   static void ReplaceRequestBody(ProcessingResponse* response,
                                  std::string_view body) {
