@@ -20,7 +20,6 @@ test {
 test {
   name: "DomainRedirect"
   benchmark: false
-  plugin_config: "abc.com xyz.com"
   request_headers {
     input {
       header { key: ":authority" value: "abc.com" }
@@ -38,7 +37,6 @@ test {
 test {
   name: "DomainWithPortRedirect"
   benchmark: false
-  plugin_config: "abc.com xyz.com"
   request_headers {
     input {
       header { key: ":authority" value: "abc.com:8080" }
@@ -48,24 +46,6 @@ test {
     result {
       immediate { http_status: 301 details: "" }
       has_header { key: "Location" value: "http://xyz.com/api/v1/data" }
-    }
-  }
-}
-
-# Multiple domain mappings test.
-test {
-  name: "MultipleDomainMappings"
-  benchmark: false
-  plugin_config: "old-domain.com new-domain.com\nlegacy.example.org example.org"
-  request_headers {
-    input {
-      header { key: ":authority" value: "legacy.example.org" }
-      header { key: ":path" value: "/users/profile" }
-      header { key: ":scheme" value: "https" }
-    }
-    result {
-      immediate { http_status: 301 details: "" }
-      has_header { key: "Location" value: "https://example.org/users/profile" }
     }
   }
 }

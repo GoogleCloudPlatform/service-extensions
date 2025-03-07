@@ -101,7 +101,7 @@ impl HttpContext for MyHttpContext {
                 let path = self.get_http_request_header(":path").unwrap_or_default();
 
                 // Get the scheme (http or https)
-                let scheme = self.get_http_request_header(":scheme").unwrap_or("https");
+                let scheme = self.get_http_request_header(":scheme").unwrap_or("https".to_string());
 
                 // Construct the new URL
                 let new_url = format!("{}://{}{}", scheme, target_domain, path);
