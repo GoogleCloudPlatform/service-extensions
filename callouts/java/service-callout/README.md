@@ -114,7 +114,7 @@ Create a new Java file Example.java and import the ``ServiceCallout`` class from
 ```java
 import service.ServiceCallout;
 ```
-### Extend the CalloutServer:
+### Extend the CalloutServer
 
 Create a custom class extending ``ServiceCallout``:
 
@@ -122,31 +122,36 @@ Create a custom class extending ``ServiceCallout``:
 public class Example extends ServiceCallout {}
 ```
 
-Create the constructor for the superclass constructor
+Create the constructor for the superclass constructor:
 
 ```java
 // Constructor that calls the superclass constructor
 public Example(Example.Builder builder) {
-super(builder);
+    super(builder);
 }
 ```
 
-Add the Builder for your example
+Add the Builder for your example:
 
 ```java
-// Builder specific to Example
-public static class Builder extends ServiceCallout.Builder<Example.Builder> {
+// Constructor that calls the superclass constructor
+public Example(Example.Builder builder) {
+  super(builder);
 
-        @Override
-        public Example build() {
-            return new Example(this);
-        }
+  // Builder specific to Example
+  public static class Builder extends ServiceCallout.Builder<Example.Builder> {
 
-        @Override
-        protected Example.Builder self() {
-            return this;
-        }
+    @Override
+    public Example build() {
+      return new Example(this);
     }
+
+    @Override
+    protected Example.Builder self() {
+      return this;
+    }
+  }
+}
 ```
 
 Add the method you are going to override for your custom processing  (e.g: Request Headers):
@@ -158,35 +163,35 @@ public void onRequestHeaders(ProcessingResponse.Builder processingResponseBuilde
 }
 ```
 
-### Run the Server:
+### Run the Server
 
 Create an instance of your custom server and call the start method:
 
 ```java
 public static void main(String[] args) throws Exception {
-        // Create a builder for ServiceCallout with custom configuration
-        Example server = new Example.Builder()
-                .build();
+    // Create a builder for ServiceCallout with custom configuration
+    Example server = new Example.Builder()
+            .build();
 
-        // Start the server and block until shutdown
-        server.start();
-        server.blockUntilShutdown();
-    }
+    // Start the server and block until shutdown
+    server.start();
+    server.blockUntilShutdown();
+}
 ```
 
 Custom configuration is also enabled, so it is possible to change the default ip and port for example:
 ```java
 public static void main(String[] args) throws Exception {
-        // Create a builder for ServiceCallout with custom configuration
-        Example server = new Example.Builder()
-                .setIp("111.222.333.444")       // Customize IP
-                .setPort(8443)                  // Set the port for secure communication
-                .build();
+    // Create a builder for ServiceCallout with custom configuration
+    Example server = new Example.Builder()
+            .setIp("111.222.333.444")       // Customize IP
+            .setPort(8443)                  // Set the port for secure communication
+            .build();
 
-        // Start the server and block until shutdown
-        server.start();
-        server.blockUntilShutdown();
-    }
+    // Start the server and block until shutdown
+    server.start();
+    server.blockUntilShutdown();
+}
 ```
 
 ## Documentation
@@ -195,7 +200,7 @@ Javadoc is a tool provided by Java for generating API documentation in HTML form
 
 We use the `maven-javadoc-plugin` plugin to generate Javadoc documentation automatically.
 
-### Execute Javadoc Command:
+### Execute Javadoc Command
 
 To generate Javadoc documentation, you can run the following Maven command in your terminal:
 
