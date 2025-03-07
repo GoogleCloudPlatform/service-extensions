@@ -1,0 +1,737 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Index &mdash; Google Cloud Service Extensions Samples  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css?v=2f82ef1c" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="#" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Google Cloud Service Extensions Samples
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Callout Server:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="readme/introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme/requirements.html">Requirements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme/quick_start.html">Quick Start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="readme/quick_start.html#setup">Setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="readme/quick_start.html#running-the-server">Running the Server</a></li>
+<li class="toctree-l2"><a class="reference internal" href="readme/quick_start.html#examples">Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="readme/developing_callouts.html">Developing Callouts</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="readme/developing_callouts.html#creating-a-new-server">Creating a New Server</a></li>
+<li class="toctree-l2"><a class="reference internal" href="readme/developing_callouts.html#additional-details">Additional Details</a></li>
+<li class="toctree-l2"><a class="reference internal" href="readme/developing_callouts.html#using-the-proto-files">Using the Proto Files</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="readme/alternative_install_methods.html">Alternative Install Methods</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="readme/alternative_install_methods.html#without-venv">Without venv</a></li>
+<li class="toctree-l2"><a class="reference internal" href="readme/alternative_install_methods.html#without-installing-proto-code-as-a-local-package">Without Installing Proto Code as a Local Package</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="readme/tests.html">Tests</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme/docker.html">Docker</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="readme/docker.html#building-docker-images">Building Docker Images</a></li>
+<li class="toctree-l2"><a class="reference internal" href="readme/docker.html#examples-with-unique-dependencies">Examples with unique dependencies</a></li>
+<li class="toctree-l2"><a class="reference internal" href="readme/docker.html#custom-docker-files">Custom Docker Files</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Services</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="extproc/service/callout_server.html">Callout Server</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="extproc/service/callout_server.html#class-definition">Class Definition</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer"><code class="docutils literal notranslate"><span class="pre">CalloutServer</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.address"><code class="docutils literal notranslate"><span class="pre">CalloutServer.address</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.port"><code class="docutils literal notranslate"><span class="pre">CalloutServer.port</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.health_check_address"><code class="docutils literal notranslate"><span class="pre">CalloutServer.health_check_address</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.health_check_port"><code class="docutils literal notranslate"><span class="pre">CalloutServer.health_check_port</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.combined_health_check"><code class="docutils literal notranslate"><span class="pre">CalloutServer.combined_health_check</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.secure_health_check"><code class="docutils literal notranslate"><span class="pre">CalloutServer.secure_health_check</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.plaintext_address"><code class="docutils literal notranslate"><span class="pre">CalloutServer.plaintext_address</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.plaintext_port"><code class="docutils literal notranslate"><span class="pre">CalloutServer.plaintext_port</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.disable_plaintext"><code class="docutils literal notranslate"><span class="pre">CalloutServer.disable_plaintext</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.default_ip"><code class="docutils literal notranslate"><span class="pre">CalloutServer.default_ip</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.cert_chain"><code class="docutils literal notranslate"><span class="pre">CalloutServer.cert_chain</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.cert_chain_path"><code class="docutils literal notranslate"><span class="pre">CalloutServer.cert_chain_path</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.private_key"><code class="docutils literal notranslate"><span class="pre">CalloutServer.private_key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.private_key_path"><code class="docutils literal notranslate"><span class="pre">CalloutServer.private_key_path</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.server_thread_count"><code class="docutils literal notranslate"><span class="pre">CalloutServer.server_thread_count</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="extproc/service/callout_server.html#calloutserver-methods">CalloutServer Methods</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.run"><code class="docutils literal notranslate"><span class="pre">CalloutServer.run()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.shutdown"><code class="docutils literal notranslate"><span class="pre">CalloutServer.shutdown()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer._start_servers"><code class="docutils literal notranslate"><span class="pre">CalloutServer._start_servers()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer._stop_servers"><code class="docutils literal notranslate"><span class="pre">CalloutServer._stop_servers()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer._loop_server"><code class="docutils literal notranslate"><span class="pre">CalloutServer._loop_server()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.process"><code class="docutils literal notranslate"><span class="pre">CalloutServer.process()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.on_request_headers"><code class="docutils literal notranslate"><span class="pre">CalloutServer.on_request_headers()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.on_response_headers"><code class="docutils literal notranslate"><span class="pre">CalloutServer.on_response_headers()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.on_request_body"><code class="docutils literal notranslate"><span class="pre">CalloutServer.on_request_body()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.on_response_body"><code class="docutils literal notranslate"><span class="pre">CalloutServer.on_response_body()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="extproc/service/callout_server.html#healthcheckservice-class">HealthCheckService Class</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.HealthCheckService"><code class="docutils literal notranslate"><span class="pre">HealthCheckService</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.HealthCheckService.do_GET"><code class="docutils literal notranslate"><span class="pre">HealthCheckService.do_GET()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="extproc/service/callout_server.html#grpc-callout-service">GRPC Callout Service</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server._GRPCCalloutService"><code class="docutils literal notranslate"><span class="pre">_GRPCCalloutService</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server._GRPCCalloutService.Process"><code class="docutils literal notranslate"><span class="pre">_GRPCCalloutService.Process()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="extproc/service/callout_tools.html">Callout Tools</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="extproc/service/callout_tools.html#callouts.python.extproc.service.callout_tools.add_body_mutation"><code class="docutils literal notranslate"><span class="pre">add_body_mutation()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="extproc/service/callout_tools.html#callouts.python.extproc.service.callout_tools.add_command_line_args"><code class="docutils literal notranslate"><span class="pre">add_command_line_args()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="extproc/service/callout_tools.html#callouts.python.extproc.service.callout_tools.add_header_mutation"><code class="docutils literal notranslate"><span class="pre">add_header_mutation()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="extproc/service/callout_tools.html#callouts.python.extproc.service.callout_tools.body_contains"><code class="docutils literal notranslate"><span class="pre">body_contains()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="extproc/service/callout_tools.html#callouts.python.extproc.service.callout_tools.build_dynamic_forwarding_metadata"><code class="docutils literal notranslate"><span class="pre">build_dynamic_forwarding_metadata()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="extproc/service/callout_tools.html#callouts.python.extproc.service.callout_tools.deny_callout"><code class="docutils literal notranslate"><span class="pre">deny_callout()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="extproc/service/callout_tools.html#callouts.python.extproc.service.callout_tools.header_immediate_response"><code class="docutils literal notranslate"><span class="pre">header_immediate_response()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="extproc/service/callout_tools.html#callouts.python.extproc.service.callout_tools.headers_contain"><code class="docutils literal notranslate"><span class="pre">headers_contain()</span></code></a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Callouts Examples</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="extproc/ext_proc_client.html">External Processing Client</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="extproc/ext_proc_client.html#callouts.python.extproc.example.ext_proc_client.make_json_request"><code class="docutils literal notranslate"><span class="pre">make_json_request()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="extproc/e2e_tests/metadata_server.html">Metadata Server</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="extproc/e2e_tests/metadata_server.html#callouts.python.extproc.example.e2e_tests.metadata_server.CalloutServerExample"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extproc/e2e_tests/metadata_server.html#callouts.python.extproc.example.e2e_tests.metadata_server.CalloutServerExample.process"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample.process()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="extproc/e2e_tests/metadata_server.html#callouts.python.extproc.example.e2e_tests.metadata_server.check_metadata"><code class="docutils literal notranslate"><span class="pre">check_metadata()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="extproc/e2e_tests/metadata_server.html#callouts.python.extproc.example.e2e_tests.metadata_server.unpack_string"><code class="docutils literal notranslate"><span class="pre">unpack_string()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="extproc/e2e_tests/observability_server.html">Observability Server</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample"><code class="docutils literal notranslate"><span class="pre">ObservabilityServerExample</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample.on_request_body"><code class="docutils literal notranslate"><span class="pre">ObservabilityServerExample.on_request_body()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample.on_request_headers"><code class="docutils literal notranslate"><span class="pre">ObservabilityServerExample.on_request_headers()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample.on_response_body"><code class="docutils literal notranslate"><span class="pre">ObservabilityServerExample.on_response_body()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample.on_response_headers"><code class="docutils literal notranslate"><span class="pre">ObservabilityServerExample.on_response_headers()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample.shutdown"><code class="docutils literal notranslate"><span class="pre">ObservabilityServerExample.shutdown()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.RequestHandler"><code class="docutils literal notranslate"><span class="pre">RequestHandler</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.RequestHandler.do_GET"><code class="docutils literal notranslate"><span class="pre">RequestHandler.do_GET()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="extproc/add_body/service_callout_example.html">Add Body</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="extproc/add_body/service_callout_example.html#callouts.python.extproc.example.add_body.service_callout_example.CalloutServerExample"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extproc/add_body/service_callout_example.html#callouts.python.extproc.example.add_body.service_callout_example.CalloutServerExample.on_request_body"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample.on_request_body()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/add_body/service_callout_example.html#callouts.python.extproc.example.add_body.service_callout_example.CalloutServerExample.on_response_body"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample.on_response_body()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="extproc/add_header/service_callout_example.html">Add Header</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="extproc/add_header/service_callout_example.html#callouts.python.extproc.example.add_header.service_callout_example.CalloutServerExample"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extproc/add_header/service_callout_example.html#callouts.python.extproc.example.add_header.service_callout_example.CalloutServerExample.on_request_headers"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample.on_request_headers()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/add_header/service_callout_example.html#callouts.python.extproc.example.add_header.service_callout_example.CalloutServerExample.on_response_headers"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample.on_response_headers()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="extproc/add_custom_response/service_callout_example.html">Add Custom Response</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="extproc/add_custom_response/service_callout_example.html#callouts.python.extproc.example.add_custom_response.service_callout_example.CalloutServerExample"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extproc/add_custom_response/service_callout_example.html#callouts.python.extproc.example.add_custom_response.service_callout_example.CalloutServerExample.on_request_body"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample.on_request_body()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/add_custom_response/service_callout_example.html#callouts.python.extproc.example.add_custom_response.service_callout_example.CalloutServerExample.on_request_headers"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample.on_request_headers()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/add_custom_response/service_callout_example.html#callouts.python.extproc.example.add_custom_response.service_callout_example.CalloutServerExample.on_response_body"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample.on_response_body()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/add_custom_response/service_callout_example.html#callouts.python.extproc.example.add_custom_response.service_callout_example.CalloutServerExample.on_response_headers"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample.on_response_headers()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="extproc/add_custom_response/service_callout_example.html#callouts.python.extproc.example.add_custom_response.service_callout_example.generate_mock_body_response"><code class="docutils literal notranslate"><span class="pre">generate_mock_body_response()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="extproc/add_custom_response/service_callout_example.html#callouts.python.extproc.example.add_custom_response.service_callout_example.generate_mock_header_response"><code class="docutils literal notranslate"><span class="pre">generate_mock_header_response()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="extproc/set_cookie/service_callout_example.html">Set Cookie</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="extproc/set_cookie/service_callout_example.html#callouts.python.extproc.example.set_cookie.service_callout_example.CalloutServerExample"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extproc/set_cookie/service_callout_example.html#callouts.python.extproc.example.set_cookie.service_callout_example.CalloutServerExample.on_response_headers"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample.on_response_headers()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="extproc/set_cookie/service_callout_example.html#callouts.python.extproc.example.set_cookie.service_callout_example.validate_header"><code class="docutils literal notranslate"><span class="pre">validate_header()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="extproc/redirect/service_callout_example.html">Redirect</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="extproc/redirect/service_callout_example.html#callouts.python.extproc.example.redirect.service_callout_example.CalloutServerExample"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extproc/redirect/service_callout_example.html#callouts.python.extproc.example.redirect.service_callout_example.CalloutServerExample.on_request_headers"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample.on_request_headers()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="extproc/update_header/service_callout_example.html">Update Header</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="extproc/update_header/service_callout_example.html#callouts.python.extproc.example.update_header.service_callout_example.CalloutServerExample"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extproc/update_header/service_callout_example.html#callouts.python.extproc.example.update_header.service_callout_example.CalloutServerExample.on_request_headers"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample.on_request_headers()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/update_header/service_callout_example.html#callouts.python.extproc.example.update_header.service_callout_example.CalloutServerExample.on_response_headers"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample.on_response_headers()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="extproc/cloud_log/service_callout_example.html">Cloud Log</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="extproc/cloud_log/service_callout_example.html#callouts.python.extproc.example.cloud_log.service_callout_example.CalloutServerExample"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extproc/cloud_log/service_callout_example.html#callouts.python.extproc.example.cloud_log.service_callout_example.CalloutServerExample.on_request_body"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample.on_request_body()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/cloud_log/service_callout_example.html#callouts.python.extproc.example.cloud_log.service_callout_example.CalloutServerExample.on_request_headers"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample.on_request_headers()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="extproc/jwt_auth/service_callout_example.html">JWT Auth</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="extproc/jwt_auth/service_callout_example.html#callouts.python.extproc.example.jwt_auth.service_callout_example.CalloutServerExample"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extproc/jwt_auth/service_callout_example.html#callouts.python.extproc.example.jwt_auth.service_callout_example.CalloutServerExample.on_request_headers"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample.on_request_headers()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="extproc/jwt_auth/service_callout_example.html#callouts.python.extproc.example.jwt_auth.service_callout_example.extract_jwt_token"><code class="docutils literal notranslate"><span class="pre">extract_jwt_token()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="extproc/jwt_auth/service_callout_example.html#callouts.python.extproc.example.jwt_auth.service_callout_example.validate_jwt_token"><code class="docutils literal notranslate"><span class="pre">validate_jwt_token()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="extproc/normalize_header/service_callout_example.html">Normalize Header</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="extproc/normalize_header/service_callout_example.html#callouts.python.extproc.example.normalize_header.service_callout_example.CalloutServerExample"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="extproc/normalize_header/service_callout_example.html#callouts.python.extproc.example.normalize_header.service_callout_example.CalloutServerExample.add_device_type_header"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample.add_device_type_header()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="extproc/normalize_header/service_callout_example.html#callouts.python.extproc.example.normalize_header.service_callout_example.CalloutServerExample.on_request_headers"><code class="docutils literal notranslate"><span class="pre">CalloutServerExample.on_request_headers()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="extproc/normalize_header/service_callout_example.html#callouts.python.extproc.example.normalize_header.service_callout_example.get_device_type"><code class="docutils literal notranslate"><span class="pre">get_device_type()</span></code></a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Google Cloud Service Extensions Samples</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Index</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/GoogleCloudPlatform/service-extensions/blob/main/docs/genindex" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+
+<h1 id="index">Index</h1>
+
+<div class="genindex-jumpbox">
+ <a href="#_"><strong>_</strong></a>
+ | <a href="#A"><strong>A</strong></a>
+ | <a href="#B"><strong>B</strong></a>
+ | <a href="#C"><strong>C</strong></a>
+ | <a href="#D"><strong>D</strong></a>
+ | <a href="#E"><strong>E</strong></a>
+ | <a href="#G"><strong>G</strong></a>
+ | <a href="#H"><strong>H</strong></a>
+ | <a href="#M"><strong>M</strong></a>
+ | <a href="#O"><strong>O</strong></a>
+ | <a href="#P"><strong>P</strong></a>
+ | <a href="#R"><strong>R</strong></a>
+ | <a href="#S"><strong>S</strong></a>
+ | <a href="#U"><strong>U</strong></a>
+ | <a href="#V"><strong>V</strong></a>
+ 
+</div>
+<h2 id="_">_</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server._GRPCCalloutService">_GRPCCalloutService (class in callouts.python.extproc.service.callout_server)</a>
+</li>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer._loop_server">_loop_server() (callouts.python.extproc.service.callout_server.CalloutServer method)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer._start_servers">_start_servers() (callouts.python.extproc.service.callout_server.CalloutServer method)</a>
+</li>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer._stop_servers">_stop_servers() (callouts.python.extproc.service.callout_server.CalloutServer method)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="A">A</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/service/callout_tools.html#callouts.python.extproc.service.callout_tools.add_body_mutation">add_body_mutation() (in module callouts.python.extproc.service.callout_tools)</a>
+</li>
+      <li><a href="extproc/service/callout_tools.html#callouts.python.extproc.service.callout_tools.add_command_line_args">add_command_line_args() (in module callouts.python.extproc.service.callout_tools)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/normalize_header/service_callout_example.html#callouts.python.extproc.example.normalize_header.service_callout_example.CalloutServerExample.add_device_type_header">add_device_type_header() (callouts.python.extproc.example.normalize_header.service_callout_example.CalloutServerExample method)</a>
+</li>
+      <li><a href="extproc/service/callout_tools.html#callouts.python.extproc.service.callout_tools.add_header_mutation">add_header_mutation() (in module callouts.python.extproc.service.callout_tools)</a>
+</li>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.address">address (callouts.python.extproc.service.callout_server.CalloutServer attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="B">B</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/service/callout_tools.html#callouts.python.extproc.service.callout_tools.body_contains">body_contains() (in module callouts.python.extproc.service.callout_tools)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/service/callout_tools.html#callouts.python.extproc.service.callout_tools.build_dynamic_forwarding_metadata">build_dynamic_forwarding_metadata() (in module callouts.python.extproc.service.callout_tools)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="C">C</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li>
+    callouts.python.extproc.example.add_body.service_callout_example
+
+      <ul>
+        <li><a href="extproc/add_body/service_callout_example.html#module-callouts.python.extproc.example.add_body.service_callout_example">module</a>
+</li>
+      </ul></li>
+      <li>
+    callouts.python.extproc.example.add_custom_response.service_callout_example
+
+      <ul>
+        <li><a href="extproc/add_custom_response/service_callout_example.html#module-callouts.python.extproc.example.add_custom_response.service_callout_example">module</a>
+</li>
+      </ul></li>
+      <li>
+    callouts.python.extproc.example.add_header.service_callout_example
+
+      <ul>
+        <li><a href="extproc/add_header/service_callout_example.html#module-callouts.python.extproc.example.add_header.service_callout_example">module</a>
+</li>
+      </ul></li>
+      <li>
+    callouts.python.extproc.example.cloud_log.service_callout_example
+
+      <ul>
+        <li><a href="extproc/cloud_log/service_callout_example.html#module-callouts.python.extproc.example.cloud_log.service_callout_example">module</a>
+</li>
+      </ul></li>
+      <li>
+    callouts.python.extproc.example.e2e_tests.metadata_server
+
+      <ul>
+        <li><a href="extproc/e2e_tests/metadata_server.html#module-callouts.python.extproc.example.e2e_tests.metadata_server">module</a>
+</li>
+      </ul></li>
+      <li>
+    callouts.python.extproc.example.e2e_tests.observability_server
+
+      <ul>
+        <li><a href="extproc/e2e_tests/observability_server.html#module-callouts.python.extproc.example.e2e_tests.observability_server">module</a>
+</li>
+      </ul></li>
+      <li>
+    callouts.python.extproc.example.ext_proc_client
+
+      <ul>
+        <li><a href="extproc/ext_proc_client.html#module-callouts.python.extproc.example.ext_proc_client">module</a>
+</li>
+      </ul></li>
+      <li>
+    callouts.python.extproc.example.jwt_auth.service_callout_example
+
+      <ul>
+        <li><a href="extproc/jwt_auth/service_callout_example.html#module-callouts.python.extproc.example.jwt_auth.service_callout_example">module</a>
+</li>
+      </ul></li>
+      <li>
+    callouts.python.extproc.example.normalize_header.service_callout_example
+
+      <ul>
+        <li><a href="extproc/normalize_header/service_callout_example.html#module-callouts.python.extproc.example.normalize_header.service_callout_example">module</a>
+</li>
+      </ul></li>
+      <li>
+    callouts.python.extproc.example.redirect.service_callout_example
+
+      <ul>
+        <li><a href="extproc/redirect/service_callout_example.html#module-callouts.python.extproc.example.redirect.service_callout_example">module</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li>
+    callouts.python.extproc.example.set_cookie.service_callout_example
+
+      <ul>
+        <li><a href="extproc/set_cookie/service_callout_example.html#module-callouts.python.extproc.example.set_cookie.service_callout_example">module</a>
+</li>
+      </ul></li>
+      <li>
+    callouts.python.extproc.example.update_header.service_callout_example
+
+      <ul>
+        <li><a href="extproc/update_header/service_callout_example.html#module-callouts.python.extproc.example.update_header.service_callout_example">module</a>
+</li>
+      </ul></li>
+      <li>
+    callouts.python.extproc.service.callout_tools
+
+      <ul>
+        <li><a href="extproc/service/callout_tools.html#module-callouts.python.extproc.service.callout_tools">module</a>
+</li>
+      </ul></li>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer">CalloutServer (class in callouts.python.extproc.service.callout_server)</a>
+</li>
+      <li><a href="extproc/add_body/service_callout_example.html#callouts.python.extproc.example.add_body.service_callout_example.CalloutServerExample">CalloutServerExample (class in callouts.python.extproc.example.add_body.service_callout_example)</a>
+
+      <ul>
+        <li><a href="extproc/add_custom_response/service_callout_example.html#callouts.python.extproc.example.add_custom_response.service_callout_example.CalloutServerExample">(class in callouts.python.extproc.example.add_custom_response.service_callout_example)</a>
+</li>
+        <li><a href="extproc/add_header/service_callout_example.html#callouts.python.extproc.example.add_header.service_callout_example.CalloutServerExample">(class in callouts.python.extproc.example.add_header.service_callout_example)</a>
+</li>
+        <li><a href="extproc/cloud_log/service_callout_example.html#callouts.python.extproc.example.cloud_log.service_callout_example.CalloutServerExample">(class in callouts.python.extproc.example.cloud_log.service_callout_example)</a>
+</li>
+        <li><a href="extproc/e2e_tests/metadata_server.html#callouts.python.extproc.example.e2e_tests.metadata_server.CalloutServerExample">(class in callouts.python.extproc.example.e2e_tests.metadata_server)</a>
+</li>
+        <li><a href="extproc/jwt_auth/service_callout_example.html#callouts.python.extproc.example.jwt_auth.service_callout_example.CalloutServerExample">(class in callouts.python.extproc.example.jwt_auth.service_callout_example)</a>
+</li>
+        <li><a href="extproc/normalize_header/service_callout_example.html#callouts.python.extproc.example.normalize_header.service_callout_example.CalloutServerExample">(class in callouts.python.extproc.example.normalize_header.service_callout_example)</a>
+</li>
+        <li><a href="extproc/redirect/service_callout_example.html#callouts.python.extproc.example.redirect.service_callout_example.CalloutServerExample">(class in callouts.python.extproc.example.redirect.service_callout_example)</a>
+</li>
+        <li><a href="extproc/set_cookie/service_callout_example.html#callouts.python.extproc.example.set_cookie.service_callout_example.CalloutServerExample">(class in callouts.python.extproc.example.set_cookie.service_callout_example)</a>
+</li>
+        <li><a href="extproc/update_header/service_callout_example.html#callouts.python.extproc.example.update_header.service_callout_example.CalloutServerExample">(class in callouts.python.extproc.example.update_header.service_callout_example)</a>
+</li>
+      </ul></li>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.cert_chain">cert_chain (callouts.python.extproc.service.callout_server.CalloutServer attribute)</a>
+</li>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.cert_chain_path">cert_chain_path (callouts.python.extproc.service.callout_server.CalloutServer attribute)</a>
+</li>
+      <li><a href="extproc/e2e_tests/metadata_server.html#callouts.python.extproc.example.e2e_tests.metadata_server.check_metadata">check_metadata() (in module callouts.python.extproc.example.e2e_tests.metadata_server)</a>
+</li>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.combined_health_check">combined_health_check (callouts.python.extproc.service.callout_server.CalloutServer attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="D">D</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.default_ip">default_ip (callouts.python.extproc.service.callout_server.CalloutServer attribute)</a>
+</li>
+      <li><a href="extproc/service/callout_tools.html#callouts.python.extproc.service.callout_tools.deny_callout">deny_callout() (in module callouts.python.extproc.service.callout_tools)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.disable_plaintext">disable_plaintext (callouts.python.extproc.service.callout_server.CalloutServer attribute)</a>
+</li>
+      <li><a href="extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.RequestHandler.do_GET">do_GET() (callouts.python.extproc.example.e2e_tests.observability_server.RequestHandler method)</a>
+
+      <ul>
+        <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.HealthCheckService.do_GET">(callouts.python.extproc.service.callout_server.HealthCheckService method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+</tr></table>
+
+<h2 id="E">E</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/jwt_auth/service_callout_example.html#callouts.python.extproc.example.jwt_auth.service_callout_example.extract_jwt_token">extract_jwt_token() (in module callouts.python.extproc.example.jwt_auth.service_callout_example)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="G">G</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/add_custom_response/service_callout_example.html#callouts.python.extproc.example.add_custom_response.service_callout_example.generate_mock_body_response">generate_mock_body_response() (in module callouts.python.extproc.example.add_custom_response.service_callout_example)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/add_custom_response/service_callout_example.html#callouts.python.extproc.example.add_custom_response.service_callout_example.generate_mock_header_response">generate_mock_header_response() (in module callouts.python.extproc.example.add_custom_response.service_callout_example)</a>
+</li>
+      <li><a href="extproc/normalize_header/service_callout_example.html#callouts.python.extproc.example.normalize_header.service_callout_example.get_device_type">get_device_type() (in module callouts.python.extproc.example.normalize_header.service_callout_example)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="H">H</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/service/callout_tools.html#callouts.python.extproc.service.callout_tools.header_immediate_response">header_immediate_response() (in module callouts.python.extproc.service.callout_tools)</a>
+</li>
+      <li><a href="extproc/service/callout_tools.html#callouts.python.extproc.service.callout_tools.headers_contain">headers_contain() (in module callouts.python.extproc.service.callout_tools)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.health_check_address">health_check_address (callouts.python.extproc.service.callout_server.CalloutServer attribute)</a>
+</li>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.health_check_port">health_check_port (callouts.python.extproc.service.callout_server.CalloutServer attribute)</a>
+</li>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.HealthCheckService">HealthCheckService (class in callouts.python.extproc.service.callout_server)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="M">M</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/ext_proc_client.html#callouts.python.extproc.example.ext_proc_client.make_json_request">make_json_request() (in module callouts.python.extproc.example.ext_proc_client)</a>
+</li>
+      <li>
+    module
+
+      <ul>
+        <li><a href="extproc/add_body/service_callout_example.html#module-callouts.python.extproc.example.add_body.service_callout_example">callouts.python.extproc.example.add_body.service_callout_example</a>
+</li>
+        <li><a href="extproc/add_custom_response/service_callout_example.html#module-callouts.python.extproc.example.add_custom_response.service_callout_example">callouts.python.extproc.example.add_custom_response.service_callout_example</a>
+</li>
+        <li><a href="extproc/add_header/service_callout_example.html#module-callouts.python.extproc.example.add_header.service_callout_example">callouts.python.extproc.example.add_header.service_callout_example</a>
+</li>
+        <li><a href="extproc/cloud_log/service_callout_example.html#module-callouts.python.extproc.example.cloud_log.service_callout_example">callouts.python.extproc.example.cloud_log.service_callout_example</a>
+</li>
+        <li><a href="extproc/e2e_tests/metadata_server.html#module-callouts.python.extproc.example.e2e_tests.metadata_server">callouts.python.extproc.example.e2e_tests.metadata_server</a>
+</li>
+        <li><a href="extproc/e2e_tests/observability_server.html#module-callouts.python.extproc.example.e2e_tests.observability_server">callouts.python.extproc.example.e2e_tests.observability_server</a>
+</li>
+        <li><a href="extproc/ext_proc_client.html#module-callouts.python.extproc.example.ext_proc_client">callouts.python.extproc.example.ext_proc_client</a>
+</li>
+        <li><a href="extproc/jwt_auth/service_callout_example.html#module-callouts.python.extproc.example.jwt_auth.service_callout_example">callouts.python.extproc.example.jwt_auth.service_callout_example</a>
+</li>
+        <li><a href="extproc/normalize_header/service_callout_example.html#module-callouts.python.extproc.example.normalize_header.service_callout_example">callouts.python.extproc.example.normalize_header.service_callout_example</a>
+</li>
+        <li><a href="extproc/redirect/service_callout_example.html#module-callouts.python.extproc.example.redirect.service_callout_example">callouts.python.extproc.example.redirect.service_callout_example</a>
+</li>
+        <li><a href="extproc/set_cookie/service_callout_example.html#module-callouts.python.extproc.example.set_cookie.service_callout_example">callouts.python.extproc.example.set_cookie.service_callout_example</a>
+</li>
+        <li><a href="extproc/update_header/service_callout_example.html#module-callouts.python.extproc.example.update_header.service_callout_example">callouts.python.extproc.example.update_header.service_callout_example</a>
+</li>
+        <li><a href="extproc/service/callout_tools.html#module-callouts.python.extproc.service.callout_tools">callouts.python.extproc.service.callout_tools</a>
+</li>
+      </ul></li>
+  </ul></td>
+</tr></table>
+
+<h2 id="O">O</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample">ObservabilityServerExample (class in callouts.python.extproc.example.e2e_tests.observability_server)</a>
+</li>
+      <li><a href="extproc/add_body/service_callout_example.html#callouts.python.extproc.example.add_body.service_callout_example.CalloutServerExample.on_request_body">on_request_body() (callouts.python.extproc.example.add_body.service_callout_example.CalloutServerExample method)</a>
+
+      <ul>
+        <li><a href="extproc/add_custom_response/service_callout_example.html#callouts.python.extproc.example.add_custom_response.service_callout_example.CalloutServerExample.on_request_body">(callouts.python.extproc.example.add_custom_response.service_callout_example.CalloutServerExample method)</a>
+</li>
+        <li><a href="extproc/cloud_log/service_callout_example.html#callouts.python.extproc.example.cloud_log.service_callout_example.CalloutServerExample.on_request_body">(callouts.python.extproc.example.cloud_log.service_callout_example.CalloutServerExample method)</a>
+</li>
+        <li><a href="extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample.on_request_body">(callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample method)</a>
+</li>
+        <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.on_request_body">(callouts.python.extproc.service.callout_server.CalloutServer method)</a>
+</li>
+      </ul></li>
+      <li><a href="extproc/add_custom_response/service_callout_example.html#callouts.python.extproc.example.add_custom_response.service_callout_example.CalloutServerExample.on_request_headers">on_request_headers() (callouts.python.extproc.example.add_custom_response.service_callout_example.CalloutServerExample method)</a>
+
+      <ul>
+        <li><a href="extproc/add_header/service_callout_example.html#callouts.python.extproc.example.add_header.service_callout_example.CalloutServerExample.on_request_headers">(callouts.python.extproc.example.add_header.service_callout_example.CalloutServerExample method)</a>
+</li>
+        <li><a href="extproc/cloud_log/service_callout_example.html#callouts.python.extproc.example.cloud_log.service_callout_example.CalloutServerExample.on_request_headers">(callouts.python.extproc.example.cloud_log.service_callout_example.CalloutServerExample method)</a>
+</li>
+        <li><a href="extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample.on_request_headers">(callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample method)</a>
+</li>
+        <li><a href="extproc/jwt_auth/service_callout_example.html#callouts.python.extproc.example.jwt_auth.service_callout_example.CalloutServerExample.on_request_headers">(callouts.python.extproc.example.jwt_auth.service_callout_example.CalloutServerExample method)</a>
+</li>
+        <li><a href="extproc/normalize_header/service_callout_example.html#callouts.python.extproc.example.normalize_header.service_callout_example.CalloutServerExample.on_request_headers">(callouts.python.extproc.example.normalize_header.service_callout_example.CalloutServerExample method)</a>
+</li>
+        <li><a href="extproc/redirect/service_callout_example.html#callouts.python.extproc.example.redirect.service_callout_example.CalloutServerExample.on_request_headers">(callouts.python.extproc.example.redirect.service_callout_example.CalloutServerExample method)</a>
+</li>
+        <li><a href="extproc/update_header/service_callout_example.html#callouts.python.extproc.example.update_header.service_callout_example.CalloutServerExample.on_request_headers">(callouts.python.extproc.example.update_header.service_callout_example.CalloutServerExample method)</a>
+</li>
+        <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.on_request_headers">(callouts.python.extproc.service.callout_server.CalloutServer method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/add_body/service_callout_example.html#callouts.python.extproc.example.add_body.service_callout_example.CalloutServerExample.on_response_body">on_response_body() (callouts.python.extproc.example.add_body.service_callout_example.CalloutServerExample method)</a>
+
+      <ul>
+        <li><a href="extproc/add_custom_response/service_callout_example.html#callouts.python.extproc.example.add_custom_response.service_callout_example.CalloutServerExample.on_response_body">(callouts.python.extproc.example.add_custom_response.service_callout_example.CalloutServerExample method)</a>
+</li>
+        <li><a href="extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample.on_response_body">(callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample method)</a>
+</li>
+        <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.on_response_body">(callouts.python.extproc.service.callout_server.CalloutServer method)</a>
+</li>
+      </ul></li>
+      <li><a href="extproc/add_custom_response/service_callout_example.html#callouts.python.extproc.example.add_custom_response.service_callout_example.CalloutServerExample.on_response_headers">on_response_headers() (callouts.python.extproc.example.add_custom_response.service_callout_example.CalloutServerExample method)</a>
+
+      <ul>
+        <li><a href="extproc/add_header/service_callout_example.html#callouts.python.extproc.example.add_header.service_callout_example.CalloutServerExample.on_response_headers">(callouts.python.extproc.example.add_header.service_callout_example.CalloutServerExample method)</a>
+</li>
+        <li><a href="extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample.on_response_headers">(callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample method)</a>
+</li>
+        <li><a href="extproc/set_cookie/service_callout_example.html#callouts.python.extproc.example.set_cookie.service_callout_example.CalloutServerExample.on_response_headers">(callouts.python.extproc.example.set_cookie.service_callout_example.CalloutServerExample method)</a>
+</li>
+        <li><a href="extproc/update_header/service_callout_example.html#callouts.python.extproc.example.update_header.service_callout_example.CalloutServerExample.on_response_headers">(callouts.python.extproc.example.update_header.service_callout_example.CalloutServerExample method)</a>
+</li>
+        <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.on_response_headers">(callouts.python.extproc.service.callout_server.CalloutServer method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+</tr></table>
+
+<h2 id="P">P</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.plaintext_address">plaintext_address (callouts.python.extproc.service.callout_server.CalloutServer attribute)</a>
+</li>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.plaintext_port">plaintext_port (callouts.python.extproc.service.callout_server.CalloutServer attribute)</a>
+</li>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.port">port (callouts.python.extproc.service.callout_server.CalloutServer attribute)</a>
+</li>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.private_key">private_key (callouts.python.extproc.service.callout_server.CalloutServer attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.private_key_path">private_key_path (callouts.python.extproc.service.callout_server.CalloutServer attribute)</a>
+</li>
+      <li><a href="extproc/e2e_tests/metadata_server.html#callouts.python.extproc.example.e2e_tests.metadata_server.CalloutServerExample.process">process() (callouts.python.extproc.example.e2e_tests.metadata_server.CalloutServerExample method)</a>
+</li>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server._GRPCCalloutService.Process">Process() (callouts.python.extproc.service.callout_server._GRPCCalloutService method)</a>
+</li>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.process">process() (callouts.python.extproc.service.callout_server.CalloutServer method)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="R">R</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.RequestHandler">RequestHandler (class in callouts.python.extproc.example.e2e_tests.observability_server)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.run">run() (callouts.python.extproc.service.callout_server.CalloutServer method)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="S">S</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.secure_health_check">secure_health_check (callouts.python.extproc.service.callout_server.CalloutServer attribute)</a>
+</li>
+      <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.server_thread_count">server_thread_count (callouts.python.extproc.service.callout_server.CalloutServer attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample.shutdown">shutdown() (callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample method)</a>
+
+      <ul>
+        <li><a href="extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.shutdown">(callouts.python.extproc.service.callout_server.CalloutServer method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+</tr></table>
+
+<h2 id="U">U</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/e2e_tests/metadata_server.html#callouts.python.extproc.example.e2e_tests.metadata_server.unpack_string">unpack_string() (in module callouts.python.extproc.example.e2e_tests.metadata_server)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="V">V</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/set_cookie/service_callout_example.html#callouts.python.extproc.example.set_cookie.service_callout_example.validate_header">validate_header() (in module callouts.python.extproc.example.set_cookie.service_callout_example)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="extproc/jwt_auth/service_callout_example.html#callouts.python.extproc.example.jwt_auth.service_callout_example.validate_jwt_token">validate_jwt_token() (in module callouts.python.extproc.example.jwt_auth.service_callout_example)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Google LLC.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
