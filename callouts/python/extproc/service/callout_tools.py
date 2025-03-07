@@ -26,10 +26,10 @@ from envoy.service.ext_proc.v3.external_processor_pb2 import BodyResponse
 from envoy.service.ext_proc.v3.external_processor_pb2 import HeadersResponse
 from envoy.service.ext_proc.v3.external_processor_pb2 import ImmediateResponse
 from envoy.type.v3.http_status_pb2 import StatusCode
-from google.protobuf.json_format import Parse
 from google.protobuf.struct_pb2 import Struct
 import grpc
 
+_DYNAMIC_FORWARDING_METADATA_NAMESPACE = "com.google.envoy.dynamic_forwarding.selected_endpoints"
 
 def _addr(value: str) -> tuple[str, int] | None:
   if not value:
@@ -257,11 +257,9 @@ def build_dynamic_forwarding_metadata(
       Struct: Configured Struct with the expected key and format with provided
       ip and port.
   """
-    dynamic_forwarding_metadata_namespace = "com.google.envoy.dynamic_forwarding.selected_endpoints"
-    return Parse('{"%s" : {"primary" : "%s:%d"}}' %
-                 (dynamic_forwarding_metadata_namespace,
-                  ip_address,
-                  port_number),
-                 Struct()
-                 )
-
+    formated_endpoint = '%s:%d' % (ip_address, port_number)
+    dynamic_forwarding_struct = Struct()
+    dynamic_forwarding_struct.get_or_create_struct(_DYNAMIC_FORWARDING_METADATA_NAMESPACE)[
+      'primary'
+    ] = formated_endpoint
+    return dynamic_forwarding_struct
