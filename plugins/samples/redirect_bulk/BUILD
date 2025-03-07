@@ -9,6 +9,7 @@ proxy_wasm_plugin_rust(
         "//bazel/cargo/remote:log",
         "//bazel/cargo/remote:proxy-wasm",
     ],
+    data = ["config.data"],
 )
 
 proxy_wasm_tests(
