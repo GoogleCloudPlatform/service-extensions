@@ -1,0 +1,45 @@
+name: Deploy Common Documentation Files
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - docs/google-cloud.png
+      - docs/style.css
+      - docs/index.html
+
+permissions: read-all
+
+jobs:
+  deploy-common:
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install GitHub Pages Action Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rsync
+
+      - name: Prepare Common Files
+        run: |
+          mkdir -p common
+          cp docs/google-cloud.png common/
+          cp docs/style.css common/
+          cp docs/index.html common/
+
+      - name: Deploy Common Files to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        with:
+          publish_branch: gh-pages
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: common
+          destination_dir: .
+          keep_files: false
+          force_orphan: false
