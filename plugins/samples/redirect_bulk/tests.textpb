@@ -49,3 +49,20 @@ test {
     }
   }
 }
+
+# Case-insensitive domain matching test.
+test {
+  name: "CaseInsensitiveDomainMatch"
+  benchmark: false
+  request_headers {
+    input {
+      header { key: ":authority" value: "ABC.com" }  # Uppercase domain
+      header { key: ":path" value: "/case-test" }
+      header { key: ":scheme" value: "https" }
+    }
+    result {
+      immediate { http_status: 301 details: "" }
+      has_header { key: "Location" value: "https://xyz.com/case-test" }
+    }
+  }
+}

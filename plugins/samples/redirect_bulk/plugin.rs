@@ -50,7 +50,8 @@ impl RootContext for MyRootContext {
 
                         let parts: Vec<&str> = line.split_whitespace().collect();
                         if parts.len() == 2 {
-                            mappings.insert(parts[0].to_string(), parts[1].to_string());
+                            // Convert source domain to lowercase for case-insensitive matching
+                            mappings.insert(parts[0].to_lowercase(), parts[1].to_string());
                         } else {
                             warn!("Invalid mapping format: {}", line);
                         }
@@ -95,8 +96,11 @@ impl HttpContext for MyHttpContext {
             // Extract the domain part (remove port if present)
             let domain = host.split(':').next().unwrap_or(&host);
 
+            // Convert domain to lowercase for case-insensitive matching
+            let domain_lowercase = domain.to_lowercase();
+
             // Check if this domain should be redirected
-            if let Some(target_domain) = self.domain_mappings.get(domain) {
+            if let Some(target_domain) = self.domain_mappings.get(&domain_lowercase) {
                 // Get the path
                 let path = self.get_http_request_header(":path").unwrap_or_default();
 
