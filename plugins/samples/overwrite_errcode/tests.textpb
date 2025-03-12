@@ -3,8 +3,10 @@ test {
   name: "With500StatusCodeChangeTo404"
   response_headers {
     input { header { key: ":status" value: "500" } }
-    result { 
-      has_header { key: ":status" value: "404" }
+    result {
+      headers {
+        has_header { key: ":status" value: "404" }
+      }
     }
   }
 }
@@ -13,8 +15,10 @@ test {
   name: "With502StatusCodeChangeTo404"
   response_headers {
     input { header { key: ":status" value: "502" } }
-    result { 
-      has_header { key: ":status" value: "404" }
+    result {
+      headers {
+        has_header { key: ":status" value: "404" }
+      }
     }
   }
 }
@@ -23,8 +27,10 @@ test {
   name: "With200StatusCodeNothingChanges"
   response_headers {
     input { header { key: ":status" value: "200" } }
-    result { 
-      has_header { key: ":status" value: "200" }
+    result {
+      headers {
+        has_header { key: ":status" value: "200" }
+      }
     }
   }
 }
