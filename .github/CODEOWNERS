@@ -1,7 +1,10 @@
 # Repository Admins
-*                 @GoogleCloudPlatform/service-extensions-samples-owners @GoogleCloudPlatform/dee-infra
+*                                                   @GoogleCloudPlatform/service-extensions-samples-owners @GoogleCloudPlatform/dee-infra
+
+# Model Armor Team
+/callouts/python/extproc/example/model_armor/       @GoogleCloudPlatform/service-extensions-samples-owners @GoogleCloudPlatform/cloud-modelarmor-team
 
 # Sample Reviewers
-/callouts/        @GoogleCloudPlatform/service-extensions-samples-reviewers @upeeth
-/plugins/         @GoogleCloudPlatform/service-extensions-samples-reviewers @upeeth
-/README.md        @GoogleCloudPlatform/service-extensions-samples-reviewers @upeeth
+/callouts/                                          @GoogleCloudPlatform/service-extensions-samples-reviewers @upeeth
+/plugins/                                           @GoogleCloudPlatform/service-extensions-samples-reviewers @upeeth
+/README.md                                          @GoogleCloudPlatform/service-extensions-samples-reviewers @upeeth
