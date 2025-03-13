@@ -21,6 +21,7 @@ import (
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/add_body"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/add_header"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/basic_callout_server"
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/dynamic_forwarding"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/jwt_auth"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/redirect"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/internal/server"
@@ -48,6 +49,8 @@ func main() {
 		customService = basic_callout_server.NewExampleCalloutService()
 	case "jwt_auth":
 		customService = jwt_auth.NewExampleCalloutService()
+	case "dynamic_forwarding":
+		customService = dynamic_forwarding.NewExampleCalloutService()
 	default:
 		fmt.Println("Unknown EXAMPLE_TYPE. Please set it to a valid example")
 		return
