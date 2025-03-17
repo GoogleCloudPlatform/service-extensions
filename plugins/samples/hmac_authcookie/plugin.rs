@@ -13,7 +13,8 @@
 // limitations under the License.
 
 // [START serviceextensions_plugin_hmac_authcookie]
-use base64::Engine;
+use base64::Engine as _;
+const BASE64_ENGINE: base64::engine::GeneralPurpose = base64::engine::general_purpose::STANDARD;
 use hmac::{Hmac, Mac};
 use proxy_wasm::{
     traits::{Context, HttpContext, RootContext},
@@ -25,7 +26,6 @@ use std::{str, time::SystemTime};
 
 // Replace with your desired secret key
 const SECRET_KEY: &str = "your_secret_key";
-const BASE64_ENGINE: base64::engine::GeneralPurpose = base64::engine::general_purpose::STANDARD;
 
 proxy_wasm::main! {{
     proxy_wasm::set_log_level(LogLevel::Info);
@@ -183,11 +183,15 @@ impl MyHttpContext {
 
     // Checks if current time is before expiration timestamp
     fn validate_expiration(&self, exp: String) -> bool {
-        let timestamp = exp.parse::<i64>().ok()?;
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .ok()?
-            .as_nanos() as i64;
+        let timestamp = match exp.parse::<i64>() {
+            Ok(t) => t,
+            Err(_) => return false,
+        };
+        
+        let now = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+            Ok(d) => d.as_nanos() as i64,
+            Err(_) => return false,
+        };
         
         now <= timestamp
     }
