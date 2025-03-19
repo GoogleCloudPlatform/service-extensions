@@ -6,20 +6,24 @@ test {
   request_headers {
     input { header { key: "OtherHeader" value: "OtherValue" } }
     result {
-      has_header { key: "OtherHeader" value: "OtherValue" }
-      no_header { key: "RequestHeader" }
+      headers {
+        has_header { key: "OtherHeader" value: "OtherValue" }
+        no_header { key: "RequestHeader" }
+      }
     }
   }
 }
-# Expect to add the header ResponseHeader due to previous non-existence. 
+# Expect to add the header ResponseHeader due to previous non-existence.
 test {
   name: "DoAddResponseHeader"
   benchmark: false
   response_headers {
     input { header { key: "OtherHeader" value: "OtherValue" } }
-    result { 
-      has_header { key: "ResponseHeader" value: "changed" }
-      has_header { key: "OtherHeader" value: "OtherValue" }
+    result {
+      headers {
+        has_header { key: "ResponseHeader" value: "changed" }
+        has_header { key: "OtherHeader" value: "OtherValue" }
+      }
     }
   }
 }
@@ -28,13 +32,15 @@ test {
   name: "OverwriteRequestHeader"
   benchmark: false
   request_headers {
-    input { 
+    input {
       header { key: "RequestHeader" value: "SomeHeaderValue"}
-      header { key: "OtherHeader" value: "OtherValue" } 
+      header { key: "OtherHeader" value: "OtherValue" }
     }
-    result { 
-      has_header { key: "RequestHeader" value: "changed" }
-      has_header { key: "OtherHeader" value: "OtherValue" }
+    result {
+      headers {
+        has_header { key: "RequestHeader" value: "changed" }
+        has_header { key: "OtherHeader" value: "OtherValue" }
+      }
     }
   }
 }
@@ -43,13 +49,15 @@ test {
   name: "OverwriteResponseHeader"
   benchmark: false
   response_headers {
-    input { 
+    input {
       header { key: "ResponseHeader" value: "SomeHeaderValue" }
       header { key: "OtherHeader" value: "OtherValue" }
     }
-    result { 
-      has_header { key: "ResponseHeader" value: "changed" }
-      has_header { key: "OtherHeader" value: "OtherValue" }
+    result {
+      headers {
+        has_header { key: "ResponseHeader" value: "changed" }
+        has_header { key: "OtherHeader" value: "OtherValue" }
+      }
     }
   }
 }
