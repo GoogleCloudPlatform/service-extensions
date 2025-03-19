@@ -28,6 +28,7 @@ proxy_wasm_plugin_rust(
         "//bazel/cargo/remote:regex",
         "//bazel/cargo/remote:proxy-wasm",
         "//bazel/cargo/remote:sha2",
+        "//bazel/cargo/remote:hex",
     ],
 )
 

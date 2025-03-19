@@ -16,6 +16,7 @@ uuid = { version = "1.12.1", features = [ "v4" ] }
 base64 = "0.21.0"
 hmac = "0.12.1"
 sha2 = "0.10.6"
+hex = "0.4"
 
 [lib]
 crate-type = ["cdylib"]
