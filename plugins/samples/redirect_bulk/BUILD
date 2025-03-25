@@ -18,6 +18,7 @@ proxy_wasm_plugin_cpp(
     deps = [
         "@com_google_absl//absl/strings",
     ],
+    data = ["config.data"],
 )
 
 proxy_wasm_tests(
