@@ -52,15 +52,17 @@ jobs:
         pip install sphinx sphinx_rtd_theme myst_parser
     - name: Sphinx build
       run: |
-        sphinx-build docs/python docs/python/_build
+        sphinx-build -E docs/python docs/python/_build
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
       if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
       with:
         publish_branch: gh-pages
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: docs/
-        force_orphan: true
+        publish_dir: docs/python/_build
+        destination_dir: python/_build
+        keep_files: false
+        force_orphan: false
     #- name: Lint with flake8
     #  run: |
     #    # stop the build if there are Python syntax errors or undefined names

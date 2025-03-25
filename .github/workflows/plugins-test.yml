@@ -82,6 +82,7 @@ jobs:
         bazel test
         --verbose_failures
         --test_output=errors
+        --test_arg=--nobench
         --disk_cache /tmp/bazel/cache
         ${{ matrix.flags }}
         -- //samples/... //test/...
