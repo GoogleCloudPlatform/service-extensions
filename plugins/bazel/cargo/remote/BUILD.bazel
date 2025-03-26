@@ -38,6 +38,12 @@ alias(
 )
 
 alias(
+    name = "lol_html",
+    actual = "@cu__lol_html-2.0.0//:lol_html",
+    tags = ["manual"],
+)
+
+alias(
     name = "proxy-wasm",
     actual = "@cu__proxy-wasm-0.2.1//:proxy_wasm",
     tags = ["manual"],
@@ -52,5 +58,11 @@ alias(
 alias(
     name = "url",
     actual = "@cu__url-2.4.1//:url",
+    tags = ["manual"],
+)
+
+alias(
+    name = "uuid",
+    actual = "@cu__uuid-1.12.1//:uuid",
     tags = ["manual"],
 )
