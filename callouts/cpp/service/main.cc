@@ -20,12 +20,12 @@
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
 #include "absl/log/log.h"
-#include "custom_callout_server.h"
+#include "callout_server.h"
 
-ABSL_FLAG(std::string, server_address, "0.0.0.0:8443",
-          "The gRPC server addess, like '0.0.0.0:8443'");
-ABSL_FLAG(uint16_t, health_check_port, 8080,
-          "The HTTP health check server port addess, like '8080'");
+ABSL_FLAG(std::string, server_address, "0.0.0.0:443",
+          "The gRPC server address, like '0.0.0.0:443'");
+ABSL_FLAG(uint16_t, health_check_port, 80,
+          "The HTTP health check server port");
 ABSL_FLAG(std::string, key_path, "ssl_creds/privatekey.pem",
           "The SSL private key file path");
 ABSL_FLAG(std::string, cert_path, "ssl_creds/chain.pem",
@@ -36,7 +36,8 @@ void StartHttpHealthCheckServer(uint16_t port) {
   namespace http = beast::http;
   namespace asio = boost::asio;
   using tcp = asio::ip::tcp;
-  boost::asio::io_context io_context;
+  
+  asio::io_context io_context;
   tcp::acceptor acceptor(io_context, {tcp::v4(), port});
 
   LOG(INFO) << "Health check service started on port: " << port;
@@ -63,33 +64,27 @@ void StartHttpHealthCheckServer(uint16_t port) {
 
 int main(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
-  std::string server_address = absl::GetFlag(FLAGS_server_address);
-  uint16_t health_check_port = absl::GetFlag(FLAGS_health_check_port);
-  std::string key_path = absl::GetFlag(FLAGS_key_path);
-  std::string cert_path = absl::GetFlag(FLAGS_cert_path);
+  
+  auto config = CalloutServer::DefaultConfig();
+  config.secure_address = absl::GetFlag(FLAGS_server_address);
+  config.key_path = absl::GetFlag(FLAGS_key_path);
+  config.cert_path = absl::GetFlag(FLAGS_cert_path);
 
-  std::shared_ptr<grpc::ServerCredentials> secure_credentials =
-      grpc::InsecureServerCredentials();
-
-  if (key_path != "" && cert_path != "") {
-    auto maybe_secure_credentials =
-        CalloutServer::CreateSecureServerCredentials(key_path, cert_path);
-    if (!maybe_secure_credentials) {
-      return 1;
-    }
-    secure_credentials = maybe_secure_credentials.value();
-    LOG(INFO) << "Envoy Ext Proc using secure credentials";
+  if (!config.key_path.empty() && !config.cert_path.empty()) {
+    LOG(INFO) << "Starting server with secure (TLS) mode";
+  } else if (config.enable_insecure) {
+    LOG(WARNING) << "Starting server in INSECURE (plaintext) mode";
   } else {
-    LOG(INFO) << "Envoy Ext Proc using insecure credentials";
+    LOG(ERROR) << "No valid configuration: secure credentials missing and insecure mode disabled";
+    return 1;
   }
 
-  // Run the HTTP health check in a separated thread
-  std::thread http_thread(StartHttpHealthCheckServer, health_check_port);
+  std::thread health_check_thread(
+      StartHttpHealthCheckServer, 
+      absl::GetFlag(FLAGS_health_check_port));
 
-  CustomCalloutServer service;
-  CalloutServer::RunServer(server_address, service, secure_credentials, true);
+  CalloutServer::RunServers(config);
 
-  http_thread.join();
-
+  health_check_thread.join();
   return 0;
 }

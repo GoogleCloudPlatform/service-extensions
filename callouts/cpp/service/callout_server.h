@@ -12,13 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef CALLOUT_SERVER_H_
+#define CALLOUT_SERVER_H_
+
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
 
 #include <fstream>
+#include <memory>
+#include <thread>
 
 #include "absl/log/log.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "envoy/service/ext_proc/v3/external_processor.grpc.pb.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
@@ -31,7 +38,28 @@ using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
 class CalloutServer : public ExternalProcessor::Service {
- public:
+  public:
+
+  struct ServerConfig {
+    std::string secure_address;
+    std::string insecure_address;
+    std::string health_check_address;
+    std::string cert_path;
+    std::string key_path;
+    bool enable_insecure;
+  };
+
+  static ServerConfig DefaultConfig() {
+    return {
+      .secure_address = "0.0.0.0:443",
+      .insecure_address = "0.0.0.0:8080",
+      .health_check_address = "0.0.0.0:80",
+      .cert_path = "ssl_creds/chain.pem",
+      .key_path = "ssl_creds/privatekey.pem",
+      .enable_insecure = true
+    };
+  }
+
   // Adds a request header field.
   static void AddRequestHeader(ProcessingResponse* response,
                                std::string_view key, std::string_view value) {
@@ -117,12 +145,12 @@ class CalloutServer : public ExternalProcessor::Service {
   static std::optional<std::shared_ptr<grpc::ServerCredentials>>
   CreateSecureServerCredentials(std::string_view key_path,
                                 std::string_view cert_path) {
-    auto key = CalloutServer::ReadDataFile(key_path);
+    auto key = ReadDataFile(key_path);
     if (!key.ok()) {
       LOG(ERROR) << "Error reading the private key file on " << key_path;
       return std::nullopt;
     }
-    auto cert = CalloutServer::ReadDataFile(cert_path);
+    auto cert = ReadDataFile(cert_path);
     if (!cert.ok()) {
       LOG(ERROR) << "Error reading the certificate file on " << cert_path;
       return std::nullopt;
@@ -137,35 +165,39 @@ class CalloutServer : public ExternalProcessor::Service {
     return grpc::SslServerCredentials(ssl_options);
   }
 
-  static std::unique_ptr<grpc::Server> RunServer(
-      std::string_view server_address, CalloutServer& service) {
-    return CalloutServer::RunServer(server_address, service,
-                                    grpc::InsecureServerCredentials(), false);
-  }
+  static void RunServers(const ServerConfig& config = ServerConfig{}) {
+    std::thread secure_thread([config] {
+      if (auto creds = CreateSecureServerCredentials(config.key_path, config.cert_path)) {
+        CalloutServer service;
+        grpc::ServerBuilder builder;
+        builder.AddListeningPort(config.secure_address, *creds);
+        builder.RegisterService(&service);
+        auto server = builder.BuildAndStart();
+        LOG(INFO) << "Secure server listening on " << config.secure_address;
+        server->Wait();
+      }
+    });
 
-  static std::unique_ptr<grpc::Server> RunServer(
-      std::string_view server_address, CalloutServer& service,
-      std::shared_ptr<grpc::ServerCredentials> credentials, bool wait) {
-    grpc::EnableDefaultHealthCheckService(true);
-    grpc::ServerBuilder builder;
-    builder.AddListeningPort(std::string{server_address}, credentials);
-    builder.RegisterService(&service);
+    std::thread insecure_thread([config] {
+      if (config.enable_insecure) {
+        CalloutServer service;
+        grpc::ServerBuilder builder;
+        builder.AddListeningPort(config.insecure_address, grpc::InsecureServerCredentials());
+        builder.RegisterService(&service);
+        auto server = builder.BuildAndStart();
+        LOG(INFO) << "Insecure server listening on " << config.insecure_address;
+        server->Wait();
+      }
+    });
 
-    std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
-    LOG(INFO) << "Envoy Ext Proc server listening on " << server_address;
-
-    if (wait) {
-      server->Wait();
-    }
-    return server;
+    secure_thread.join();
+    insecure_thread.join();
   }
 
   grpc::Status Process(
       grpc::ServerContext* context,
       grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream)
       override {
-    (void)context;
-
     ProcessingRequest request;
     while (stream->Read(&request)) {
       ProcessingResponse response;
@@ -215,25 +247,23 @@ class CalloutServer : public ExternalProcessor::Service {
   void ProcessRequest(ProcessingRequest* request,
                       ProcessingResponse* response) {
     switch (request->request_case()) {
-      case ProcessingRequest::RequestCase::kRequestHeaders:
-        this->OnRequestHeader(request, response);
+      case ProcessingRequest::kRequestHeaders:
+        OnRequestHeader(request, response);
         break;
-      case ProcessingRequest::RequestCase::kResponseHeaders:
-        this->OnResponseHeader(request, response);
+      case ProcessingRequest::kResponseHeaders:
+        OnResponseHeader(request, response);
         break;
-      case ProcessingRequest::RequestCase::kRequestBody:
-        this->OnRequestBody(request, response);
+      case ProcessingRequest::kRequestBody:
+        OnRequestBody(request, response);
         break;
-      case ProcessingRequest::RequestCase::kResponseBody:
-        this->OnResponseBody(request, response);
+      case ProcessingRequest::kResponseBody:
+        OnResponseBody(request, response);
         break;
-      case ProcessingRequest::RequestCase::kRequestTrailers:
-      case ProcessingRequest::RequestCase::kResponseTrailers:
-        break;
-      case ProcessingRequest::RequestCase::REQUEST_NOT_SET:
       default:
         LOG(WARNING) << "Received a ProcessingRequest with no request data.";
         break;
     }
   }
 };
+
+#endif  // CALLOUT_SERVER_H_
