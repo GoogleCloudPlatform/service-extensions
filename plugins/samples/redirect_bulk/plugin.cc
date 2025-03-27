@@ -31,14 +31,12 @@ public:
     // Retrieve the plugin configuration data.
     auto config_data = getBufferBytes(WasmBufferType::PluginConfiguration, 0, config_len);
     
-    // If no configuration is provided, log a warning and continue.
     if (!config_data || config_data->size() == 0) {
       LOG_WARN("No configuration provided, no redirects will be performed");
       return true;
     }
 
-    // Convert the configuration data to a string.
-    std::string config_str = config_data->toString();
+    absl::string_view config_str = config_data->view();
     // Split the configuration string into lines.
     std::vector<std::string> lines = absl::StrSplit(config_str, '\n');
 
@@ -49,10 +47,8 @@ public:
       if (stripped.empty() || stripped[0] == '#') continue;
 
       // Split the line into source and target domains.
-      std::vector<absl::string_view> parts = 
-          absl::StrSplit(stripped, absl::MaxSplits(' ', 1));
+      std::vector<absl::string_view> parts = absl::StrSplit(stripped, ' ');
           
-      // Ensure the line has exactly two parts (source and target domains).
       if (parts.size() != 2) {
         LOG_WARN("Invalid mapping format: " + std::string(stripped));
         continue;
@@ -60,7 +56,6 @@ public:
 
       // Convert the source domain to lowercase for case-insensitive matching.
       std::string source = absl::AsciiStrToLower(parts[0]);
-      // Store the mapping in the domain_mappings_ map.
       domain_mappings_[source] = std::string(parts[1]);
     }
 
@@ -97,16 +92,12 @@ public:
     }
 
     // Get the request path.
-    std::string path = "/";
-    if (auto path_header = getRequestHeader(":path")) {
-      path = path_header->toString();
-    }
+    auto path_header = getRequestHeader(":path");
+    std::string path = path_header ? path_header->toString() : "/";
 
     // Get the request scheme (http or https).
-    std::string scheme = "https";
-    if (auto scheme_header = getRequestHeader(":scheme")) {
-      scheme = scheme_header->toString();
-    }
+    auto scheme_header = getRequestHeader(":scheme");
+    std::string scheme = scheme_header ? scheme_header->toString() : "https";
 
     // Construct the new URL.
     const std::string new_url = absl::StrCat(
