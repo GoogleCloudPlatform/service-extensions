@@ -7,6 +7,8 @@ cc_binary(
     srcs = ["//:service/main.cc"],
     deps = [
         ":custom_callout_server_lib",
+        "//:jwt-cpp",
+
     ],
     includes = ["."],
 )
@@ -16,6 +18,7 @@ cc_library(
     srcs = ["custom_callout_server.h"],
     deps = [
         "//:callout_service_cpp_lib",
+        "//:jwt-cpp",
     ],
 )
 
