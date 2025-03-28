@@ -17,16 +17,13 @@ async-trait = "0.1"
 log = "0.4"
 env_logger = "0.10"
 thiserror = "1.0"
-anyhow = "1.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 hyper = { version = "0.14", features = ["full"] }
-tower = "0.4"
-async-stream = "0.3"
+jsonwebtoken = "8.3"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.138"
 
 [build-dependencies]
 tonic-build = { version = "0.10", features = ["prost"] }
-walkdir = "2.4"
 
 [lib]
 name = "ext_proc"
@@ -34,9 +31,21 @@ path = "src/lib.rs"
 
 # Examples
 [[example]]
-name = "add-header"
-path = "examples/add-header/main.rs"
+name = "add_header"
+path = "examples/add_header/main.rs"
+
+[[example]]
+name = "add_body"
+path = "examples/add_body/main.rs"
+
+[[example]]
+name = "basic"
+path = "examples/basic/main.rs"
 
 [[example]]
 name = "redirect"
 path = "examples/redirect/main.rs"
+
+[[example]]
+name = "jwt_auth"
+path = "examples/jwt_auth/main.rs"
