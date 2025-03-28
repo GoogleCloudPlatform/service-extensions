@@ -24,19 +24,28 @@ const COOKIE_NAME: &str = "my_cookie";
 proxy_wasm::main! {{
     proxy_wasm::set_log_level(LogLevel::Info);
     proxy_wasm::set_root_context(|_| -> Box<dyn RootContext> {
-        Box::new(MyRootContext)
+        let seed = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos() as u64;
+
+        Box::new(MyRootContext {
+            rng: SmallRng::seed_from_u64(seed),
+        })
     });
 }}
 
-struct MyRootContext;
+struct MyRootContext {
+    rng: SmallRng,
+}
 
 impl Context for MyRootContext {}
 
 impl RootContext for MyRootContext {
-
     fn create_http_context(&self, _context_id: u32) -> Option<Box<dyn HttpContext>> {
         Some(Box::new(MyHttpContext {
             session_id: None,
+            rng: self.rng.clone(),
         }))
     }
 
@@ -47,6 +56,7 @@ impl RootContext for MyRootContext {
 
 struct MyHttpContext {
     session_id: Option<String>,
+    rng: SmallRng,
 }
 
 impl Context for MyHttpContext {}
@@ -106,14 +116,8 @@ impl MyHttpContext {
     }
 
     /// Generates a random `u32` session ID.
-    fn generate_random_session_id(&self) -> u32 {
-        let seed = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos() as u64;
-
-        let mut rng = SmallRng::seed_from_u64(seed);
-        rng.next_u32()
+    fn generate_random_session_id(&mut self) -> u32 {
+        self.rng.next_u32()
     }
 }
 // [END serviceextensions_plugin_set_cookie]
