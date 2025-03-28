@@ -9,26 +9,27 @@ use std::path::PathBuf;
 use futures::Stream;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::error;
 
 #[derive(Clone)]
 pub struct Config {
     pub address: String,
-    pub insecure_address: Option<String>,
+    pub plaintext_address: Option<String>,
     pub health_check_address: String,
     pub cert_file: PathBuf,
     pub key_file: PathBuf,
-    pub enable_insecure_server: bool,
+    pub enable_plaintext_server: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            address: "0.0.0.0:8443".to_string(),
-            insecure_address: Some("0.0.0.0:8080".to_string()),
-            health_check_address: "0.0.0.0:8000".to_string(),
+            address: "0.0.0.0:443".to_string(),
+            plaintext_address: Some("0.0.0.0:8080".to_string()),
+            health_check_address: "0.0.0.0:80".to_string(),
             cert_file: "extproc/ssl_creds/localhost.crt".into(),
             key_file: "extproc/ssl_creds/localhost.key".into(),
-            enable_insecure_server: false,
+            enable_plaintext_server: true,
         }
     }
 }
@@ -80,15 +81,15 @@ impl CalloutServer {
         })
     }
 
-    pub async fn spawn_insecure_grpc<P: ExtProcessor + Clone + Send + 'static>(
+    pub async fn spawn_plaintext_grpc<P: ExtProcessor + Clone + Send + 'static>(
         &self,
         processor: P,
     ) -> tokio::task::JoinHandle<()> {
         let server = self.clone();
         let processor = processor.clone();
         tokio::spawn(async move {
-            if let Err(e) = server.start_insecure_grpc(processor).await {
-                error!("Failed to start insecure server: {}", e);
+            if let Err(e) = server.start_plaintext_grpc(processor).await {
+                error!("Failed to start plaintext server: {}", e);
             }
         })
     }
@@ -105,7 +106,7 @@ impl CalloutServer {
     async fn start_grpc<P: ExtProcessor + 'static>(
         &self,
         processor: P,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
         // Check if certificate files exist
         if !self.config.cert_file.exists() {
             return Err(format!("Certificate file not found: {:?}", self.config.cert_file).into());
@@ -138,21 +139,21 @@ impl CalloutServer {
         Ok(())
     }
 
-    async fn start_insecure_grpc<P: ExtProcessor + 'static>(
+    async fn start_plaintext_grpc<P: ExtProcessor + 'static>(
         &self,
         processor: P,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        if !self.config.enable_insecure_server {
-            info!("Insecure server is disabled");
+    ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+        if !self.config.enable_plaintext_server {
+            info!("Plaintext server is disabled");
             return Ok(());
         }
 
-        let addr = self.config.insecure_address.as_ref()
-            .ok_or("Insecure address not configured")?
+        let addr = self.config.plaintext_address.as_ref()
+            .ok_or("Plaintext address not configured")?
             .parse()?;
         let service = ExtProcService::new(processor);
 
-        info!("Starting insecure gRPC server on {}", self.config.insecure_address.as_ref().unwrap());
+        info!("Starting plaintext gRPC server on {}", self.config.plaintext_address.as_ref().unwrap());
         Server::builder()
             .add_service(service.into_server())
             .serve(addr)
@@ -161,7 +162,7 @@ impl CalloutServer {
         Ok(())
     }
 
-    async fn start_health_check(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn start_health_check(&self) -> Result<(), Box<dyn error::Error + Send + Sync>> {
         let listener = TcpListener::bind(&self.config.health_check_address).await?;
         info!("Starting health check server on {}", self.config.health_check_address);
 

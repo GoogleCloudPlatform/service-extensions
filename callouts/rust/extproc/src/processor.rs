@@ -6,6 +6,8 @@ use thiserror::Error;
 pub enum ProcessingError {
     #[error("Processing failed: {0}")]
     Failed(String),
+    #[error("Authorization token is invalid: {0}")]
+    PermissionDenied(String),
 }
 
 #[async_trait]
