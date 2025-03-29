@@ -5,13 +5,16 @@ env {
 test {
   name: "NoXForwardedForHeader"
   request_headers {
-    input { 
+    input {
       header { key: ":path" value: "/somepage/otherpage" }
       header { key: "Cookie" value: "SomeCookie=SomeValue; Authorization=48277f04685e364e0e3f3c4bfa78cb91293d304bbf196829334cb1c4a741d6b0" }
     }
-    result { 
-      immediate { http_status: 403 details: "" }
-      body { exact: "Access forbidden - missing client IP.\n" }
+    result {
+      immediate {
+        http_status: 403
+        details: ""
+        body { exact: "Access forbidden - missing client IP.\n" }
+      }
       log { regex: ".*Access forbidden - missing client IP.$" }
     }
   }
@@ -25,9 +28,12 @@ test {
       header { key: ":path" value: "/somepage/otherpage" }
       header { key: "Cookie" value: "SomeCookie=SomeValue; Authorization=48277f04685e364e0e3f3c4bfa78cb91293d304bbf196829334cb1c4a741d6b0" }
     }
-    result { 
-      immediate { http_status: 403 details: "" }
-      body { exact: "Access forbidden - missing client IP.\n" }
+    result {
+      immediate {
+        http_status: 403
+        details: ""
+        body { exact: "Access forbidden - missing client IP.\n" }
+      }
       log { regex: ".*Access forbidden - missing client IP.$" }
     }
   }
@@ -46,7 +52,9 @@ test {
       header { key: "Cookie" value: "SomeCookie=SomeValue; Authorization=MTI3LjAuMC4xLDE3MzU3MDA0MDAwMDAwMDAwMDA.MThmNzliYzBhMzA3YzhiMmI4OTFiMTQ0NzNhMmFhNjljYWVkNGVmMzYwY2NiNTRjZTU3YWY0MTczZGMwMGZkNA" }
     }
     result {
-      has_header { key: ":path" value: "/somepage/otherpage" }
+      headers {
+        has_header { key: ":path" value: "/somepage/otherpage" }
+      }
     }
   }
 }
@@ -63,9 +71,12 @@ test {
       header { key: ":path" value: "/somepage/otherpage" }
       header { key: "Cookie" value: "SomeCookie=SomeValue; Authorization=MTI3LjAuMC4xLDE3MzU1Mjc2MDAwMDAwMDAwMDA.NWFlODcwYjBlMGNmM2JmODM1NjQwNjgyZjZhNWUyZTI4MDc5MGQ3ODgwMjBmOWI5NGQwYThhYzIxODc3YWM1Yg" }
     }
-    result { 
-      immediate { http_status: 403 details: "" }
-      body { exact: "Access forbidden - hash expired.\n" }
+    result {
+      immediate {
+        http_status: 403
+        details: ""
+        body { exact: "Access forbidden - hash expired.\n" }
+      }
       log { regex: ".*Access forbidden - hash expired.$" }
     }
   }
@@ -83,9 +94,12 @@ test {
       header { key: ":path" value: "/somepage/otherpage" }
       header { key: "Cookie" value: "SomeCookie=SomeValue; Authorization=MTI3LjAuMC4xLDE3MzU3MDA0MDAwMDAwMDAwMDA.MThmNzliYzBhMzA3YzhiMmI4OTFiMTQ0NzNhMmFhNjljYWVkNGVmMzYwY2NiNTRjZTU3YWY0MTczZGMwMGZkNA" }
     }
-    result { 
-      immediate { http_status: 403 details: "" }
-      body { exact: "Access forbidden - invalid client IP.\n" }
+    result {
+      immediate {
+        http_status: 403
+        details: ""
+        body { exact: "Access forbidden - invalid client IP.\n" }
+      }
       log { regex: ".*Access forbidden - invalid client IP.$" }
     }
   }
@@ -103,9 +117,12 @@ test {
       header { key: ":path" value: "/somepage/otherpage" }
       header { key: "Cookie" value: "SomeCookie=SomeValue; Authorization=MTI3LjAuMC4xLDE3MzU3MDA0MDAwMDAwMDAwMDA.MTI3LjAuMC4xLDE3MzU3MDA0MDAwMDAwMDAwMDA" }
     }
-    result { 
-      immediate { http_status: 403 details: "" }
-      body { exact: "Access forbidden - invalid HMAC hash.\n" }
+    result {
+      immediate {
+        http_status: 403
+        details: ""
+        body { exact: "Access forbidden - invalid HMAC hash.\n" }
+      }
       log { regex: ".*Access forbidden - invalid HMAC hash.$" }
     }
   }
@@ -118,9 +135,12 @@ test {
       header { key: "X-Forwarded-For" value: "<existing-values>,127.0.0.1,<load-balancer-ip>" }
       header { key: ":path" value: "/admin" }
     }
-    result { 
-      immediate { http_status: 403 details: "" }
-      body { exact: "Access forbidden - missing HMAC cookie.\n" }
+    result {
+      immediate {
+        http_status: 403
+        details: ""
+        body { exact: "Access forbidden - missing HMAC cookie.\n" }
+      }
       log { regex: ".*Access forbidden - missing HMAC cookie.$" }
     }
   }
@@ -134,9 +154,12 @@ test {
       header { key: ":path" value: "/somepage/otherpage" }
       header { key: "Cookie" value: "SomeCookie=SomeValue; Authorization=48277f04685e364e0e3f3c4bfa78cb91293d304bbf196829334cb1c4a741d6b0" }
     }
-    result { 
-      immediate { http_status: 403 details: "" }
-      body { exact: "Access forbidden - invalid HMAC cookie.\n" }
+    result {
+      immediate {
+        http_status: 403
+        details: ""
+        body { exact: "Access forbidden - invalid HMAC cookie.\n" }
+      }
       log { regex: ".*Access forbidden - invalid HMAC cookie.$" }
     }
   }

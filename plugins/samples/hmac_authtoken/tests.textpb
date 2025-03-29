@@ -5,7 +5,9 @@ test {
   request_headers {
     input { header { key: ":path" value: "/somepage/otherpage?param1=value1&param2=value2&token=48277f04685e364e0e3f3c4bfa78cb91293d304bbf196829334cb1c4a741d6b0" } }
     result {
-      has_header { key: ":path" value: "/somepage/otherpage?param1=value1&param2=value2" }
+      headers {
+        has_header { key: ":path" value: "/somepage/otherpage?param1=value1&param2=value2" }
+      }
     }
   }
 }
@@ -16,9 +18,12 @@ test {
     input {
       header { key: ":path" value: "/admin" }
     }
-    result { 
-      immediate { http_status: 403 details: "" }
-      body { exact: "Access forbidden - missing token.\n" }
+    result {
+      immediate {
+        http_status: 403
+        details: ""
+        body { exact: "Access forbidden - missing token.\n" }
+      }
       log { regex: ".+Access forbidden - missing token.$" }
     }
   }
@@ -30,9 +35,12 @@ test {
     input {
       header { key: ":path" value: "/admin?token=ddssdsdsddfdffddsssd" }
     }
-    result { 
-      immediate { http_status: 403 details: "" }
-      body { exact: "Access forbidden - invalid token.\n" }
+    result {
+      immediate {
+        http_status: 403
+        details: ""
+        body { exact: "Access forbidden - invalid token.\n" }
+      }
       log { regex: ".+Access forbidden - invalid token.$" }
     }
   }
@@ -44,9 +52,13 @@ test {
     input {
       header { key: ":path" value: "foo:bar" }
     }
-    result { 
-      immediate { http_status: 400 details: "" }
-      body { exact: "Error parsing the :path HTTP header.\n" }
+    result {
+      immediate {
+        http_status: 400
+        details: ""
+        body { exact: "Error parsing the :path HTTP header.\n" }
+      }
+
       log { regex: ".*Error parsing the :path HTTP header: mismatch$" }
     }
   }

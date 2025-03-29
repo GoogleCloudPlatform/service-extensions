@@ -3,8 +3,10 @@ test {
   benchmark: true
   request_headers {
     result {
-      has_header { key: "Message" value: "hello" }
-      has_header { key: "Welcome" value: "warm" }
+      headers {
+        has_header { key: "Message" value: "hello" }
+        has_header { key: "Welcome" value: "warm" }
+      }
     }
   }
 }
@@ -17,22 +19,32 @@ test {
       header { key: "Welcome" value: "cold" }
     }
     result {
-      has_header { key: "Message" value: "hey, hello" }
-      has_header { key: "Welcome" value: "warm" }
+      headers {
+        has_header { key: "Message" value: "hey, hello" }
+        has_header { key: "Welcome" value: "warm" }
+      }
     }
   }
 }
 test {
   name: "NoDefaultResponseHeader"
   response_headers {
-    result { no_header { key: "Message" } }
+    result {
+      headers {
+        no_header { key: "Message" }
+      }
+    }
   }
 }
 test {
   name: "LeavesResponseHeader"
   response_headers {
     input { header { key: "Message" value: "non-matching" } }
-    result { has_header { key: "Message" value: "non-matching" } }
+    result {
+      headers {
+        has_header { key: "Message" value: "non-matching" }
+      }
+    }
   }
 }
 test {
@@ -40,7 +52,11 @@ test {
   benchmark: true
   response_headers {
     input { header { key: "Message" value: "foo" } }
-    result { has_header { key: "Message" value: "foo, bar" } }
+    result {
+      headers {
+        has_header { key: "Message" value: "foo, bar" }
+      }
+    }
   }
 }
 test {
@@ -48,7 +64,11 @@ test {
   benchmark: true
   response_headers {
     input { header { key: "Welcome" value: "any" } }
-    result { no_header { key: "Welcome" } }
+    result {
+      headers {
+        no_header { key: "Welcome" }
+      }
+    }
   }
 }
 # Behavior is independent of stream.
@@ -56,11 +76,19 @@ test {
   name: "RequestAndResponse"
   benchmark: true
   request_headers {
-    result { has_header { key: "Message" value: "hello" } }
+    result {
+      headers {
+        has_header { key: "Message" value: "hello" }
+      }
+    }
   }
   response_headers {
     input { header { key: "Message" value: "foo" } }
-    result { has_header { key: "Message" value: "foo, bar" } }
+    result {
+      headers {
+        has_header { key: "Message" value: "foo, bar" }
+      }
+    }
   }
 }
 # Tests for header name case insensitivity.
@@ -76,8 +104,10 @@ test {
       header { key: "welcome" value: "cold" }
     }
     result {
-      has_header { key: "message" value: "hey, hello" }
-      has_header { key: "welcome" value: "warm" }
+      headers {
+        has_header { key: "message" value: "hey, hello" }
+        has_header { key: "welcome" value: "warm" }
+      }
     }
   }
 }
@@ -85,13 +115,21 @@ test {
   name: "CaseInsensitiveLookup"
   response_headers {
     input { header { key: "message" value: "foo" } }
-    result { has_header { key: "message" value: "foo, bar" } }
+    result {
+      headers {
+        has_header { key: "message" value: "foo, bar" }
+      }
+    }
   }
 }
 test {
   name: "CaseInsensitiveRemoval"
   response_headers {
     input { header { key: "welcome" value: "any" } }
-    result { no_header { key: "welcome" } }
+    result {
+      headers {
+        no_header { key: "welcome" }
+      }
+    }
   }
 }
