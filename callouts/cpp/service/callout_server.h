@@ -166,13 +166,12 @@ class CalloutServer : public ExternalProcessor::Service {
     return grpc::SslServerCredentials(ssl_options);
   }
 
-  template <typename T>
   static bool RunServers(const ServerConfig& config = ServerConfig{}) {
     std::unique_lock<std::mutex> lock(server_mutex_);
     if (config.enable_plaintext && !plaintext_server_) {
       plaintext_thread_ = std::thread([config]() {
         std::unique_ptr<grpc::Server> local_server;
-        auto service = std::make_unique<T>();
+        auto service = std::make_unique<CalloutServer>();
         {
           grpc::ServerBuilder builder;
           builder.AddListeningPort(config.plaintext_address,

@@ -38,7 +38,7 @@ class BasicServerTest : public testing::Test {
     config_.cert_path = "";
 
     server_thread_ = std::thread([this]() {
-      CalloutServer::RunServers<CustomCalloutServer>(config_);
+      CalloutServer::RunServers(config_);
     });
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
   }
