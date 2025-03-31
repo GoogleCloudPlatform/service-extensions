@@ -30,17 +30,16 @@ using google::protobuf::util::MessageDifferencer;
 
 class BasicServerTest : public testing::Test {
  protected:
- void SetUp() override {
+  void SetUp() override {
     config_ = CalloutServer::DefaultConfig();
-    config_.enable_insecure = true;
-    config_.insecure_address = "0.0.0.0:8181";
+    config_.enable_plaintext = true;
+    config_.plaintext_address = "0.0.0.0:8181";
     config_.health_check_address = "0.0.0.0:8081";
     config_.key_path = "";
     config_.cert_path = "";
-    
-    server_thread_ = std::thread([this]() {
-      CalloutServer::RunServers(config_);
-    });
+
+    server_thread_ = std::thread([this]() { CalloutServer::RunServers(config_); });
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
   }
 
   void TearDown() override {

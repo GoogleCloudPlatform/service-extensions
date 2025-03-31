@@ -36,7 +36,7 @@ void StartHttpHealthCheckServer(uint16_t port) {
   namespace http = beast::http;
   namespace asio = boost::asio;
   using tcp = asio::ip::tcp;
-  
+
   asio::io_context io_context;
   tcp::acceptor acceptor(io_context, {tcp::v4(), port});
 
@@ -64,27 +64,28 @@ void StartHttpHealthCheckServer(uint16_t port) {
 
 int main(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
-  
+
   auto config = CalloutServer::DefaultConfig();
   config.secure_address = absl::GetFlag(FLAGS_server_address);
   config.key_path = absl::GetFlag(FLAGS_key_path);
   config.cert_path = absl::GetFlag(FLAGS_cert_path);
 
-  if (!(!config.key_path.empty() && !config.cert_path.empty()) && !config.enable_insecure) {
-      LOG(ERROR) << "No valid configuration";
-      return 1;
+  if (!(!config.key_path.empty() && !config.cert_path.empty()) &&
+      !config.enable_plaintext) {
+    LOG(ERROR) << "No valid configuration";
+    return 1;
   }
 
-  std::thread health_check_thread(StartHttpHealthCheckServer, 
-                                absl::GetFlag(FLAGS_health_check_port));
+  std::thread health_check_thread(StartHttpHealthCheckServer,
+                                  absl::GetFlag(FLAGS_health_check_port));
 
   CalloutServer::RunServers(config);
 
   boost::asio::io_context io_context;
   boost::asio::signal_set signals(io_context, SIGINT, SIGTERM);
   signals.async_wait([&](auto, auto) {
-      CalloutServer::Shutdown();
-      io_context.stop();
+    CalloutServer::Shutdown();
+    io_context.stop();
   });
 
   io_context.run();

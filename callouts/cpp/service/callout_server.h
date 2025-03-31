@@ -38,48 +38,46 @@ using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
 class CalloutServer : public ExternalProcessor::Service {
-  public:
-
+ public:
   struct ServerConfig {
     std::string secure_address;
-    std::string insecure_address;
+    std::string plaintext_address;
     std::string health_check_address;
     std::string cert_path;
     std::string key_path;
-    bool enable_insecure;
+    bool enable_plaintext;
   };
 
   static ServerConfig DefaultConfig() {
     return {
-      .secure_address = "0.0.0.0:443",
-      .insecure_address = "0.0.0.0:8080",
-      .health_check_address = "0.0.0.0:80",
-      .cert_path = "ssl_creds/chain.pem",
-      .key_path = "ssl_creds/privatekey.pem",
-      .enable_insecure = true
-    };
+        .secure_address = "0.0.0.0:443",
+        .plaintext_address = "0.0.0.0:8080",
+        .health_check_address = "0.0.0.0:80",
+        .cert_path = "ssl_creds/chain.pem",
+        .key_path = "ssl_creds/privatekey.pem",
+        .enable_plaintext = true};
   }
 
   // Adds a request header field.
   static void AddRequestHeader(ProcessingResponse* response,
-                               std::string_view key, std::string_view value) {
+                             std::string_view key, std::string_view value) {
     HeaderValue* new_header = response->mutable_request_headers()
-                                  ->mutable_response()
-                                  ->mutable_header_mutation()
-                                  ->add_set_headers()
-                                  ->mutable_header();
+                                ->mutable_response()
+                                ->mutable_header_mutation()
+                                ->add_set_headers()
+                                ->mutable_header();
     new_header->set_key(key);
     new_header->set_value(value);
   }
 
   // Replaces a request header field.
   static void ReplaceRequestHeader(ProcessingResponse* response,
-                                   std::string_view key,
-                                   std::string_view value) {
+                                 std::string_view key,
+                                 std::string_view value) {
     HeaderValueOption* new_header_option = response->mutable_request_headers()
-                                               ->mutable_response()
-                                               ->mutable_header_mutation()
-                                               ->add_set_headers();
+                                            ->mutable_response()
+                                            ->mutable_header_mutation()
+                                            ->add_set_headers();
     new_header_option->set_append_action(
         HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
     HeaderValue* new_header = new_header_option->mutable_header();
@@ -89,24 +87,24 @@ class CalloutServer : public ExternalProcessor::Service {
 
   // Adds a response header field.
   static void AddResponseHeader(ProcessingResponse* response,
-                                std::string_view key, std::string_view value) {
+                              std::string_view key, std::string_view value) {
     HeaderValue* new_header = response->mutable_response_headers()
-                                  ->mutable_response()
-                                  ->mutable_header_mutation()
-                                  ->add_set_headers()
-                                  ->mutable_header();
+                                ->mutable_response()
+                                ->mutable_header_mutation()
+                                ->add_set_headers()
+                                ->mutable_header();
     new_header->set_key(key);
     new_header->set_value(value);
   }
 
   // Replaces a response header field.
   static void ReplaceResponseHeader(ProcessingResponse* response,
-                                    std::string_view key,
-                                    std::string_view value) {
+                                  std::string_view key,
+                                  std::string_view value) {
     HeaderValueOption* new_header_option = response->mutable_response_headers()
-                                               ->mutable_response()
-                                               ->mutable_header_mutation()
-                                               ->add_set_headers();
+                                            ->mutable_response()
+                                            ->mutable_header_mutation()
+                                            ->add_set_headers();
     new_header_option->set_append_action(
         HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
     HeaderValue* new_header = new_header_option->mutable_header();
@@ -116,16 +114,16 @@ class CalloutServer : public ExternalProcessor::Service {
 
   // Removes a response header field.
   static void RemoveResponseHeader(ProcessingResponse* response,
-                                   std::string_view header_name) {
+                                 std::string_view header_name) {
     auto* headers_mutation = response->mutable_response_headers()
-                                 ->mutable_response()
-                                 ->mutable_header_mutation();
+                              ->mutable_response()
+                              ->mutable_header_mutation();
     headers_mutation->add_remove_headers(header_name);
   }
 
   // Replaces a request body field.
   static void ReplaceRequestBody(ProcessingResponse* response,
-                                 std::string_view body) {
+                               std::string_view body) {
     response->mutable_request_body()
         ->mutable_response()
         ->mutable_body_mutation()
@@ -134,7 +132,7 @@ class CalloutServer : public ExternalProcessor::Service {
 
   // Replaces a response body field.
   static void ReplaceResponseBody(ProcessingResponse* response,
-                                  std::string_view body) {
+                                std::string_view body) {
     response->mutable_response_body()
         ->mutable_response()
         ->mutable_body_mutation()
@@ -144,7 +142,7 @@ class CalloutServer : public ExternalProcessor::Service {
   // Creates the SSL secure server credentials given the key and cert path set.
   static std::optional<std::shared_ptr<grpc::ServerCredentials>>
   CreateSecureServerCredentials(std::string_view key_path,
-                                std::string_view cert_path) {
+                              std::string_view cert_path) {
     auto key = ReadDataFile(key_path);
     if (!key.ok()) {
       LOG(ERROR) << "Error reading the private key file on " << key_path;
@@ -165,65 +163,51 @@ class CalloutServer : public ExternalProcessor::Service {
     return grpc::SslServerCredentials(ssl_options);
   }
 
-  static void RunServers(const ServerConfig& config = ServerConfig{}) {
+  static bool RunServers(const ServerConfig& config = ServerConfig{}) {
     should_run_ = true;
-    
-    if (!config.key_path.empty() && !config.cert_path.empty()) {
-        secure_thread_ = std::thread([config] {
-            if (auto creds = CreateSecureServerCredentials(config.key_path, config.cert_path)) {
-                CalloutServer service;
-                grpc::ServerBuilder builder;
-                builder.AddListeningPort(config.secure_address, *creds);
-                builder.RegisterService(&service);
-                secure_server_ = builder.BuildAndStart();
-                if (secure_server_) {
-                    LOG(INFO) << "Secure server listening on " << config.secure_address;
-                    while (should_run_) {
-                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                    }
-                    secure_server_->Shutdown();
-                }
-            }
-        });
+
+    if (config.enable_plaintext) {
+      plaintext_thread_ = std::thread([config]() {
+        try {
+          grpc::ServerBuilder builder;
+          builder.AddListeningPort(config.plaintext_address,
+                                 grpc::InsecureServerCredentials());
+                                 
+          auto service = std::make_unique<CalloutServer>();
+          builder.RegisterService(service.get());
+          plaintext_server_ = builder.BuildAndStart();
+
+          if (plaintext_server_) {
+            LOG(INFO) << "Plaintext server listening on " << config.plaintext_address;
+            plaintext_server_->Wait();
+            service.reset();
+          }
+        } catch (const std::exception& e) {
+          LOG(ERROR) << "Plaintext server error: " << e.what();
+        }
+      });
+
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      return plaintext_server_ != nullptr;
     }
 
-    if (config.enable_insecure) {
-        insecure_thread_ = std::thread([config] {
-            CalloutServer service;
-            grpc::ServerBuilder builder;
-            builder.AddListeningPort(config.insecure_address, grpc::InsecureServerCredentials());
-            builder.RegisterService(&service);
-            insecure_server_ = builder.BuildAndStart();
-            if (insecure_server_) {
-                LOG(INFO) << "Insecure server listening on " << config.insecure_address;
-                while (should_run_) {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                }
-                insecure_server_->Shutdown();
-            }
-        });
-    }
+    return false;
   }
 
   static void Shutdown() {
+    if (plaintext_server_) {
+      plaintext_server_->Shutdown();
+      plaintext_server_.reset();
+    }
     should_run_ = false;
-    
-    if (secure_server_) {
-        secure_server_->Shutdown();
-        secure_server_.reset();
-    }
-    if (insecure_server_) {
-        insecure_server_->Shutdown();
-        insecure_server_.reset();
-    }
   }
 
   static void WaitForCompletion() {
     if (secure_thread_.joinable()) {
-        secure_thread_.join();
+      secure_thread_.join();
     }
-    if (insecure_thread_.joinable()) {
-        insecure_thread_.join();
+    if (plaintext_thread_.joinable()) {
+      plaintext_thread_.join();
     }
   }
 
@@ -237,39 +221,38 @@ class CalloutServer : public ExternalProcessor::Service {
       ProcessRequest(&request, &response);
       stream->Write(response);
     }
-
     return grpc::Status::OK;
   }
 
   // Handles request headers.
   virtual void OnRequestHeader(ProcessingRequest* request,
-                               ProcessingResponse* response) {
+                             ProcessingResponse* response) {
     LOG(INFO) << "OnRequestHeader called.";
   }
 
   // Handles response headers.
   virtual void OnResponseHeader(ProcessingRequest* request,
-                                ProcessingResponse* response) {
+                              ProcessingResponse* response) {
     LOG(INFO) << "OnResponseHeader called.";
   }
 
   // Handles request bodies.
   virtual void OnRequestBody(ProcessingRequest* request,
-                             ProcessingResponse* response) {
+                           ProcessingResponse* response) {
     LOG(INFO) << "OnRequestBody called.";
   }
 
   // Handles response bodies.
   virtual void OnResponseBody(ProcessingRequest* request,
-                              ProcessingResponse* response) {
+                            ProcessingResponse* response) {
     LOG(INFO) << "OnResponseBody called.";
   }
 
-  private:
+ private:
   static inline std::unique_ptr<grpc::Server> secure_server_ = nullptr;
-  static inline std::unique_ptr<grpc::Server> insecure_server_ = nullptr;
+  static inline std::unique_ptr<grpc::Server> plaintext_server_ = nullptr;
   static inline std::thread secure_thread_;
-  static inline std::thread insecure_thread_;
+  static inline std::thread plaintext_thread_;
   static inline std::atomic<bool> should_run_{false};
 
   static absl::StatusOr<std::string> ReadDataFile(std::string_view path) {
@@ -283,8 +266,7 @@ class CalloutServer : public ExternalProcessor::Service {
     return file_string_stream.str();
   }
 
-  void ProcessRequest(ProcessingRequest* request,
-                      ProcessingResponse* response) {
+  void ProcessRequest(ProcessingRequest* request, ProcessingResponse* response) {
     switch (request->request_case()) {
       case ProcessingRequest::kRequestHeaders:
         OnRequestHeader(request, response);
