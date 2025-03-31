@@ -70,21 +70,27 @@ int main(int argc, char** argv) {
   config.key_path = absl::GetFlag(FLAGS_key_path);
   config.cert_path = absl::GetFlag(FLAGS_cert_path);
 
-  if (!config.key_path.empty() && !config.cert_path.empty()) {
-    LOG(INFO) << "Starting server with secure (TLS) mode";
-  } else if (config.enable_insecure) {
-    LOG(WARNING) << "Starting server in INSECURE (plaintext) mode";
-  } else {
-    LOG(ERROR) << "No valid configuration: secure credentials missing and insecure mode disabled";
-    return 1;
+  if (!(!config.key_path.empty() && !config.cert_path.empty()) && !config.enable_insecure) {
+      LOG(ERROR) << "No valid configuration";
+      return 1;
   }
 
-  std::thread health_check_thread(
-      StartHttpHealthCheckServer, 
-      absl::GetFlag(FLAGS_health_check_port));
+  std::thread health_check_thread(StartHttpHealthCheckServer, 
+                                absl::GetFlag(FLAGS_health_check_port));
 
   CalloutServer::RunServers(config);
 
+  boost::asio::io_context io_context;
+  boost::asio::signal_set signals(io_context, SIGINT, SIGTERM);
+  signals.async_wait([&](auto, auto) {
+      CalloutServer::Shutdown();
+      io_context.stop();
+  });
+
+  io_context.run();
+
+  CalloutServer::WaitForCompletion();
   health_check_thread.join();
+
   return 0;
 }

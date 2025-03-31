@@ -45,12 +45,10 @@ class BasicServerTest : public testing::Test {
 
   void TearDown() override {
     CalloutServer::Shutdown();
+    CalloutServer::WaitForCompletion();
+    
     if (server_thread_.joinable()) {
-      try {
         server_thread_.join();
-      } catch (const std::system_error& e) {
-        LOG(ERROR) << "Thread join error: " << e.what();
-      }
     }
   }
 

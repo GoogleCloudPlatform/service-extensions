@@ -168,48 +168,62 @@ class CalloutServer : public ExternalProcessor::Service {
   static void RunServers(const ServerConfig& config = ServerConfig{}) {
     should_run_ = true;
     
-    secure_thread_ = std::thread([config] {
-      if (auto creds = CreateSecureServerCredentials(config.key_path, config.cert_path)) {
-        CalloutServer service;
-        grpc::ServerBuilder builder;
-        builder.AddListeningPort(config.secure_address, *creds);
-        builder.RegisterService(&service);
-        secure_server_ = builder.BuildAndStart();
-        if (secure_server_) {
-          LOG(INFO) << "Secure server listening on " << config.secure_address;
-          while (should_run_) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-          }
-          secure_server_->Shutdown();
-        }
-      }
-    });
+    if (!config.key_path.empty() && !config.cert_path.empty()) {
+        secure_thread_ = std::thread([config] {
+            if (auto creds = CreateSecureServerCredentials(config.key_path, config.cert_path)) {
+                CalloutServer service;
+                grpc::ServerBuilder builder;
+                builder.AddListeningPort(config.secure_address, *creds);
+                builder.RegisterService(&service);
+                secure_server_ = builder.BuildAndStart();
+                if (secure_server_) {
+                    LOG(INFO) << "Secure server listening on " << config.secure_address;
+                    while (should_run_) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    }
+                    secure_server_->Shutdown();
+                }
+            }
+        });
+    }
 
-    insecure_thread_ = std::thread([config] {
-      if (config.enable_insecure) {
-        CalloutServer service;
-        grpc::ServerBuilder builder;
-        builder.AddListeningPort(config.insecure_address, grpc::InsecureServerCredentials());
-        builder.RegisterService(&service);
-        insecure_server_ = builder.BuildAndStart();
-        if (insecure_server_) {
-          LOG(INFO) << "Insecure server listening on " << config.insecure_address;
-          while (should_run_) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-          }
-          insecure_server_->Shutdown();
-        }
-      }
-    });
+    if (config.enable_insecure) {
+        insecure_thread_ = std::thread([config] {
+            CalloutServer service;
+            grpc::ServerBuilder builder;
+            builder.AddListeningPort(config.insecure_address, grpc::InsecureServerCredentials());
+            builder.RegisterService(&service);
+            insecure_server_ = builder.BuildAndStart();
+            if (insecure_server_) {
+                LOG(INFO) << "Insecure server listening on " << config.insecure_address;
+                while (should_run_) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
+                insecure_server_->Shutdown();
+            }
+        });
+    }
   }
 
   static void Shutdown() {
     should_run_ = false;
+    
+    if (secure_server_) {
+        secure_server_->Shutdown();
+        secure_server_.reset();
+    }
+    if (insecure_server_) {
+        insecure_server_->Shutdown();
+        insecure_server_.reset();
+    }
+  }
+
+  static void WaitForCompletion() {
     if (secure_thread_.joinable()) {
-      secure_thread_.join();
+        secure_thread_.join();
     }
     if (insecure_thread_.joinable()) {
-      insecure_thread_.join();
+        insecure_thread_.join();
     }
   }
 
