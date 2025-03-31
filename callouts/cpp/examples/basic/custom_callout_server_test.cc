@@ -13,9 +13,10 @@
 // limitations under the License.
 
 #include "custom_callout_server.h"
+#include "service/callout_server.h"
 
 #include <google/protobuf/arena.h>
-
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "google/protobuf/util/message_differencer.h"
 #include "gtest/gtest.h"
@@ -28,22 +29,30 @@ using envoy::service::ext_proc::v3::ProcessingResponse;
 using google::protobuf::util::MessageDifferencer;
 
 class BasicServerTest : public testing::Test {
- private:
-  std::unique_ptr<grpc::Server> server;
-
  protected:
   void SetUp() override {
-    std::string server_address("0.0.0.0:8181");
-    server = CalloutServer::RunServer(server_address, service_);
+    config_ = CalloutServer::DefaultConfig();
+    config_.enable_insecure = true;
+    config_.insecure_address = "0.0.0.0:8080";
+    config_.health_check_address = "0.0.0.0:80";
+    
+    // Start server in separate thread
+    server_thread_ = std::thread([this]() {
+      CalloutServer::RunServers(config_);
+    });
   }
 
-  void TearDown() override { server->Shutdown(); }
+  void TearDown() override {
+    server_thread_.join();
+  }
 
+  CalloutServer::ServerConfig config_;
+  std::thread server_thread_;
   CustomCalloutServer service_;
 };
 
 TEST_F(BasicServerTest, OnRequestHeader) {
-  // Initialize the service paremeters
+// Initialize the service paremeters
   google::protobuf::Arena arena;
   ProcessingRequest* request =
       google::protobuf::Arena::Create<ProcessingRequest>(&arena);
