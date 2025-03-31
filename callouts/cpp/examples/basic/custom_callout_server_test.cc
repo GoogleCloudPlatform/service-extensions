@@ -30,20 +30,22 @@ using google::protobuf::util::MessageDifferencer;
 
 class BasicServerTest : public testing::Test {
  protected:
-  void SetUp() override {
+ void SetUp() override {
     config_ = CalloutServer::DefaultConfig();
     config_.enable_insecure = true;
-    config_.insecure_address = "0.0.0.0:8080";
-    config_.health_check_address = "0.0.0.0:80";
+    config_.insecure_address = "0.0.0.0:8181";
+    config_.health_check_address = "0.0.0.0:8081";
     
-    // Start server in separate thread
     server_thread_ = std::thread([this]() {
       CalloutServer::RunServers(config_);
     });
   }
 
   void TearDown() override {
-    server_thread_.join();
+    CalloutServer::Shutdown();
+    if (server_thread_.joinable()) {
+      server_thread_.join();
+    }
   }
 
   CalloutServer::ServerConfig config_;

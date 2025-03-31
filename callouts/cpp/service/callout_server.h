@@ -166,32 +166,51 @@ class CalloutServer : public ExternalProcessor::Service {
   }
 
   static void RunServers(const ServerConfig& config = ServerConfig{}) {
-    std::thread secure_thread([config] {
+    should_run_ = true;
+    
+    secure_thread_ = std::thread([config] {
       if (auto creds = CreateSecureServerCredentials(config.key_path, config.cert_path)) {
         CalloutServer service;
         grpc::ServerBuilder builder;
         builder.AddListeningPort(config.secure_address, *creds);
         builder.RegisterService(&service);
-        auto server = builder.BuildAndStart();
-        LOG(INFO) << "Secure server listening on " << config.secure_address;
-        server->Wait();
+        secure_server_ = builder.BuildAndStart();
+        if (secure_server_) {
+          LOG(INFO) << "Secure server listening on " << config.secure_address;
+          while (should_run_) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+          }
+          secure_server_->Shutdown();
+        }
       }
     });
 
-    std::thread insecure_thread([config] {
+    insecure_thread_ = std::thread([config] {
       if (config.enable_insecure) {
         CalloutServer service;
         grpc::ServerBuilder builder;
         builder.AddListeningPort(config.insecure_address, grpc::InsecureServerCredentials());
         builder.RegisterService(&service);
-        auto server = builder.BuildAndStart();
-        LOG(INFO) << "Insecure server listening on " << config.insecure_address;
-        server->Wait();
+        insecure_server_ = builder.BuildAndStart();
+        if (insecure_server_) {
+          LOG(INFO) << "Insecure server listening on " << config.insecure_address;
+          while (should_run_) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+          }
+          insecure_server_->Shutdown();
+        }
       }
     });
+  }
 
-    secure_thread.join();
-    insecure_thread.join();
+  static void Shutdown() {
+    should_run_ = false;
+    if (secure_thread_.joinable()) {
+      secure_thread_.join();
+    }
+    if (insecure_thread_.joinable()) {
+      insecure_thread_.join();
+    }
   }
 
   grpc::Status Process(
@@ -232,7 +251,13 @@ class CalloutServer : public ExternalProcessor::Service {
     LOG(INFO) << "OnResponseBody called.";
   }
 
- private:
+  private:
+  static inline std::unique_ptr<grpc::Server> secure_server_ = nullptr;
+  static inline std::unique_ptr<grpc::Server> insecure_server_ = nullptr;
+  static inline std::thread secure_thread_;
+  static inline std::thread insecure_thread_;
+  static inline std::atomic<bool> should_run_{false};
+
   static absl::StatusOr<std::string> ReadDataFile(std::string_view path) {
     std::ifstream file(std::string{path}, std::ios::binary);
     if (file.fail()) {
