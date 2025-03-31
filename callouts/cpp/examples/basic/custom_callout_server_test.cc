@@ -35,6 +35,8 @@ class BasicServerTest : public testing::Test {
     config_.enable_insecure = true;
     config_.insecure_address = "0.0.0.0:8181";
     config_.health_check_address = "0.0.0.0:8081";
+    config_.key_path = "";
+    config_.cert_path = "";
     
     server_thread_ = std::thread([this]() {
       CalloutServer::RunServers(config_);
@@ -44,7 +46,11 @@ class BasicServerTest : public testing::Test {
   void TearDown() override {
     CalloutServer::Shutdown();
     if (server_thread_.joinable()) {
-      server_thread_.join();
+      try {
+        server_thread_.join();
+      } catch (const std::system_error& e) {
+        LOG(ERROR) << "Thread join error: " << e.what();
+      }
     }
   }
 

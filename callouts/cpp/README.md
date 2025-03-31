@@ -27,11 +27,39 @@ The minimal operation of this C++ based ext_proc server requires Bazel, Clang an
 
 You can run the examples directly with Bazel and Clang without using Docker.
 
+### Install Clang
+
+#### For Linux
+
+```sh
+sudo apt-get install clang
+```
+
+#### For macOS
+
+```
+brew install llvm
+```
+
 ### Install Bazel
 
 The recommended way to install Bazel is from the
 [Bazelisk](https://bazel.build/install/bazelisk#installing_bazel) which can manage different Bazel
 versions.
+
+#### For Linux/macOS
+
+```sh
+npm install -g @bazel/bazelisk
+```
+
+### Verify Installation
+
+```
+clang --version
+bazel --version
+docker --version
+```
 
 ### Set Environment Variable
 
@@ -93,6 +121,21 @@ Running from the [./config](./config)
 EXAMPLE_TYPE=basic docker-compose up
 ```
 
+## Running the without Docker
+
+### Set Example Type:
+
+```
+export EXAMPLE_TYPE=basic  # Options: basic, jwt_auth, redirect
+```
+
+### Build and Run:
+
+```
+bazel build --config=clang //examples/${EXAMPLE_TYPE}:custom_callout_server_cpp
+./bazel-bin/examples/${EXAMPLE_TYPE}/custom_callout_server_cpp
+```
+
 ## Running Tests
 
 To run the unit tests, use the following command from the project root:
@@ -111,6 +154,15 @@ Configure the server using these command line flags:
   --health_check_port=8080 \       # Health check port (default: 80)
   --key_path=/path/to/key.pem \    # SSL private key (default: ssl_creds/privatekey.pem)
   --cert_path=/path/to/cert.pem    # SSL certificate (default: ssl_creds/chain.pem)
+```
+
+### Custom Ports and SSL
+
+```
+docker run -p 8443:8443 -p 8080:8080 \
+  -e SERVER_ADDRESS=0.0.0.0:8443 \
+  -v /path/to/ssl:/ssl_creds \
+  service-callout-cpp:${EXAMPLE_TYPE}
 ```
 
 ## Developing Callouts

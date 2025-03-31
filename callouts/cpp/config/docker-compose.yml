@@ -25,7 +25,5 @@ services:
       - "443:443"
       - "8080:8080"
       - "80:80"
-    volumes:
-      - ../ssl_creds:/app/ssl_creds
     environment:
       - EXAMPLE_TYPE=${EXAMPLE_TYPE:-basic}
