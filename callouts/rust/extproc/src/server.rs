@@ -1,3 +1,34 @@
+// Copyright 2025 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//! # CalloutServer Module
+//!
+//! This module provides the server infrastructure for running Envoy external processors.
+//! It handles the setup and management of gRPC servers (both secure and plaintext) and
+//! a health check HTTP server.
+//!
+//! ## Overview
+//!
+//! The `CalloutServer` is responsible for:
+//!
+//! - Setting up a secure gRPC server with TLS for production use
+//! - Optionally providing a plaintext gRPC server for development/testing
+//! - Running a simple HTTP health check endpoint
+//! - Managing the lifecycle of these servers
+//!
+//! This infrastructure allows external processors to focus on implementing their
+//! processing logic without worrying about server setup and management.
+
 use crate::processor::ExtProcessor;
 use crate::service::ExtProcService;
 use log::{info, error};
@@ -11,17 +42,39 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::error;
 
+/// Configuration for the `CalloutServer`.
+///
+/// This struct contains all the settings needed to configure the various
+/// server endpoints, including addresses and TLS certificate paths.
 #[derive(Clone)]
 pub struct Config {
+    /// Address for the secure gRPC server (format: "host:port")
     pub address: String,
+
+    /// Optional address for the plaintext gRPC server (format: "host:port")
     pub plaintext_address: Option<String>,
+
+    /// Address for the health check HTTP server (format: "host:port")
     pub health_check_address: String,
+
+    /// Path to the TLS certificate file
     pub cert_file: PathBuf,
+
+    /// Path to the TLS key file
     pub key_file: PathBuf,
+
+    /// Whether to enable the plaintext gRPC server
     pub enable_plaintext_server: bool,
 }
 
 impl Default for Config {
+    /// Creates a default configuration for the `CalloutServer`.
+    ///
+    /// Default values:
+    /// - Secure gRPC server on 0.0.0.0:443
+    /// - Plaintext gRPC server on 0.0.0.0:8080 (enabled)
+    /// - Health check server on 0.0.0.0:80
+    /// - TLS certificates at "extproc/ssl_creds/localhost.crt" and "extproc/ssl_creds/localhost.key"
     fn default() -> Self {
         Self {
             address: "0.0.0.0:443".to_string(),
@@ -34,19 +87,35 @@ impl Default for Config {
     }
 }
 
+/// Server for hosting Envoy external processors.
+///
+/// The `CalloutServer` manages three separate servers:
+/// 1. A secure gRPC server with TLS for production use
+/// 2. An optional plaintext gRPC server for development/testing
+/// 3. A simple HTTP health check endpoint
+///
+/// Each server runs in its own task and can be spawned separately.
 #[derive(Clone)]
 pub struct CalloutServer {
+    /// Configuration for the server
     config: Config,
 }
 
-// Custom TcpListener stream for health check
+/// Custom stream adapter for the TcpListener used by the health check server.
+///
+/// This adapter implements the `Stream` trait to make the TcpListener compatible
+/// with hyper's `accept::from_stream` function.
 struct TcpListenerStream {
+    /// The underlying TCP listener
     listener: TcpListener,
 }
 
 impl Stream for TcpListenerStream {
     type Item = Result<tokio::net::TcpStream, std::io::Error>;
 
+    /// Polls the TCP listener for new connections.
+    ///
+    /// This method is called by the runtime to check if a new connection is available.
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let listener = &self.listener;
         match listener.poll_accept(cx) {
@@ -58,16 +127,41 @@ impl Stream for TcpListenerStream {
 }
 
 impl CalloutServer {
+    /// Creates a new `CalloutServer` with the specified configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - The configuration for the server
+    ///
+    /// # Returns
+    ///
+    /// A new `CalloutServer` instance
     pub fn new(config: Config) -> Self {
         Self { config }
     }
 
+    /// Creates a new `CalloutServer` with default configuration.
+    ///
+    /// # Returns
+    ///
+    /// A new `CalloutServer` instance with default settings
     pub fn with_default_config() -> Self {
         Self {
             config: Config::default(),
         }
     }
 
+    /// Spawns the secure gRPC server in a new task.
+    ///
+    /// This method starts the TLS-enabled gRPC server that hosts the external processor.
+    ///
+    /// # Arguments
+    ///
+    /// * `processor` - The external processor implementation to host
+    ///
+    /// # Returns
+    ///
+    /// A `JoinHandle` for the spawned task
     pub async fn spawn_grpc<P: ExtProcessor + Clone + Send + 'static>(
         &self,
         processor: P,
@@ -81,6 +175,18 @@ impl CalloutServer {
         })
     }
 
+    /// Spawns the plaintext gRPC server in a new task.
+    ///
+    /// This method starts the non-TLS gRPC server that hosts the external processor.
+    /// This server is intended for development and testing purposes.
+    ///
+    /// # Arguments
+    ///
+    /// * `processor` - The external processor implementation to host
+    ///
+    /// # Returns
+    ///
+    /// A `JoinHandle` for the spawned task
     pub async fn spawn_plaintext_grpc<P: ExtProcessor + Clone + Send + 'static>(
         &self,
         processor: P,
@@ -94,6 +200,14 @@ impl CalloutServer {
         })
     }
 
+    /// Spawns the health check HTTP server in a new task.
+    ///
+    /// This method starts a simple HTTP server that responds to all requests with
+    /// an empty 200 OK response, which can be used for health checking.
+    ///
+    /// # Returns
+    ///
+    /// A `JoinHandle` for the spawned task
     pub async fn spawn_health_check(&self) -> tokio::task::JoinHandle<()> {
         let server = self.clone();
         tokio::spawn(async move {
@@ -103,6 +217,19 @@ impl CalloutServer {
         })
     }
 
+    /// Starts the secure gRPC server.
+    ///
+    /// This method sets up and runs the TLS-enabled gRPC server that hosts
+    /// the external processor. It loads the TLS certificates, creates the
+    /// service, and starts the server.
+    ///
+    /// # Arguments
+    ///
+    /// * `processor` - The external processor implementation to host
+    ///
+    /// # Returns
+    ///
+    /// A `Result` indicating success or failure
     async fn start_grpc<P: ExtProcessor + 'static>(
         &self,
         processor: P,
@@ -139,6 +266,20 @@ impl CalloutServer {
         Ok(())
     }
 
+    /// Starts the plaintext gRPC server.
+    ///
+    /// This method sets up and runs the non-TLS gRPC server that hosts
+    /// the external processor. It creates the service and starts the server.
+    /// If plaintext server is disabled in the configuration, this method
+    /// returns immediately without starting a server.
+    ///
+    /// # Arguments
+    ///
+    /// * `processor` - The external processor implementation to host
+    ///
+    /// # Returns
+    ///
+    /// A `Result` indicating success or failure
     async fn start_plaintext_grpc<P: ExtProcessor + 'static>(
         &self,
         processor: P,
@@ -162,6 +303,15 @@ impl CalloutServer {
         Ok(())
     }
 
+    /// Starts the health check HTTP server.
+    ///
+    /// This method sets up and runs a simple HTTP server that responds to all
+    /// requests with an empty 200 OK response. This can be used for health checking
+    /// by load balancers or container orchestration systems.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` indicating success or failure
     async fn start_health_check(&self) -> Result<(), Box<dyn error::Error + Send + Sync>> {
         let listener = TcpListener::bind(&self.config.health_check_address).await?;
         info!("Starting health check server on {}", self.config.health_check_address);

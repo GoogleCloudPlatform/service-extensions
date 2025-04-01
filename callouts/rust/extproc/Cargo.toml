@@ -1,9 +1,7 @@
 [package]
-name = "envoy-ext-proc"
-version = "0.1.0"
+name = "service-extensions"
+version = "0.0.0"
 edition = "2021"
-authors = ["author"]
-description = "Envoy External Processing Filter SDK in Rust"
 license = "Apache-2.0"
 
 [dependencies]

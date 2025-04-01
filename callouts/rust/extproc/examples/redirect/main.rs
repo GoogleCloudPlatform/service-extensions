@@ -1,3 +1,40 @@
+// Copyright 2025 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//! # Redirect Example
+//!
+//! This module demonstrates how to create an Envoy external processor that
+//! redirects all incoming HTTP requests to a specified URL.
+//!
+//! ## Overview
+//!
+//! The `RedirectProcessor` implements the `ExtProcessor` trait to intercept
+//! HTTP requests and immediately respond with a redirect status code (301 Moved Permanently)
+//! and a Location header pointing to the target URL.
+//!
+//! This example shows how to:
+//! - Create an immediate response instead of modifying the request
+//! - Set HTTP status codes
+//! - Add HTTP headers for redirection
+//!
+//! ## Usage
+//!
+//! To run this example:
+//!
+//! ```bash
+//! cargo run --example redirect
+//! ```
+
 use async_trait::async_trait;
 use ext_proc::{
     processor::{ExtProcessor, ProcessingError},
@@ -9,11 +46,21 @@ use ext_proc::{
 };
 use ext_proc::utils::mutations;
 
-/// RedirectProcessor returns a redirect response for all requests
+/// `RedirectProcessor` returns a redirect response for all incoming HTTP requests.
+///
+/// This processor demonstrates how to create an immediate response with a redirect
+/// status code (301 Moved Permanently) and a Location header pointing to the target URL.
+/// It intercepts all requests at the request headers phase and returns a redirect
+/// response without further processing.
 #[derive(Clone)]
 struct RedirectProcessor;
 
 impl RedirectProcessor {
+    /// Creates a new instance of `RedirectProcessor`.
+    ///
+    /// # Returns
+    ///
+    /// A new `RedirectProcessor` instance.
     fn new() -> Self {
         Self
     }
@@ -21,26 +68,84 @@ impl RedirectProcessor {
 
 #[async_trait]
 impl ExtProcessor for RedirectProcessor {
+    /// Processes request headers and returns a redirect response.
+    ///
+    /// This method intercepts all incoming requests and immediately responds with
+    /// a 301 Moved Permanently redirect to "http://service-extensions.com/redirect".
+    ///
+    /// # Arguments
+    ///
+    /// * `_req` - The processing request containing request headers (not used)
+    ///
+    /// # Returns
+    ///
+    /// A `ProcessingResponse` containing a redirect response with:
+    /// - Status code 301 (Moved Permanently)
+    /// - Location header with the target URL
     async fn process_request_headers(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
         Ok(mutations::add_redirect_response(
             301,
             "http://service-extensions.com/redirect".to_string(),
+            None
         ))
     }
 
+    /// Processes response headers.
+    ///
+    /// This implementation simply passes through response headers without modification,
+    /// as the processor already responded with a redirect at the request headers phase.
+    ///
+    /// # Arguments
+    ///
+    /// * `_req` - The processing request containing response headers
+    ///
+    /// # Returns
+    ///
+    /// A default `ProcessingResponse` that allows the response headers to proceed unchanged.
     async fn process_response_headers(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
         Ok(ProcessingResponse::default())
     }
 
+    /// Processes request bodies.
+    ///
+    /// This implementation simply passes through request bodies without modification,
+    /// as the processor already responded with a redirect at the request headers phase.
+    ///
+    /// # Arguments
+    ///
+    /// * `_req` - The processing request containing the request body
+    ///
+    /// # Returns
+    ///
+    /// A default `ProcessingResponse` that allows the request body to proceed unchanged.
     async fn process_request_body(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
         Ok(ProcessingResponse::default())
     }
 
+    /// Processes response bodies.
+    ///
+    /// This implementation simply passes through response bodies without modification,
+    /// as the processor already responded with a redirect at the request headers phase.
+    ///
+    /// # Arguments
+    ///
+    /// * `_req` - The processing request containing the response body
+    ///
+    /// # Returns
+    ///
+    /// A default `ProcessingResponse` that allows the response body to proceed unchanged.
     async fn process_response_body(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
         Ok(ProcessingResponse::default())
     }
 }
 
+/// Main entry point for the redirect example.
+///
+/// Sets up and starts the external processor server with the `RedirectProcessor`.
+///
+/// # Returns
+///
+/// A Result indicating success or failure of the server startup.
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
@@ -64,6 +169,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 #[cfg(test)]
 mod tests {
+    //! Test module for the `RedirectProcessor`.
+    //!
+    //! Contains comprehensive tests for the redirect functionality, including:
+    //! - Verifying the redirect status code
+    //! - Checking the Location header
+    //! - Testing the structure of the immediate response
+    //! - Ensuring other processor methods return default responses
+    //! - Testing behavior with empty and different request types
+
     use super::*;
     use ext_proc::envoy::{
         config::core::v3::{HeaderMap, HeaderValue},
@@ -74,6 +188,13 @@ mod tests {
         },
     };
 
+    /// Creates a test request with HTTP headers.
+    ///
+    /// # Returns
+    ///
+    /// An `HttpHeaders` object containing common request headers:
+    /// - "host": "example.com"
+    /// - "user-agent": "test-client"
     fn create_test_request_headers() -> HttpHeaders {
         HttpHeaders {
             headers: Some(HeaderMap {
@@ -95,6 +216,12 @@ mod tests {
         }
     }
 
+    /// Tests the basic redirect response functionality.
+    ///
+    /// This test verifies that:
+    /// - The processor returns an immediate response
+    /// - The status code is 301 (Moved Permanently)
+    /// - The Location header contains the correct redirect URL
     #[tokio::test]
     async fn test_redirect_response() {
         let processor = RedirectProcessor::new();
@@ -135,6 +262,10 @@ mod tests {
         }
     }
 
+    /// Tests that the redirect status code is correct.
+    ///
+    /// This test verifies that:
+    /// - The status code in the immediate response is 301 (Moved Permanently)
     #[tokio::test]
     async fn test_redirect_status_code() {
         let processor = RedirectProcessor::new();
@@ -155,6 +286,11 @@ mod tests {
         }
     }
 
+    /// Tests that other processor methods return default responses.
+    ///
+    /// This test verifies that:
+    /// - The response_headers, request_body, and response_body methods all return default responses
+    /// - These methods don't modify the traffic in any way
     #[tokio::test]
     async fn test_other_processor_methods() {
         let processor = RedirectProcessor::new();
@@ -176,6 +312,11 @@ mod tests {
         assert_eq!(response, ProcessingResponse::default());
     }
 
+    /// Tests handling of empty requests.
+    ///
+    /// This test verifies that:
+    /// - Even with an empty request, the processor still returns a redirect response
+    /// - The redirect contains the correct status code and Location header
     #[tokio::test]
     async fn test_empty_request() {
         let processor = RedirectProcessor::new();
@@ -209,6 +350,11 @@ mod tests {
         }
     }
 
+    /// Tests behavior with different request types.
+    ///
+    /// This test verifies that:
+    /// - The processor returns a redirect response for all request types
+    /// - The redirect is consistent regardless of the input request type
     #[tokio::test]
     async fn test_different_request_types() {
         let processor = RedirectProcessor::new();
@@ -246,6 +392,12 @@ mod tests {
         }
     }
 
+    /// Tests the complete structure of the redirect response.
+    ///
+    /// This test verifies that:
+    /// - The immediate response has the correct structure
+    /// - All required fields are present and have the expected values
+    /// - Optional fields have the expected default values
     #[tokio::test]
     async fn test_redirect_response_structure() {
         let processor = RedirectProcessor::new();
@@ -280,6 +432,11 @@ mod tests {
         }
     }
 
+    /// Tests that the processor response matches the direct mutation result.
+    ///
+    /// This test verifies that:
+    /// - The response from the processor matches the response created directly with the mutations helper
+    /// - The processor is correctly using the mutations utility function
     #[tokio::test]
     async fn test_compare_with_direct_mutation() {
         let processor = RedirectProcessor::new();
@@ -296,6 +453,7 @@ mod tests {
         let expected_response = mutations::add_redirect_response(
             301,
             "http://service-extensions.com/redirect".to_string(),
+            None
         );
 
         // Compare the responses
