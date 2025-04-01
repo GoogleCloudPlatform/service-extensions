@@ -23,12 +23,11 @@
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "service/callout_server.h"
 
-using grpc::ServerContext;
-using envoy::service::ext_proc::v3::HttpHeaders;
-using extproc::service::CalloutServer;
+using envoy::service::ext_proc::v3::ProcessingRequest;
 
-std::string extract_jwt_token(const HttpHeaders& request_headers) {
-    for (const auto& header : request_headers.headers().headers()) {
+
+std::string extract_jwt_token(ProcessingRequest* request) {
+    for (const auto& header : request_headers.request().headers()) {
         if (header.key() == "authorization") {
             std::string auth_value = header.value();
             size_t pos = auth_value.find("Bearer ");
@@ -42,11 +41,11 @@ std::string extract_jwt_token(const HttpHeaders& request_headers) {
 
 std::unordered_map<std::string, std::string> validate_jwt_token(
     const std::string& key,
-    const HttpHeaders& request_headers,
+    const ProcessingRequest* request,
     const std::string& algorithm,
     ServerContext* context) {
 
-    std::string jwt_token = extract_jwt_token(request_headers);
+    std::string jwt_token = extract_jwt_token(request);
     if (jwt_token.empty()) {
         // Deny callout
         deny_callout(context, "No Authorization token found.");
@@ -88,8 +87,8 @@ public:
         }
     }
 
-    grpc::Status on_request_headers(const HttpHeaders& headers, ServerContext* context) override {
-        auto decoded = validate_jwt_token(public_key_, headers, "RS256", context);
+    grpc::Status on_request_headers(ProcessingRequest* request, ServerContext* context) override {
+        auto decoded = validate_jwt_token(public_key_, request, "RS256", context);
 
         if (!decoded.empty()) {
             std::vector<std::pair<std::string, std::string>> decoded_items;
