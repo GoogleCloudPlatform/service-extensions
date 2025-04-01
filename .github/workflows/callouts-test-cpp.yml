@@ -16,7 +16,6 @@
 name: Callouts test C++ SDK
 
 on:
-  workflow_dispatch: true
   push:
     branches: ["main", "cpp-sdk-doc-gen"]
     paths:
