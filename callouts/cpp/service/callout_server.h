@@ -168,6 +168,46 @@ class CalloutServer : public ExternalProcessor::Service {
 
   static bool RunServers(const ServerConfig& config = ServerConfig{}) {
     std::unique_lock<std::mutex> lock(server_mutex_);
+    bool server_started = false;
+  
+    // Start secure server if credentials are available
+    if (!config.secure_address.empty()) {
+      auto creds = CreateSecureServerCredentials(config.key_path, config.cert_path);
+      if (creds) {
+        secure_thread_ = std::thread([config, creds]() {
+          std::unique_ptr<grpc::Server> local_server;
+          auto service = std::make_unique<CalloutServer>();
+          {
+            grpc::ServerBuilder builder;
+            builder.AddListeningPort(config.secure_address, *creds);
+            builder.RegisterService(service.get());
+            local_server = builder.BuildAndStart();
+          }
+  
+          {
+            std::lock_guard<std::mutex> lock(server_mutex_);
+            secure_server_.reset(local_server.release());
+            server_ready_ = true;
+          }
+          server_cv_.notify_one();
+  
+          if (secure_server_) {
+            LOG(INFO) << "Secure server listening on " << config.secure_address;
+            secure_server_->Wait();
+          }
+  
+          {
+            std::lock_guard<std::mutex> lock(server_mutex_);
+            if (shutdown_requested_) {
+              secure_server_.reset();
+            }
+          }
+        });
+        server_started = true;
+      }
+    }
+  
+    // Start plaintext server if enabled
     if (config.enable_plaintext && !plaintext_server_) {
       plaintext_thread_ = std::thread([config]() {
         std::unique_ptr<grpc::Server> local_server;
@@ -179,19 +219,19 @@ class CalloutServer : public ExternalProcessor::Service {
           builder.RegisterService(service.get());
           local_server = builder.BuildAndStart();
         }
-
+  
         {
           std::lock_guard<std::mutex> lock(server_mutex_);
           plaintext_server_.reset(local_server.release());
           server_ready_ = true;
         }
         server_cv_.notify_one();
-
+  
         if (plaintext_server_) {
           LOG(INFO) << "Plaintext server listening on " << config.plaintext_address;
           plaintext_server_->Wait();
         }
-
+  
         {
           std::lock_guard<std::mutex> lock(server_mutex_);
           if (shutdown_requested_) {
@@ -199,11 +239,13 @@ class CalloutServer : public ExternalProcessor::Service {
           }
         }
       });
-
-      server_cv_.wait(lock, [] { return server_ready_.load(); });
-      return true;
+      server_started = true;
     }
-    return false;
+  
+    if (server_started) {
+      server_cv_.wait(lock, [] { return server_ready_.load(); });
+    }
+    return server_started;
   }
 
   static void Shutdown() {
@@ -212,14 +254,21 @@ class CalloutServer : public ExternalProcessor::Service {
     if (plaintext_server_) {
       plaintext_server_->Shutdown();
     }
+    if (secure_server_) {
+      secure_server_->Shutdown();
+    }
   }
-
+  
   static void WaitForCompletion() {
     if (plaintext_thread_.joinable()) {
       plaintext_thread_.join();
     }
+    if (secure_thread_.joinable()) {
+      secure_thread_.join();
+    }
     std::lock_guard<std::mutex> lock(server_mutex_);
     plaintext_server_.reset();
+    secure_server_.reset();
   }
 
   grpc::Status Process(
@@ -261,6 +310,8 @@ class CalloutServer : public ExternalProcessor::Service {
 
  private:
   static inline std::shared_ptr<grpc::Server> plaintext_server_ = nullptr;
+  static inline std::shared_ptr<grpc::Server> secure_server_ = nullptr;
+  static inline std::thread secure_thread_;
   static inline std::thread plaintext_thread_;
   static inline std::mutex server_mutex_;
   static inline std::condition_variable server_cv_;
