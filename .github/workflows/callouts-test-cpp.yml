@@ -112,7 +112,8 @@ jobs:
       - name: Deploy to GitHub Pages
         if: >-
           ${{ github.event_name == 'push' &&
-          github.ref == 'refs/heads/main' }}
+          (github.ref == 'refs/heads/main' || \
+          github.ref == 'refs/heads/cpp-sdk-doc-gen') }}
         uses: peaceiris/actions-gh-pages@v4
         with:
           publish_branch: gh-pages
