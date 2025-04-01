@@ -16,7 +16,7 @@ name: Callouts test C++ SDK
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "cpp-sdk-doc-gen" ]
     paths:
     - callouts/cpp/**
     - docs/cpp/**
@@ -25,16 +25,16 @@ on:
     paths:
     - callouts/cpp/**
   schedule:
-    # GitHub removes infrequently accessed caches. Run once a week to keep the cache from going stale.
     - cron: '0 0 * * 1'
 
-# Default permissions are read only.
-permissions: read-all
+permissions:
+  contents: write
+  actions: read
+  packages: read
 
 jobs:
   test:
     name: bazel test (${{ matrix.name }})
-
     runs-on: ubuntu-22.04
 
     strategy:
@@ -74,9 +74,6 @@ jobs:
           bazel-cache-${{ matrix.name }}-
           bazel-cache-
 
-    # - name: Deploy to GitHub Pages
-    # TODO
-
     - name: bazel test
       shell: bash
       working-directory: ./callouts/cpp
@@ -87,6 +84,29 @@ jobs:
         --disk_cache /tmp/bazel/cache
         ${{ matrix.flags }}
         -- //...
+
+    - name: Install Doxygen
+      run: sudo apt-get install -y doxygen graphviz
+
+    - name: Generate Documentation
+      working-directory: ./callouts/cpp
+      run: |
+        mkdir -p docs/html
+        doxygen Doxyfile
+
+    - name: Prepare Docs Directory
+      run: |
+        mkdir -p docs/cpp/_build
+        cp -r callouts/cpp/docs/html/* docs/cpp/_build/
+        sed -i '/<a href="https:\/\/pkg.go.dev\/github.com\/GoogleCloudPlatform\/service-extensions\/callouts\/go"/i \            <a href="/service-extensions/cpp/_build/index.html" class="box">C++ Callouts SDK</a>' docs/index.html
+
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v4
+      with:
+        publish_branch: gh-pages
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: docs/
+        keep_files: true
 
     - name: remove unaccessed files from cache
       shell: bash
