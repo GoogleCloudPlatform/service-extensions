@@ -25,8 +25,6 @@ on:
     branches: ["main"]
     paths:
       - callouts/cpp/**
-  schedule:
-    - cron: '0 0 * * 1'
 
 permissions:
   contents: write
