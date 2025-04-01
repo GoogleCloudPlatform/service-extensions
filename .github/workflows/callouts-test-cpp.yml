@@ -12,19 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+---
 name: Callouts test C++ SDK
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: true
   push:
-    branches: [ "main", "cpp-sdk-doc-gen" ]
+    branches: ["main", "cpp-sdk-doc-gen"]
     paths:
-    - callouts/cpp/**
-    - docs/cpp/**
+      - callouts/cpp/**
+      - docs/cpp/**
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
     paths:
-    - callouts/cpp/**
+      - callouts/cpp/**
   schedule:
     - cron: '0 0 * * 1'
 
@@ -40,86 +41,87 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        - name: 'opt'
-          flags: --config=clang -c opt --define=crypto=system
-        - name: 'ASan'
-          flags: --config=clang-asan
-        - name: 'TSan'
-          flags: --config=clang-tsan
+          - name: 'opt'
+            flags: --config=clang -c opt --define=crypto=system
+          - name: 'ASan'
+            flags: --config=clang-asan
+          - name: 'TSan'
+            flags: --config=clang-tsan
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: set cache name
-      id: vars
-      working-directory: ./callouts/cpp
-      # The cache tag consists of the following parts:
-      # * bazel-cache- prefix
-      # * matrix.name, which separates the cache for opt, tsan, and asan.
-      # * hash of WORKSPACE, .bazelrc, and .bazelversion, which is
-      #   purely to differentiate caches for substantial changes in bazel.
-      # * github.sha, which is the commit hash of the commit used to generate
-      #   the cache entry.
-      run: echo "CACHE_TAG=bazel-cache-${{ matrix.name }}-${{ hashFiles('WORKSPACE', '.bazelrc', '.bazelversion') }}" >> "$GITHUB_OUTPUT"
+      - name: set cache name
+        id: vars
+        working-directory: ./callouts/cpp
+        run: |
+          echo "CACHE_TAG=bazel-cache-${{ matrix.name }}-${{
+            hashFiles('WORKSPACE', '.bazelrc', '.bazelversion')
+          }}" >> "$GITHUB_OUTPUT"
 
-    - name: bazel cache
-      uses: actions/cache/restore@v4
-      with:
-        path: /tmp/bazel/cache
-        key: ${{ steps.vars.outputs.CACHE_TAG }}-${{ github.sha }}
-        restore-keys: |
-          ${{ steps.vars.outputs.CACHE_TAG }}-${{ github.sha }}
-          ${{ steps.vars.outputs.CACHE_TAG }}-
-          bazel-cache-${{ matrix.name }}-
-          bazel-cache-
+      - name: bazel cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/bazel/cache
+          key: ${{ steps.vars.outputs.CACHE_TAG }}-${{ github.sha }}
+          restore-keys: |
+            ${{ steps.vars.outputs.CACHE_TAG }}-${{ github.sha }}
+            ${{ steps.vars.outputs.CACHE_TAG }}-
+            bazel-cache-${{ matrix.name }}-
+            bazel-cache-
 
-    - name: bazel test
-      shell: bash
-      working-directory: ./callouts/cpp
-      run: >
-        bazel test
-        --verbose_failures
-        --test_output=errors
-        --disk_cache /tmp/bazel/cache
-        ${{ matrix.flags }}
-        -- //...
+      - name: bazel test
+        shell: bash
+        working-directory: ./callouts/cpp
+        run: >
+          bazel test
+          --verbose_failures
+          --test_output=errors
+          --disk_cache /tmp/bazel/cache
+          ${{ matrix.flags }}
+          -- //...
 
-    - name: Install Doxygen
-      run: sudo apt-get install -y doxygen graphviz
+      - name: Install Doxygen
+        run: sudo apt-get install -y doxygen graphviz
 
-    - name: Generate Documentation
-      working-directory: ./callouts/cpp
-      run: |
-        mkdir -p docs/html
-        doxygen Doxyfile
+      - name: Generate Documentation
+        working-directory: ./callouts/cpp
+        run: |
+          mkdir -p docs/html
+          doxygen Doxyfile
 
-    - name: Prepare Docs Directory
-      run: |
-        mkdir -p docs/cpp/_build
-        cp -r callouts/cpp/docs/html/* docs/cpp/_build/
-        sed -i '/<a href="https:\/\/pkg.go.dev\/github.com\/GoogleCloudPlatform\/service-extensions\/callouts\/go"/i \            <a href="/service-extensions/cpp/_build/index.html" class="box">C++ Callouts SDK</a>' docs/index.html
+      - name: Prepare Docs Directory
+        run: |
+          mkdir -p docs/cpp/_build
+          cp -r callouts/cpp/docs/html/* docs/cpp/_build/
+          sed -i '/<a href="https:\/\/pkg.go.dev\/github.com\/\
+            GoogleCloudPlatform\/service-extensions\/callouts\/go"/i \
+            <a href="/service-extensions/cpp/_build/index.html" \
+            class="box">C++ Callouts SDK</a>' docs/index.html
 
-    - name: Deploy to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v4
-      if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-      with:
-        publish_branch: gh-pages
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: docs/
-        force_orphan: true
+      - name: Deploy to GitHub Pages
+        if: >-
+          ${{ github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' }}
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          publish_branch: gh-pages
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs/
+          force_orphan: true
 
-    - name: remove unaccessed files from cache
-      shell: bash
-      run: >
-        find /tmp/bazel/cache
-        -type f
-        -name '*'
-        -amin +300
-        -exec rm {} \;
+      - name: remove unaccessed files from cache
+        shell: bash
+        run: >
+          find /tmp/bazel/cache
+          -type f
+          -name '*'
+          -amin +300
+          -exec rm {} \;
 
-    - name: save bazel cache
-      uses: actions/cache/save@v4
-      if: always()
-      with:
-        path: /tmp/bazel/cache
-        key: ${{ steps.vars.outputs.CACHE_TAG }}-${{ github.sha }}
+      - name: save bazel cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /tmp/bazel/cache
+          key: ${{ steps.vars.outputs.CACHE_TAG }}-${{ github.sha }}
