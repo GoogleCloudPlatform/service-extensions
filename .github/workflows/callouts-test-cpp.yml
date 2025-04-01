@@ -97,13 +97,13 @@ jobs:
       - name: Generate Documentation
         working-directory: ./callouts/cpp
         run: |
-          mkdir -p docs/html
+          mkdir -p docs/_build
           doxygen Doxyfile
 
       - name: Prepare Docs Directory
         run: |
           mkdir -p docs/cpp/_build
-          cp -r callouts/cpp/docs/html/* docs/cpp/_build/
+          cp -r callouts/cpp/docs/_build/html/* docs/cpp/_build/
           sed -i '/<a href="https:\/\/pkg.go.dev\/github.com\/\
             GoogleCloudPlatform\/service-extensions\/callouts\/go"/i \
             <a href="/service-extensions/cpp/_build/index.html" \
