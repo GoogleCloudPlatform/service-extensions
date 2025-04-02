@@ -26,6 +26,7 @@ tonic-build = { version = "0.10", features = ["prost"] }
 [lib]
 name = "ext_proc"
 path = "src/lib.rs"
+doctest = false
 
 # Examples
 [[example]]

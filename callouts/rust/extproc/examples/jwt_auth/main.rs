@@ -51,12 +51,11 @@ use ext_proc::{
     utils::mutations,
 };
 use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm};
-use log::{info, error};
+use log::error;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
 
 /// `JWTAuthProcessor` validates JWT tokens in request headers and adds decoded claims as new headers.
 ///
