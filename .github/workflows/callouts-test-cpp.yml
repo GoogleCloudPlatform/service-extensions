@@ -21,6 +21,7 @@ on:
     paths:
       - 'callouts/cpp/**'
       - 'docs/cpp/**'
+      - 'docs/index.html'
       - '.github/workflows/callouts-test-cpp.yml'
   pull_request:
     branches: ["main"]
