@@ -119,6 +119,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: docs/
           force_orphan: true
+          keep_files: false
 
       - name: remove unaccessed files from cache
         shell: bash
