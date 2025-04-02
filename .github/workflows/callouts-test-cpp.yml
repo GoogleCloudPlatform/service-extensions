@@ -105,10 +105,6 @@ jobs:
         run: |
           mkdir -p docs/cpp/_build
           cp -r callouts/cpp/docs/_build/html/* docs/cpp/_build/
-          sed -i '/<a href="https:\/\/pkg.go.dev\/github.com\/\
-            GoogleCloudPlatform\/service-extensions\/callouts\/go"/i \
-            <a href="/service-extensions/cpp/_build/index.html" \
-            class="box">C++ Callouts SDK</a>' docs/index.html
 
       - name: Deploy to GitHub Pages
         if: >
