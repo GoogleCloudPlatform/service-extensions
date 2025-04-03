@@ -36,12 +36,11 @@
 
 use async_trait::async_trait;
 use ext_proc::{
-    processor::{ExtProcessor, ProcessingError},
     envoy::service::ext_proc::v3::{
-        ProcessingRequest,
+        processing_request::Request as ProcessingRequestVariant, ProcessingRequest,
         ProcessingResponse,
-        processing_request::Request as ProcessingRequestVariant,
     },
+    processor::{ExtProcessor, ProcessingError},
     server::{CalloutServer, Config},
     utils::mutations,
 };
@@ -78,7 +77,10 @@ impl ExtProcessor for AddBodyProcessor {
     /// # Returns
     ///
     /// A default `ProcessingResponse` that allows the request to proceed unchanged.
-    async fn process_request_headers(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+    async fn process_request_headers(
+        &self,
+        _req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError> {
         Ok(ProcessingResponse::default())
     }
 
@@ -93,7 +95,10 @@ impl ExtProcessor for AddBodyProcessor {
     /// # Returns
     ///
     /// A default `ProcessingResponse` that allows the response to proceed unchanged.
-    async fn process_response_headers(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+    async fn process_response_headers(
+        &self,
+        _req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError> {
         Ok(ProcessingResponse::default())
     }
 
@@ -110,9 +115,16 @@ impl ExtProcessor for AddBodyProcessor {
     /// A `ProcessingResponse` that either:
     /// - Replaces the request body with "new-body-request" if a body is present
     /// - Passes through the request unchanged if no body is present
-    async fn process_request_body(&self, req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+    async fn process_request_body(
+        &self,
+        req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError> {
         if let Some(ProcessingRequestVariant::RequestBody(_body)) = &req.request {
-            return Ok(mutations::add_body_string_mutation("new-body-request".to_string(), true, false));
+            return Ok(mutations::add_body_string_mutation(
+                "new-body-request".to_string(),
+                true,
+                false,
+            ));
         }
 
         // If no body, just pass through
@@ -132,9 +144,16 @@ impl ExtProcessor for AddBodyProcessor {
     /// A `ProcessingResponse` that either:
     /// - Replaces the response body with "new-body-response" if a body is present
     /// - Passes through the response unchanged if no body is present
-    async fn process_response_body(&self, req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+    async fn process_response_body(
+        &self,
+        req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError> {
         if let Some(ProcessingRequestVariant::ResponseBody(_body)) = &req.request {
-            return Ok(mutations::add_body_string_mutation("new-body-response".to_string(), false, false));
+            return Ok(mutations::add_body_string_mutation(
+                "new-body-response".to_string(),
+                false,
+                false,
+            ));
         }
 
         // If no body, just pass through
@@ -185,13 +204,10 @@ mod tests {
     //! - Custom processor implementations
 
     use super::*;
-    use ext_proc::envoy::{
-        service::ext_proc::v3::{
-            HttpBody,
-            processing_request::Request as ProcessingRequestVariant,
-            processing_response::Response as ProcessingResponseVariant,
-            body_mutation::Mutation as BodyMutationType,
-        },
+    use ext_proc::envoy::service::ext_proc::v3::{
+        body_mutation::Mutation as BodyMutationType,
+        processing_request::Request as ProcessingRequestVariant,
+        processing_response::Response as ProcessingResponseVariant, HttpBody,
     };
 
     /// Creates a test request with a request body.
@@ -246,7 +262,9 @@ mod tests {
 
         let request = create_test_request_body(body_content, true);
 
-        let response = processor.process_request_body(&request).await
+        let response = processor
+            .process_request_body(&request)
+            .await
             .expect("Failed to process request body");
 
         // Verify the response type and content
@@ -265,7 +283,10 @@ mod tests {
             }
 
             // Verify clear_route_cache is false
-            assert!(!common_response.clear_route_cache, "clear_route_cache should be false");
+            assert!(
+                !common_response.clear_route_cache,
+                "clear_route_cache should be false"
+            );
         } else {
             panic!("Expected RequestBody response");
         }
@@ -284,7 +305,9 @@ mod tests {
 
         let request = create_test_response_body(body_content, true);
 
-        let response = processor.process_response_body(&request).await
+        let response = processor
+            .process_response_body(&request)
+            .await
             .expect("Failed to process response body");
 
         // Verify the response type and content
@@ -303,7 +326,10 @@ mod tests {
             }
 
             // Verify clear_route_cache is false
-            assert!(!common_response.clear_route_cache, "clear_route_cache should be false");
+            assert!(
+                !common_response.clear_route_cache,
+                "clear_route_cache should be false"
+            );
         } else {
             panic!("Expected ResponseBody response");
         }
@@ -321,11 +347,17 @@ mod tests {
         // Create a request with no body
         let request = ProcessingRequest::default();
 
-        let response = processor.process_request_body(&request).await
+        let response = processor
+            .process_request_body(&request)
+            .await
             .expect("Failed to process empty request body");
 
         // For empty body, expect a default response (pass-through)
-        assert_eq!(response, ProcessingResponse::default(), "Empty body should result in default response");
+        assert_eq!(
+            response,
+            ProcessingResponse::default(),
+            "Empty body should result in default response"
+        );
     }
 
     /// Tests handling of empty response bodies.
@@ -340,11 +372,17 @@ mod tests {
         // Create a request with no body
         let request = ProcessingRequest::default();
 
-        let response = processor.process_response_body(&request).await
+        let response = processor
+            .process_response_body(&request)
+            .await
             .expect("Failed to process empty response body");
 
         // For empty body, expect a default response (pass-through)
-        assert_eq!(response, ProcessingResponse::default(), "Empty body should result in default response");
+        assert_eq!(
+            response,
+            ProcessingResponse::default(),
+            "Empty body should result in default response"
+        );
     }
 
     /// Tests the clear body mutation for request bodies.
@@ -370,7 +408,10 @@ mod tests {
             }
 
             // Verify clear_route_cache is false
-            assert!(!common_response.clear_route_cache, "clear_route_cache should be false");
+            assert!(
+                !common_response.clear_route_cache,
+                "clear_route_cache should be false"
+            );
         } else {
             panic!("Expected RequestBody response");
         }
@@ -399,7 +440,10 @@ mod tests {
             }
 
             // Verify clear_route_cache is false
-            assert!(!common_response.clear_route_cache, "clear_route_cache should be false");
+            assert!(
+                !common_response.clear_route_cache,
+                "clear_route_cache should be false"
+            );
         } else {
             panic!("Expected ResponseBody response");
         }
@@ -420,7 +464,10 @@ mod tests {
             let common_response = body_response.response.as_ref().unwrap();
 
             // Verify clear_route_cache is true
-            assert!(common_response.clear_route_cache, "clear_route_cache should be true");
+            assert!(
+                common_response.clear_route_cache,
+                "clear_route_cache should be true"
+            );
         } else {
             panic!("Expected RequestBody response");
         }
@@ -439,7 +486,9 @@ mod tests {
         let large_body = vec![b'X'; 10000];
         let request = create_test_request_body(&large_body, true);
 
-        let response = processor.process_request_body(&request).await
+        let response = processor
+            .process_request_body(&request)
+            .await
             .expect("Failed to process large request body");
 
         // Verify the response replaces the large body
@@ -473,7 +522,9 @@ mod tests {
         // Create a body with end_of_stream set to false (simulating streaming)
         let request = create_test_request_body(b"streaming chunk", false);
 
-        let response = processor.process_request_body(&request).await
+        let response = processor
+            .process_request_body(&request)
+            .await
             .expect("Failed to process streaming request body");
 
         // Verify the response still replaces the body
@@ -509,24 +560,40 @@ mod tests {
 
         #[async_trait]
         impl ExtProcessor for CustomBodyProcessor {
-            async fn process_request_headers(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+            async fn process_request_headers(
+                &self,
+                _req: &ProcessingRequest,
+            ) -> Result<ProcessingResponse, ProcessingError> {
                 Ok(ProcessingResponse::default())
             }
 
-            async fn process_response_headers(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+            async fn process_response_headers(
+                &self,
+                _req: &ProcessingRequest,
+            ) -> Result<ProcessingResponse, ProcessingError> {
                 Ok(ProcessingResponse::default())
             }
 
-            async fn process_request_body(&self, req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+            async fn process_request_body(
+                &self,
+                req: &ProcessingRequest,
+            ) -> Result<ProcessingResponse, ProcessingError> {
                 if let Some(ProcessingRequestVariant::RequestBody(_)) = &req.request {
                     return Ok(mutations::add_body_clear_mutation(true, false));
                 }
                 Ok(ProcessingResponse::default())
             }
 
-            async fn process_response_body(&self, req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+            async fn process_response_body(
+                &self,
+                req: &ProcessingRequest,
+            ) -> Result<ProcessingResponse, ProcessingError> {
                 if let Some(ProcessingRequestVariant::ResponseBody(_)) = &req.request {
-                    return Ok(mutations::add_body_string_mutation("custom-response".to_string(), false, true));
+                    return Ok(mutations::add_body_string_mutation(
+                        "custom-response".to_string(),
+                        false,
+                        true,
+                    ));
                 }
                 Ok(ProcessingResponse::default())
             }
@@ -536,7 +603,9 @@ mod tests {
 
         // Test request body processing (should clear the body)
         let request = create_test_request_body(b"test body", true);
-        let response = processor.process_request_body(&request).await
+        let response = processor
+            .process_request_body(&request)
+            .await
             .expect("Failed to process request body");
 
         if let Some(ProcessingResponseVariant::RequestBody(body_response)) = response.response {
@@ -554,7 +623,9 @@ mod tests {
 
         // Test response body processing (should replace with custom string and clear route cache)
         let request = create_test_response_body(b"test body", true);
-        let response = processor.process_response_body(&request).await
+        let response = processor
+            .process_response_body(&request)
+            .await
             .expect("Failed to process response body");
 
         if let Some(ProcessingResponseVariant::ResponseBody(body_response)) = response.response {
@@ -572,7 +643,10 @@ mod tests {
             }
 
             // Verify clear_route_cache is true
-            assert!(common_response.clear_route_cache, "clear_route_cache should be true for response");
+            assert!(
+                common_response.clear_route_cache,
+                "clear_route_cache should be true for response"
+            );
         } else {
             panic!("Expected ResponseBody response");
         }

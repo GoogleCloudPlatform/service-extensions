@@ -36,8 +36,8 @@
 
 use async_trait::async_trait;
 use ext_proc::{
-    processor::{ExtProcessor, ProcessingError},
     envoy::service::ext_proc::v3::{ProcessingRequest, ProcessingResponse},
+    processor::{ExtProcessor, ProcessingError},
     server::{CalloutServer, Config},
     utils::mutations,
 };
@@ -76,13 +76,16 @@ impl ExtProcessor for AddHeaderProcessor {
     /// # Returns
     ///
     /// A `ProcessingResponse` that adds the custom header to the request.
-    async fn process_request_headers(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+    async fn process_request_headers(
+        &self,
+        _req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError> {
         Ok(mutations::add_header_mutation(
             vec![("header-request".to_string(), "Value-request".to_string())],
             vec![],
             false,
             true,
-            None
+            None,
         ))
     }
 
@@ -97,13 +100,16 @@ impl ExtProcessor for AddHeaderProcessor {
     /// # Returns
     ///
     /// A `ProcessingResponse` that adds the custom header to the response.
-    async fn process_response_headers(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+    async fn process_response_headers(
+        &self,
+        _req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError> {
         Ok(mutations::add_header_mutation(
             vec![("header-response".to_string(), "Value-response".to_string())],
             vec![],
             false,
             false,
-            None
+            None,
         ))
     }
 
@@ -118,7 +124,10 @@ impl ExtProcessor for AddHeaderProcessor {
     /// # Returns
     ///
     /// A default `ProcessingResponse` that allows the request body to proceed unchanged.
-    async fn process_request_body(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+    async fn process_request_body(
+        &self,
+        _req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError> {
         Ok(ProcessingResponse::default())
     }
 
@@ -133,7 +142,10 @@ impl ExtProcessor for AddHeaderProcessor {
     /// # Returns
     ///
     /// A default `ProcessingResponse` that allows the response body to proceed unchanged.
-    async fn process_response_body(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+    async fn process_response_body(
+        &self,
+        _req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError> {
         Ok(ProcessingResponse::default())
     }
 }
@@ -183,8 +195,7 @@ mod tests {
         config::core::v3::{HeaderMap, HeaderValue},
         service::ext_proc::v3::{
             processing_request::Request as ProcessingRequestVariant,
-            processing_response::Response as ProcessingResponseVariant,
-            HttpHeaders,
+            processing_response::Response as ProcessingResponseVariant, HttpHeaders,
         },
     };
 
@@ -256,17 +267,28 @@ mod tests {
 
         // Create request with headers
         let request = ProcessingRequest {
-            request: Some(ProcessingRequestVariant::RequestHeaders(create_test_request_headers())),
+            request: Some(ProcessingRequestVariant::RequestHeaders(
+                create_test_request_headers(),
+            )),
             ..Default::default()
         };
 
         // Process the request
-        let response = processor.process_request_headers(&request).await
+        let response = processor
+            .process_request_headers(&request)
+            .await
             .expect("Failed to process request headers");
 
         // Check if the response contains the expected header mutation
-        if let Some(ProcessingResponseVariant::RequestHeaders(headers_response)) = response.response {
-            let header_mutation = headers_response.response.as_ref().unwrap().header_mutation.as_ref().unwrap();
+        if let Some(ProcessingResponseVariant::RequestHeaders(headers_response)) = response.response
+        {
+            let header_mutation = headers_response
+                .response
+                .as_ref()
+                .unwrap()
+                .header_mutation
+                .as_ref()
+                .unwrap();
 
             // Check if custom header is present
             let mut found_header = false;
@@ -274,10 +296,7 @@ mod tests {
                 if let Some(h) = &header.header {
                     if h.key == "header-request" {
                         found_header = true;
-                        assert_eq!(
-                            String::from_utf8_lossy(&h.raw_value),
-                            "Value-request"
-                        );
+                        assert_eq!(String::from_utf8_lossy(&h.raw_value), "Value-request");
                     }
                 }
             }
@@ -300,17 +319,29 @@ mod tests {
 
         // Create request with response headers
         let request = ProcessingRequest {
-            request: Some(ProcessingRequestVariant::ResponseHeaders(create_test_response_headers())),
+            request: Some(ProcessingRequestVariant::ResponseHeaders(
+                create_test_response_headers(),
+            )),
             ..Default::default()
         };
 
         // Process the response headers
-        let response = processor.process_response_headers(&request).await
+        let response = processor
+            .process_response_headers(&request)
+            .await
             .expect("Failed to process response headers");
 
         // Check if the response contains the expected header mutation
-        if let Some(ProcessingResponseVariant::ResponseHeaders(headers_response)) = response.response {
-            let header_mutation = headers_response.response.as_ref().unwrap().header_mutation.as_ref().unwrap();
+        if let Some(ProcessingResponseVariant::ResponseHeaders(headers_response)) =
+            response.response
+        {
+            let header_mutation = headers_response
+                .response
+                .as_ref()
+                .unwrap()
+                .header_mutation
+                .as_ref()
+                .unwrap();
 
             // Check if custom header is present
             let mut found_header = false;
@@ -318,10 +349,7 @@ mod tests {
                 if let Some(h) = &header.header {
                     if h.key == "header-response" {
                         found_header = true;
-                        assert_eq!(
-                            String::from_utf8_lossy(&h.raw_value),
-                            "Value-response"
-                        );
+                        assert_eq!(String::from_utf8_lossy(&h.raw_value), "Value-response");
                     }
                 }
             }
@@ -349,12 +377,19 @@ mod tests {
             vec![],
             false,
             true,
-            None
+            None,
         );
 
         // Check if all headers are present
-        if let Some(ProcessingResponseVariant::RequestHeaders(headers_response)) = response.response {
-            let header_mutation = headers_response.response.as_ref().unwrap().header_mutation.as_ref().unwrap();
+        if let Some(ProcessingResponseVariant::RequestHeaders(headers_response)) = response.response
+        {
+            let header_mutation = headers_response
+                .response
+                .as_ref()
+                .unwrap()
+                .header_mutation
+                .as_ref()
+                .unwrap();
 
             // Check if all custom headers are present
             let expected_headers = [
@@ -369,10 +404,7 @@ mod tests {
                     if let Some(h) = &header.header {
                         if h.key == *expected_key {
                             found = true;
-                            assert_eq!(
-                                String::from_utf8_lossy(&h.raw_value),
-                                *expected_value
-                            );
+                            assert_eq!(String::from_utf8_lossy(&h.raw_value), *expected_value);
                         }
                     }
                 }
@@ -396,15 +428,24 @@ mod tests {
             vec!["user-agent".to_string(), "host".to_string()],
             false,
             true,
-            None
+            None,
         );
 
-        if let Some(ProcessingResponseVariant::RequestHeaders(headers_response)) = response.response {
-            let header_mutation = headers_response.response.as_ref().unwrap().header_mutation.as_ref().unwrap();
+        if let Some(ProcessingResponseVariant::RequestHeaders(headers_response)) = response.response
+        {
+            let header_mutation = headers_response
+                .response
+                .as_ref()
+                .unwrap()
+                .header_mutation
+                .as_ref()
+                .unwrap();
 
             // Check that the headers to remove are present
             assert_eq!(header_mutation.remove_headers.len(), 2);
-            assert!(header_mutation.remove_headers.contains(&"user-agent".to_string()));
+            assert!(header_mutation
+                .remove_headers
+                .contains(&"user-agent".to_string()));
             assert!(header_mutation.remove_headers.contains(&"host".to_string()));
 
             // Check that the new header is present
@@ -413,10 +454,7 @@ mod tests {
                 if let Some(h) = &header.header {
                     if h.key == "new-header" {
                         found_new_header = true;
-                        assert_eq!(
-                            String::from_utf8_lossy(&h.raw_value),
-                            "new-value"
-                        );
+                        assert_eq!(String::from_utf8_lossy(&h.raw_value), "new-value");
                     }
                 }
             }
@@ -440,10 +478,11 @@ mod tests {
             vec![],
             true,
             true,
-            None
+            None,
         );
 
-        if let Some(ProcessingResponseVariant::RequestHeaders(headers_response)) = response.response {
+        if let Some(ProcessingResponseVariant::RequestHeaders(headers_response)) = response.response
+        {
             let common_response = headers_response.response.as_ref().unwrap();
 
             // Check that clear_route_cache is set to true
@@ -458,10 +497,11 @@ mod tests {
             vec![],
             false,
             true,
-            None
+            None,
         );
 
-        if let Some(ProcessingResponseVariant::RequestHeaders(headers_response)) = response.response {
+        if let Some(ProcessingResponseVariant::RequestHeaders(headers_response)) = response.response
+        {
             let common_response = headers_response.response.as_ref().unwrap();
 
             // Check that clear_route_cache is set to false
@@ -482,17 +522,31 @@ mod tests {
         // Test adding headers to a response
         let response = mutations::add_header_mutation(
             vec![
-                ("response-header1".to_string(), "response-value1".to_string()),
-                ("response-header2".to_string(), "response-value2".to_string()),
+                (
+                    "response-header1".to_string(),
+                    "response-value1".to_string(),
+                ),
+                (
+                    "response-header2".to_string(),
+                    "response-value2".to_string(),
+                ),
             ],
             vec![],
             false,
             false,
-            None
+            None,
         );
 
-        if let Some(ProcessingResponseVariant::ResponseHeaders(headers_response)) = response.response {
-            let header_mutation = headers_response.response.as_ref().unwrap().header_mutation.as_ref().unwrap();
+        if let Some(ProcessingResponseVariant::ResponseHeaders(headers_response)) =
+            response.response
+        {
+            let header_mutation = headers_response
+                .response
+                .as_ref()
+                .unwrap()
+                .header_mutation
+                .as_ref()
+                .unwrap();
 
             // Check if all custom headers are present
             let expected_headers = [
@@ -506,10 +560,7 @@ mod tests {
                     if let Some(h) = &header.header {
                         if h.key == *expected_key {
                             found = true;
-                            assert_eq!(
-                                String::from_utf8_lossy(&h.raw_value),
-                                *expected_value
-                            );
+                            assert_eq!(String::from_utf8_lossy(&h.raw_value), *expected_value);
                         }
                     }
                 }
@@ -529,20 +580,35 @@ mod tests {
     async fn test_response_header_removal() {
         // Test that headers can be removed from a response
         let response = mutations::add_header_mutation(
-            vec![("new-response-header".to_string(), "new-response-value".to_string())],
+            vec![(
+                "new-response-header".to_string(),
+                "new-response-value".to_string(),
+            )],
             vec!["content-type".to_string(), "server".to_string()],
             false,
             false,
-            None
+            None,
         );
 
-        if let Some(ProcessingResponseVariant::ResponseHeaders(headers_response)) = response.response {
-            let header_mutation = headers_response.response.as_ref().unwrap().header_mutation.as_ref().unwrap();
+        if let Some(ProcessingResponseVariant::ResponseHeaders(headers_response)) =
+            response.response
+        {
+            let header_mutation = headers_response
+                .response
+                .as_ref()
+                .unwrap()
+                .header_mutation
+                .as_ref()
+                .unwrap();
 
             // Check that the headers to remove are present
             assert_eq!(header_mutation.remove_headers.len(), 2);
-            assert!(header_mutation.remove_headers.contains(&"content-type".to_string()));
-            assert!(header_mutation.remove_headers.contains(&"server".to_string()));
+            assert!(header_mutation
+                .remove_headers
+                .contains(&"content-type".to_string()));
+            assert!(header_mutation
+                .remove_headers
+                .contains(&"server".to_string()));
 
             // Check that the new header is present
             let mut found_new_header = false;
@@ -550,10 +616,7 @@ mod tests {
                 if let Some(h) = &header.header {
                     if h.key == "new-response-header" {
                         found_new_header = true;
-                        assert_eq!(
-                            String::from_utf8_lossy(&h.raw_value),
-                            "new-response-value"
-                        );
+                        assert_eq!(String::from_utf8_lossy(&h.raw_value), "new-response-value");
                     }
                 }
             }

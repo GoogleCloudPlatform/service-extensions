@@ -13,8 +13,8 @@
 // limitations under the License.
 use crate::envoy::service::ext_proc::v3::{
     external_processor_server::{ExternalProcessor, ExternalProcessorServer},
-    ProcessingRequest, ProcessingResponse,
     processing_request::Request as ProcessingRequestType,
+    ProcessingRequest, ProcessingResponse,
 };
 use crate::processor::ExtProcessor;
 use futures::Stream;
@@ -42,7 +42,8 @@ impl ExtProcService {
 
 #[tonic::async_trait]
 impl ExternalProcessor for ExtProcService {
-    type ProcessStream = Pin<Box<dyn Stream<Item = Result<ProcessingResponse, Status>> + Send + 'static>>;
+    type ProcessStream =
+        Pin<Box<dyn Stream<Item = Result<ProcessingResponse, Status>> + Send + 'static>>;
 
     async fn process(
         &self,

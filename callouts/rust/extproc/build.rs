@@ -25,7 +25,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build_server(true)
         .out_dir("src/gen")
         .compile(
-            &protos.iter().map(|p| format!("proto/{}", p)).collect::<Vec<_>>(),
+            &protos
+                .iter()
+                .map(|p| format!("proto/{}", p))
+                .collect::<Vec<_>>(),
             &["proto"],
         )?;
 

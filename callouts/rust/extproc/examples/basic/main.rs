@@ -39,12 +39,11 @@
 
 use async_trait::async_trait;
 use ext_proc::{
-    processor::{ExtProcessor, ProcessingError},
     envoy::service::ext_proc::v3::{
-        ProcessingRequest,
+        processing_request::Request as ProcessingRequestVariant, ProcessingRequest,
         ProcessingResponse,
-        processing_request::Request as ProcessingRequestVariant,
     },
+    processor::{ExtProcessor, ProcessingError},
     server::{CalloutServer, Config},
     utils::mutations,
 };
@@ -83,13 +82,16 @@ impl ExtProcessor for BasicProcessor {
     /// # Returns
     ///
     /// A `ProcessingResponse` that adds the custom header to the request.
-    async fn process_request_headers(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+    async fn process_request_headers(
+        &self,
+        _req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError> {
         Ok(mutations::add_header_mutation(
             vec![("header-request".to_string(), "Value-request".to_string())],
             vec![],
             false,
             true,
-            None
+            None,
         ))
     }
 
@@ -104,13 +106,16 @@ impl ExtProcessor for BasicProcessor {
     /// # Returns
     ///
     /// A `ProcessingResponse` that adds the custom header to the response.
-    async fn process_response_headers(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+    async fn process_response_headers(
+        &self,
+        _req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError> {
         Ok(mutations::add_header_mutation(
             vec![("header-response".to_string(), "Value-response".to_string())],
             vec![],
             false,
             false,
-            None
+            None,
         ))
     }
 
@@ -127,9 +132,16 @@ impl ExtProcessor for BasicProcessor {
     /// A `ProcessingResponse` that either:
     /// - Replaces the request body with "new-body-request" if a body is present
     /// - Passes through the request unchanged if no body is present
-    async fn process_request_body(&self, req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+    async fn process_request_body(
+        &self,
+        req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError> {
         if let Some(ProcessingRequestVariant::RequestBody(_body)) = &req.request {
-            return Ok(mutations::add_body_string_mutation("new-body-request".to_string(), true, false));
+            return Ok(mutations::add_body_string_mutation(
+                "new-body-request".to_string(),
+                true,
+                false,
+            ));
         }
 
         // If no body, just pass through
@@ -149,9 +161,16 @@ impl ExtProcessor for BasicProcessor {
     /// A `ProcessingResponse` that either:
     /// - Replaces the response body with "new-body-response" if a body is present
     /// - Passes through the response unchanged if no body is present
-    async fn process_response_body(&self, req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+    async fn process_response_body(
+        &self,
+        req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError> {
         if let Some(ProcessingRequestVariant::ResponseBody(_body)) = &req.request {
-            return Ok(mutations::add_body_string_mutation("new-body-response".to_string(), false, false));
+            return Ok(mutations::add_body_string_mutation(
+                "new-body-response".to_string(),
+                false,
+                false,
+            ));
         }
 
         // If no body, just pass through
@@ -201,11 +220,9 @@ mod tests {
     use ext_proc::envoy::{
         config::core::v3::{HeaderMap, HeaderValue},
         service::ext_proc::v3::{
-            HttpBody,
-            HttpHeaders,
-            processing_request::Request as ProcessingRequestVariant,
-            processing_response::Response as ProcessingResponseVariant,
             body_mutation::Mutation as BodyMutationType,
+            processing_request::Request as ProcessingRequestVariant,
+            processing_response::Response as ProcessingResponseVariant, HttpBody, HttpHeaders,
         },
     };
 
@@ -275,16 +292,27 @@ mod tests {
         let processor = BasicProcessor::new();
 
         let request = ProcessingRequest {
-            request: Some(ProcessingRequestVariant::RequestHeaders(create_test_request_headers())),
+            request: Some(ProcessingRequestVariant::RequestHeaders(
+                create_test_request_headers(),
+            )),
             ..Default::default()
         };
 
-        let response = processor.process_request_headers(&request).await
+        let response = processor
+            .process_request_headers(&request)
+            .await
             .expect("Failed to process request headers");
 
         // Verify the response adds the expected header
-        if let Some(ProcessingResponseVariant::RequestHeaders(headers_response)) = response.response {
-            let header_mutation = headers_response.response.as_ref().unwrap().header_mutation.as_ref().unwrap();
+        if let Some(ProcessingResponseVariant::RequestHeaders(headers_response)) = response.response
+        {
+            let header_mutation = headers_response
+                .response
+                .as_ref()
+                .unwrap()
+                .header_mutation
+                .as_ref()
+                .unwrap();
 
             // Check if custom header is present
             let mut found_header = false;
@@ -292,10 +320,7 @@ mod tests {
                 if let Some(h) = &header.header {
                     if h.key == "header-request" {
                         found_header = true;
-                        assert_eq!(
-                            String::from_utf8_lossy(&h.raw_value),
-                            "Value-request"
-                        );
+                        assert_eq!(String::from_utf8_lossy(&h.raw_value), "Value-request");
                     }
                 }
             }
@@ -316,16 +341,28 @@ mod tests {
         let processor = BasicProcessor::new();
 
         let request = ProcessingRequest {
-            request: Some(ProcessingRequestVariant::ResponseHeaders(create_test_response_headers())),
+            request: Some(ProcessingRequestVariant::ResponseHeaders(
+                create_test_response_headers(),
+            )),
             ..Default::default()
         };
 
-        let response = processor.process_response_headers(&request).await
+        let response = processor
+            .process_response_headers(&request)
+            .await
             .expect("Failed to process response headers");
 
         // Verify the response adds the expected header
-        if let Some(ProcessingResponseVariant::ResponseHeaders(headers_response)) = response.response {
-            let header_mutation = headers_response.response.as_ref().unwrap().header_mutation.as_ref().unwrap();
+        if let Some(ProcessingResponseVariant::ResponseHeaders(headers_response)) =
+            response.response
+        {
+            let header_mutation = headers_response
+                .response
+                .as_ref()
+                .unwrap()
+                .header_mutation
+                .as_ref()
+                .unwrap();
 
             // Check if custom header is present
             let mut found_header = false;
@@ -333,10 +370,7 @@ mod tests {
                 if let Some(h) = &header.header {
                     if h.key == "header-response" {
                         found_header = true;
-                        assert_eq!(
-                            String::from_utf8_lossy(&h.raw_value),
-                            "Value-response"
-                        );
+                        assert_eq!(String::from_utf8_lossy(&h.raw_value), "Value-response");
                     }
                 }
             }
@@ -365,7 +399,9 @@ mod tests {
             ..Default::default()
         };
 
-        let response = processor.process_request_body(&request).await
+        let response = processor
+            .process_request_body(&request)
+            .await
             .expect("Failed to process request body");
 
         // Verify the response type and content
@@ -405,7 +441,9 @@ mod tests {
             ..Default::default()
         };
 
-        let response = processor.process_response_body(&request).await
+        let response = processor
+            .process_response_body(&request)
+            .await
             .expect("Failed to process response body");
 
         // Verify the response type and content
@@ -443,11 +481,16 @@ mod tests {
 
         // 1. Process request headers
         let req_headers = ProcessingRequest {
-            request: Some(ProcessingRequestVariant::RequestHeaders(create_test_request_headers())),
+            request: Some(ProcessingRequestVariant::RequestHeaders(
+                create_test_request_headers(),
+            )),
             ..Default::default()
         };
 
-        let resp_headers = processor.process_request_headers(&req_headers).await.unwrap();
+        let resp_headers = processor
+            .process_request_headers(&req_headers)
+            .await
+            .unwrap();
 
         // 2. Process request body
         let req_body = ProcessingRequest {
@@ -462,11 +505,16 @@ mod tests {
 
         // 3. Process response headers
         let resp_headers_req = ProcessingRequest {
-            request: Some(ProcessingRequestVariant::ResponseHeaders(create_test_response_headers())),
+            request: Some(ProcessingRequestVariant::ResponseHeaders(
+                create_test_response_headers(),
+            )),
             ..Default::default()
         };
 
-        let resp_headers_resp = processor.process_response_headers(&resp_headers_req).await.unwrap();
+        let resp_headers_resp = processor
+            .process_response_headers(&resp_headers_req)
+            .await
+            .unwrap();
 
         // 4. Process response body
         let resp_body_req = ProcessingRequest {
@@ -477,13 +525,24 @@ mod tests {
             ..Default::default()
         };
 
-        let resp_body_resp = processor.process_response_body(&resp_body_req).await.unwrap();
+        let resp_body_resp = processor
+            .process_response_body(&resp_body_req)
+            .await
+            .unwrap();
 
         // Verify all responses have the expected modifications
 
         // Request headers should have "header-request" added
-        if let Some(ProcessingResponseVariant::RequestHeaders(headers_response)) = resp_headers.response {
-            let header_mutation = headers_response.response.as_ref().unwrap().header_mutation.as_ref().unwrap();
+        if let Some(ProcessingResponseVariant::RequestHeaders(headers_response)) =
+            resp_headers.response
+        {
+            let header_mutation = headers_response
+                .response
+                .as_ref()
+                .unwrap()
+                .header_mutation
+                .as_ref()
+                .unwrap();
             let mut found = false;
             for header in &header_mutation.set_headers {
                 if let Some(h) = &header.header {
@@ -500,12 +559,15 @@ mod tests {
 
         // Request body should be replaced with "new-body-request"
         if let Some(ProcessingResponseVariant::RequestBody(body_response)) = resp_body.response {
-            let body_mutation = body_response.response.as_ref().unwrap().body_mutation.as_ref().unwrap();
+            let body_mutation = body_response
+                .response
+                .as_ref()
+                .unwrap()
+                .body_mutation
+                .as_ref()
+                .unwrap();
             if let Some(BodyMutationType::Body(new_body)) = &body_mutation.mutation {
-                assert_eq!(
-                    String::from_utf8_lossy(new_body),
-                    "new-body-request"
-                );
+                assert_eq!(String::from_utf8_lossy(new_body), "new-body-request");
             } else {
                 panic!("Expected Body mutation type for request body");
             }
@@ -514,8 +576,16 @@ mod tests {
         }
 
         // Response headers should have "header-response" added
-        if let Some(ProcessingResponseVariant::ResponseHeaders(headers_response)) = resp_headers_resp.response {
-            let header_mutation = headers_response.response.as_ref().unwrap().header_mutation.as_ref().unwrap();
+        if let Some(ProcessingResponseVariant::ResponseHeaders(headers_response)) =
+            resp_headers_resp.response
+        {
+            let header_mutation = headers_response
+                .response
+                .as_ref()
+                .unwrap()
+                .header_mutation
+                .as_ref()
+                .unwrap();
             let mut found = false;
             for header in &header_mutation.set_headers {
                 if let Some(h) = &header.header {
@@ -531,13 +601,18 @@ mod tests {
         }
 
         // Response body should be replaced with "new-body-response"
-        if let Some(ProcessingResponseVariant::ResponseBody(body_response)) = resp_body_resp.response {
-            let body_mutation = body_response.response.as_ref().unwrap().body_mutation.as_ref().unwrap();
+        if let Some(ProcessingResponseVariant::ResponseBody(body_response)) =
+            resp_body_resp.response
+        {
+            let body_mutation = body_response
+                .response
+                .as_ref()
+                .unwrap()
+                .body_mutation
+                .as_ref()
+                .unwrap();
             if let Some(BodyMutationType::Body(new_body)) = &body_mutation.mutation {
-                assert_eq!(
-                    String::from_utf8_lossy(new_body),
-                    "new-body-response"
-                );
+                assert_eq!(String::from_utf8_lossy(new_body), "new-body-response");
             } else {
                 panic!("Expected Body mutation type for response body");
             }

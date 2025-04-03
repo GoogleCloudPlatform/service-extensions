@@ -14,6 +14,6 @@
 mod gen;
 pub use gen::envoy;
 pub mod processor;
+pub mod server;
 pub mod service;
 pub mod utils;
-pub mod server;

@@ -11,8 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use async_trait::async_trait;
 use crate::envoy::service::ext_proc::v3::{ProcessingRequest, ProcessingResponse};
+use async_trait::async_trait;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -25,8 +25,20 @@ pub enum ProcessingError {
 
 #[async_trait]
 pub trait ExtProcessor: Send + Sync + 'static {
-    async fn process_request_headers(&self, req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError>;
-    async fn process_response_headers(&self, req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError>;
-    async fn process_request_body(&self, req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError>;
-    async fn process_response_body(&self, req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError>;
+    async fn process_request_headers(
+        &self,
+        req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError>;
+    async fn process_response_headers(
+        &self,
+        req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError>;
+    async fn process_request_body(
+        &self,
+        req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError>;
+    async fn process_response_body(
+        &self,
+        req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError>;
 }

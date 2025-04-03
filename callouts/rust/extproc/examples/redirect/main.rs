@@ -36,15 +36,12 @@
 //! ```
 
 use async_trait::async_trait;
+use ext_proc::utils::mutations;
 use ext_proc::{
+    envoy::service::ext_proc::v3::{ProcessingRequest, ProcessingResponse},
     processor::{ExtProcessor, ProcessingError},
-    envoy::service::ext_proc::v3::{
-        ProcessingRequest,
-        ProcessingResponse,
-    },
     server::{CalloutServer, Config},
 };
-use ext_proc::utils::mutations;
 
 /// `RedirectProcessor` returns a redirect response for all incoming HTTP requests.
 ///
@@ -82,11 +79,14 @@ impl ExtProcessor for RedirectProcessor {
     /// A `ProcessingResponse` containing a redirect response with:
     /// - Status code 301 (Moved Permanently)
     /// - Location header with the target URL
-    async fn process_request_headers(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+    async fn process_request_headers(
+        &self,
+        _req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError> {
         Ok(mutations::add_redirect_response(
             301,
             "http://service-extensions.com/redirect".to_string(),
-            None
+            None,
         ))
     }
 
@@ -102,7 +102,10 @@ impl ExtProcessor for RedirectProcessor {
     /// # Returns
     ///
     /// A default `ProcessingResponse` that allows the response headers to proceed unchanged.
-    async fn process_response_headers(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+    async fn process_response_headers(
+        &self,
+        _req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError> {
         Ok(ProcessingResponse::default())
     }
 
@@ -118,7 +121,10 @@ impl ExtProcessor for RedirectProcessor {
     /// # Returns
     ///
     /// A default `ProcessingResponse` that allows the request body to proceed unchanged.
-    async fn process_request_body(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+    async fn process_request_body(
+        &self,
+        _req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError> {
         Ok(ProcessingResponse::default())
     }
 
@@ -134,7 +140,10 @@ impl ExtProcessor for RedirectProcessor {
     /// # Returns
     ///
     /// A default `ProcessingResponse` that allows the response body to proceed unchanged.
-    async fn process_response_body(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+    async fn process_response_body(
+        &self,
+        _req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError> {
         Ok(ProcessingResponse::default())
     }
 }
@@ -182,9 +191,8 @@ mod tests {
     use ext_proc::envoy::{
         config::core::v3::{HeaderMap, HeaderValue},
         service::ext_proc::v3::{
-            HttpHeaders,
             processing_request::Request as ProcessingRequestVariant,
-            processing_response::Response as ProcessingResponseVariant,
+            processing_response::Response as ProcessingResponseVariant, HttpHeaders,
         },
     };
 
@@ -227,17 +235,27 @@ mod tests {
         let processor = RedirectProcessor::new();
 
         let request = ProcessingRequest {
-            request: Some(ProcessingRequestVariant::RequestHeaders(create_test_request_headers())),
+            request: Some(ProcessingRequestVariant::RequestHeaders(
+                create_test_request_headers(),
+            )),
             ..Default::default()
         };
 
-        let response = processor.process_request_headers(&request).await
+        let response = processor
+            .process_request_headers(&request)
+            .await
             .expect("Failed to process request headers");
 
         // Verify the response is an immediate response with redirect
-        if let Some(ProcessingResponseVariant::ImmediateResponse(immediate_response)) = response.response {
+        if let Some(ProcessingResponseVariant::ImmediateResponse(immediate_response)) =
+            response.response
+        {
             // Check status code
-            assert_eq!(immediate_response.status.as_ref().unwrap().code, 301, "Expected 301 status code");
+            assert_eq!(
+                immediate_response.status.as_ref().unwrap().code,
+                301,
+                "Expected 301 status code"
+            );
 
             // Check location header
             let headers = immediate_response.headers.as_ref().unwrap();
@@ -271,15 +289,21 @@ mod tests {
         let processor = RedirectProcessor::new();
 
         let request = ProcessingRequest {
-            request: Some(ProcessingRequestVariant::RequestHeaders(create_test_request_headers())),
+            request: Some(ProcessingRequestVariant::RequestHeaders(
+                create_test_request_headers(),
+            )),
             ..Default::default()
         };
 
-        let response = processor.process_request_headers(&request).await
+        let response = processor
+            .process_request_headers(&request)
+            .await
             .expect("Failed to process request headers");
 
         // Verify the status code is 301 (Moved Permanently)
-        if let Some(ProcessingResponseVariant::ImmediateResponse(immediate_response)) = response.response {
+        if let Some(ProcessingResponseVariant::ImmediateResponse(immediate_response)) =
+            response.response
+        {
             assert_eq!(immediate_response.status.as_ref().unwrap().code, 301);
         } else {
             panic!("Expected ImmediateResponse");
@@ -297,17 +321,23 @@ mod tests {
         let empty_request = ProcessingRequest::default();
 
         // Test response headers method
-        let response = processor.process_response_headers(&empty_request).await
+        let response = processor
+            .process_response_headers(&empty_request)
+            .await
             .expect("Failed to process response headers");
         assert_eq!(response, ProcessingResponse::default());
 
         // Test request body method
-        let response = processor.process_request_body(&empty_request).await
+        let response = processor
+            .process_request_body(&empty_request)
+            .await
             .expect("Failed to process request body");
         assert_eq!(response, ProcessingResponse::default());
 
         // Test response body method
-        let response = processor.process_response_body(&empty_request).await
+        let response = processor
+            .process_response_body(&empty_request)
+            .await
             .expect("Failed to process response body");
         assert_eq!(response, ProcessingResponse::default());
     }
@@ -325,11 +355,15 @@ mod tests {
         let request = ProcessingRequest::default();
 
         // Even with an empty request, should still get a redirect
-        let response = processor.process_request_headers(&request).await
+        let response = processor
+            .process_request_headers(&request)
+            .await
             .expect("Failed to process empty request");
 
         // Verify still get a redirect response
-        if let Some(ProcessingResponseVariant::ImmediateResponse(immediate_response)) = response.response {
+        if let Some(ProcessingResponseVariant::ImmediateResponse(immediate_response)) =
+            response.response
+        {
             assert_eq!(immediate_response.status.as_ref().unwrap().code, 301);
 
             // Check location header
@@ -363,14 +397,18 @@ mod tests {
         let request_types = vec![
             ProcessingRequestVariant::RequestHeaders(create_test_request_headers()),
             ProcessingRequestVariant::ResponseHeaders(create_test_request_headers()), // Using request headers as response headers for simplicity
-            ProcessingRequestVariant::RequestBody(ext_proc::envoy::service::ext_proc::v3::HttpBody {
-                body: b"test body".to_vec(),
-                end_of_stream: true,
-            }),
-            ProcessingRequestVariant::ResponseBody(ext_proc::envoy::service::ext_proc::v3::HttpBody {
-                body: b"test body".to_vec(),
-                end_of_stream: true,
-            }),
+            ProcessingRequestVariant::RequestBody(
+                ext_proc::envoy::service::ext_proc::v3::HttpBody {
+                    body: b"test body".to_vec(),
+                    end_of_stream: true,
+                },
+            ),
+            ProcessingRequestVariant::ResponseBody(
+                ext_proc::envoy::service::ext_proc::v3::HttpBody {
+                    body: b"test body".to_vec(),
+                    end_of_stream: true,
+                },
+            ),
         ];
 
         for req_type in request_types {
@@ -380,7 +418,9 @@ mod tests {
             };
 
             // Only request headers should produce a redirect
-            let response = processor.process_request_headers(&request).await
+            let response = processor
+                .process_request_headers(&request)
+                .await
                 .expect("Failed to process request");
 
             // Verify redirect response
@@ -403,30 +443,51 @@ mod tests {
         let processor = RedirectProcessor::new();
 
         let request = ProcessingRequest {
-            request: Some(ProcessingRequestVariant::RequestHeaders(create_test_request_headers())),
+            request: Some(ProcessingRequestVariant::RequestHeaders(
+                create_test_request_headers(),
+            )),
             ..Default::default()
         };
 
-        let response = processor.process_request_headers(&request).await
+        let response = processor
+            .process_request_headers(&request)
+            .await
             .expect("Failed to process request headers");
 
         // Verify the complete structure of the redirect response
-        if let Some(ProcessingResponseVariant::ImmediateResponse(immediate_response)) = response.response {
+        if let Some(ProcessingResponseVariant::ImmediateResponse(immediate_response)) =
+            response.response
+        {
             // Check status
-            assert!(immediate_response.status.is_some(), "Status should be present");
+            assert!(
+                immediate_response.status.is_some(),
+                "Status should be present"
+            );
             assert_eq!(immediate_response.status.as_ref().unwrap().code, 301);
 
             // Check headers
-            assert!(immediate_response.headers.is_some(), "Headers should be present");
+            assert!(
+                immediate_response.headers.is_some(),
+                "Headers should be present"
+            );
 
             // Check body (should be empty for redirects)
-            assert!(immediate_response.body.is_empty(), "Body should be empty for redirects");
+            assert!(
+                immediate_response.body.is_empty(),
+                "Body should be empty for redirects"
+            );
 
             // Check details (should be empty)
-            assert!(immediate_response.details.is_empty(), "Details should be empty");
+            assert!(
+                immediate_response.details.is_empty(),
+                "Details should be empty"
+            );
 
             // Check grpc_status (should be None for HTTP redirects)
-            assert!(immediate_response.grpc_status.is_none(), "gRPC status should be None for HTTP redirects");
+            assert!(
+                immediate_response.grpc_status.is_none(),
+                "gRPC status should be None for HTTP redirects"
+            );
         } else {
             panic!("Expected ImmediateResponse");
         }
@@ -442,21 +503,28 @@ mod tests {
         let processor = RedirectProcessor::new();
 
         let request = ProcessingRequest {
-            request: Some(ProcessingRequestVariant::RequestHeaders(create_test_request_headers())),
+            request: Some(ProcessingRequestVariant::RequestHeaders(
+                create_test_request_headers(),
+            )),
             ..Default::default()
         };
 
-        let response = processor.process_request_headers(&request).await
+        let response = processor
+            .process_request_headers(&request)
+            .await
             .expect("Failed to process request headers");
 
         // Create the expected response directly using the mutations helper
         let expected_response = mutations::add_redirect_response(
             301,
             "http://service-extensions.com/redirect".to_string(),
-            None
+            None,
         );
 
         // Compare the responses
-        assert_eq!(response, expected_response, "Response should match the direct mutation result");
+        assert_eq!(
+            response, expected_response,
+            "Response should match the direct mutation result"
+        );
     }
 }

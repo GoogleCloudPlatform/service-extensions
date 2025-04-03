@@ -31,16 +31,16 @@
 
 use crate::processor::ExtProcessor;
 use crate::service::ExtProcService;
-use log::{info, error};
-use tokio::net::TcpListener;
-use tonic::transport::{Identity, Server};
-use hyper::{Body, Response, Server as HyperServer};
-use std::convert::Infallible;
-use std::path::PathBuf;
 use futures::Stream;
+use hyper::{Body, Response, Server as HyperServer};
+use log::{error, info};
+use std::convert::Infallible;
+use std::error;
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::error;
+use tokio::net::TcpListener;
+use tonic::transport::{Identity, Server};
 
 /// Configuration for the `CalloutServer`.
 ///
@@ -243,13 +243,18 @@ impl CalloutServer {
         }
 
         info!("Loading TLS certificates...");
-        let cert = tokio::fs::read(&self.config.cert_file).await
+        let cert = tokio::fs::read(&self.config.cert_file)
+            .await
             .map_err(|e| format!("Failed to read certificate file: {}", e))?;
-        let key = tokio::fs::read(&self.config.key_file).await
+        let key = tokio::fs::read(&self.config.key_file)
+            .await
             .map_err(|e| format!("Failed to read key file: {}", e))?;
 
         let identity = Identity::from_pem(cert, key);
-        let addr = self.config.address.parse()
+        let addr = self
+            .config
+            .address
+            .parse()
             .map_err(|e| format!("Failed to parse secure address: {}", e))?;
 
         let service = ExtProcService::new(processor);
@@ -289,12 +294,18 @@ impl CalloutServer {
             return Ok(());
         }
 
-        let addr = self.config.plaintext_address.as_ref()
+        let addr = self
+            .config
+            .plaintext_address
+            .as_ref()
             .ok_or("Plaintext address not configured")?
             .parse()?;
         let service = ExtProcService::new(processor);
 
-        info!("Starting plaintext gRPC server on {}", self.config.plaintext_address.as_ref().unwrap());
+        info!(
+            "Starting plaintext gRPC server on {}",
+            self.config.plaintext_address.as_ref().unwrap()
+        );
         Server::builder()
             .add_service(service.into_server())
             .serve(addr)
@@ -314,7 +325,10 @@ impl CalloutServer {
     /// A `Result` indicating success or failure
     async fn start_health_check(&self) -> Result<(), Box<dyn error::Error + Send + Sync>> {
         let listener = TcpListener::bind(&self.config.health_check_address).await?;
-        info!("Starting health check server on {}", self.config.health_check_address);
+        info!(
+            "Starting health check server on {}",
+            self.config.health_check_address
+        );
 
         let make_service = hyper::service::make_service_fn(|_| async {
             Ok::<_, Infallible>(hyper::service::service_fn(|_| async {

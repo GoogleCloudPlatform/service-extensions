@@ -40,17 +40,15 @@
 
 use async_trait::async_trait;
 use ext_proc::{
-    processor::{ExtProcessor, ProcessingError},
     envoy::service::ext_proc::v3::{
-        ProcessingRequest,
+        processing_request::Request as ProcessingRequestVariant, HttpHeaders, ProcessingRequest,
         ProcessingResponse,
-        processing_request::Request as ProcessingRequestVariant,
-        HttpHeaders,
     },
+    processor::{ExtProcessor, ProcessingError},
     server::{CalloutServer, Config},
     utils::mutations,
 };
-use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm};
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use log::error;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -218,7 +216,10 @@ impl ExtProcessor for JWTAuthProcessor {
     ///
     /// * `Ok(ProcessingResponse)` - Response with added claim headers
     /// * `Err(ProcessingError)` - Permission denied error for invalid tokens
-    async fn process_request_headers(&self, req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+    async fn process_request_headers(
+        &self,
+        req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError> {
         if let Some(ProcessingRequestVariant::RequestHeaders(headers)) = &req.request {
             match self.validate_jwt_token(headers) {
                 Ok(claims) => {
@@ -227,11 +228,19 @@ impl ExtProcessor for JWTAuthProcessor {
                         .map(|(key, value)| (format!("decoded-{}", key), value))
                         .collect();
 
-                    Ok(mutations::add_header_mutation(headers_to_add, vec![], true, true, None))
-                },
+                    Ok(mutations::add_header_mutation(
+                        headers_to_add,
+                        vec![],
+                        true,
+                        true,
+                        None,
+                    ))
+                }
                 Err(e) => {
                     error!("JWT validation failed: {}", e);
-                    Err(ProcessingError::PermissionDenied("Authorization token is invalid".to_string()))
+                    Err(ProcessingError::PermissionDenied(
+                        "Authorization token is invalid".to_string(),
+                    ))
                 }
             }
         } else {
@@ -251,7 +260,10 @@ impl ExtProcessor for JWTAuthProcessor {
     /// # Returns
     ///
     /// A default `ProcessingResponse` that allows the response headers to proceed unchanged.
-    async fn process_response_headers(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+    async fn process_response_headers(
+        &self,
+        _req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError> {
         Ok(ProcessingResponse::default())
     }
 
@@ -266,7 +278,10 @@ impl ExtProcessor for JWTAuthProcessor {
     /// # Returns
     ///
     /// A default `ProcessingResponse` that allows the request body to proceed unchanged.
-    async fn process_request_body(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+    async fn process_request_body(
+        &self,
+        _req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError> {
         Ok(ProcessingResponse::default())
     }
 
@@ -281,7 +296,10 @@ impl ExtProcessor for JWTAuthProcessor {
     /// # Returns
     ///
     /// A default `ProcessingResponse` that allows the response body to proceed unchanged.
-    async fn process_response_body(&self, _req: &ProcessingRequest) -> Result<ProcessingResponse, ProcessingError> {
+    async fn process_response_body(
+        &self,
+        _req: &ProcessingRequest,
+    ) -> Result<ProcessingResponse, ProcessingError> {
         Ok(ProcessingResponse::default())
     }
 }
@@ -341,9 +359,7 @@ mod tests {
     use super::*;
     use ext_proc::envoy::{
         config::core::v3::{HeaderMap, HeaderValue},
-        service::ext_proc::v3::{
-            processing_response::Response as ProcessingResponseVariant,
-        },
+        service::ext_proc::v3::processing_response::Response as ProcessingResponseVariant,
     };
     use jsonwebtoken::{encode, EncodingKey, Header};
     use std::collections::HashMap;
@@ -402,7 +418,10 @@ mod tests {
     /// # Returns
     ///
     /// A Result containing the JWT token string or an error
-    fn generate_test_jwt_token(private_key: &[u8], claims: Claims) -> Result<String, jsonwebtoken::errors::Error> {
+    fn generate_test_jwt_token(
+        private_key: &[u8],
+        claims: Claims,
+    ) -> Result<String, jsonwebtoken::errors::Error> {
         let encoding_key = EncodingKey::from_rsa_pem(private_key)?;
         encode(&Header::new(Algorithm::RS256), &claims, &encoding_key)
     }
@@ -499,12 +518,21 @@ mod tests {
         let processor = JWTAuthProcessor { public_key };
 
         // Process the request
-        let response = processor.process_request_headers(&request).await
+        let response = processor
+            .process_request_headers(&request)
+            .await
             .expect("Failed to process request headers");
 
         // Check if the response contains the expected headers
-        if let Some(ProcessingResponseVariant::RequestHeaders(headers_response)) = response.response {
-            let header_mutation = headers_response.response.as_ref().unwrap().header_mutation.as_ref().unwrap();
+        if let Some(ProcessingResponseVariant::RequestHeaders(headers_response)) = response.response
+        {
+            let header_mutation = headers_response
+                .response
+                .as_ref()
+                .unwrap()
+                .header_mutation
+                .as_ref()
+                .unwrap();
 
             // Check if all expected headers are present
             let mut found_sub = false;
@@ -516,18 +544,24 @@ mod tests {
                 match header.header.as_ref().unwrap().key.as_str() {
                     "decoded-sub" => {
                         found_sub = true;
-                        assert_eq!(String::from_utf8_lossy(&header.header.as_ref().unwrap().raw_value), "1234567890");
-                    },
+                        assert_eq!(
+                            String::from_utf8_lossy(&header.header.as_ref().unwrap().raw_value),
+                            "1234567890"
+                        );
+                    }
                     "decoded-name" => {
                         found_name = true;
-                        assert_eq!(String::from_utf8_lossy(&header.header.as_ref().unwrap().raw_value), "John Doe");
-                    },
+                        assert_eq!(
+                            String::from_utf8_lossy(&header.header.as_ref().unwrap().raw_value),
+                            "John Doe"
+                        );
+                    }
                     "decoded-iat" => {
                         found_iat = true;
-                    },
+                    }
                     "decoded-exp" => {
                         found_exp = true;
-                    },
+                    }
                     _ => {}
                 }
             }
@@ -563,10 +597,13 @@ mod tests {
         let mut extra = HashMap::new();
         extra.insert("role".to_string(), Value::String("admin".to_string()));
         extra.insert("org".to_string(), Value::String("example-org".to_string()));
-        extra.insert("permissions".to_string(), Value::Array(vec![
-            Value::String("read".to_string()),
-            Value::String("write".to_string())
-        ]));
+        extra.insert(
+            "permissions".to_string(),
+            Value::Array(vec![
+                Value::String("read".to_string()),
+                Value::String("write".to_string()),
+            ]),
+        );
 
         let claims = Claims {
             sub: "user123".to_string(),
@@ -597,12 +634,21 @@ mod tests {
         let processor = JWTAuthProcessor { public_key };
 
         // Process the request
-        let response = processor.process_request_headers(&request).await
+        let response = processor
+            .process_request_headers(&request)
+            .await
             .expect("Failed to process request headers");
 
         // Check if the response contains the expected headers
-        if let Some(ProcessingResponseVariant::RequestHeaders(headers_response)) = response.response {
-            let header_mutation = headers_response.response.as_ref().unwrap().header_mutation.as_ref().unwrap();
+        if let Some(ProcessingResponseVariant::RequestHeaders(headers_response)) = response.response
+        {
+            let header_mutation = headers_response
+                .response
+                .as_ref()
+                .unwrap()
+                .header_mutation
+                .as_ref()
+                .unwrap();
 
             // Check if all expected headers are present
             let mut found_sub = false;
@@ -619,24 +665,24 @@ mod tests {
                     "decoded-sub" => {
                         found_sub = true;
                         assert_eq!(value, "user123");
-                    },
+                    }
                     "decoded-name" => {
                         found_name = true;
                         assert_eq!(value, "Jane Smith");
-                    },
+                    }
                     "decoded-role" => {
                         found_role = true;
                         assert_eq!(value, "admin");
-                    },
+                    }
                     "decoded-org" => {
                         found_org = true;
                         assert_eq!(value, "example-org");
-                    },
+                    }
                     "decoded-permissions" => {
                         found_permissions = true;
                         assert!(value.contains("read"));
                         assert!(value.contains("write"));
-                    },
+                    }
                     _ => {}
                 }
             }
@@ -703,8 +749,10 @@ mod tests {
 
         assert!(result.is_err(), "Expected error for expired token");
         if let Err(ProcessingError::PermissionDenied(msg)) = result {
-            assert!(msg.contains("invalid") || msg.contains("expired"),
-                    "Error message should indicate token is invalid or expired");
+            assert!(
+                msg.contains("invalid") || msg.contains("expired"),
+                "Error message should indicate token is invalid or expired"
+            );
         } else {
             panic!("Expected PermissionDenied error");
         }
@@ -742,10 +790,15 @@ mod tests {
         // Process the request - should fail with missing authorization header
         let result = processor.process_request_headers(&request).await;
 
-        assert!(result.is_err(), "Expected error for missing authorization header");
+        assert!(
+            result.is_err(),
+            "Expected error for missing authorization header"
+        );
         if let Err(ProcessingError::PermissionDenied(msg)) = result {
-            assert!(msg.contains("Authorization token is invalid"),
-                    "Error message should indicate token is invalid");
+            assert!(
+                msg.contains("Authorization token is invalid"),
+                "Error message should indicate token is invalid"
+            );
         } else {
             panic!("Expected PermissionDenied error");
         }
@@ -785,7 +838,10 @@ mod tests {
 
         assert!(result.is_err(), "Expected error for invalid token format");
         if let Err(ProcessingError::PermissionDenied(msg)) = result {
-            assert!(msg.contains("invalid"), "Error message should indicate token is invalid");
+            assert!(
+                msg.contains("invalid"),
+                "Error message should indicate token is invalid"
+            );
         } else {
             panic!("Expected PermissionDenied error");
         }
@@ -857,12 +913,21 @@ mod tests {
         let processor = JWTAuthProcessor { public_key };
 
         // Process the request - should still work without "Bearer " prefix
-        let response = processor.process_request_headers(&request).await
+        let response = processor
+            .process_request_headers(&request)
+            .await
             .expect("Failed to process request headers without Bearer prefix");
 
         // Verify we got a valid response with decoded claims
-        if let Some(ProcessingResponseVariant::RequestHeaders(headers_response)) = response.response {
-            let header_mutation = headers_response.response.as_ref().unwrap().header_mutation.as_ref().unwrap();
+        if let Some(ProcessingResponseVariant::RequestHeaders(headers_response)) = response.response
+        {
+            let header_mutation = headers_response
+                .response
+                .as_ref()
+                .unwrap()
+                .header_mutation
+                .as_ref()
+                .unwrap();
 
             // Check if sub claim is present
             let mut found_sub = false;
@@ -897,7 +962,9 @@ mod tests {
 
         // Create a request with something other than RequestHeaders
         let request = ProcessingRequest {
-            request: Some(ProcessingRequestVariant::ResponseHeaders(HttpHeaders::default())),
+            request: Some(ProcessingRequestVariant::ResponseHeaders(
+                HttpHeaders::default(),
+            )),
             ..Default::default()
         };
 
@@ -905,7 +972,9 @@ mod tests {
         let processor = JWTAuthProcessor { public_key };
 
         // Process the request - should return default response
-        let response = processor.process_request_headers(&request).await
+        let response = processor
+            .process_request_headers(&request)
+            .await
             .expect("Failed to process non-request headers");
 
         // Should get default response
@@ -932,17 +1001,23 @@ mod tests {
         let empty_request = ProcessingRequest::default();
 
         // Test response headers method
-        let response = processor.process_response_headers(&empty_request).await
+        let response = processor
+            .process_response_headers(&empty_request)
+            .await
             .expect("Failed to process response headers");
         assert_eq!(response, ProcessingResponse::default());
 
         // Test request body method
-        let response = processor.process_request_body(&empty_request).await
+        let response = processor
+            .process_request_body(&empty_request)
+            .await
             .expect("Failed to process request body");
         assert_eq!(response, ProcessingResponse::default());
 
         // Test response body method
-        let response = processor.process_response_body(&empty_request).await
+        let response = processor
+            .process_response_body(&empty_request)
+            .await
             .expect("Failed to process response body");
         assert_eq!(response, ProcessingResponse::default());
     }
