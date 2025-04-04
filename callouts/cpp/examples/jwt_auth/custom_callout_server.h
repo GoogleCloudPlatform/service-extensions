@@ -18,16 +18,21 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include <jwt-cpp/jwt.h> 
+#include <jwt-cpp/jwt.h>
 #include <grpcpp/grpcpp.h>
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "service/callout_server.h"
 
 using envoy::service::ext_proc::v3::ProcessingRequest;
+using envoy::service::ext_proc::v3::ProcessingResponse;
+using envoy::service::ext_proc::v3::HttpHeaders;
+using envoy::type::v3::StatusCode;
 
+// Forward declaration
+void deny_callout(grpc::ServerContext* context, const std::string& msg);
 
-std::string extract_jwt_token(ProcessingRequest* request) {
-    for (const auto& header : request_headers.request().headers()) {
+std::string extract_jwt_token(const HttpHeaders& request_headers) {
+    for (const auto& header : request_headers.headers().headers()) {
         if (header.key() == "authorization") {
             std::string auth_value = header.value();
             size_t pos = auth_value.find("Bearer ");
@@ -41,11 +46,11 @@ std::string extract_jwt_token(ProcessingRequest* request) {
 
 std::unordered_map<std::string, std::string> validate_jwt_token(
     const std::string& key,
-    const ProcessingRequest* request,
+    const HttpHeaders& request_headers,
     const std::string& algorithm,
-    ServerContext* context) {
+    grpc::ServerContext* context) {
 
-    std::string jwt_token = extract_jwt_token(request);
+    std::string jwt_token = extract_jwt_token(request_headers);
     if (jwt_token.empty()) {
         // Deny callout
         deny_callout(context, "No Authorization token found.");
@@ -59,8 +64,8 @@ std::unordered_map<std::string, std::string> validate_jwt_token(
         verifier.verify(decoded); // May throw if verification fails
 
         std::unordered_map<std::string, std::string> claims;
-        for (const auto& e : decoded.get_payload_json().items()) {
-            claims[e.key()] = e.value();
+        for (const auto& e : decoded.get_payload_claims()) {
+            claims[e.first] = e.second.to_json().to_str();
         }
         std::cout << "Approved - Decoded Values: " << jwt_token << std::endl;
         return claims;
@@ -70,9 +75,9 @@ std::unordered_map<std::string, std::string> validate_jwt_token(
     }
 }
 
-class CalloutServerExample : public CalloutServer {
+class CustomCalloutServer : public CalloutServer {
 public:
-    CalloutServerExample() {
+    CustomCalloutServer() {
         load_public_key("./extproc/ssl_creds/publickey.pem");
     }
 
@@ -87,17 +92,16 @@ public:
         }
     }
 
-    grpc::Status on_request_headers(ProcessingRequest* request, ServerContext* context) override {
-        auto decoded = validate_jwt_token(public_key_, request, "RS256", context);
+    grpc::Status on_request_headers(const HttpHeaders& headers, grpc::ServerContext* context) {
+        auto decoded = validate_jwt_token(public_key_, headers, "RS256", context);
 
         if (!decoded.empty()) {
-            std::vector<std::pair<std::string, std::string>> decoded_items;
-            for (const auto& item : decoded) {
-                decoded_items.emplace_back("decoded-" + item.first, item.second);
+            ProcessingResponse response;
+            for (const auto& [claim, value] : decoded) {
+                CalloutServer::AddRequestHeader(&response, "decoded-" + claim, value);
             }
-            return add_header_mutation(decoded_items, true);
         } else {
-            deny_callout(context, "Authorization token is invalid.");
+            deny_callout(context, "No Authorization token found.");
             return grpc::Status::CANCELLED; // Or appropriate status
         }
     }
@@ -106,8 +110,7 @@ private:
     std::string public_key_;
 };
 
-
-void deny_callout(grpc::ServerContext* context, const std::string& msg = "") {
+void deny_callout(grpc::ServerContext* context, const std::string& msg) {
     // Default message if none is provided
     std::string message = msg.empty() ? "Callout DENIED." : msg;
 
@@ -116,60 +119,5 @@ void deny_callout(grpc::ServerContext* context, const std::string& msg = "") {
 
     // Deny the callout
     context->TryCancel(); // Optionally cancel the call
-    context->Abort(grpc::Status(grpc::StatusCode::PERMISSION_DENIED, message));
+    // grpc::ServerContext does not have an Abort method, so removing it
 }
-
-HeadersResponse add_header_mutation(
-    const std::optional<std::vector<std::pair<std::string, std::string>>>& add = std::nullopt,
-    const std::optional<std::vector<std::string>>& remove = std::nullopt,
-    bool clear_route_cache = false,
-    std::optional<int> append_action = std::nullopt) /
-    HeadersResponse header_mutation;
-    
-    if (add) {
-        for (const auto& [k, v] : *add) {
-            header_mutation.response.header_mutation.set_headers.emplace_back(k, v, append_action);
-        }
-    }
-    if (remove) {
-        header_mutation.response.header_mutation.remove_headers.insert(
-            header_mutation.response.header_mutation.remove_headers.end(),
-            remove->begin(), remove->end());
-    }
-    if (clear_route_cache) {
-        header_mutation.response.clear_route_cache = true;
-    }
-    
-    return header_mutation;
-}
-
-class HeadersResponse {
-public:
-    struct Response {
-        HeaderMutation header_mutation;
-        bool clear_route_cache = false;
-    } response;
-};
-
-class HeaderMutation {
-public:
-    std::vector<HeaderValueOption> set_headers;
-    std::vector<std::string> remove_headers;
-};
-
-class HeaderValue {
-public:
-    std::string key;
-    std::string raw_value;
-
-    HeaderValue(const std::string& k, const std::string& v) : key(k), raw_value(v) {}
-};
-
-class HeaderValueOption {
-public:
-    HeaderValue header;
-    std::optional<int> append_action; // Replace 'int' with actual enum type if available
-
-    HeaderValueOption(const std::string& key, const std::string& value, std::optional<int> action = std::nullopt)
-        : header(key, value), append_action(action) {}
-};
