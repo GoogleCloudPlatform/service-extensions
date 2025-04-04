@@ -77,7 +77,7 @@ jobs:
 
       - name: Generate Documentation
         working-directory: callouts/rust/extproc/
-        run: cargo doc --no-deps
+        run: cargo doc --no-deps --examples
 
       - name: Copy Documentation to Build Directory
         run: |
