@@ -16,6 +16,7 @@
 package main
 
 import (
+	"bytes"
 	"strings"
 
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm"
@@ -63,22 +64,21 @@ func (p *pluginContext) OnPluginStart(pluginConfigurationSize int) types.OnPlugi
 	}
 
 	// Parse configuration
-	configStr := string(config)
 	mappings := make(map[string]string)
 
 	// Parse each line as "source_domain target_domain"
-	for _, line := range strings.Split(configStr, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
+	for _, line := range bytes.Split(config, []byte("\n")) {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 || bytes.HasPrefix(line, []byte("#")) {
 			continue // Skip empty lines and comments
 		}
 
-		parts := strings.Fields(line)
+		parts := bytes.Fields(line)
 		if len(parts) == 2 {
 			// Convert source domain to lowercase for case-insensitive matching
-			mappings[strings.ToLower(parts[0])] = parts[1]
+			mappings[strings.ToLower(string(parts[0]))] = string(parts[1])
 		} else {
-			proxywasm.LogWarnf("Invalid mapping format: %s", line)
+			proxywasm.LogWarnf("Invalid mapping format: %s", string(line))
 		}
 	}
 
@@ -130,7 +130,7 @@ func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) t
 			proxywasm.LogErrorf("Failed to send redirect response: %v", err)
 		}
 
-		return types.ActionPause // End stream and stop further processing
+		return types.ActionContinue
 	}
 
 	return types.ActionContinue
