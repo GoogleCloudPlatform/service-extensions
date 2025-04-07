@@ -17,6 +17,8 @@ use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
+use std::rc::Rc;
+use std::cell::RefCell;
 
 // Define the cookie name as a constant
 const COOKIE_NAME: &str = "my_cookie";
@@ -30,13 +32,13 @@ proxy_wasm::main! {{
             .as_nanos() as u64;
 
         Box::new(MyRootContext {
-            rng: SmallRng::seed_from_u64(seed),
+            rng: Rc::new(RefCell::new(SmallRng::seed_from_u64(seed))),
         })
     });
 }}
 
 struct MyRootContext {
-    rng: SmallRng,
+    rng: Rc<RefCell<SmallRng>>,
 }
 
 impl Context for MyRootContext {}
@@ -56,7 +58,7 @@ impl RootContext for MyRootContext {
 
 struct MyHttpContext {
     session_id: Option<String>,
-    rng: SmallRng,
+    rng: Rc<RefCell<SmallRng>>,
 }
 
 impl Context for MyHttpContext {}
@@ -117,7 +119,7 @@ impl MyHttpContext {
 
     /// Generates a random `u32` session ID.
     fn generate_random_session_id(&mut self) -> u32 {
-        self.rng.next_u32()
+        self.rng.borrow_mut().next_u32()
     }
 }
 // [END serviceextensions_plugin_set_cookie]
