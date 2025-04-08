@@ -29,3 +29,9 @@ cpp_grpc_library(
     protos = ['@envoy_api//envoy/service/ext_proc/v3:pkg'],
     deps = [':envoy_proto']
 )
+
+cc_library(
+    name = "jwt-cpp",
+    deps = ["@com_github_thalhammer_jwt_cpp//:jwt-cpp"],
+    visibility = ["//visibility:public"],
+)

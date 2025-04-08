@@ -63,3 +63,19 @@ http_archive(
     strip_prefix = "googletest-release-1.10.0",
     urls = ["https://github.com/google/googletest/archive/release-1.10.0.tar.gz"],
 )
+
+# jwt-cpp deps
+http_archive(
+    name = "com_github_thalhammer_jwt_cpp",
+    strip_prefix = "jwt-cpp-0.6.0",
+    sha256 = "0227bd6e0356b211341075c7997c837f0b388c01379bd256aa525566a5553f03",
+    url = "https://github.com/Thalhammer/jwt-cpp/archive/v0.6.0.tar.gz",
+    build_file_content = """
+cc_library(
+    name = "jwt-cpp",
+    hdrs = glob(["include/**/*.h"]),
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+)
+"""
+)
