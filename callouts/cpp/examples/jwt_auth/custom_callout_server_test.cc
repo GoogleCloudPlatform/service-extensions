@@ -15,140 +15,221 @@
 #include "custom_callout_server.h"
 
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
+#include "envoy/type/v3/http_status.pb.h"
 #include "google/protobuf/util/message_differencer.h"
 #include "gtest/gtest.h"
+#include <jwt-cpp/jwt.h>
+#include <fstream>
+#include <sys/stat.h>
 
+using envoy::config::core::v3::HeaderMap;
 using envoy::config::core::v3::HeaderValue;
-using envoy::config::core::v3::HeaderValueOption;
-using envoy::service::ext_proc::v3::HeaderMutation;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
+using envoy::service::ext_proc::v3::HttpHeaders;
+using envoy::type::v3::StatusCode;
 using google::protobuf::util::MessageDifferencer;
 
-class BasicServerTest : public testing::Test {
+class CustomCalloutServerTest : public testing::Test {
  private:
   std::unique_ptr<grpc::Server> server;
 
  protected:
   void SetUp() override {
-    std::string server_address("0.0.0.0:8181");
+
+    // Initialize the server
+    std::string server_address("0.0.0.0:8080");
+
     server = CalloutServer::RunServer(server_address, service_, false);
   }
 
-  void TearDown() override { server->Shutdown(); }
+  void TearDown() override {
+    server->Shutdown();
+  }
 
-  CustomCalloutServer service_;
+  // Helper method to create a request with JWT token
+  void SetupRequestWithToken(ProcessingRequest* request, const std::string& token) {
+    auto* headers = request->mutable_request_headers();
+    auto* header_map = headers->mutable_headers();
+    auto* header = header_map->add_headers();
+    header->set_key("authorization");
+    header->set_value("Bearer " + token);
+  }
+
+  // Generate a valid JWT token for testing using the actual key files
+  std::string GenerateValidToken() {
+    try {
+        // Load the private key from file
+        std::string private_key_path = "ssl_creds/privatekey.pem";
+        std::ifstream private_key_file(private_key_path);
+        if (!private_key_file) {
+            std::cerr << "Failed to open private key file: " << private_key_path << std::endl;
+            throw std::runtime_error("Failed to open private key file");
+        }
+
+        std::stringstream buffer;
+        buffer << private_key_file.rdbuf();
+        std::string private_key = buffer.str();
+
+        std::cout << "Loaded private key, length: " << private_key.length() << std::endl;
+
+        // Create token using the loaded private key
+        auto token = jwt::create()
+            .set_issuer("test_issuer")
+            .set_type("JWT")
+            .set_payload_claim("sub", jwt::claim(std::string("1234567890")))
+            .set_payload_claim("name", jwt::claim(std::string("Test User")))
+            .set_payload_claim("role", jwt::claim(std::string("admin")))
+            .sign(jwt::algorithm::rs256("", private_key));
+
+        std::cout << "Successfully generated token" << std::endl;
+        return token;
+    } catch (const std::exception& e) {
+        std::cerr << "Error generating token: " << e.what() << std::endl;
+        throw;
+    }
+  }
+
+    // Create an expired token
+    std::string GenerateExpiredToken() {
+      try {
+          // Load the private key from file
+          std::string private_key_path = "ssl_creds/privatekey.pem";
+          std::ifstream private_key_file(private_key_path);
+          if (!private_key_file) {
+              std::cerr << "Failed to open private key file: " << private_key_path << std::endl;
+              throw std::runtime_error("Failed to open private key file");
+          }
+
+          std::stringstream buffer;
+          buffer << private_key_file.rdbuf();
+          std::string private_key = buffer.str();
+
+          // Create token with expiration in the past
+          auto now = std::chrono::system_clock::now();
+          auto exp = now - std::chrono::hours(1); // Expired 1 hour ago
+
+          auto token = jwt::create()
+              .set_issuer("test_issuer")
+              .set_type("JWT")
+              .set_expires_at(exp)
+              .set_payload_claim("sub", jwt::claim(std::string("1234567890")))
+              .sign(jwt::algorithm::rs256("", private_key));
+
+          return token;
+      } catch (const std::exception& e) {
+          std::cerr << "Error generating expired token: " << e.what() << std::endl;
+          throw;
+      }
+    }
+
+    CustomCalloutServer service_;
 };
 
-TEST_F(BasicServerTest, OnRequestHeader) {
-  // Initialize the service paremeters
-  ProcessingRequest* request = ProcessingRequest::default_instance().New();
-  ProcessingResponse* response = ProcessingResponse::default_instance().New();
+TEST_F(CustomCalloutServerTest, NoAuthorizationToken) {
+  ProcessingRequest request;
+  ProcessingResponse response;
+
+  // Call the OnRequestHeader method without setting a token
+  service_.OnRequestHeader(&request, &response);
+
+  // Verify the response indicates unauthorized
+  EXPECT_TRUE(response.has_immediate_response());
+  EXPECT_EQ(response.immediate_response().status().code(), StatusCode::Unauthorized);
+  EXPECT_EQ(response.immediate_response().body(), "No Authorization token found");
+}
+
+TEST_F(CustomCalloutServerTest, ValidJwtToken) {
+  ProcessingRequest request;
+  ProcessingResponse response;
+
+  // Generate and set a valid token
+  std::string token = GenerateValidToken();
+  SetupRequestWithToken(&request, token);
 
   // Call the OnRequestHeader method
-  service_.OnRequestHeader(request, response);
+  service_.OnRequestHeader(&request, &response);
 
-  // Define the expected response
-  ProcessingResponse expected_response;
-  HeaderMutation* header_mutation = expected_response.mutable_request_headers()
-                                        ->mutable_response()
-                                        ->mutable_header_mutation();
+  // Verify the response has request headers with decoded claims
+  EXPECT_FALSE(response.has_immediate_response());
+  EXPECT_TRUE(response.has_request_headers());
 
-  HeaderValue* header = header_mutation->add_set_headers()->mutable_header();
-  header->set_key("add-header-request");
-  header->set_value("Value-request");
+  // Check for specific headers that should be added based on JWT claims
+  bool found_sub = false;
+  bool found_name = false;
+  bool found_role = false;
 
-  HeaderValueOption* header_option = header_mutation->add_set_headers();
-  header_option->set_append_action(
-      HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
-  HeaderValue* new_header = header_option->mutable_header();
-  new_header->set_key("replace-header-request");
-  new_header->set_value("Value-request");
+  const auto& headers = response.request_headers().response().header_mutation().set_headers();
+  for (const auto& header : headers) {
+    if (header.header().key() == "decoded-sub" && header.header().value() == "1234567890") {
+      found_sub = true;
+    }
+    if (header.header().key() == "decoded-name" && header.header().value() == "Test User") {
+      found_name = true;
+    }
+    if (header.header().key() == "decoded-role" && header.header().value() == "admin") {
+      found_role = true;
+    }
+  }
 
-  // Compare the proto messages
-  MessageDifferencer differencer;
-  std::string diff_string;
-  differencer.ReportDifferencesToString(&diff_string);
-  EXPECT_TRUE(differencer.Compare(*response, expected_response))
-      << "Responses should be equal. Difference: " << diff_string;
+  EXPECT_TRUE(found_sub) << "Missing decoded-sub header";
+  EXPECT_TRUE(found_name) << "Missing decoded-name header";
+  EXPECT_TRUE(found_role) << "Missing decoded-role header";
 }
 
-TEST_F(BasicServerTest, OnResponseHeader) {
-  // Initialize the service paremeters
-  ProcessingRequest* request = ProcessingRequest::default_instance().New();
-  ProcessingResponse* response = ProcessingResponse::default_instance().New();
+TEST_F(CustomCalloutServerTest, InvalidJwtToken) {
+  ProcessingRequest request;
+  ProcessingResponse response;
 
-  // Call the OnResponseHeader method
-  service_.OnResponseHeader(request, response);
+  // Set an invalid token
+  SetupRequestWithToken(&request, "invalid.jwt.token");
 
-  // Define the expected response
-  ProcessingResponse expected_response;
-  HeaderMutation* header_mutation =
-      expected_response.mutable_response_headers()
-          ->mutable_response()
-          ->mutable_header_mutation();
+  // Call the OnRequestHeader method
+  service_.OnRequestHeader(&request, &response);
 
-  HeaderValue* header = header_mutation->add_set_headers()->mutable_header();
-  header->set_key("add-header-response");
-  header->set_value("Value-response");
-
-  HeaderValueOption* header_option = header_mutation->add_set_headers();
-  header_option->set_append_action(
-      HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
-  HeaderValue* new_header = header_option->mutable_header();
-  new_header->set_key("replace-header-response");
-  new_header->set_value("Value-response");
-
-  // Compare the proto messages
-  MessageDifferencer differencer;
-  std::string diff_string;
-  differencer.ReportDifferencesToString(&diff_string);
-  EXPECT_TRUE(differencer.Compare(*response, expected_response))
-      << "Responses should be equal. Difference: " << diff_string;
+  // Verify the response indicates unauthorized
+  EXPECT_TRUE(response.has_immediate_response());
+  EXPECT_EQ(response.immediate_response().status().code(), StatusCode::Unauthorized);
+  EXPECT_EQ(response.immediate_response().body(), "Invalid Authorization token");
 }
 
-TEST_F(BasicServerTest, OnRequestBody) {
-  // Initialize the service paremeters
-  ProcessingRequest* request = ProcessingRequest::default_instance().New();
-  ProcessingResponse* response = ProcessingResponse::default_instance().New();
+TEST_F(CustomCalloutServerTest, ExpiredJwtToken) {
+  ProcessingRequest request;
+  ProcessingResponse response;
 
-  // Call the OnRequestBody method
-  service_.OnRequestBody(request, response);
+  // Generate and set an expired token
+  try {
+    std::string token = GenerateExpiredToken();
+    SetupRequestWithToken(&request, token);
 
-  // Define the expected response
-  ProcessingResponse expected_response;
-  expected_response.mutable_request_body()
-      ->mutable_response()
-      ->mutable_body_mutation()
-      ->set_body("new-body-request");
+    // Call the OnRequestHeader method
+    service_.OnRequestHeader(&request, &response);
 
-  // Compare the proto messages
-  MessageDifferencer differencer;
-  std::string diff_string;
-  differencer.ReportDifferencesToString(&diff_string);
-  EXPECT_TRUE(differencer.Compare(*response, expected_response))
-      << "Responses should be equal. Difference: " << diff_string;
+    // Verify the response indicates unauthorized
+    EXPECT_TRUE(response.has_immediate_response());
+    EXPECT_EQ(response.immediate_response().status().code(), StatusCode::Unauthorized);
+    EXPECT_EQ(response.immediate_response().body(), "Invalid Authorization token");
+  } catch (const std::exception& e) {
+    FAIL() << "Exception during test: " << e.what();
+  }
 }
 
-TEST_F(BasicServerTest, OnResponseBody) {
-  // Initialize the service paremeters
-  ProcessingRequest* request = ProcessingRequest::default_instance().New();
-  ProcessingResponse* response = ProcessingResponse::default_instance().New();
+TEST_F(CustomCalloutServerTest, MalformedAuthorizationHeader) {
+  ProcessingRequest request;
+  ProcessingResponse response;
 
-  // Call the OnResponseBody method
-  service_.OnResponseBody(request, response);
+  // Set a malformed authorization header (missing "Bearer " prefix)
+  auto* headers = request.mutable_request_headers();
+  auto* header_map = headers->mutable_headers();
+  auto* header = header_map->add_headers();
+  header->set_key("authorization");
+  header->set_value("some-token-without-bearer-prefix");
 
-  // Define the expected response
-  ProcessingResponse expected_response;
-  expected_response.mutable_response_body()
-      ->mutable_response()
-      ->mutable_body_mutation()
-      ->set_body("new-body-response");
+  // Call the OnRequestHeader method
+  service_.OnRequestHeader(&request, &response);
 
-  // Compare the proto messages
-  MessageDifferencer differencer;
-  std::string diff_string;
-  differencer.ReportDifferencesToString(&diff_string);
-  EXPECT_TRUE(differencer.Compare(*response, expected_response))
-      << "Responses should be equal. Difference: " << diff_string;
+  // Verify the response indicates unauthorized
+  EXPECT_TRUE(response.has_immediate_response());
+  EXPECT_EQ(response.immediate_response().status().code(), StatusCode::Unauthorized);
+  EXPECT_EQ(response.immediate_response().body(), "No Authorization token found");
 }

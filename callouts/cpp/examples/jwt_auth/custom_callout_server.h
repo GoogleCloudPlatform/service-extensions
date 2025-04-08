@@ -22,14 +22,12 @@
 #include <grpcpp/grpcpp.h>
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "service/callout_server.h"
+#include "envoy/type/v3/http_status.pb.h"
 
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 using envoy::service::ext_proc::v3::HttpHeaders;
 using envoy::type::v3::StatusCode;
-
-// Forward declaration
-void deny_callout(grpc::ServerContext* context, const std::string& msg);
 
 std::string extract_jwt_token(const HttpHeaders& request_headers) {
     for (const auto& header : request_headers.headers().headers()) {
@@ -44,41 +42,10 @@ std::string extract_jwt_token(const HttpHeaders& request_headers) {
     return {};
 }
 
-std::unordered_map<std::string, std::string> validate_jwt_token(
-    const std::string& key,
-    const HttpHeaders& request_headers,
-    const std::string& algorithm,
-    grpc::ServerContext* context) {
-
-    std::string jwt_token = extract_jwt_token(request_headers);
-    if (jwt_token.empty()) {
-        // Deny callout
-        deny_callout(context, "No Authorization token found.");
-        return {};
-    }
-
-    try {
-        auto decoded = jwt::decode(jwt_token);
-        auto verifier = jwt::verify().allow_algorithm(jwt::algorithm::rs256(key)).with_issuer("your-issuer");
-
-        verifier.verify(decoded); // May throw if verification fails
-
-        std::unordered_map<std::string, std::string> claims;
-        for (const auto& e : decoded.get_payload_claims()) {
-            claims[e.first] = e.second.to_json().to_str();
-        }
-        std::cout << "Approved - Decoded Values: " << jwt_token << std::endl;
-        return claims;
-    } catch (const std::exception& e) {
-        std::cerr << "Invalid token error: " << e.what() << std::endl;
-        return {};
-    }
-}
-
 class CustomCalloutServer : public CalloutServer {
 public:
     CustomCalloutServer() {
-        load_public_key("./extproc/ssl_creds/publickey.pem");
+        load_public_key("ssl_creds/publickey.pem");
     }
 
     void load_public_key(const std::string& path) {
@@ -87,37 +54,53 @@ public:
             std::stringstream buffer;
             buffer << key_file.rdbuf();
             public_key_ = buffer.str();
+            std::cout << "Successfully loaded public key from " << path << ", length: " << public_key_.length() << std::endl;
         } else {
-            std::cerr << "Unable to open public key file." << std::endl;
+            std::cerr << "Unable to open public key file: " << path << std::endl;
         }
     }
 
-    grpc::Status on_request_headers(const HttpHeaders& headers, grpc::ServerContext* context) {
-        auto decoded = validate_jwt_token(public_key_, headers, "RS256", context);
+    // Processes the incoming HTTP request headers.
+    void OnRequestHeader(ProcessingRequest* request, ProcessingResponse* response) override {
+        const HttpHeaders& headers = request->request_headers();
+        std::string jwt_token = extract_jwt_token(headers);
 
-        if (!decoded.empty()) {
-            ProcessingResponse response;
-            for (const auto& [claim, value] : decoded) {
-                CalloutServer::AddRequestHeader(&response, "decoded-" + claim, value);
+        if (jwt_token.empty()) {
+            std::cerr << "WARNING: No Authorization token found." << std::endl;
+            // Deny the request
+            response->mutable_immediate_response()->mutable_status()->set_code(StatusCode::Unauthorized);
+            response->mutable_immediate_response()->set_body("No Authorization token found");
+            return;
+        }
+
+        try {
+            auto decoded = jwt::decode(jwt_token);
+
+            auto verifier = jwt::verify()
+                .allow_algorithm(jwt::algorithm::rs256(public_key_));
+
+            verifier.verify(decoded); // May throw if verification fails
+
+            // Extract claims and add them as headers
+            auto payload = decoded.get_payload_claims();
+            for (auto& claim : payload) {
+                std::string claim_value;
+                if (claim.second.get_type() == jwt::json::type::string) {
+                    claim_value = claim.second.as_string();
+                } else {
+                    // Convert other types to string as needed
+                    claim_value = "non-string-value";
+                }
+
+                CalloutServer::AddRequestHeader(response, "decoded-" + claim.first, claim_value);
             }
-        } else {
-            deny_callout(context, "No Authorization token found.");
-            return grpc::Status::CANCELLED; // Or appropriate status
+        } catch (const std::exception& e) {
+            // Deny the request
+            response->mutable_immediate_response()->mutable_status()->set_code(StatusCode::Unauthorized);
+            response->mutable_immediate_response()->set_body("Invalid Authorization token");
         }
     }
 
 private:
     std::string public_key_;
 };
-
-void deny_callout(grpc::ServerContext* context, const std::string& msg) {
-    // Default message if none is provided
-    std::string message = msg.empty() ? "Callout DENIED." : msg;
-
-    // Log the warning message
-    std::cerr << "WARNING: " << message << std::endl;
-
-    // Deny the callout
-    context->TryCancel(); // Optionally cancel the call
-    // grpc::ServerContext does not have an Abort method, so removing it
-}
