@@ -17,16 +17,13 @@ version: '3.8'
 services:
   app:
     build:
-      context: ../  # Adjust the context to the correct path if needed
+      context: ../
       dockerfile: config/Dockerfile
       args:
-        EXAMPLE_TYPE: ${EXAMPLE_TYPE}
+        EXAMPLE_TYPE: ${EXAMPLE_TYPE:-basic}
     ports:
-      - "8443:8443"
+      - "443:443"
       - "8080:8080"
-      - "8000:8000"
+      - "80:80"
     environment:
-      - EXAMPLE_TYPE=${EXAMPLE_TYPE}
-    volumes:
-      - .:/app
-    command: "./examples/${EXAMPLE_TYPE}/custom_callout_server_cpp"
+      - EXAMPLE_TYPE=${EXAMPLE_TYPE:-basic}

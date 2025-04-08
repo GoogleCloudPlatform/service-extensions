@@ -12,13 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef CALLOUT_SERVER_H_
+#define CALLOUT_SERVER_H_
+
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
 
+#include <atomic>
+#include <condition_variable>
 #include <fstream>
+#include <memory>
+#include <mutex>
+#include <thread>
 
 #include "absl/log/log.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "envoy/service/ext_proc/v3/external_processor.grpc.pb.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
@@ -30,8 +40,33 @@ using envoy::service::ext_proc::v3::HeaderMutation;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
+/**
+ * @class CalloutServer
+ * @brief Base class for implementing custom HTTP request/response processing logic
+ * 
+ * Provides default implementations for header/body processing operations and gRPC server setup.
+ */
 class CalloutServer : public ExternalProcessor::Service {
  public:
+  struct ServerConfig {
+    std::string secure_address;
+    std::string plaintext_address;
+    std::string health_check_address;
+    std::string cert_path;
+    std::string key_path;
+    bool enable_plaintext;
+  };
+
+  static ServerConfig DefaultConfig() {
+    return {
+        .secure_address = "0.0.0.0:443",
+        .plaintext_address = "0.0.0.0:8080",
+        .health_check_address = "0.0.0.0:80",
+        .cert_path = "ssl_creds/chain.pem",
+        .key_path = "ssl_creds/privatekey.pem",
+        .enable_plaintext = true};
+  }
+
   // Adds a request header field.
   static void AddRequestHeader(ProcessingResponse* response,
                                std::string_view key, std::string_view value) {
@@ -44,7 +79,12 @@ class CalloutServer : public ExternalProcessor::Service {
     new_header->set_value(value);
   }
 
-  // Replaces a request header field.
+  /**
+   * @brief Replaces or adds a header in the HTTP request
+   * @param response The ProcessingResponse to modify
+   * @param key Header name to replace
+   * @param value New header value
+   */
   static void ReplaceRequestHeader(ProcessingResponse* response,
                                    std::string_view key,
                                    std::string_view value) {
@@ -59,7 +99,12 @@ class CalloutServer : public ExternalProcessor::Service {
     new_header->set_value(value);
   }
 
-  // Adds a response header field.
+  /**
+   * @brief Adds a header to the HTTP response
+   * @param response The ProcessingResponse to modify
+   * @param key Header name to add
+   * @param value Header value to add
+   */
   static void AddResponseHeader(ProcessingResponse* response,
                                 std::string_view key, std::string_view value) {
     HeaderValue* new_header = response->mutable_response_headers()
@@ -71,7 +116,12 @@ class CalloutServer : public ExternalProcessor::Service {
     new_header->set_value(value);
   }
 
-  // Replaces a response header field.
+  /**
+   * @brief Replaces or adds a header in the HTTP response
+   * @param response The ProcessingResponse to modify
+   * @param key Header name to replace
+   * @param value New header value
+   */
   static void ReplaceResponseHeader(ProcessingResponse* response,
                                     std::string_view key,
                                     std::string_view value) {
@@ -86,7 +136,11 @@ class CalloutServer : public ExternalProcessor::Service {
     new_header->set_value(value);
   }
 
-  // Removes a response header field.
+  /**
+   * @brief Removes a header from the HTTP response
+   * @param response The ProcessingResponse to modify
+   * @param header_name Name of the header to remove
+   */
   static void RemoveResponseHeader(ProcessingResponse* response,
                                    std::string_view header_name) {
     auto* headers_mutation = response->mutable_response_headers()
@@ -95,7 +149,11 @@ class CalloutServer : public ExternalProcessor::Service {
     headers_mutation->add_remove_headers(header_name);
   }
 
-  // Replaces a request body field.
+  /**
+   * @brief Replaces the HTTP request body
+   * @param response The ProcessingResponse to modify
+   * @param body New body content
+   */
   static void ReplaceRequestBody(ProcessingResponse* response,
                                  std::string_view body) {
     response->mutable_request_body()
@@ -104,7 +162,11 @@ class CalloutServer : public ExternalProcessor::Service {
         ->set_body(body);
   }
 
-  // Replaces a response body field.
+  /**
+   * @brief Replaces the HTTP response body
+   * @param response The ProcessingResponse to modify
+   * @param body New body content
+   */
   static void ReplaceResponseBody(ProcessingResponse* response,
                                   std::string_view body) {
     response->mutable_response_body()
@@ -113,16 +175,21 @@ class CalloutServer : public ExternalProcessor::Service {
         ->set_body(body);
   }
 
-  // Creates the SSL secure server credentials given the key and cert path set.
+  /**
+   * @brief Creates SSL credentials for secure server communication
+   * @param key_path Path to private key file
+   * @param cert_path Path to certificate file
+   * @return Optional containing server credentials or nullopt on error
+   */
   static std::optional<std::shared_ptr<grpc::ServerCredentials>>
   CreateSecureServerCredentials(std::string_view key_path,
                                 std::string_view cert_path) {
-    auto key = CalloutServer::ReadDataFile(key_path);
+    auto key = ReadDataFile(key_path);
     if (!key.ok()) {
       LOG(ERROR) << "Error reading the private key file on " << key_path;
       return std::nullopt;
     }
-    auto cert = CalloutServer::ReadDataFile(cert_path);
+    auto cert = ReadDataFile(cert_path);
     if (!cert.ok()) {
       LOG(ERROR) << "Error reading the certificate file on " << cert_path;
       return std::nullopt;
@@ -137,70 +204,180 @@ class CalloutServer : public ExternalProcessor::Service {
     return grpc::SslServerCredentials(ssl_options);
   }
 
-  static std::unique_ptr<grpc::Server> RunServer(
-      std::string_view server_address, CalloutServer& service) {
-    return CalloutServer::RunServer(server_address, service,
-                                    grpc::InsecureServerCredentials(), false);
-  }
-
-  static std::unique_ptr<grpc::Server> RunServer(
-      std::string_view server_address, CalloutServer& service,
-      std::shared_ptr<grpc::ServerCredentials> credentials, bool wait) {
-    grpc::EnableDefaultHealthCheckService(true);
-    grpc::ServerBuilder builder;
-    builder.AddListeningPort(std::string{server_address}, credentials);
-    builder.RegisterService(&service);
-
-    std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
-    LOG(INFO) << "Envoy Ext Proc server listening on " << server_address;
-
-    if (wait) {
-      server->Wait();
+  static bool RunServers(const ServerConfig& config = ServerConfig{}) {
+    std::unique_lock<std::mutex> lock(server_mutex_);
+    bool server_started = false;
+  
+    // Start secure server if credentials are available
+    if (!config.secure_address.empty()) {
+      auto creds = CreateSecureServerCredentials(config.key_path, config.cert_path);
+      if (creds) {
+        secure_thread_ = std::thread([config, creds]() {
+          std::unique_ptr<grpc::Server> local_server;
+          auto service = std::make_unique<CalloutServer>();
+          {
+            grpc::ServerBuilder builder;
+            builder.AddListeningPort(config.secure_address, *creds);
+            builder.RegisterService(service.get());
+            local_server = builder.BuildAndStart();
+          }
+  
+          {
+            std::lock_guard<std::mutex> lock(server_mutex_);
+            secure_server_.reset(local_server.release());
+            server_ready_ = true;
+          }
+          server_cv_.notify_one();
+  
+          if (secure_server_) {
+            LOG(INFO) << "Secure server listening on " << config.secure_address;
+            secure_server_->Wait();
+          }
+  
+          {
+            std::lock_guard<std::mutex> lock(server_mutex_);
+            if (shutdown_requested_) {
+              secure_server_.reset();
+            }
+          }
+        });
+        server_started = true;
+      }
     }
-    return server;
+  
+    // Start plaintext server if enabled
+    if (config.enable_plaintext && !plaintext_server_) {
+      plaintext_thread_ = std::thread([config]() {
+        std::unique_ptr<grpc::Server> local_server;
+        auto service = std::make_unique<CalloutServer>();
+        {
+          grpc::ServerBuilder builder;
+          builder.AddListeningPort(config.plaintext_address,
+                                  grpc::InsecureServerCredentials());
+          builder.RegisterService(service.get());
+          local_server = builder.BuildAndStart();
+        }
+  
+        {
+          std::lock_guard<std::mutex> lock(server_mutex_);
+          plaintext_server_.reset(local_server.release());
+          server_ready_ = true;
+        }
+        server_cv_.notify_one();
+  
+        if (plaintext_server_) {
+          LOG(INFO) << "Plaintext server listening on " << config.plaintext_address;
+          plaintext_server_->Wait();
+        }
+  
+        {
+          std::lock_guard<std::mutex> lock(server_mutex_);
+          if (shutdown_requested_) {
+            plaintext_server_.reset();
+          }
+        }
+      });
+      server_started = true;
+    }
+  
+    if (server_started) {
+      server_cv_.wait(lock, [] { return server_ready_.load(); });
+    }
+    return server_started;
   }
 
+  static void Shutdown() {
+    std::unique_lock<std::mutex> lock(server_mutex_);
+    shutdown_requested_ = true;
+    if (plaintext_server_) {
+      plaintext_server_->Shutdown();
+    }
+    if (secure_server_) {
+      secure_server_->Shutdown();
+    }
+  }
+  
+  static void WaitForCompletion() {
+    if (plaintext_thread_.joinable()) {
+      plaintext_thread_.join();
+    }
+    if (secure_thread_.joinable()) {
+      secure_thread_.join();
+    }
+    std::lock_guard<std::mutex> lock(server_mutex_);
+    plaintext_server_.reset();
+    secure_server_.reset();
+  }
+
+  /**
+   * @brief Main processing loop for handling gRPC streams
+   * @param context Server context
+   * @param stream Bidirectional gRPC stream
+   * @return gRPC status
+   */
   grpc::Status Process(
       grpc::ServerContext* context,
       grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream)
       override {
-    (void)context;
-
     ProcessingRequest request;
     while (stream->Read(&request)) {
       ProcessingResponse response;
       ProcessRequest(&request, &response);
       stream->Write(response);
     }
-
     return grpc::Status::OK;
   }
 
-  // Handles request headers.
+  /**
+   * @brief Handle HTTP request headers (to be overridden)
+   * @param request Incoming processing request
+   * @param response Output response to populate
+   */
   virtual void OnRequestHeader(ProcessingRequest* request,
                                ProcessingResponse* response) {
     LOG(INFO) << "OnRequestHeader called.";
   }
 
-  // Handles response headers.
+  /**
+   * @brief Handle HTTP response headers (to be overridden)
+   * @param request Incoming processing request
+   * @param response Output response to populate
+   */
   virtual void OnResponseHeader(ProcessingRequest* request,
                                 ProcessingResponse* response) {
     LOG(INFO) << "OnResponseHeader called.";
   }
 
-  // Handles request bodies.
+  /**
+   * @brief Handle HTTP request body (to be overridden)
+   * @param request Incoming processing request
+   * @param response Output response to populate
+   */
   virtual void OnRequestBody(ProcessingRequest* request,
                              ProcessingResponse* response) {
     LOG(INFO) << "OnRequestBody called.";
   }
 
-  // Handles response bodies.
+  /**
+   * @brief Handle HTTP response body (to be overridden)
+   * @param request Incoming processing request
+   * @param response Output response to populate
+   */
   virtual void OnResponseBody(ProcessingRequest* request,
                               ProcessingResponse* response) {
     LOG(INFO) << "OnResponseBody called.";
   }
 
  private:
+  static inline std::shared_ptr<grpc::Server> plaintext_server_ = nullptr;
+  static inline std::shared_ptr<grpc::Server> secure_server_ = nullptr;
+  static inline std::thread secure_thread_;
+  static inline std::thread plaintext_thread_;
+  static inline std::mutex server_mutex_;
+  static inline std::condition_variable server_cv_;
+  static inline std::atomic<bool> server_ready_{false};
+  static inline std::atomic<bool> shutdown_requested_{false};
+
   static absl::StatusOr<std::string> ReadDataFile(std::string_view path) {
     std::ifstream file(std::string{path}, std::ios::binary);
     if (file.fail()) {
@@ -212,28 +389,25 @@ class CalloutServer : public ExternalProcessor::Service {
     return file_string_stream.str();
   }
 
-  void ProcessRequest(ProcessingRequest* request,
-                      ProcessingResponse* response) {
+  void ProcessRequest(ProcessingRequest* request, ProcessingResponse* response) {
     switch (request->request_case()) {
-      case ProcessingRequest::RequestCase::kRequestHeaders:
-        this->OnRequestHeader(request, response);
+      case ProcessingRequest::kRequestHeaders:
+        OnRequestHeader(request, response);
         break;
-      case ProcessingRequest::RequestCase::kResponseHeaders:
-        this->OnResponseHeader(request, response);
+      case ProcessingRequest::kResponseHeaders:
+        OnResponseHeader(request, response);
         break;
-      case ProcessingRequest::RequestCase::kRequestBody:
-        this->OnRequestBody(request, response);
+      case ProcessingRequest::kRequestBody:
+        OnRequestBody(request, response);
         break;
-      case ProcessingRequest::RequestCase::kResponseBody:
-        this->OnResponseBody(request, response);
+      case ProcessingRequest::kResponseBody:
+        OnResponseBody(request, response);
         break;
-      case ProcessingRequest::RequestCase::kRequestTrailers:
-      case ProcessingRequest::RequestCase::kResponseTrailers:
-        break;
-      case ProcessingRequest::RequestCase::REQUEST_NOT_SET:
       default:
         LOG(WARNING) << "Received a ProcessingRequest with no request data.";
         break;
     }
   }
 };
+
+#endif  // CALLOUT_SERVER_H_

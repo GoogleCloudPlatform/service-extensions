@@ -27,11 +27,39 @@ The minimal operation of this C++ based ext_proc server requires Bazel, Clang an
 
 You can run the examples directly with Bazel and Clang without using Docker.
 
+### Install Clang
+
+#### For Linux
+
+```sh
+sudo apt-get install clang
+```
+
+#### For macOS
+
+```
+brew install llvm
+```
+
 ### Install Bazel
 
 The recommended way to install Bazel is from the
 [Bazelisk](https://bazel.build/install/bazelisk#installing_bazel) which can manage different Bazel
 versions.
+
+#### For Linux/macOS
+
+```sh
+npm install -g @bazel/bazelisk
+```
+
+### Verify Installation
+
+```
+clang --version
+bazel --version
+docker --version
+```
 
 ### Set Environment Variable
 
@@ -93,6 +121,21 @@ Running from the [./config](./config)
 EXAMPLE_TYPE=basic docker-compose up
 ```
 
+## Running the without Docker
+
+### Set Example Type:
+
+```
+export EXAMPLE_TYPE=basic  # Options: basic, jwt_auth, redirect
+```
+
+### Build and Run:
+
+```
+bazel build --config=clang //examples/${EXAMPLE_TYPE}:custom_callout_server_cpp
+./bazel-bin/examples/${EXAMPLE_TYPE}/custom_callout_server_cpp
+```
+
 ## Running Tests
 
 To run the unit tests, use the following command from the project root:
@@ -101,18 +144,40 @@ To run the unit tests, use the following command from the project root:
 bazel test --test_summary=detailed --config=clang //...
 ```
 
+## Runtime Configuration
+
+Configure the server using these command line flags:
+
+```sh
+./custom_callout_server_cpp \
+  --server_address=0.0.0.0:8443 \  # Secure endpoint (default: 0.0.0.0:443)
+  --health_check_port=8080 \       # Health check port (default: 80)
+  --key_path=/path/to/key.pem \    # SSL private key (default: ssl_creds/privatekey.pem)
+  --cert_path=/path/to/cert.pem    # SSL certificate (default: ssl_creds/chain.pem)
+```
+
+### Custom Ports and SSL
+
+```
+docker run -p 8443:8443 -p 8080:8080 \
+  -e SERVER_ADDRESS=0.0.0.0:8443 \
+  -v /path/to/ssl:/ssl_creds \
+  service-callout-cpp:${EXAMPLE_TYPE}
+```
+
 ## Developing Callouts
 
 This repository provides the following files to be extended to fit the needs of the user:
 
-[CalloutServer](./service/callout_server.h): Baseline service callout server.
+[CalloutServer](./service/callout_server.h): Baseline service callout server with dual endpoints (secure/insecure) and health check service.
 
 ### Making a New Server
 
-The provided code defines a basic `CalloutServer` class that implements
-the `ExternalProcessor::Service` interface.
-This server listens for gRPC requests from Envoy and processes them.
-To create a new server, you'll generally extend this class.
+The provided `CalloutServer` class implements the `ExternalProcessor::Service` interface with:
+- Secure (TLS) endpoint on port 443
+- Insecure (plaintext) endpoint on port 8080
+- HTTP health check on port 80
+- Configurable via command line flags
 
 ### Extend the CalloutServer
 
@@ -153,14 +218,16 @@ void OnRequestHeader(ProcessingRequest* request,
 
 ### Run the Server
 
-To start your custom server, you'll need to create an instance of your custom class
-and use a `grpc::ServerBuilder` to build and start the gRPC server.
+The server automatically handles:
+- Dual gRPC endpoints (secure/insecure)
+- Health check service
+- Command line configuration
 
-To make this process easier there is already a [main.cc](./service/main.cc) file which
-serve this purpose.
-
-This _main_ file, in addition to initializing the gRPC server, also configures
-command line arguments and initializes the HTTP health check.
+Example minimal setup:
+```c++
+auto config = CalloutServer::DefaultConfig();
+CalloutServer::RunServers(config);
+```
 
 An example of how this file can be used together with your custom service
 implementation can be found in this bazel [BUILD](./examples/basic/BUILD) file

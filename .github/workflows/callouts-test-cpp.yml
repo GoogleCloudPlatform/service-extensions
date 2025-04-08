@@ -12,94 +12,127 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+---
 name: Callouts test C++ SDK
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main", "cpp-sdk-doc-gen"]
     paths:
-    - callouts/cpp/**
-    - docs/cpp/**
+      - 'callouts/cpp/**'
+      - 'docs/cpp/**'
+      - 'docs/index.html'
+      - '.github/workflows/callouts-test-cpp.yml'
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
     paths:
-    - callouts/cpp/**
-  schedule:
-    # GitHub removes infrequently accessed caches. Run once a week to keep the cache from going stale.
-    - cron: '0 0 * * 1'
+      - 'callouts/cpp/**'
 
-# Default permissions are read only.
-permissions: read-all
+permissions:
+  contents: write
 
 jobs:
   test:
     name: bazel test (${{ matrix.name }})
-
     runs-on: ubuntu-22.04
 
     strategy:
       fail-fast: false
       matrix:
         include:
-        - name: 'opt'
-          flags: --config=clang -c opt --define=crypto=system
-        - name: 'ASan'
-          flags: --config=clang-asan
-        - name: 'TSan'
-          flags: --config=clang-tsan
+          - name: 'opt'
+            flags: '--config=clang -c opt --define=crypto=system'
+          - name: 'ASan'
+            flags: '--config=clang-asan'
+          - name: 'TSan'
+            flags: '--config=clang-tsan'
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: set cache name
-      id: vars
-      working-directory: ./callouts/cpp
-      # The cache tag consists of the following parts:
-      # * bazel-cache- prefix
-      # * matrix.name, which separates the cache for opt, tsan, and asan.
-      # * hash of WORKSPACE, .bazelrc, and .bazelversion, which is
-      #   purely to differentiate caches for substantial changes in bazel.
-      # * github.sha, which is the commit hash of the commit used to generate
-      #   the cache entry.
-      run: echo "CACHE_TAG=bazel-cache-${{ matrix.name }}-${{ hashFiles('WORKSPACE', '.bazelrc', '.bazelversion') }}" >> "$GITHUB_OUTPUT"
+      - name: Set up Bazel
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apt-transport-https curl gnupg
+          curl -fsSL https://bazel.build/bazel-release.pub.gpg \
+            | gpg --dearmor > bazel.gpg
+          sudo mv bazel.gpg /etc/apt/trusted.gpg.d/
+          echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt \
+            stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
+          sudo apt-get update
+          sudo apt-get install -y bazel
 
-    - name: bazel cache
-      uses: actions/cache/restore@v4
-      with:
-        path: /tmp/bazel/cache
-        key: ${{ steps.vars.outputs.CACHE_TAG }}-${{ github.sha }}
-        restore-keys: |
-          ${{ steps.vars.outputs.CACHE_TAG }}-${{ github.sha }}
-          ${{ steps.vars.outputs.CACHE_TAG }}-
-          bazel-cache-${{ matrix.name }}-
-          bazel-cache-
+      - name: set cache name
+        id: vars
+        working-directory: ./callouts/cpp
+        run: |
+          echo "CACHE_TAG=bazel-cache-${{ matrix.name }}-${{
+            hashFiles('WORKSPACE', '.bazelrc', '.bazelversion')
+          }}" >> "$GITHUB_OUTPUT"
 
-    # - name: Deploy to GitHub Pages
-    # TODO
+      - name: bazel cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/bazel/cache
+          key: ${{ steps.vars.outputs.CACHE_TAG }}-${{ github.sha }}
+          restore-keys: |
+            ${{ steps.vars.outputs.CACHE_TAG }}-${{ github.sha }}
+            ${{ steps.vars.outputs.CACHE_TAG }}-
+            bazel-cache-${{ matrix.name }}-
+            bazel-cache-
 
-    - name: bazel test
-      shell: bash
-      working-directory: ./callouts/cpp
-      run: >
-        bazel test
-        --verbose_failures
-        --test_output=errors
-        --disk_cache /tmp/bazel/cache
-        ${{ matrix.flags }}
-        -- //...
+      - name: bazel test
+        shell: bash
+        working-directory: ./callouts/cpp
+        run: >
+          bazel test
+          --verbose_failures
+          --test_output=errors
+          --disk_cache /tmp/bazel/cache
+          ${{ matrix.flags }}
+          -- //...
 
-    - name: remove unaccessed files from cache
-      shell: bash
-      run: >
-        find /tmp/bazel/cache
-        -type f
-        -name '*'
-        -amin +300
-        -exec rm {} \;
+      - name: Install Doxygen
+        run: sudo apt-get install -y doxygen graphviz
 
-    - name: save bazel cache
-      uses: actions/cache/save@v4
-      if: always()
-      with:
-        path: /tmp/bazel/cache
-        key: ${{ steps.vars.outputs.CACHE_TAG }}-${{ github.sha }}
+      - name: Generate Documentation
+        working-directory: ./callouts/cpp
+        run: |
+          mkdir -p docs/_build
+          doxygen Doxyfile
+
+      - name: Prepare Docs Directory
+        run: |
+          mkdir -p docs/cpp/_build
+          cp -r callouts/cpp/docs/_build/html/* docs/cpp/_build/
+
+      - name: Deploy to GitHub Pages
+        if: >
+          ${{
+            github.event_name == 'push' &&
+            (github.ref == 'refs/heads/main' ||
+            github.ref == 'refs/heads/cpp-sdk-doc-gen')
+          }}
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          publish_branch: gh-pages
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs/
+          force_orphan: true
+          keep_files: false
+
+      - name: remove unaccessed files from cache
+        shell: bash
+        run: >
+          find /tmp/bazel/cache
+          -type f
+          -name '*'
+          -amin +300
+          -exec rm {} \;
+
+      - name: save bazel cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /tmp/bazel/cache
+          key: ${{ steps.vars.outputs.CACHE_TAG }}-${{ github.sha }}

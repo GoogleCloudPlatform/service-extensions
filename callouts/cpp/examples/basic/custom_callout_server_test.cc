@@ -13,9 +13,9 @@
 // limitations under the License.
 
 #include "custom_callout_server.h"
+#include "service/callout_server.h"
 
-#include <google/protobuf/arena.h>
-
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "google/protobuf/util/message_differencer.h"
 #include "gtest/gtest.h"
@@ -28,141 +28,136 @@ using envoy::service::ext_proc::v3::ProcessingResponse;
 using google::protobuf::util::MessageDifferencer;
 
 class BasicServerTest : public testing::Test {
- private:
-  std::unique_ptr<grpc::Server> server;
-
  protected:
   void SetUp() override {
-    std::string server_address("0.0.0.0:8181");
-    server = CalloutServer::RunServer(server_address, service_);
+    config_ = CalloutServer::DefaultConfig();
+    config_.enable_plaintext = true;
+    config_.plaintext_address = "0.0.0.0:8181";
+    config_.health_check_address = "0.0.0.0:8081";
+    config_.key_path = "";
+    config_.cert_path = "";
+
+    server_thread_ = std::thread([this]() {
+      CalloutServer::RunServers(config_);
+    });
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
   }
 
-  void TearDown() override { server->Shutdown(); }
+  void TearDown() override {
+    CalloutServer::Shutdown();
+    CalloutServer::WaitForCompletion();
+    
+    if (server_thread_.joinable()) {
+      server_thread_.join();
+    }
+  }
 
-  CustomCalloutServer service_;
+  CalloutServer::ServerConfig config_;
+  std::thread server_thread_;
 };
 
 TEST_F(BasicServerTest, OnRequestHeader) {
-  // Initialize the service paremeters
-  google::protobuf::Arena arena;
-  ProcessingRequest* request =
-      google::protobuf::Arena::Create<ProcessingRequest>(&arena);
-  ProcessingResponse* response =
-      google::protobuf::Arena::Create<ProcessingResponse>(&arena);
+  ProcessingRequest request;
+  request.mutable_request_headers();
+  ProcessingResponse response;
+  CustomCalloutServer service;
+  
+  service.OnRequestHeader(&request, &response);
 
-  // Call the OnRequestHeader method
-  service_.OnRequestHeader(request, response);
-
-  // Define the expected response
   ProcessingResponse expected_response;
-  HeaderMutation* header_mutation = expected_response.mutable_request_headers()
-                                        ->mutable_response()
-                                        ->mutable_header_mutation();
-
-  HeaderValue* header = header_mutation->add_set_headers()->mutable_header();
-  header->set_key("add-header-request");
-  header->set_value("Value-request");
-
-  HeaderValueOption* header_option = header_mutation->add_set_headers();
-  header_option->set_append_action(
-      HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
-  HeaderValue* new_header = header_option->mutable_header();
-  new_header->set_key("replace-header-request");
+  auto* headers_mutation = expected_response.mutable_request_headers()
+                              ->mutable_response()
+                              ->mutable_header_mutation();
+  
+  // Add header
+  auto* new_header = headers_mutation->add_set_headers()->mutable_header();
+  new_header->set_key("add-header-request");
   new_header->set_value("Value-request");
+  
+  // Replace header
+  auto* replace_header = headers_mutation->add_set_headers();
+  replace_header->set_append_action(
+      HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+  replace_header->mutable_header()->set_key("replace-header-request");
+  replace_header->mutable_header()->set_value("Value-request");
 
-  // Compare the proto messages
   MessageDifferencer differencer;
-  std::string diff_string;
-  differencer.ReportDifferencesToString(&diff_string);
-  EXPECT_TRUE(differencer.Compare(*response, expected_response))
-      << "Responses should be equal. Difference: " << diff_string;
+  std::string diff;
+  differencer.ReportDifferencesToString(&diff);
+  EXPECT_TRUE(differencer.Compare(response, expected_response))
+      << "Differences found:\n" << diff;
 }
 
 TEST_F(BasicServerTest, OnResponseHeader) {
-  // Initialize the service paremeters
-  google::protobuf::Arena arena;
-  ProcessingRequest* request =
-      google::protobuf::Arena::Create<ProcessingRequest>(&arena);
-  ProcessingResponse* response =
-      google::protobuf::Arena::Create<ProcessingResponse>(&arena);
+  ProcessingRequest request;
+  request.mutable_response_headers();
+  ProcessingResponse response;
+  CustomCalloutServer service;
+  
+  service.OnResponseHeader(&request, &response);
 
-  // Call the OnResponseHeader method
-  service_.OnResponseHeader(request, response);
-
-  // Define the expected response
   ProcessingResponse expected_response;
-  HeaderMutation* header_mutation =
-      expected_response.mutable_response_headers()
-          ->mutable_response()
-          ->mutable_header_mutation();
-
-  HeaderValue* header = header_mutation->add_set_headers()->mutable_header();
-  header->set_key("add-header-response");
-  header->set_value("Value-response");
-
-  HeaderValueOption* header_option = header_mutation->add_set_headers();
-  header_option->set_append_action(
-      HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
-  HeaderValue* new_header = header_option->mutable_header();
-  new_header->set_key("replace-header-response");
+  auto* headers_mutation = expected_response.mutable_response_headers()
+                               ->mutable_response()
+                               ->mutable_header_mutation();
+  
+  // Add header
+  auto* new_header = headers_mutation->add_set_headers()->mutable_header();
+  new_header->set_key("add-header-response");
   new_header->set_value("Value-response");
+  
+  // Replace header
+  auto* replace_header = headers_mutation->add_set_headers();
+  replace_header->set_append_action(
+      HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+  replace_header->mutable_header()->set_key("replace-header-response");
+  replace_header->mutable_header()->set_value("Value-response");
 
-  // Compare the proto messages
   MessageDifferencer differencer;
-  std::string diff_string;
-  differencer.ReportDifferencesToString(&diff_string);
-  EXPECT_TRUE(differencer.Compare(*response, expected_response))
-      << "Responses should be equal. Difference: " << diff_string;
+  std::string diff;
+  differencer.ReportDifferencesToString(&diff);
+  EXPECT_TRUE(differencer.Compare(response, expected_response))
+      << "Differences found:\n" << diff;
 }
 
 TEST_F(BasicServerTest, OnRequestBody) {
-  // Initialize the service paremeters
-  google::protobuf::Arena arena;
-  ProcessingRequest* request =
-      google::protobuf::Arena::Create<ProcessingRequest>(&arena);
-  ProcessingResponse* response =
-      google::protobuf::Arena::Create<ProcessingResponse>(&arena);
+  ProcessingRequest request;
+  request.mutable_request_body();
+  ProcessingResponse response;
+  CustomCalloutServer service;
+  
+  service.OnRequestBody(&request, &response);
 
-  // Call the OnRequestBody method
-  service_.OnRequestBody(request, response);
-
-  // Define the expected response
   ProcessingResponse expected_response;
   expected_response.mutable_request_body()
       ->mutable_response()
       ->mutable_body_mutation()
       ->set_body("new-body-request");
 
-  // Compare the proto messages
   MessageDifferencer differencer;
-  std::string diff_string;
-  differencer.ReportDifferencesToString(&diff_string);
-  EXPECT_TRUE(differencer.Compare(*response, expected_response))
-      << "Responses should be equal. Difference: " << diff_string;
+  std::string diff;
+  differencer.ReportDifferencesToString(&diff);
+  EXPECT_TRUE(differencer.Compare(response, expected_response))
+      << "Differences found:\n" << diff;
 }
 
 TEST_F(BasicServerTest, OnResponseBody) {
-  // Initialize the service paremeters
-  google::protobuf::Arena arena;
-  ProcessingRequest* request =
-      google::protobuf::Arena::Create<ProcessingRequest>(&arena);
-  ProcessingResponse* response =
-      google::protobuf::Arena::Create<ProcessingResponse>(&arena);
+  ProcessingRequest request;
+  request.mutable_response_body();
+  ProcessingResponse response;
+  CustomCalloutServer service;
+  
+  service.OnResponseBody(&request, &response);
 
-  // Call the OnResponseBody method
-  service_.OnResponseBody(request, response);
-
-  // Define the expected response
   ProcessingResponse expected_response;
   expected_response.mutable_response_body()
       ->mutable_response()
       ->mutable_body_mutation()
       ->set_body("new-body-response");
 
-  // Compare the proto messages
   MessageDifferencer differencer;
-  std::string diff_string;
-  differencer.ReportDifferencesToString(&diff_string);
-  EXPECT_TRUE(differencer.Compare(*response, expected_response))
-      << "Responses should be equal. Difference: " << diff_string;
+  std::string diff;
+  differencer.ReportDifferencesToString(&diff);
+  EXPECT_TRUE(differencer.Compare(response, expected_response))
+      << "Differences found:\n" << diff;
 }

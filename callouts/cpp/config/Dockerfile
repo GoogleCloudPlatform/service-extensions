@@ -12,52 +12,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Global build type to be used on the stages
 ARG EXAMPLE_TYPE=basic
 
-# Use the Debian 9 Clang base image for both stages
-FROM marketplace.gcr.io/google/debian12 AS builder
+FROM debian:12-slim AS builder
 
-# Install bazelisk
-RUN apt-get update \
-&& apt-get install -y wget \
-&& wget https://github.com/bazelbuild/bazelisk/releases/download/v1.20.0/bazelisk-linux-amd64 \
-&& chmod +x bazelisk-linux-amd64 \
-&& mv bazelisk-linux-amd64 /usr/local/bin/bazel
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    wget clang g++ git python3 python3-pip \
+    libssl-dev libboost-all-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Clang
-RUN apt-get install -y clang
+# Install Bazelisk
+RUN wget -O /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 \
+    && chmod +x /usr/local/bin/bazel
 
-# Set the compiler env var for bazel
-ENV CC /usr/bin/clang
-
-#Set environment variable for runtine
-ARG EXAMPLE_TYPE
-ENV EXAMPLE_TYPE=${EXAMPLE_TYPE}
-
-# Set the Current Working Directory inside the container
 WORKDIR /app
-
-# Copy the source from the current directory to the Working Directory inside the container
 COPY . .
 
-# Build the C++ app
-RUN bazel build --config=clang //examples/${EXAMPLE_TYPE}:custom_callout_server_cpp
+# Build with explicit output path
+RUN EXAMPLE_TYPE=${EXAMPLE_TYPE:-basic} && \
+    bazel build --config=clang --cxxopt='-std=c++17' //examples/${EXAMPLE_TYPE}:custom_callout_server_cpp && \
+    mkdir -p /app/build_output && \
+    cp bazel-bin/examples/${EXAMPLE_TYPE}/custom_callout_server_cpp /app/build_output/
 
-# Use the same image for the final stage
-FROM marketplace.gcr.io/google/debian12
+# Runtime image
+FROM debian:12-slim
 
-ARG EXAMPLE_TYPE
-ENV EXAMPLE_TYPE=${EXAMPLE_TYPE}
+RUN apt-get update && apt-get install -y \
+    libssl3 libboost-system1.74.0 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy the Pre-built binary file from the previous stage
-COPY --from=builder /app/bazel-bin .
+# Copy artifacts from builder
+COPY --from=builder /app/build_output/custom_callout_server_cpp /app/
+COPY --from=builder /app/ssl_creds /app/ssl_creds
 
-# Copy SSL certificates
-COPY ssl_creds ./ssl_creds
-
-# Expose port 8443, 8181, and 8000
-EXPOSE 8443 8181 8000
-
-# Command to run the executable
-CMD "./examples/${EXAMPLE_TYPE}/custom_callout_server_cpp"
+EXPOSE 443 8080 80
+WORKDIR /app
+CMD ["./custom_callout_server_cpp"]
