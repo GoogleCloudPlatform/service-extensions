@@ -40,6 +40,12 @@ using envoy::service::ext_proc::v3::HeaderMutation;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
+/**
+ * @class CalloutServer
+ * @brief Base class for implementing custom HTTP request/response processing logic
+ * 
+ * Provides default implementations for header/body processing operations and gRPC server setup.
+ */
 class CalloutServer : public ExternalProcessor::Service {
  public:
   struct ServerConfig {
@@ -73,7 +79,12 @@ class CalloutServer : public ExternalProcessor::Service {
     new_header->set_value(value);
   }
 
-  // Replaces a request header field.
+  /**
+   * @brief Replaces or adds a header in the HTTP request
+   * @param response The ProcessingResponse to modify
+   * @param key Header name to replace
+   * @param value New header value
+   */
   static void ReplaceRequestHeader(ProcessingResponse* response,
                                    std::string_view key,
                                    std::string_view value) {
@@ -88,7 +99,12 @@ class CalloutServer : public ExternalProcessor::Service {
     new_header->set_value(value);
   }
 
-  // Adds a response header field.
+  /**
+   * @brief Adds a header to the HTTP response
+   * @param response The ProcessingResponse to modify
+   * @param key Header name to add
+   * @param value Header value to add
+   */
   static void AddResponseHeader(ProcessingResponse* response,
                                 std::string_view key, std::string_view value) {
     HeaderValue* new_header = response->mutable_response_headers()
@@ -100,7 +116,12 @@ class CalloutServer : public ExternalProcessor::Service {
     new_header->set_value(value);
   }
 
-  // Replaces a response header field.
+  /**
+   * @brief Replaces or adds a header in the HTTP response
+   * @param response The ProcessingResponse to modify
+   * @param key Header name to replace
+   * @param value New header value
+   */
   static void ReplaceResponseHeader(ProcessingResponse* response,
                                     std::string_view key,
                                     std::string_view value) {
@@ -115,7 +136,11 @@ class CalloutServer : public ExternalProcessor::Service {
     new_header->set_value(value);
   }
 
-  // Removes a response header field.
+  /**
+   * @brief Removes a header from the HTTP response
+   * @param response The ProcessingResponse to modify
+   * @param header_name Name of the header to remove
+   */
   static void RemoveResponseHeader(ProcessingResponse* response,
                                    std::string_view header_name) {
     auto* headers_mutation = response->mutable_response_headers()
@@ -124,7 +149,11 @@ class CalloutServer : public ExternalProcessor::Service {
     headers_mutation->add_remove_headers(header_name);
   }
 
-  // Replaces a request body field.
+  /**
+   * @brief Replaces the HTTP request body
+   * @param response The ProcessingResponse to modify
+   * @param body New body content
+   */
   static void ReplaceRequestBody(ProcessingResponse* response,
                                  std::string_view body) {
     response->mutable_request_body()
@@ -133,7 +162,11 @@ class CalloutServer : public ExternalProcessor::Service {
         ->set_body(body);
   }
 
-  // Replaces a response body field.
+  /**
+   * @brief Replaces the HTTP response body
+   * @param response The ProcessingResponse to modify
+   * @param body New body content
+   */
   static void ReplaceResponseBody(ProcessingResponse* response,
                                   std::string_view body) {
     response->mutable_response_body()
@@ -142,7 +175,12 @@ class CalloutServer : public ExternalProcessor::Service {
         ->set_body(body);
   }
 
-  // Creates the SSL secure server credentials given the key and cert path set.
+  /**
+   * @brief Creates SSL credentials for secure server communication
+   * @param key_path Path to private key file
+   * @param cert_path Path to certificate file
+   * @return Optional containing server credentials or nullopt on error
+   */
   static std::optional<std::shared_ptr<grpc::ServerCredentials>>
   CreateSecureServerCredentials(std::string_view key_path,
                                 std::string_view cert_path) {
@@ -271,6 +309,12 @@ class CalloutServer : public ExternalProcessor::Service {
     secure_server_.reset();
   }
 
+  /**
+   * @brief Main processing loop for handling gRPC streams
+   * @param context Server context
+   * @param stream Bidirectional gRPC stream
+   * @return gRPC status
+   */
   grpc::Status Process(
       grpc::ServerContext* context,
       grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream)
@@ -284,25 +328,41 @@ class CalloutServer : public ExternalProcessor::Service {
     return grpc::Status::OK;
   }
 
-  // Handles request headers.
+  /**
+   * @brief Handle HTTP request headers (to be overridden)
+   * @param request Incoming processing request
+   * @param response Output response to populate
+   */
   virtual void OnRequestHeader(ProcessingRequest* request,
                                ProcessingResponse* response) {
     LOG(INFO) << "OnRequestHeader called.";
   }
 
-  // Handles response headers.
+  /**
+   * @brief Handle HTTP response headers (to be overridden)
+   * @param request Incoming processing request
+   * @param response Output response to populate
+   */
   virtual void OnResponseHeader(ProcessingRequest* request,
                                 ProcessingResponse* response) {
     LOG(INFO) << "OnResponseHeader called.";
   }
 
-  // Handles request bodies.
+  /**
+   * @brief Handle HTTP request body (to be overridden)
+   * @param request Incoming processing request
+   * @param response Output response to populate
+   */
   virtual void OnRequestBody(ProcessingRequest* request,
                              ProcessingResponse* response) {
     LOG(INFO) << "OnRequestBody called.";
   }
 
-  // Handles response bodies.
+  /**
+   * @brief Handle HTTP response body (to be overridden)
+   * @param request Incoming processing request
+   * @param response Output response to populate
+   */
   virtual void OnResponseBody(ProcessingRequest* request,
                               ProcessingResponse* response) {
     LOG(INFO) << "OnResponseBody called.";
