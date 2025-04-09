@@ -159,10 +159,12 @@ proxy_wasm::WasmResult TestHttpContext::sendLocalResponse(
     uint32_t response_code, std::string_view body_text,
     proxy_wasm::Pairs additional_headers, uint32_t grpc_status,
     std::string_view details) {
-  if (phase_ != proxy_wasm::WasmHeaderMapType::RequestHeaders &&
-      phase_ != proxy_wasm::WasmHeaderMapType::ResponseHeaders) {
+  if (current_callback_ != RequestHeaders &&
+      current_callback_ != ResponseHeaders &&
+      current_callback_ != RequestBody) {
     return proxy_wasm::WasmResult::BadArgument;
   }
+  sent_local_response_ = true;
   result_.http_code = response_code;
   result_.body = body_text;
   result_.grpc_code = grpc_status;
@@ -193,7 +195,9 @@ TestHttpContext::Result TestHttpContext::SendRequestBody(std::string body) {
   current_callback_ = TestHttpContext::CallbackType::RequestBody;
   result_.body_status =
       onRequestBody(body_buffer_.size(), /*end_of_stream=*/false);
-  result_.body = body_buffer_.release();
+  if (!sent_local_response_) {
+    result_.body = body_buffer_.release();
+  }
   return std::move(result_);
 }
 
