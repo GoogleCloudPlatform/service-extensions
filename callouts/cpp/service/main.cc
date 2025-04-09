@@ -21,9 +21,14 @@
 #include "absl/flags/parse.h"
 #include "absl/log/log.h"
 #include "callout_server.h"
+#include "custom_callout_server.h"
 
 ABSL_FLAG(std::string, server_address, "0.0.0.0:443",
           "The gRPC server address, like '0.0.0.0:443'");
+ABSL_FLAG(std::string, plaintext_address, "0.0.0.0:8080",
+          "The plaintext gRPC server address, like '0.0.0.0:8080'");
+ABSL_FLAG(bool, enable_plaintext, true,
+          "Whether to enable plaintext gRPC server");
 ABSL_FLAG(uint16_t, health_check_port, 80,
           "The HTTP health check server port");
 ABSL_FLAG(std::string, key_path, "ssl_creds/privatekey.pem",
@@ -43,22 +48,40 @@ void StartHttpHealthCheckServer(uint16_t port) {
   LOG(INFO) << "Health check service started on port: " << port;
 
   while (true) {
-    tcp::socket socket(io_context);
-    acceptor.accept(socket);
+    try {
+      tcp::socket socket(io_context);
+      acceptor.accept(socket);
 
-    beast::flat_buffer buffer;
-    http::request<http::string_body> request;
-    http::read(socket, buffer, request);
+      beast::flat_buffer buffer;
+      http::request<http::string_body> request;
 
-    http::response<http::string_body> response;
-    response.version(request.version());
-    response.result(http::status::ok);
-    response.set(http::field::content_type, "text/plain");
-    response.body() = "";
-    response.prepare_payload();
-    http::write(socket, response);
+      beast::error_code ec;
+      http::read(socket, buffer, request, ec);
 
-    socket.shutdown(tcp::socket::shutdown_send);
+      if (ec) {
+        LOG(WARNING) << "Error reading HTTP request: " << ec.message();
+        continue;
+      }
+
+      http::response<http::string_body> response;
+      response.version(request.version());
+      response.result(http::status::ok);
+      response.set(http::field::content_type, "text/plain");
+      response.body() = "OK";
+      response.prepare_payload();
+
+      http::write(socket, response, ec);
+      if (ec) {
+        LOG(WARNING) << "Error writing HTTP response: " << ec.message();
+      }
+
+      socket.shutdown(tcp::socket::shutdown_send, ec);
+      if (ec) {
+        LOG(WARNING) << "Error shutting down socket: " << ec.message();
+      }
+    } catch (const std::exception& e) {
+      LOG(ERROR) << "Exception in health check server: " << e.what();
+    }
   }
 }
 
@@ -70,6 +93,10 @@ int main(int argc, char** argv) {
   config.key_path = absl::GetFlag(FLAGS_key_path);
   config.cert_path = absl::GetFlag(FLAGS_cert_path);
 
+  // Set plaintext configuration
+  config.enable_plaintext = absl::GetFlag(FLAGS_enable_plaintext);
+  config.plaintext_address = absl::GetFlag(FLAGS_plaintext_address);
+
   if (!(!config.key_path.empty() && !config.cert_path.empty()) &&
       !config.enable_plaintext) {
     LOG(ERROR) << "No valid configuration";
@@ -79,7 +106,7 @@ int main(int argc, char** argv) {
   std::thread health_check_thread(StartHttpHealthCheckServer,
                                   absl::GetFlag(FLAGS_health_check_port));
 
-  CalloutServer::RunServers(config);
+  CalloutServer::RunServers<CustomCalloutServer>(config);
 
   boost::asio::io_context io_context;
   boost::asio::signal_set signals(io_context, SIGINT, SIGTERM);

@@ -204,6 +204,7 @@ class CalloutServer : public ExternalProcessor::Service {
     return grpc::SslServerCredentials(ssl_options);
   }
 
+  template <typename ServerType = CalloutServer>
   static bool RunServers(const ServerConfig& config = ServerConfig{}) {
     std::unique_lock<std::mutex> lock(server_mutex_);
     bool server_started = false;
@@ -214,7 +215,7 @@ class CalloutServer : public ExternalProcessor::Service {
       if (creds) {
         secure_thread_ = std::thread([config, creds]() {
           std::unique_ptr<grpc::Server> local_server;
-          auto service = std::make_unique<CalloutServer>();
+          auto service = std::make_unique<ServerType>();
           {
             grpc::ServerBuilder builder;
             builder.AddListeningPort(config.secure_address, *creds);
@@ -249,7 +250,7 @@ class CalloutServer : public ExternalProcessor::Service {
     if (config.enable_plaintext && !plaintext_server_) {
       plaintext_thread_ = std::thread([config]() {
         std::unique_ptr<grpc::Server> local_server;
-        auto service = std::make_unique<CalloutServer>();
+        auto service = std::make_unique<ServerType>();
         {
           grpc::ServerBuilder builder;
           builder.AddListeningPort(config.plaintext_address,
