@@ -47,11 +47,6 @@ The recommended way to install Bazel is from the
 [Bazelisk](https://bazel.build/install/bazelisk#installing_bazel) which can manage different Bazel
 versions.
 
-#### For Linux/macOS
-
-```sh
-npm install -g @bazel/bazelisk
-```
 
 ### Verify Installation
 
@@ -150,17 +145,19 @@ Configure the server using these command line flags:
 
 ```sh
 ./custom_callout_server_cpp \
-  --server_address=0.0.0.0:8443 \  # Secure endpoint (default: 0.0.0.0:443)
-  --health_check_port=8080 \       # Health check port (default: 80)
-  --key_path=/path/to/key.pem \    # SSL private key (default: ssl_creds/privatekey.pem)
-  --cert_path=/path/to/cert.pem    # SSL certificate (default: ssl_creds/chain.pem)
+  --server_address=0.0.0.0:443 \      # Secure endpoint (default: 0.0.0.0:443)
+  --plaintext_address=0.0.0.0:8080 \  # Plaintext endpoint (default: 0.0.0.0:8080)
+  --enable_plaintext=true \           # Whether to enable plaintext gRPC server (default: true)
+  --health_check_port=80 \            # Health check port (default: 80)
+  --key_path=/path/to/key.pem \       # SSL private key (default: ssl_creds/privatekey.pem)
+  --cert_path=/path/to/cert.pem       # SSL certificate (default: ssl_creds/chain.pem)
 ```
 
 ### Custom Ports and SSL
 
 ```
-docker run -p 8443:8443 -p 8080:8080 \
-  -e SERVER_ADDRESS=0.0.0.0:8443 \
+docker run -p 443:443 -p 8080:8080 \
+  -e SERVER_ADDRESS=0.0.0.0:443 \
   -v /path/to/ssl:/ssl_creds \
   service-callout-cpp:${EXAMPLE_TYPE}
 ```

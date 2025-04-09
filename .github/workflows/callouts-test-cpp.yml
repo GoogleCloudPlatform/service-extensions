@@ -17,12 +17,9 @@ name: Callouts test C++ SDK
 
 on:
   push:
-    branches: ["main", "cpp-sdk-doc-gen"]
+    branches: ["main"]
     paths:
       - 'callouts/cpp/**'
-      - 'docs/cpp/**'
-      - 'docs/index.html'
-      - '.github/workflows/callouts-test-cpp.yml'
   pull_request:
     branches: ["main"]
     paths:
@@ -110,15 +107,15 @@ jobs:
         if: >
           ${{
             github.event_name == 'push' &&
-            (github.ref == 'refs/heads/main' ||
-            github.ref == 'refs/heads/cpp-sdk-doc-gen')
+            (github.ref == 'refs/heads/main')
           }}
         uses: peaceiris/actions-gh-pages@v4
         with:
           publish_branch: gh-pages
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: docs/
-          force_orphan: true
+          publish_dir: docs/cpp/_build
+          destination_dir: cpp/_build
+          force_orphan: false
           keep_files: false
 
       - name: remove unaccessed files from cache

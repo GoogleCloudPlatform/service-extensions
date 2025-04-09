@@ -12,15 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * @file custom_callout_server.h
+ * @brief Implementation of a custom callout server that performs HTTP redirects
+ * @ingroup redirect_example
+ */
+
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "service/callout_server.h"
 
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
+/**
+ * @class CustomCalloutServer
+ * @brief Custom implementation of callout server that performs HTTP redirects
+ *
+ * This server demonstrates how to implement a simple HTTP redirect by:
+ * - Intercepting incoming requests
+ * - Generating an immediate response with a 301 status code
+ * - Setting the appropriate Location header for the redirect target
+ */
 class CustomCalloutServer : public CalloutServer {
  public:
-  // Processes the incoming HTTP request headers to initiate a redirect.
+  /**
+   * @brief Processes incoming request headers to perform a redirect
+   *
+   * This method intercepts all incoming HTTP requests and responds with a
+   * 301 Moved Permanently redirect to a predefined URL.
+   *
+   * @param request The processing request containing headers
+   * @param response The response to populate with redirect information
+   */
   void OnRequestHeader(ProcessingRequest* request,
                        ProcessingResponse* response) override {
     // Create an immediate response for redirection

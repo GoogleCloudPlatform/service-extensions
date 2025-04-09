@@ -12,22 +12,53 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * @file custom_callout_server.h
+ * @brief Implementation of a custom callout server that manipulates HTTP headers
+ * @ingroup add_header_example
+ */
+
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "service/callout_server.h"
 
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
+/**
+ * @class CustomCalloutServer
+ * @brief Custom implementation of callout server that manipulates HTTP headers
+ *
+ * This server demonstrates how to modify HTTP headers by:
+ * - Adding custom headers to requests
+ * - Adding custom headers to responses
+ * - Removing specific headers from responses
+ */
 class CustomCalloutServer : public CalloutServer {
  public:
-  // Processes the incoming HTTP request headers
+  /**
+   * @brief Processes incoming request headers to add custom headers
+   *
+   * Adds a custom header to the incoming HTTP request before it's
+   * forwarded to the upstream service.
+   *
+   * @param request The processing request containing headers
+   * @param response The response to populate with header modifications
+   */
   void OnRequestHeader(ProcessingRequest* request,
                       ProcessingResponse* response) override {
     // Add custom header using helper method
     CalloutServer::AddRequestHeader(response, "header-request", "request");
   }
 
-  // Processes the outgoing HTTP response headers
+  /**
+   * @brief Processes outgoing response headers to modify headers
+   *
+   * Adds a custom header to the outgoing HTTP response and removes
+   * the "foo" header if present.
+   *
+   * @param request The processing request containing headers
+   * @param response The response to populate with header modifications
+   */
   void OnResponseHeader(ProcessingRequest* request,
                        ProcessingResponse* response) override {
     // Add custom response header
