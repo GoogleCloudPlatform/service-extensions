@@ -239,6 +239,7 @@ class TestHttpContext : public TestContext {
   // State tracked during a headers call. Invalid otherwise.
   proxy_wasm::WasmHeaderMapType phase_;
   Result result_;
+  bool sent_local_response_ = false;
 
   Buffer body_buffer_;
   CallbackType current_callback_;
