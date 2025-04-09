@@ -10,6 +10,9 @@ cc_binary(
         "//:jwt-cpp",
 
     ],
+    data = [
+        "//ssl_creds:ssl_creds",
+    ],
     includes = ["."],
 )
 
@@ -29,5 +32,8 @@ cc_test(
         ":custom_callout_server_lib",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
+    ],
+    data = [
+        "//ssl_creds:ssl_creds",
     ],
 )
