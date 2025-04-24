@@ -32,16 +32,5 @@ impl HttpContext for MyHttpContext {
         self.set_http_request_header("Welcome", Some("warm"));
         return Action::Continue;
     }
-
-    fn on_http_response_headers(&mut self, _: usize, _: bool) -> Action {
-        // Conditionally add to a header value.
-        let msg = self.get_http_response_header("Message");
-        if msg.unwrap_or_default() == "foo" {
-            self.add_http_response_header("Message", "bar");
-        }
-        // Unconditionally remove a header.
-        self.set_http_response_header("Welcome", None);
-        return Action::Continue;
-    }
 }
 // [END serviceextensions_plugin_add_header]

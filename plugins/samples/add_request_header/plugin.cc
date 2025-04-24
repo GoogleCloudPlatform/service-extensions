@@ -27,19 +27,6 @@ class MyHttpContext : public Context {
     return FilterHeadersStatus::Continue;
   }
 
-  FilterHeadersStatus onResponseHeaders(uint32_t headers,
-                                        bool end_of_stream) override {
-    // Conditionally add to a header value.
-    auto msg = getResponseHeader("Message");
-    if (msg && msg->view() == "foo") {
-      addResponseHeader("Message", "bar");
-    }
-    // Unconditionally remove a header.
-    removeResponseHeader("Welcome");
-    return FilterHeadersStatus::Continue;
-  }
-};
-
 static RegisterContextFactory register_StaticContext(
     CONTEXT_FACTORY(MyHttpContext), ROOT_FACTORY(RootContext));
 // [END serviceextensions_plugin_add_header]
