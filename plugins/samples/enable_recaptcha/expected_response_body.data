@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-<script src="https://www.google.com/recaptcha/api.js"></script>
-<script>function onLogin(token) {document.getElementById("login-form").submit();}</script>
+<script src="https://www.google.com/recaptcha/enterprise.js?render=123456789"></script>
+
 <title>Page Title</title>
 </head>
 <body>
@@ -15,7 +15,8 @@
   <br>
 </form>
 
-<button class="g-recaptcha" data-sitekey="reCAPTCHA_site_key" data-callback="onLogin" data-action="login">Login</button>
+<button form="login-form"
+        type="submit">Login</button>
 
 
 </body>

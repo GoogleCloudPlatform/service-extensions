@@ -14,12 +14,10 @@
 
 // [START serviceextensions_plugin_enable_recaptcha]
 
-// Warning: This plugin simply shows that by adding scripts and modifying a
-// button on a page, one could enable a reCAPTCHA challenge. This is not a
-// replacement for reading reCAPTCHA documentaion or following all user guide
-// instructions. Please follow official reCAPTCHA documentation at
-// https://developers.google.com/recaptcha. This plugin follows instructions for
-// "Automatically bind the challenge to a button" https://developers.google.com/recaptcha/docs/v3#automatically_bind_the_challenge_to_a_button.
+// Warning: This plugin simply shows that by adding scripts, one could enable a
+// reCAPTCHA challenge. This is not a replacement for reading reCAPTCHA
+// documentaion or following all user guide instructions. Please follow official
+// reCAPTCHA documentation at https://developers.google.com/recaptcha.
 use lol_html::html_content::ContentType;
 use lol_html::*;
 use proxy_wasm::traits::*;
@@ -30,8 +28,38 @@ use std::rc::Rc;
 
 proxy_wasm::main! {{
     proxy_wasm::set_log_level(LogLevel::Trace);
-    proxy_wasm::set_http_context(|_, _| -> Box<dyn HttpContext> { Box::new(MyHttpContext::new())});
+    proxy_wasm::set_root_context(|_| -> Box<dyn RootContext> {
+      Box::new(MyRootContext {
+          recaptcha_key: Rc::new(RefCell::new(String::new())),
+      })
+    });
 }}
+
+struct MyRootContext {
+    recaptcha_key: Rc<RefCell<String>>,
+}
+
+impl Context for MyRootContext {}
+
+impl RootContext for MyRootContext {
+    fn on_configure(&mut self, _: usize) -> bool {
+        if let Some(config) = self.get_plugin_configuration() {
+            // Config file contains only the recaptcha key.
+            // Use of .unwrap() is fine here, since failure in on_configure
+            // should result in plugin crash.
+            let config_lines = String::from_utf8(config).unwrap();
+            self.recaptcha_key = Rc::new(RefCell::new(config_lines));
+        }
+        return true;
+    }
+
+    fn create_http_context(&self, _: u32) -> Option<Box<dyn HttpContext>> {
+        Some(Box::new(MyHttpContext::new(self.recaptcha_key.clone())))
+    }
+    fn get_type(&self) -> Option<ContextType> {
+        Some(ContextType::HttpContext)
+    }
+}
 
 struct MyOutputSink {
     // Stores HTML as the rewriter parses and modifies HTML.
@@ -75,43 +103,29 @@ struct MyHttpContext<'a> {
     rewriter: Option<HtmlRewriter<'a, MyOutputSink>>,
     // True when plugin has added script to <head>.
     completed_script_injection: Rc<RefCell<bool>>,
-    // True when plugin has modified <button>.
-    completed_button_modification: Rc<RefCell<bool>>,
+    // reCaptcha site key
+    recaptcha_key: Rc<RefCell<String>>,
 }
 
 impl<'a> MyHttpContext<'a> {
-    pub fn new() -> MyHttpContext<'a> {
+    pub fn new(key: Rc<RefCell<String>>) -> MyHttpContext<'a> {
         let output = Rc::new(RefCell::new(Vec::new()));
         let completed_script_injection = Rc::new(RefCell::new(false));
-        let completed_button_modification = Rc::new(RefCell::new(false));
+        let recaptcha_key = key;
         MyHttpContext {
             output: output.clone(),
             completed_script_injection: completed_script_injection.clone(),
-            completed_button_modification: completed_button_modification.clone(),
+            recaptcha_key: recaptcha_key.clone(),
             rewriter: Some(HtmlRewriter::new(
                 Settings {
-                    element_content_handlers: vec![
-                        element!("head", move |el| {
-                            el.prepend(
-                            "\n<script src=\"https://www.google.com/recaptcha/api.js\"></script>\n\
-                            <script>function onLogin(token) {document.getElementById(\"login-form\").submit();}</script>",
+                    element_content_handlers: vec![element!("head", move |el| {
+                        el.prepend(
+                            format!("\n<script src=\"https://www.google.com/recaptcha/enterprise.js?render={}\"></script>\n", *recaptcha_key.borrow_mut()).as_str(),
                             ContentType::Html,
                             );
-                            *completed_script_injection.borrow_mut() = true;
-                            Ok(())
-                        }),
-                        element!("button", move |el| {
-                            el.remove_attribute("form");
-                            el.remove_attribute("type");
-                            el.set_attribute("class", "g-recaptcha").unwrap();
-                            el.set_attribute("data-sitekey", "reCAPTCHA_site_key")
-                                .unwrap();
-                            el.set_attribute("data-callback", "onLogin").unwrap();
-                            el.set_attribute("data-action", "login").unwrap();
-                            *completed_button_modification.borrow_mut() = true;
-                            Ok(())
-                        }),
-                    ],
+                        *completed_script_injection.borrow_mut() = true;
+                        Ok(())
+                    })],
                     ..Settings::new()
                 },
                 MyOutputSink {
@@ -144,14 +158,15 @@ impl<'a> MyHttpContext<'a> {
 impl<'a> Context for MyHttpContext<'a> {}
 
 impl<'a> HttpContext for MyHttpContext<'a> {
+    // If request header callback is invoked, body will not be compressed.
     fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
+        self.set_http_request_header("accept-encoding", "none")
         return Action::Continue;
     }
 
     fn on_http_response_body(&mut self, body_size: usize, _: bool) -> Action {
         let chunk_size = 500;
-        if *self.completed_script_injection.borrow() && *self.completed_button_modification.borrow()
-        {
+        if *self.completed_script_injection.borrow() {
             // Return immediately if plugin is "done" to avoid unnecessary work
             // and resource usage.
             return Action::Continue;
@@ -170,9 +185,7 @@ impl<'a> HttpContext for MyHttpContext<'a> {
                     );
                     return Action::Pause;
                 }
-                if *self.completed_script_injection.borrow()
-                    && *self.completed_button_modification.borrow()
-                {
+                if *self.completed_script_injection.borrow() {
                     if let Err(e) = self.end_rewriter() {
                         self.send_http_response(
                             500,

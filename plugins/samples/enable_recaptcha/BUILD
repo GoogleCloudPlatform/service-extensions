@@ -15,6 +15,7 @@ proxy_wasm_plugin_rust(
 
 proxy_wasm_tests(
     name = "tests",
+    config = ":tests.config",
     data = [
         ":expected_response_body.data",
         ":response_body.data",
