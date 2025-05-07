@@ -188,22 +188,27 @@ TestHttpContext::Result TestHttpContext::SendRequestHeaders(
   return std::move(result_);
 }
 
-TestHttpContext::Result TestHttpContext::SendRequestBody(std::string body) {
+TestHttpContext::Result TestHttpContext::SendRequestBody(std::string body,
+                                                         bool end_of_stream) {
   phase_logs_.clear();
   result_ = Result{};
+  if (sent_local_response_) {
+    return Result{};
+  }
   body_buffer_.setOwned(std::move(body));
   current_callback_ = TestHttpContext::CallbackType::RequestBody;
-  result_.body_status =
-      onRequestBody(body_buffer_.size(), /*end_of_stream=*/false);
-  if (!sent_local_response_) {
+  result_.body_status = onRequestBody(body_buffer_.size(), end_of_stream);
     result_.body = body_buffer_.release();
-  }
   return std::move(result_);
 }
 
 TestHttpContext::Result TestHttpContext::SendResponseHeaders(
     TestHttpContext::Headers headers) {
   phase_logs_.clear();
+  result_ = Result{};
+  if (sent_local_response_) {
+    return Result{};
+  }
   result_ = Result{.headers = std::move(headers)};
   phase_ = proxy_wasm::WasmHeaderMapType::ResponseHeaders;
   current_callback_ = TestHttpContext::CallbackType::ResponseHeaders;
@@ -213,13 +218,16 @@ TestHttpContext::Result TestHttpContext::SendResponseHeaders(
   return std::move(result_);
 }
 
-TestHttpContext::Result TestHttpContext::SendResponseBody(std::string body) {
+TestHttpContext::Result TestHttpContext::SendResponseBody(std::string body,
+                                                         bool end_of_stream) {
   phase_logs_.clear();
   result_ = Result{};
+  if (sent_local_response_) {
+    return Result{};
+  }
   body_buffer_.setOwned(std::move(body));
   current_callback_ = TestHttpContext::CallbackType::ResponseBody;
-  result_.body_status =
-      onResponseBody(body_buffer_.size(), /*end_of_stream=*/false);
+  result_.body_status = onResponseBody(body_buffer_.size(), end_of_stream);
   result_.body = body_buffer_.release();
   return std::move(result_);
 }
