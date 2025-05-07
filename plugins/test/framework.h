@@ -221,9 +221,9 @@ class TestHttpContext : public TestContext {
 
   // Testing helpers. Use these instead of direct on*Headers methods.
   Result SendRequestHeaders(Headers headers);
-  Result SendRequestBody(std::string body);
+  Result SendRequestBody(std::string body, bool end_of_stream);
   Result SendResponseHeaders(Headers headers);
-  Result SendResponseBody(std::string body);
+  Result SendResponseBody(std::string body, bool end_of_stream);
 
   enum CallbackType {
     None,
