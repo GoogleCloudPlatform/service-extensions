@@ -145,7 +145,9 @@ for your own plugin. Extend them to fit your particular use case.
     html in response body chunks and replace insances of "foo.com" with
     "bar.com" in `<a href=***>`.
 *   [Enable reCAPTCHA challenge on response body](samples/enable_recaptcha/):
-    Enable reCAPTCHA challenge on response body.
+    Enable reCAPTCHA challenge on response body. Optionally, use a request
+    header to stop compression of body which could cause issues in production
+    environment.
     Warning: This is not a replacement for [official reCAPTCHA documentation](https://developers.google.com/recaptcha).
 
 # Feature set / ABI
