@@ -46,8 +46,8 @@ class MyRootContext : public RootContext {
 // credit card numbers and 10-digit numeric codes. Masks the initial numbers
 // found while preserving the last few digits for both types of PII.
 //
-// - Credit Card Numbers: Masks the first 12 digits, displaying only the last 4 digits
-//   in the format XXXX-XXXX-XXXX-1234.
+// - Credit Card Numbers: Masks the first 12 digits, displaying only the last 4
+//   digits in the format XXXX-XXXX-XXXX-1234.
 // - 10-Digit Codes: Masks the first 7 digits, displaying only the last 3 digits
 //   as XXXXXXX123.
 //
@@ -60,10 +60,12 @@ class MyHttpContext : public Context {
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                          bool end_of_stream) override {
-      // One current limitation is that this plugin won't strip PII as intended if the server response is compressed,
-      // since in that case the bytes returned by getBufferBytes() will be compressed rather than plaintext data.
-      // The simplest workaround is to disallow the server from using response compression.
-      // This is achieved by setting "Accept-Encoding: identity" in request headers.
+      // One current limitation is that this plugin won't strip PII as intended
+      // if the server response is compressed, since in that case the bytes
+      // returned by getBufferBytes() will be compressed rather than plaintext
+      // data. The simplest workaround is to disallow the server from using
+      // response compression. This is achieved by setting
+      // "Accept-Encoding: identity" in request headers.
       replaceRequestHeader("accept-encoding", "identity");
       return FilterHeadersStatus::Continue;
     }
