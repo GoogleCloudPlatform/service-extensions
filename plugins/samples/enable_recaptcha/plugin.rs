@@ -160,7 +160,7 @@ impl<'a> Context for MyHttpContext<'a> {}
 impl<'a> HttpContext for MyHttpContext<'a> {
     // If request header callback is invoked, body will not be compressed.
     fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
-        self.set_http_request_header("accept-encoding", "none")
+        self.set_http_request_header("accept-encoding", Some("none"));
         return Action::Continue;
     }
 
