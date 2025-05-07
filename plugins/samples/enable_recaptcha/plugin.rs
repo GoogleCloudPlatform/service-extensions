@@ -158,9 +158,13 @@ impl<'a> MyHttpContext<'a> {
 impl<'a> Context for MyHttpContext<'a> {}
 
 impl<'a> HttpContext for MyHttpContext<'a> {
-    // If request header callback is invoked, body will not be compressed.
+    // Use header 'stop-compression' to toggle body compression.
     fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
-        self.set_http_request_header("accept-encoding", Some("none"));
+        let stop_compression = self.get_http_request_header("Stop-compresssion");
+        if stop_compression.unwrap_or_default() == "true" {
+            self.set_http_request_header("accept-encoding", Some("none"));
+        }
+
         return Action::Continue;
     }
 
