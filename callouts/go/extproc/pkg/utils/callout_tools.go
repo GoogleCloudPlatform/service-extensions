@@ -15,11 +15,16 @@
 package utils
 
 import (
+	"fmt"
+
 	base "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	httpstatus "github.com/envoyproxy/go-control-plane/envoy/type/v3"
+        structpb "google.golang.org/protobuf/types/known/structpb"
 	"github.com/golang/protobuf/proto"
 )
+
+const DYNAMIC_FORWARDING_METADATA_NAMESPACE string = "com.google.envoy.dynamic_forwarding.selected_endpoints"
 
 // HeaderImmediateResponse creates an ImmediateResponse with the given status code, headers to add, and headers to remove.
 // The headers can be appended if appendAction is provided.
@@ -107,4 +112,15 @@ func AddBodyClearMutation(clearRouteCache bool) *extproc.BodyResponse {
 	}
 
 	return bodyResponse
+}
+
+// AddDynamicForwardingMetadata creates a Struct with expected Dynamic Forwarding
+// key and format with provided ip and port.
+func AddDynamicForwardingMetadata(ipAddress string, portNumber int) (*structpb.Struct, error) {
+	formatedEndpoint := fmt.Sprintf("%s:%d", ipAddress, portNumber)
+	return structpb.NewStruct(map[string]any{
+		DYNAMIC_FORWARDING_METADATA_NAMESPACE: map[string]any{
+			"primary": formatedEndpoint,
+		},
+	})
 }

@@ -14,13 +14,13 @@
 
 # Base build image
 FROM launcher.gcr.io/google/ubuntu2204 as build
-RUN apt update && apt upgrade -y
-RUN apt autoremove -y
+RUN apt-get update && apt-get upgrade -y
+RUN apt-get autoremove -y
 
 # Install go for bazelisk
 # Install git/py for v8
 # Install clang/stdc++ for c++
-RUN apt install -y \
+RUN apt-get install -y \
   ca-certificates \
   openssl \
   golang-go \
@@ -37,7 +37,7 @@ RUN openssl s_client -showcerts -connect github.com:443 \
 RUN update-ca-certificates
 
 # Install bazelisk
-RUN go install github.com/bazelbuild/bazelisk@latest
+RUN go install github.com/bazelbuild/bazelisk@v1.21.0
 ENV PATH="${PATH}:/root/go/bin"
 
 # Debug environment

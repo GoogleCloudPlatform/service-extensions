@@ -34,8 +34,9 @@ namespace service_extensions_samples {
 struct ContextOptions {
   // Wasm logging output file.
   std::ofstream log_file;
-  // Static time returned to wasm.
-  absl::Time clock_time = absl::UnixEpoch();
+  // Static time returned to wasm. Must be non-zero for Go plugin
+  // initialization.
+  absl::Time clock_time = absl::UnixEpoch() + absl::Milliseconds(1);
 };
 
 // Buffer class to handle copying to and from an individual BODY chunk.
@@ -105,12 +106,14 @@ class TestContext : public proxy_wasm::TestContext {
   // --- BEGIN Testing facilities ---
   // Unsafe access to logs. Not thread safe w.r.t. plugin execution.
   const std::vector<std::string>& phase_logs() const { return phase_logs_; }
+  const uint64_t logging_bytes() const { return logging_bytes_; }
   // Options to customize context behavior.
   ContextOptions& options() const;
   // --- END   Testing facilities ---
 
  protected:
   std::vector<std::string> phase_logs_;
+  uint64_t logging_bytes_ = 0;
 
  private:
   proxy_wasm::BufferBase plugin_config_;
@@ -218,9 +221,9 @@ class TestHttpContext : public TestContext {
 
   // Testing helpers. Use these instead of direct on*Headers methods.
   Result SendRequestHeaders(Headers headers);
-  Result SendRequestBody(std::string body);
+  Result SendRequestBody(std::string body, bool end_of_stream);
   Result SendResponseHeaders(Headers headers);
-  Result SendResponseBody(std::string body);
+  Result SendResponseBody(std::string body, bool end_of_stream);
 
   enum CallbackType {
     None,
@@ -236,6 +239,7 @@ class TestHttpContext : public TestContext {
   // State tracked during a headers call. Invalid otherwise.
   proxy_wasm::WasmHeaderMapType phase_;
   Result result_;
+  bool sent_local_response_ = false;
 
   Buffer body_buffer_;
   CallbackType current_callback_;

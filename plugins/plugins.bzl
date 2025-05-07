@@ -14,6 +14,7 @@
 
 """Plugin build wrappers."""
 
+load("@io_bazel_rules_go//go:def.bzl", "go_binary")
 load("@proxy_wasm_cpp_host//bazel:wasm.bzl", "wasm_rust_binary")
 load("@proxy_wasm_cpp_sdk//bazel:defs.bzl", "proxy_wasm_cc_binary")
 load("@rules_cc//cc:defs.bzl", "cc_test")
@@ -26,6 +27,28 @@ def proxy_wasm_plugin_rust(**kwargs):
             "-Cstrip=debuginfo",  # Strip debug info, but leave symbols
             "-Clto=yes",  # Link time optimization of the whole binary
         ],
+        **kwargs
+    )
+
+def proxy_wasm_plugin_go(name, srcs, deps = [], **kwargs):
+    """Generates a go binary from the provided main package srcs.
+
+    Args:
+      name: Name for the wasm module.
+      srcs: Source files containing a main package.
+      deps: Optional dependencies of the go binary.
+    """
+
+    go_binary(
+        name = name,
+        srcs = srcs,
+        deps = deps + [
+            "@com_github_proxy_wasm_proxy_wasm_go_sdk//proxywasm:go_default_library",
+            "@com_github_proxy_wasm_proxy_wasm_go_sdk//proxywasm/types:go_default_library",
+        ],
+        goarch = "wasm",
+        goos = "wasip1",
+        linkmode = "c-shared",
         **kwargs
     )
 

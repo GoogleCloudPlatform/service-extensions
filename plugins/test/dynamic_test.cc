@@ -216,7 +216,8 @@ void DynamicTest::TestBody() {
     }
     for (const pb::Invocation& invocation : invocations) {
       TestHttpContext::Result body_result = TestHttpContext::Result{};
-      absl::StatusOr<std::string> complete_input_body = ParseBodyInput(invocation.input());
+      absl::StatusOr<std::string> complete_input_body =
+          ParseBodyInput(invocation.input());
       if (!complete_input_body.ok()) {
         FAIL() << complete_input_body.status();
       }
@@ -228,8 +229,10 @@ void DynamicTest::TestBody() {
       } else {
         chunks = {*complete_input_body};
       }
-      for (std::string& body_chunk : chunks) {
-        TestHttpContext::Result res = invoke_wasm(std::move(body_chunk));
+      for (int i = 0; i < chunks.size(); ++i) {
+        // When there are no trailers, the last body chunk is end of stream.
+        TestHttpContext::Result res =
+            invoke_wasm(std::move(chunks[i]), i == chunks.size() - 1);
         ASSERT_VM_HEALTH(phase, handle, stream);
         body_result.body = body_result.body.append(res.body);
       }
@@ -237,9 +240,11 @@ void DynamicTest::TestBody() {
     }
   };
 
-  ASSERT_NO_FATAL_FAILURE(run_body_test(
-      "request_body", cfg_.request_body(),
-      [&stream](std::string chunk) { return stream.SendRequestBody(chunk); }));
+  ASSERT_NO_FATAL_FAILURE(
+      run_body_test("request_body", cfg_.request_body(),
+                    [&stream](std::string chunk, bool end_of_stream) {
+                      return stream.SendRequestBody(chunk, end_of_stream);
+                    }));
 
   if (cfg_.has_response_headers()) {
     const auto& invoke = cfg_.response_headers();
@@ -250,9 +255,11 @@ void DynamicTest::TestBody() {
     CheckPhaseResults("response_headers", invoke.result(), stream, res);
   }
 
-  ASSERT_NO_FATAL_FAILURE(run_body_test(
-      "response_body", cfg_.response_body(),
-      [&stream](std::string chunk) { return stream.SendResponseBody(chunk); }));
+  ASSERT_NO_FATAL_FAILURE(
+      run_body_test("response_body", cfg_.response_body(),
+                    [&stream](std::string chunk, bool end_of_stream) {
+                      return stream.SendResponseBody(chunk, end_of_stream);
+                    }));
 
   // Tear down HTTP context.
   stream.TearDown();
@@ -278,6 +285,20 @@ void DynamicTest::TestBody() {
     return;                                   \
   }
 
+void DynamicTest::EmitStats(benchmark::State& state,
+                            proxy_wasm::PluginHandleBase& handle,
+                            const TestContext& context) {
+  state.counters["WasmMemoryB"] = benchmark::Counter(
+      handle.wasm()->wasm_vm()->getMemorySize(), benchmark::Counter::kDefaults,
+      benchmark::Counter::kIs1024);
+  state.counters["LogsSizeB"] =
+      benchmark::Counter(context.logging_bytes(), benchmark::Counter::kDefaults,
+                         benchmark::Counter::kIs1024);
+  state.counters["WasmSizeB"] = benchmark::Counter(
+      std::filesystem::file_size(env_.wasm_path()),
+      benchmark::Counter::kDefaults, benchmark::Counter::kIs1024);
+}
+
 void DynamicTest::BenchPluginLifecycle(benchmark::State& state) {
   // Initialize VM.
   auto load_wasm = LoadWasm(/*benchmark=*/true);
@@ -285,10 +306,21 @@ void DynamicTest::BenchPluginLifecycle(benchmark::State& state) {
   auto handle = *load_wasm;
 
   // Benchmark plugin initialization and teardown.
+  bool first = true;
   for (auto _ : state) {
     // Create root context (start) and call configure on it.
     auto plugin_init = InitializePlugin(handle);
     BM_RETURN_IF_ERROR(plugin_init);
+
+    // Emit root stats before teardown. After teardown the context is gone.
+    if (first) {
+      first = false;
+      TestContext* root = static_cast<TestContext*>(
+          handle->wasm()->getRootContext(handle->plugin(),
+                                         /*allow_closed=*/false));
+      EmitStats(state, *handle, *root);
+    }
+
     // Explicit shutdown; required to recreate root context in the next loop.
     handle->wasm()->startShutdown(handle->plugin()->key());
     BM_RETURN_IF_FAILED(handle);
@@ -307,10 +339,17 @@ void DynamicTest::BenchStreamLifecycle(benchmark::State& state) {
   BM_RETURN_IF_FAILED(handle);
 
   // Benchmark stream initialization and teardown.
+  bool first = true;
   for (auto _ : state) {
     auto stream = TestHttpContext(handle);
     benchmark::DoNotOptimize(stream);
     BM_RETURN_IF_FAILED(handle);
+    stream.TearDown();
+
+    if (first) {
+      first = false;
+      EmitStats(state, *handle, stream);
+    }
   }
 }
 
@@ -347,7 +386,7 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
 
   std::optional<TestHttpContext> stream;
   for (auto _ : state) {
-    // Pausing timing here is not recommended. One way we could avoid it:
+    // Pausing timing is not recommended. One way we could avoid it:
     // - include stream context create/destroy cost in handler benchmarks
     // - don't hand ownership of body chunks to stream context
     state.PauseTiming();
@@ -362,8 +401,10 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
-    for (std::string& body : request_body_chunks_copies) {
-      auto res = stream->SendRequestBody(std::move(body));
+    for (int i = 0; i < request_body_chunks_copies.size(); ++i) {
+      std::string& body = request_body_chunks_copies[i];
+      auto res = stream->SendRequestBody(
+        std::move(body), i == request_body_chunks_copies.size() - 1);
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
@@ -372,12 +413,26 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
-    for (std::string& body : response_body_chunks_copies) {
-      auto res = stream->SendResponseBody(std::move(body));
+    for (int i = 0; i < response_body_chunks_copies.size(); ++i) {
+      std::string& body = response_body_chunks_copies[i];
+      auto res = stream->SendResponseBody(
+        std::move(body), i == response_body_chunks_copies.size() - 1);
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
   }
+
+  // TODO: the above doesn't give a realistic view of memory usage under load,
+  // because in a real environment there may be many streams in flight, each
+  // storing some state between callbacks. Consider:
+  //
+  // 1. Holding a configurable number of open streams. This would capture any
+  // state accumulated (and not cleaned up) per stream.
+  //
+  // 2. Interleaving callbacks for those open streams. This would capture any
+  // ephemeral state in each stream (combined allocation peaks). This might
+  // throw off benchmark times.
+  EmitStats(state, *handle, *stream);
 }
 
 void DynamicTest::CheckSideEffects(const std::string& phase,
@@ -601,7 +656,7 @@ std::vector<std::string> DynamicTest::ChunkBody(
 absl::StatusOr<std::vector<std::string>> DynamicTest::PrepBodyCallbackBenchmark(
     const pb::Test& test,
     google::protobuf::RepeatedPtrField<pb::Invocation> invocations) {
-  if (invocations.size() == 0) return std::vector<std::string> {};
+  if (invocations.size() == 0) return std::vector<std::string>{};
   auto body_chunking_plan = test.body_chunking_plan_case();
   if (invocations.size() != 1 &&
       body_chunking_plan !=
@@ -611,7 +666,8 @@ absl::StatusOr<std::vector<std::string>> DynamicTest::PrepBodyCallbackBenchmark(
   }
   std::vector<std::string> chunks;
   for (const pb::Invocation& invocation : invocations) {
-    absl::StatusOr<std::string> complete_input_body = ParseBodyInput(invocation.input());
+    absl::StatusOr<std::string> complete_input_body =
+        ParseBodyInput(invocation.input());
     if (!complete_input_body.ok()) {
       return complete_input_body.status();
     }
