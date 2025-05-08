@@ -22,45 +22,12 @@ test {
     }
   }
 }
-test {
-  name: "NoDefaultResponseHeader"
-  response_headers {
-    result { no_header { key: "Message" } }
-  }
-}
-test {
-  name: "LeavesResponseHeader"
-  response_headers {
-    input { header { key: "Message" value: "non-matching" } }
-    result { has_header { key: "Message" value: "non-matching" } }
-  }
-}
-test {
-  name: "ExtendsResponseHeader"
-  benchmark: true
-  response_headers {
-    input { header { key: "Message" value: "foo" } }
-    result { has_header { key: "Message" value: "foo, bar" } }
-  }
-}
-test {
-  name: "RemovesResponseHeader"
-  benchmark: true
-  response_headers {
-    input { header { key: "Welcome" value: "any" } }
-    result { no_header { key: "Welcome" } }
-  }
-}
 # Behavior is independent of stream.
 test {
   name: "RequestAndResponse"
   benchmark: true
   request_headers {
     result { has_header { key: "Message" value: "hello" } }
-  }
-  response_headers {
-    input { header { key: "Message" value: "foo" } }
-    result { has_header { key: "Message" value: "foo, bar" } }
   }
 }
 # Tests for header name case insensitivity.
@@ -79,19 +46,5 @@ test {
       has_header { key: "message" value: "hey, hello" }
       has_header { key: "welcome" value: "warm" }
     }
-  }
-}
-test {
-  name: "CaseInsensitiveLookup"
-  response_headers {
-    input { header { key: "message" value: "foo" } }
-    result { has_header { key: "message" value: "foo, bar" } }
-  }
-}
-test {
-  name: "CaseInsensitiveRemoval"
-  response_headers {
-    input { header { key: "welcome" value: "any" } }
-    result { no_header { key: "welcome" } }
   }
 }

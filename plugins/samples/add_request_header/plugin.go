@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [START serviceextensions_plugin_add_header]
+// [START serviceextensions_plugin_add_request_header]
 package main
 
 import (
@@ -65,4 +65,4 @@ func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) t
 	return types.ActionContinue
 }
 
-// [END serviceextensions_plugin_add_header]
+// [END serviceextensions_plugin_add_request_header]
