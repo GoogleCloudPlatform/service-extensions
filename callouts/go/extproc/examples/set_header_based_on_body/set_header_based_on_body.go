@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package body_buffering
+package set_header_based_on_body
 
 import (
 	"bytes"
