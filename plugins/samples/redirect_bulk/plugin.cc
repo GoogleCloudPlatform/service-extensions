@@ -22,47 +22,45 @@
 
 // Root context class that handles plugin configuration and domain mappings.
 class MyRootContext : public RootContext {
-public:
-  explicit MyRootContext(uint32_t id, std::string_view root_id)
-      : RootContext(id, root_id) {}
-
-  // Called when the plugin is configured with the provided configuration.
-  bool onConfigure(size_t config_len) override {
-    // Retrieve the plugin configuration data.
-    auto config_data = getBufferBytes(WasmBufferType::PluginConfiguration, 0, config_len);
-    
-    if (!config_data || config_data->size() == 0) {
-      LOG_WARN("No configuration provided, no redirects will be performed");
+  public:
+    explicit MyRootContext(uint32_t id, std::string_view root_id)
+        : RootContext(id, root_id) {}
+  
+    // Called when the plugin is configured with the provided configuration.
+    bool onConfigure(size_t config_len) override {
+      // Retrieve the plugin configuration data.
+      auto config_data = getBufferBytes(WasmBufferType::PluginConfiguration, 0, config_len);
+      
+      if (!config_data || config_data->size() == 0) {
+        LOG_WARN("No configuration provided, no redirects will be performed");
+        return true;
+      }
+  
+      absl::string_view config_str = config_data->view();
+      
+      // Parse each line to extract domain mappings.
+      for (absl::string_view line : absl::StrSplit(config_str, '\n')) {
+        // Strip whitespace and skip empty lines or comments.
+        absl::string_view stripped = absl::StripAsciiWhitespace(line);
+        if (stripped.empty() || stripped[0] == '#') continue;
+  
+        // Split the line into source and target domains.
+        std::vector<absl::string_view> parts = absl::StrSplit(stripped, ' ');
+            
+        if (parts.size() != 2) {
+          LOG_WARN("Invalid mapping format: " + std::string(stripped));
+          continue;
+        }
+  
+        // Convert the source domain to lowercase for case-insensitive matching.
+        std::string source = absl::AsciiStrToLower(parts[0]);
+        domain_mappings_[source] = std::string(parts[1]);
+      }
+  
+      // Log the number of domain mappings loaded.
+      LOG_INFO(absl::StrCat("Loaded ", domain_mappings_.size(), " domain mappings"));
       return true;
     }
-
-    absl::string_view config_str = config_data->view();
-    // Split the configuration string into lines.
-    std::vector<std::string> lines = absl::StrSplit(config_str, '\n');
-
-    // Parse each line to extract domain mappings.
-    for (const auto& line : lines) {
-      // Strip whitespace and skip empty lines or comments.
-      absl::string_view stripped = absl::StripAsciiWhitespace(line);
-      if (stripped.empty() || stripped[0] == '#') continue;
-
-      // Split the line into source and target domains.
-      std::vector<absl::string_view> parts = absl::StrSplit(stripped, ' ');
-          
-      if (parts.size() != 2) {
-        LOG_WARN("Invalid mapping format: " + std::string(stripped));
-        continue;
-      }
-
-      // Convert the source domain to lowercase for case-insensitive matching.
-      std::string source = absl::AsciiStrToLower(parts[0]);
-      domain_mappings_[source] = std::string(parts[1]);
-    }
-
-    // Log the number of domain mappings loaded.
-    LOG_INFO(absl::StrCat("Loaded ", domain_mappings_.size(), " domain mappings"));
-    return true;
-  }
 
   // Map to store domain mappings (source domain -> target domain).
   std::unordered_map<std::string, std::string> domain_mappings_;
