@@ -1,4 +1,4 @@
-// Copyright 2024 Google LLC.
+// Copyright 2025 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/dynamic_forwarding"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/jwt_auth"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/redirect"
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/set_header_based_on_body"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/internal/server"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 )
@@ -51,6 +52,8 @@ func main() {
 		customService = jwt_auth.NewExampleCalloutService()
 	case "dynamic_forwarding":
 		customService = dynamic_forwarding.NewExampleCalloutService()
+	case "set_header_based_on_body":
+		customService = set_header_based_on_body.NewExampleCalloutService()
 	default:
 		fmt.Println("Unknown EXAMPLE_TYPE. Please set it to a valid example")
 		return
