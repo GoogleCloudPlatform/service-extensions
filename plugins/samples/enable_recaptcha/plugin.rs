@@ -158,16 +158,6 @@ impl<'a> MyHttpContext<'a> {
 impl<'a> Context for MyHttpContext<'a> {}
 
 impl<'a> HttpContext for MyHttpContext<'a> {
-    // Use header 'stop-compression' to toggle body compression.
-    fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
-        let stop_compression = self.get_http_request_header("Stop-compresssion");
-        if stop_compression.unwrap_or_default() == "true" {
-            self.set_http_request_header("accept-encoding", Some("none"));
-        }
-
-        return Action::Continue;
-    }
-
     fn on_http_response_body(&mut self, body_size: usize, _: bool) -> Action {
         let chunk_size = 500;
         if *self.completed_script_injection.borrow() {
