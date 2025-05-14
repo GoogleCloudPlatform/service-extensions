@@ -139,11 +139,18 @@ for your own plugin. Extend them to fit your particular use case.
     initial numbers will be masked.
 *   [Validate client token on query string using HMAC](samples/hmac_authtoken):
     Check the client request URL for a valid token signed using HMAC.
+*   [Validate client token using HMAC with cookie](samples/hmac_authcookie): Check
+    the client request for a valid token signed using HMAC provided via a cookie.
 *   [Rewrite domains in html response body](samples/html_domain_rewrite/): Parse
     html in response body chunks and replace insances of "foo.com" with
     "bar.com" in `<a href=***>`.
 *   [Add script in html response body](samples/content_injection/): Inject a
     `<script>` at the start of `<head>` in response body.
+*   [Enable reCAPTCHA challenge on response body](samples/enable_recaptcha/):
+    Enable reCAPTCHA challenge on response body by injecting script into head
+    tag.
+    Warning: This is not a replacement for [official reCAPTCHA documentation](https://developers.google.com/recaptcha).
+
 
 # Feature set / ABI
 
