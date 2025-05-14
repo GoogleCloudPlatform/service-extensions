@@ -144,6 +144,10 @@ for your own plugin. Extend them to fit your particular use case.
 *   [Rewrite domains in html response body](samples/html_domain_rewrite/): Parse
     html in response body chunks and replace insances of "foo.com" with
     "bar.com" in `<a href=***>`.
+*   [Enable reCAPTCHA challenge on response body](samples/enable_recaptcha/):
+    Enable reCAPTCHA challenge on response body by injecting script into head
+    tag.
+    Warning: This is not a replacement for [official reCAPTCHA documentation](https://developers.google.com/recaptcha).
 
 # Feature set / ABI
 
