@@ -12,11 +12,18 @@ proxy_wasm_plugin_rust(
     data = ["config.data"],
 )
 
+proxy_wasm_plugin_go(
+    name = "plugin_go.wasm",
+    srcs = ["plugin.go"],
+    data = ["config.data"],
+)
+
 proxy_wasm_tests(
     name = "tests",
     config = ":config.data",
     plugins = [
         ":plugin_rust.wasm",
+        ":plugin_go.wasm",
     ],
     tests = ":tests.textpb",
 )
