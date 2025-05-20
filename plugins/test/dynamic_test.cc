@@ -229,8 +229,10 @@ void DynamicTest::TestBody() {
       } else {
         chunks = {*complete_input_body};
       }
-      for (std::string& body_chunk : chunks) {
-        TestHttpContext::Result res = invoke_wasm(std::move(body_chunk));
+      for (int i = 0; i < chunks.size(); ++i) {
+        // When there are no trailers, the last body chunk is end of stream.
+        TestHttpContext::Result res =
+            invoke_wasm(std::move(chunks[i]), i == chunks.size() - 1);
         ASSERT_VM_HEALTH(phase, handle, stream);
         body_result.body = body_result.body.append(res.body);
       }
@@ -238,9 +240,11 @@ void DynamicTest::TestBody() {
     }
   };
 
-  ASSERT_NO_FATAL_FAILURE(run_body_test(
-      "request_body", cfg_.request_body(),
-      [&stream](std::string chunk) { return stream.SendRequestBody(chunk); }));
+  ASSERT_NO_FATAL_FAILURE(
+      run_body_test("request_body", cfg_.request_body(),
+                    [&stream](std::string chunk, bool end_of_stream) {
+                      return stream.SendRequestBody(chunk, end_of_stream);
+                    }));
 
   if (cfg_.has_response_headers()) {
     const auto& invoke = cfg_.response_headers();
@@ -251,9 +255,11 @@ void DynamicTest::TestBody() {
     CheckPhaseResults("response_headers", invoke.result(), stream, res);
   }
 
-  ASSERT_NO_FATAL_FAILURE(run_body_test(
-      "response_body", cfg_.response_body(),
-      [&stream](std::string chunk) { return stream.SendResponseBody(chunk); }));
+  ASSERT_NO_FATAL_FAILURE(
+      run_body_test("response_body", cfg_.response_body(),
+                    [&stream](std::string chunk, bool end_of_stream) {
+                      return stream.SendResponseBody(chunk, end_of_stream);
+                    }));
 
   // Tear down HTTP context.
   stream.TearDown();
@@ -395,8 +401,10 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
-    for (std::string& body : request_body_chunks_copies) {
-      auto res = stream->SendRequestBody(std::move(body));
+    for (int i = 0; i < request_body_chunks_copies.size(); ++i) {
+      std::string& body = request_body_chunks_copies[i];
+      auto res = stream->SendRequestBody(
+        std::move(body), i == request_body_chunks_copies.size() - 1);
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
@@ -405,8 +413,10 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
-    for (std::string& body : response_body_chunks_copies) {
-      auto res = stream->SendResponseBody(std::move(body));
+    for (int i = 0; i < response_body_chunks_copies.size(); ++i) {
+      std::string& body = response_body_chunks_copies[i];
+      auto res = stream->SendResponseBody(
+        std::move(body), i == response_body_chunks_copies.size() - 1);
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
