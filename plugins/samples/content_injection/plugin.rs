@@ -26,7 +26,7 @@ proxy_wasm::main! {{
     proxy_wasm::set_http_context(|_, _| -> Box<dyn HttpContext> { MyHttpContext::new()});
 }}
 
-struct MyOutputSink {
+struct SharedRewriterOutputSink {
     // Stores HTML as the rewriter parses and modifies HTML.
     // Only stores sections of HTML that have not yet been seen back to client.
     // After sending data to client, we clear output to avoid unnecessary memory
@@ -35,7 +35,7 @@ struct MyOutputSink {
     output_sink: Rc<RefCell<Vec<u8>>>,
 }
 
-impl OutputSink for MyOutputSink {
+impl OutputSink for SharedRewriterOutputSink {
     fn handle_chunk(&mut self, chunk: &[u8]) {
         self.output_sink.borrow_mut().extend_from_slice(chunk);
     }
@@ -65,7 +65,7 @@ struct MyHttpContext<'a> {
     // HtmlRewriter::end() is called. HtmlRewriter::end() results in all
     // uncompleted Html being buffered in rewriter to be sent to output sink as
     // if it were plain text.
-    rewriter: Option<HtmlRewriter<'a, MyOutputSink>>,
+    rewriter: Option<HtmlRewriter<'a, SharedRewriterOutputSink>>,
     // True when plugin has added script to <head>.
     completed: Rc<RefCell<bool>>,
 }
@@ -79,7 +79,12 @@ impl<'a> MyHttpContext<'a> {
             completed: completed.clone(),
             rewriter: Some(HtmlRewriter::new(
                 Settings {
+                    // Register content handler to match <head> tag. Content for
+                    // the rewriter to match on, and it's behavior in case of
+                    // match, is set at rewriter creation and cannot be modified
+                    // during it's lifetime.
                     element_content_handlers: vec![element!("head", move |el| {
+                        // Prepend element with script
                         el.prepend(
                             "<script src=\"https://www.foo.com/api.js\"></script>",
                             ContentType::Html,
@@ -89,7 +94,7 @@ impl<'a> MyHttpContext<'a> {
                     })],
                     ..Settings::new()
                 },
-                MyOutputSink {
+                SharedRewriterOutputSink {
                     output_sink: output,
                 },
             )),
@@ -119,9 +124,6 @@ impl<'a> MyHttpContext<'a> {
 impl<'a> Context for MyHttpContext<'a> {}
 
 impl<'a> HttpContext for MyHttpContext<'a> {
-    fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
-        return Action::Continue;
-    }
 
     fn on_http_response_body(&mut self, body_size: usize, _: bool) -> Action {
         let chunk_size = 500;
