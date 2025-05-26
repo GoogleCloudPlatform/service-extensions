@@ -6,29 +6,20 @@ proxy_wasm_plugin_rust(
     name = "plugin_rust.wasm",
     srcs = ["plugin.rs"],
     deps = [
+        "//bazel/cargo/remote:log",
         "//bazel/cargo/remote:proxy-wasm",
+        "//bazel/cargo/remote:lol_html",
     ],
-)
-
-proxy_wasm_plugin_cpp(
-    name = "plugin_cpp.wasm",
-    srcs = ["plugin.cc"],
-    deps = [
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-proxy_wasm_plugin_go(
-    name = "plugin_go.wasm",
-    srcs = ["plugin.go"],
 )
 
 proxy_wasm_tests(
     name = "tests",
+    data = [
+        ":expected_response_body.data",
+        ":response_body.data",
+    ],
     plugins = [
-        ":plugin_cpp.wasm",
         ":plugin_rust.wasm",
-        ":plugin_go.wasm",
     ],
     tests = ":tests.textpb",
 )
