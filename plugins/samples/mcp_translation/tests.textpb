@@ -1,0 +1,351 @@
+test {
+  name: "MCPRequestTransformSuccess"
+  request_headers {
+    input {
+      header [
+        {
+          key: "content-type"
+          value: "application/json"
+        },
+        {
+          key: "x-conversation-id"
+          value: "conv-123"
+        },
+        {
+          key: "x-user-id"
+          value: "user-abc"
+        },
+        {
+          key: "x-trace-id"
+          value: "trace-xyz"
+        }
+      ]
+    }
+    result {
+      has_header [
+        {
+          key: "content-type"
+          value: "application/json"
+        }
+      ]
+      no_header [
+        {
+          key: "x-conversation-id"
+        },
+        {
+          key: "x-user-id"
+        },
+        {
+          key: "x-trace-id"
+        }
+      ]
+    }
+  }
+  request_body {
+    input {
+      content: "{\"method\":\"processData\",\"params\":{\"input\":\"value1\",\"flag\":true}}"
+    }
+    result {
+      body {
+        regex: "\\{\"jsonrpc\":\"2\\.0\",\"id\":\"[a-f0-9-]+\",\"method\":\"processData\",\"params\":\\{\"context\":\\{\"conversation_id\":\"conv-123\",\"message_id\":\"[a-f0-9-]+\",\"user_id\":\"user-abc\",\"timestamp\":\"\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z\",\"trace_id\":\"trace-xyz\"\\},\"flag\":true,\"input\":\"value1\"\\}\\}"
+      }
+    }
+  }
+}
+
+test {
+  name: "MCPRequestTransformMissingOptionalContext"
+  request_headers {
+    input {
+      header [
+        {
+          key: "content-type"
+          value: "application/json"
+        }
+      ]
+    }
+    result {
+      has_header [
+        {
+          key: "content-type"
+          value: "application/json"
+        }
+      ]
+    }
+  }
+  request_body {
+    input {
+      content: "{\"method\":\"simpleCall\",\"params\":{}}"
+    }
+    result {
+      body {
+        regex: "\\{\"jsonrpc\":\"2\\.0\",\"id\":\"[a-f0-9-]+\",\"method\":\"simpleCall\",\"params\":\\{\"context\":\\{\"message_id\":\"[a-f0-9-]+\",\"timestamp\":\"\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z\"\\}\\}\\}"
+      }
+    }
+  }
+}
+
+test {
+  name: "MCPResponseTransformSuccess"
+  response_headers {
+    input {
+      header {
+        key: ":status"
+        value: "200"
+      }
+      header {
+        key: "content-type"
+        value: "application/json"
+      }
+      header {
+        key: "x-some-upstream-header"
+        value: "upstream-value"
+      }
+      header {
+        key: "content-length"
+        value: "102"
+      }
+    }
+    result {
+      has_header {
+        key: ":status"
+        value: "200"
+      }
+      has_header {
+        key: "content-type"
+        value: "application/json"
+      }
+      has_header {
+        key: "x-some-upstream-header"
+        value: "upstream-value"
+      }
+    }
+  }
+  response_body {
+    input {
+      content: "{\"jsonrpc\":\"2.0\",\"id\":\"mcp-resp-id-001\",\"result\":{\"processed_data\":\"example_value\",\"status_code\":200}}"
+    }
+    result {
+      body {
+        exact: "{\"processed_data\":\"example_value\",\"status_code\":200}"
+      }
+    }
+  }
+}
+
+test {
+  name: "MCPRequestErrorInvalidJson"
+  request_headers {
+    input {
+      header [
+        {
+          key: "content-type"
+          value: "application/json"
+        }
+      ]
+    }
+  }
+  request_body {
+    input {
+      content: "{\"method\":\"test\", \"params\":{\"key\":\"value\""
+    }
+    result {
+      immediate {
+        http_status: 400
+      }
+      has_header [
+        {
+          key: "content-type"
+          value: "application/json"
+        },
+        {
+          key: "x-mcp-filter-error"
+          value: "true"
+        }
+      ]
+      body {
+        regex: "\\{\"error\":\\{\"code\":\"MCP_REQUEST_PARSE_ERROR\",\"message\":\"Failed to parse request as JSON: EOF while parsing an object at line 1 column 41\"\\}\\}"
+      }
+    }
+  }
+}
+
+test {
+  name: "MCPRequestErrorMissingMethod"
+  request_headers {
+    input {
+      header [
+        {
+          key: "content-type"
+          value: "application/json"
+        }
+      ]
+    }
+  }
+  request_body {
+    input {
+      content: "{\"params\":{\"key\":\"value\"}}"
+    }
+    result {
+      immediate {
+        http_status: 400
+      }
+      has_header [
+        {
+          key: "content-type"
+          value: "application/json"
+        },
+        {
+          key: "x-mcp-filter-error"
+          value: "true"
+        }
+      ]
+      body {
+        exact: "{\"error\":{\"code\":\"MCP_MISSING_METHOD\",\"message\":\"Missing or empty 'method' in original request\"}}"
+      }
+    }
+  }
+}
+
+test {
+  name: "MCPResponseTransformErrorResponse"
+  response_headers {
+    input {
+      header [
+        {
+          key: "content-type"
+          value: "application/json"
+        }
+      ]
+    }
+  }
+  response_body {
+    input {
+      content: "{\"jsonrpc\": \"2.0\", \"id\": \"req-err\", \"error\": {\"code\": -32600, \"message\": \"Invalid Request\"}}"
+    }
+    result {
+      immediate {
+        http_status: 502
+      }
+      has_header [
+        {
+          key: "content-type"
+          value: "application/json"
+        },
+        {
+          key: "x-mcp-filter-error"
+          value: "true"
+        }
+      ]
+      body {
+        regex: "\\{\"error\":\\{\"code\":\"MCP_TOOL_ERROR\",\"message\":\"Error received from downstream tool.\",\"details\":\\{\"code\":-32600,\"message\":\"Invalid Request\"\\}\\}\\}"
+      }
+    }
+  }
+}
+
+test {
+  name: "MCPResponseErrorInvalidJson"
+  response_headers {
+    input {
+      header [
+        {
+          key: "content-type"
+          value: "application/json"
+        }
+      ]
+    }
+  }
+  response_body {
+    input {
+      content: "{\"jsonrpc\": \"2.0\", \"id\": \"req-bad-json\", \"result\": {\"output\": \"ok\""
+    }
+    result {
+      immediate {
+        http_status: 502
+      }
+      has_header [
+        {
+          key: "content-type"
+          value: "application/json"
+        },
+        {
+          key: "x-mcp-filter-error"
+          value: "true"
+        }
+      ]
+      body {
+        regex: "\\{\"error\":\\{\"code\":\"MCP_RESPONSE_PARSE_ERROR\",\"message\":\"Failed to parse MCP response JSON: EOF while parsing an object at line 1 column 66\"\\}\\}"
+      }
+    }
+  }
+}
+
+test {
+  name: "MCPFullFlowSuccess"
+  request_headers {
+    input {
+      header [
+        {
+          key: "content-type"
+          value: "application/json"
+        },
+        {
+          key: "x-conversation-id"
+          value: "conv-full"
+        }
+      ]
+    }
+    result {
+      has_header [
+        {
+          key: "content-type"
+          value: "application/json"
+        }
+      ]
+      no_header [
+        {
+          key: "x-conversation-id"
+        }
+      ]
+    }
+  }
+  request_body {
+    input {
+      content: "{\"method\":\"getData\",\"params\":{\"id\":1}}"
+    }
+    result {
+      body {
+        regex: "\\{\"jsonrpc\":\"2\\.0\",\"id\":\"[a-f0-9-]+\",\"method\":\"getData\",\"params\":\\{\"context\":\\{\"conversation_id\":\"conv-full\",\"message_id\":\"[a-f0-9-]+\",\"timestamp\":\".*\"\\},\"id\":1\\}\\}"
+      }
+    }
+  }
+  response_headers {
+    input {
+      header [
+        {
+          key: "content-type"
+          value: "application/json"
+        }
+      ]
+    }
+    result {
+      has_header [
+        {
+          key: "content-type"
+          value: "application/json"
+        }
+      ]
+    }
+  }
+  response_body {
+    input {
+      content: "{\"jsonrpc\":\"2.0\",\"id\":\"mcp-id-123\",\"result\":{\"data\":\"value\"}}"
+    }
+    result {
+      body {
+        exact: "{\"data\":\"value\"}"
+      }
+    }
+  }
+}
