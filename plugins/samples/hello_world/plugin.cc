@@ -21,22 +21,18 @@ class HelloWorldHttpContext : public Context {
 public:
   explicit HelloWorldHttpContext(uint32_t id, RootContext* root) : Context(id, root) {}
   FilterHeadersStatus onRequestHeaders(uint32_t, bool) override {
-    return FilterHeadersStatus::Continue;
+    // Send a local response with status 200 and "Hello World" as body
+    sendLocalResponse(200, "", "Hello World",
+                      {{"Content-Type", "text/plain"}, {":status", "200"}});
+    return FilterHeadersStatus::StopIteration;
   }
   FilterDataStatus onRequestBody(size_t body_size, bool end_stream) override {
     return FilterDataStatus::Continue;
   }
   FilterHeadersStatus onResponseHeaders(uint32_t headers,
                                         bool end_of_stream) override {
-    // Add the :status header explicitly
-    addResponseHeader(":status", "200");
-    addResponseHeader("Content-Type", "text/plain");
-    
-    // Send a local response with status 200 and "Hello World" as body
-    sendLocalResponse(200, "Hello World", "",
-                      {{"Content-Type", "text/plain"}, {":status", "200"}});
-    return FilterHeadersStatus::StopIteration;
-}
+    return FilterHeadersStatus::Continue;
+  }
 };
 static RegisterContextFactory register_HelloWorldContext(
     CONTEXT_FACTORY(HelloWorldHttpContext),

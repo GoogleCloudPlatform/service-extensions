@@ -31,9 +31,9 @@ impl HttpContext for MyHttpContext {
         self.send_http_response(
             200, 
             vec![("Content-Type", "text/plain")], 
-            Some(b"Hello, World!")
+            Some(b"Hello World")
         );
-        Action::Continue
+        Action::Pause
     }
 }
 // [END serviceextensions_plugin_hello_world]
