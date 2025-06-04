@@ -36,6 +36,33 @@ const (
 	deviceTypeOther   = "other"
 )
 
+// Package-level variables for keyword lists
+var (
+	botKeywords = []string{
+		"bot", "crawler", "spider",
+		"googlebot", "bingbot", "slurp",
+		"duckduckbot", "yandexbot", "baiduspider",
+	}
+
+	tabletKeywords = []string{
+		"ipad", "tablet", "kindle",
+		"tab", "playbook", "nexus 7",
+		"sm-t", "pad", "gt-p",
+	}
+
+	mobileKeywords = []string{
+		"mobile", "android", "iphone",
+		"ipod", "blackberry", "windows phone",
+		"webos", "iemobile", "opera mini",
+	}
+
+	desktopKeywords = []string{
+		"mozilla", "chrome", "safari",
+		"firefox", "msie", "opera",
+		"edge", "chromium", "vivaldi",
+	}
+)
+
 func main() {}
 
 type vmContext struct{ types.DefaultVMContext }
@@ -92,20 +119,12 @@ func detectDeviceType(ua string) string {
 
 // isBot checks if the user agent indicates a bot or crawler
 func isBot(ua string) bool {
-	return containsAny(ua, []string{
-		"bot", "crawler", "spider",
-		"googlebot", "bingbot", "slurp",
-		"duckduckbot", "yandexbot", "baiduspider",
-	})
+	return containsAny(ua, botKeywords)
 }
 
 // isTablet checks if the user agent indicates a tablet device
 func isTablet(ua string) bool {
-	if containsAny(ua, []string{
-		"ipad", "tablet", "kindle",
-		"tab", "playbook", "nexus 7",
-		"sm-t", "pad", "gt-p",
-	}) {
+	if containsAny(ua, tabletKeywords) {
 		return true
 	}
 
@@ -118,20 +137,12 @@ func isTablet(ua string) bool {
 
 // isMobile checks if the user agent indicates a mobile phone
 func isMobile(ua string) bool {
-	return containsAny(ua, []string{
-		"mobile", "android", "iphone",
-		"ipod", "blackberry", "windows phone",
-		"webos", "iemobile", "opera mini",
-	})
+	return containsAny(ua, mobileKeywords)
 }
 
 // isDesktop checks if the user agent indicates a desktop device
 func isDesktop(ua string) bool {
-	return containsAny(ua, []string{
-		"mozilla", "chrome", "safari",
-		"firefox", "msie", "opera",
-		"edge", "chromium", "vivaldi",
-	})
+	return containsAny(ua, desktopKeywords)
 }
 
 // containsAny checks if the string contains any of the substrings provided
