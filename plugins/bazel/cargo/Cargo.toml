@@ -12,7 +12,10 @@ regex = "1.9"
 url = "2.4"
 # Pin version 2.0.0 until rust-version includes https://github.com/rust-lang/rust/issues/119128
 lol_html = "=2.0.0"
-uuid = { version = "1.12.1", features = [ "v4" ] }
+uuid = { version = "1.12.1", features = [ "v4", "serde" ] }
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.140"
 
 [lib]
 crate-type = ["cdylib"]
