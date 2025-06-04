@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [START serviceextensions_plugin_add_header]
+// [START serviceextensions_plugin_add_repoonse_header]
 package main
 
 import (
@@ -47,24 +47,6 @@ func (pc *pluginContext) NewHttpContext(contextID uint32) types.HttpContext {
 	return &httpContext{}
 }
 
-func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) types.Action {
-	defer func() {
-		if err := recover(); err != nil {
-			proxywasm.SendHttpResponse(500, [][2]string{}, []byte(fmt.Sprintf("%v", err)), 0)
-		}
-	}()
-
-	// Add and replace headers.
-	if err := proxywasm.AddHttpRequestHeader("Message", "hello"); err != nil {
-		panic(err)
-	}
-	if err := proxywasm.ReplaceHttpRequestHeader("Welcome", "warm"); err != nil {
-		panic(err)
-	}
-
-	return types.ActionContinue
-}
-
 func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) types.Action {
 	defer func() {
 		if err := recover(); err != nil {
@@ -90,4 +72,4 @@ func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) 
 	return types.ActionContinue
 }
 
-// [END serviceextensions_plugin_add_header]
+// [END serviceextensions_plugin_add_repoonse_header]
