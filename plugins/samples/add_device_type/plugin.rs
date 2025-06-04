@@ -54,46 +54,48 @@ fn detect_device_type(ua: &str) -> String {
     "other".to_string()
 }
 
+// Static keyword arrays defined once at compile time
 fn is_bot(ua: &str) -> bool {
-    let bot_keywords = [
+    static BOT_KEYWORDS: &[&str] = &[
         "bot", "crawler", "spider", "googlebot", 
         "bingbot", "slurp", "duckduckbot", "yandexbot", "baiduspider"
     ];
-    contains_any(ua, &bot_keywords)
+    contains_any(ua, BOT_KEYWORDS)
 }
 
 fn is_tablet(ua: &str) -> bool {
-    let tablet_keywords = [
+    static TABLET_KEYWORDS: &[&str] = &[
         "ipad", "tablet", "kindle", "tab", 
         "playbook", "nexus 7", "sm-t", "pad", "gt-p"
     ];
     
-    if contains_any(ua, &tablet_keywords) {
+    static ANDROID_TABLET_INDICATORS: &[&str] = &["tablet", "tab", "pad"];
+    
+    if contains_any(ua, TABLET_KEYWORDS) {
         return true;
     }
     
     if ua.contains("android") {
-        let android_tablet_indicators = ["tablet", "tab", "pad"];
-        return contains_any(ua, &android_tablet_indicators);
+        return contains_any(ua, ANDROID_TABLET_INDICATORS);
     }
     
     false
 }
 
 fn is_mobile(ua: &str) -> bool {
-    let mobile_keywords = [
+    static MOBILE_KEYWORDS: &[&str] = &[
         "mobile", "android", "iphone", "ipod", 
         "blackberry", "windows phone", "webos", "iemobile", "opera mini"
     ];
-    contains_any(ua, &mobile_keywords)
+    contains_any(ua, MOBILE_KEYWORDS)
 }
 
 fn is_desktop(ua: &str) -> bool {
-    let desktop_keywords = [
+    static DESKTOP_KEYWORDS: &[&str] = &[
         "mozilla", "chrome", "safari", "firefox",
         "msie", "opera", "edge", "chromium", "vivaldi"
     ];
-    contains_any(ua, &desktop_keywords)
+    contains_any(ua, DESKTOP_KEYWORDS)
 }
 
 fn contains_any(s: &str, subs: &[&str]) -> bool {
