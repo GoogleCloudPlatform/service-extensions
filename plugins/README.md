@@ -98,6 +98,8 @@ for your own plugin. Extend them to fit your particular use case.
 *   [Log each Wasm call](samples/log_calls): Don't change anything about the
     traffic (noop plugin). Log each wasm invocation, including lifecycle
     callbacks.
+*   [Hello World](samples/local_reply): Immediately response with "Hello World"
+    upon request.
 *   [Add HTTP request & response headers](samples/add_header): Add a header on
     both the client request and server response paths. Also check for existing
     headers.
@@ -144,10 +146,13 @@ for your own plugin. Extend them to fit your particular use case.
 *   [Rewrite domains in html response body](samples/html_domain_rewrite/): Parse
     html in response body chunks and replace insances of "foo.com" with
     "bar.com" in `<a href=***>`.
+*   [Add script in html response body](samples/content_injection/): Inject a
+    `<script>` at the start of `<head>` in response body.
 *   [Enable reCAPTCHA challenge on response body](samples/enable_recaptcha/):
     Enable reCAPTCHA challenge on response body by injecting script into head
     tag.
     Warning: This is not a replacement for [official reCAPTCHA documentation](https://developers.google.com/recaptcha).
+
 
 # Feature set / ABI
 
