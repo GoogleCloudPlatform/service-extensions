@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [START serviceextensions_plugin_docs_first_plugin]
+// [START serviceextensions_plugin_remove_setcookie]
 package main
 
 import (
@@ -43,29 +43,8 @@ func (*vmContext) NewPluginContext(contextID uint32) types.PluginContext {
 	return &pluginContext{}
 }
 
-func (*pluginContext) NewHttpContext(uint32) types.HttpContext {
+func (p *pluginContext) NewHttpContext(contextID uint32) types.HttpContext {
 	return &httpContext{}
-}
-
-func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) types.Action {
-	defer func() {
-		err := recover()
-		if err != nil {
-			proxywasm.SendHttpResponse(500, [][2]string{}, []byte(fmt.Sprintf("%v", err)), 0)
-		}
-	}()
-	proxywasm.LogInfof("onRequestHeaders: hello from wasm")
-
-	// Route Extension example: host rewrite
-	err := proxywasm.ReplaceHttpRequestHeader(":authority", "service-extensions.com")
-	if err != nil {
-		panic(err)
-	}
-	err = proxywasm.ReplaceHttpRequestHeader(":path", "/")
-	if err != nil {
-		panic(err)
-	}
-	return types.ActionContinue
 }
 
 func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) types.Action {
@@ -75,14 +54,13 @@ func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) 
 			proxywasm.SendHttpResponse(500, [][2]string{}, []byte(fmt.Sprintf("%v", err)), 0)
 		}
 	}()
-	proxywasm.LogInfof("onResponseHeaders: hello from wasm")
 
-	// Traffic Extension example: add response header
-	err := proxywasm.AddHttpResponseHeader("hello", "service-extensions")
-	if err != nil {
-		panic(err)
+	// Remove all Set-Cookie headers from the response
+	if err := proxywasm.RemoveHttpResponseHeader("Set-Cookie"); err != nil {
+		proxywasm.LogErrorf("failed to remove Set-Cookie header: %v", err)
 	}
+
 	return types.ActionContinue
 }
 
-// [END serviceextensions_plugin_docs_first_plugin]
+// [END serviceextensions_plugin_remove_setcookie]
