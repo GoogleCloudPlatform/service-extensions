@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [START serviceextensions_plugin_hello_world_plugin]
+// [START serviceextensions_plugin_hello_world]
 #include "proxy_wasm_intrinsics.h"
 
 class MyHttpContext : public Context {
@@ -24,11 +24,11 @@ class MyHttpContext : public Context {
     LOG_INFO("onRequestHeaders: hello from wasm");
 
     sendLocalResponse(400, "", "Hello World", {});
-    return FilterHeadersStatus::Continue;
+    return FilterHeadersStatus::StopAllIterationAndWatermark;
   }
 
 };
 
 static RegisterContextFactory register_StaticContext(
     CONTEXT_FACTORY(MyHttpContext), ROOT_FACTORY(RootContext));
-// [END serviceextensions_plugin_hello_world_plugin]
+// [END serviceextensions_plugin_hello_world]
