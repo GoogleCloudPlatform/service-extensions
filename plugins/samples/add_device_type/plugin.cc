@@ -17,6 +17,47 @@
 #include "absl/strings/match.h"
 #include "proxy_wasm_intrinsics.h"
 
+class MyRootContext : public RootContext {
+ public:
+  explicit MyRootContext(uint32_t id, std::string_view root_id)
+      : RootContext(id, root_id) {}
+
+  // Define all keyword lists as static variables
+  static const std::vector<std::string>& BotKeywords() {
+    static const auto* bots = new std::vector<std::string>{
+        "bot", "crawler", "spider", "googlebot", "bingbot", "slurp",
+        "duckduckbot", "yandexbot", "baiduspider"};
+    return *bots;
+  }
+
+  static const std::vector<std::string>& TabletKeywords() {
+    static const auto* tablets = new std::vector<std::string>{
+        "ipad", "tablet", "kindle", "tab", "playbook", "nexus 7",
+        "sm-t", "pad", "gt-p"};
+    return *tablets;
+  }
+
+  static const std::vector<std::string>& AndroidIndicators() {
+    static const auto* indicators = new std::vector<std::string>{
+        "tablet", "tab", "pad"};
+    return *indicators;
+  }
+
+  static const std::vector<std::string>& MobileKeywords() {
+    static const auto* mobiles = new std::vector<std::string>{
+        "mobile", "android", "iphone", "ipod", "blackberry",
+        "windows phone", "webos", "iemobile", "opera mini"};
+    return *mobiles;
+  }
+
+  static const std::vector<std::string>& DesktopKeywords() {
+    static const auto* desktops = new std::vector<std::string>{
+        "mozilla", "chrome", "safari", "firefox",
+        "msie", "opera", "edge", "chromium", "vivaldi"};
+    return *desktops;
+  }
+};
+
 class MyHttpContext : public Context {
  public:
   explicit MyHttpContext(uint32_t id, RootContext* root) : Context(id, root) {}
@@ -46,38 +87,24 @@ class MyHttpContext : public Context {
   }
 
   bool IsBot(const std::string& ua) const {
-    const std::vector<std::string> bots = {
-        "bot", "crawler", "spider", "googlebot", "bingbot", "slurp",
-        "duckduckbot", "yandexbot", "baiduspider"};
-    return ContainsAny(ua, bots);
+    return ContainsAny(ua, MyRootContext::BotKeywords());
   }
 
   bool IsTablet(const std::string& ua) const {
-    const std::vector<std::string> tablet_keywords = {
-        "ipad", "tablet", "kindle", "tab", "playbook", "nexus 7",
-        "sm-t", "pad", "gt-p"};
-    
-    if (ContainsAny(ua, tablet_keywords)) return true;
+    if (ContainsAny(ua, MyRootContext::TabletKeywords())) return true;
     
     if (absl::StrContains(ua, "android")) {
-      const std::vector<std::string> android_indicators = {"tablet", "tab", "pad"};
-      return ContainsAny(ua, android_indicators);
+      return ContainsAny(ua, MyRootContext::AndroidIndicators());
     }
     return false;
   }
 
   bool IsMobile(const std::string& ua) const {
-    const std::vector<std::string> mobile_keywords = {
-        "mobile", "android", "iphone", "ipod", "blackberry",
-        "windows phone", "webos", "iemobile", "opera mini"};
-    return ContainsAny(ua, mobile_keywords);
+    return ContainsAny(ua, MyRootContext::MobileKeywords());
   }
 
   bool IsDesktop(const std::string& ua) const {
-    const std::vector<std::string> desktop_keywords = {
-        "mozilla", "chrome", "safari", "firefox",
-        "msie", "opera", "edge", "chromium", "vivaldi"};
-    return ContainsAny(ua, desktop_keywords);
+    return ContainsAny(ua, MyRootContext::DesktopKeywords());
   }
 
   bool ContainsAny(const std::string& ua,
@@ -90,5 +117,5 @@ class MyHttpContext : public Context {
 };
 
 static RegisterContextFactory register_StaticContext(
-    CONTEXT_FACTORY(MyHttpContext), ROOT_FACTORY(RootContext));
+    CONTEXT_FACTORY(MyHttpContext), ROOT_FACTORY(MyRootContext));
 // [END serviceextensions_plugin_device_type]
