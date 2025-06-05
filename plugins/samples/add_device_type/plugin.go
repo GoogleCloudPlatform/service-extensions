@@ -124,15 +124,7 @@ func isBot(ua string) bool {
 
 // isTablet checks if the user agent indicates a tablet device
 func isTablet(ua string) bool {
-	if containsAny(ua, tabletKeywords) {
-		return true
-	}
-
-	// Check for Android tablet indicators in the user agent
-	return strings.Contains(ua, "android") &&
-		(strings.Contains(ua, "tablet") ||
-			strings.Contains(ua, "tab") ||
-			strings.Contains(ua, "pad"))
+	return containsAny(ua, tabletKeywords)
 }
 
 // isMobile checks if the user agent indicates a mobile phone
