@@ -1,6 +1,6 @@
-# Load Testing for Add Body Callout
+# Load Testing for End-to-End (E2E) Tests Callout
 
-This directory contains load testing tools and configurations for the Add Body callout service.
+This directory contains load testing tools and configurations for the End-to-End (E2E) Tests callout service.
 
 ## Prerequisites
 
@@ -24,7 +24,6 @@ Execute the load test script with default parameters:
 ### Output
 Results will be saved in the `results/` directory with timestamped filenames:
 - `.json`: Detailed results in JSON format
-- `.html`: Visual report in HTML format
 
 ## Test Configuration
 
