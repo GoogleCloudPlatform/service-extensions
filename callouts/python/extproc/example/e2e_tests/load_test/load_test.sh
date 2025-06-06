@@ -1,12 +1,12 @@
 #!/bin/bash
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOST="localhost"
-PORT="8443"  # Porta padrão para SSL
+PORT="8443"  # SSL default port
 TEMP_PROTO_DIR="$SCRIPT_DIR/temp_protos"
 IMPORT_PATHS="$TEMP_PROTO_DIR/protodef"
 PROTO_FILE="$IMPORT_PATHS/envoy/service/ext_proc/v3/external_processor.proto"
 
-# Request data com metadados
+# Request data with metadata
 REQUEST_DATA_METADATA='[
   {
     "request_headers": {
@@ -31,7 +31,7 @@ REQUEST_DATA_METADATA='[
   }
 ]'
 
-# Request data sem metadados
+# Request data with no metadata
 REQUEST_DATA_NO_METADATA='[
   {
     "request_headers": {
@@ -109,7 +109,7 @@ copy_proto "envoy/config/core/v3/address.proto"
 copy_proto "envoy/config/core/v3/socket_option.proto"
 copy_proto "envoy/type/v3/range.proto"
 
-# Teste com metadados
+# Test with metadata
 echo "Starting METADATA test with $TOTAL_REQUESTS requests and $CONCURRENT concurrent connections"
 ghz --insecure "$HOST:$PORT" \
   --proto "$PROTO_FILE" \
@@ -121,7 +121,7 @@ ghz --insecure "$HOST:$PORT" \
   -O json \
   -o "$OUTPUT_FILE_METADATA"
 
-# Teste sem metadados
+# Test with no metadata
 echo "Starting NO METADATA test with $TOTAL_REQUESTS requests and $CONCURRENT concurrent connections"
 ghz --insecure "$HOST:$PORT" \
   --proto "$PROTO_FILE" \

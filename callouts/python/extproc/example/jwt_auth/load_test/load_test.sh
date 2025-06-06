@@ -1,5 +1,5 @@
 #!/bin/bash
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOST="localhost"
 PORT="8080"
 TEMP_PROTO_DIR="$SCRIPT_DIR/temp_protos"
@@ -15,7 +15,7 @@ REQUEST_DATA_VALID='{
   "request_headers": {
     "headers": {
       "headers": [
-        {"key": "Authorization", "raw_value": "QmVhcmVyICVz"}' # Base64 for "Bearer %s"
+        {"key": "Authorization", "raw_value": "QmVhcmVyICVz"}
       ]
     },
     "end_of_stream": true
@@ -26,7 +26,7 @@ REQUEST_DATA_INVALID='{
   "request_headers": {
     "headers": {
       "headers": [
-        {"key": "Authorization", "raw_value": "QmVhcmVyICVz"}' # Base64 for "Bearer %s"
+        {"key": "Authorization", "raw_value": "QmVhcmVyICVz"}
       ]
     },
     "end_of_stream": true

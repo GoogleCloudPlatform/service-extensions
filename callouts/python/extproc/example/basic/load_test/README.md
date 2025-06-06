@@ -24,7 +24,6 @@ Execute the load test script with default parameters:
 ### Output
 Results will be saved in the `results/` directory with timestamped filenames:
 - `.json`: Detailed results in JSON format
-- `.html`: Visual report in HTML format
 
 ## Test Configuration
 
