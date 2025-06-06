@@ -12,11 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // [START serviceextensions_plugin_hello_world]
+
 #include "proxy_wasm_intrinsics.h"
+
 class HelloWorldRootContext : public RootContext {
+
 public:
   explicit HelloWorldRootContext(uint32_t id, std::string_view root_id) : RootContext(id, root_id) {}
 };
+
 class HelloWorldHttpContext : public Context {
 public:
   explicit HelloWorldHttpContext(uint32_t id, RootContext* root) : Context(id, root) {}
@@ -26,14 +30,18 @@ public:
                       {{"Content-Type", "text/plain"}, {":status", "200"}});
     return FilterHeadersStatus::StopIteration;
   }
+
   FilterDataStatus onRequestBody(size_t body_size, bool end_stream) override {
     return FilterDataStatus::Continue;
   }
+
   FilterHeadersStatus onResponseHeaders(uint32_t headers,
                                         bool end_of_stream) override {
     return FilterHeadersStatus::Continue;
   }
+
 };
+
 static RegisterContextFactory register_HelloWorldContext(
     CONTEXT_FACTORY(HelloWorldHttpContext),
     ROOT_FACTORY(HelloWorldRootContext));

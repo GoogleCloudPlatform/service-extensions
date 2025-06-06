@@ -21,21 +21,27 @@ func main() {}
 func init() {
 	proxywasm.SetVMContext(&vmContext{})
 }
+
 type vmContext struct {
 	types.DefaultVMContext
 }
+
 type pluginContext struct {
 	types.DefaultPluginContext
 }
+
 type httpContext struct {
 	types.DefaultHttpContext
 }
+
 func (vc *vmContext) NewPluginContext(contextID uint32) types.PluginContext {
 	return &pluginContext{}
 }
+
 func (pc *pluginContext) NewHttpContext(contextID uint32) types.HttpContext {
 	return &httpContext{}
 }
+
 func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) types.Action {
 	// Send HTTP response immediately to avoid unnecessary path
 	proxywasm.SendHttpResponse(200, [][2]string{
@@ -44,10 +50,13 @@ func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) t
 	}, []byte("Hello World"), -1)
 	return types.ActionPause
 }
+
 func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) types.Action {
 	return types.ActionContinue
 }
+
 func (ctx *httpContext) OnHttpResponseBody(bodySize int, endOfStream bool) types.Action {
 	return types.ActionContinue
 }
+
 // [END serviceextensions_plugin_hello_world]
