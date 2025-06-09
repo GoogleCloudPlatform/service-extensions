@@ -5,10 +5,56 @@ PORT="8080"
 TEMP_PROTO_DIR="$SCRIPT_DIR/temp_protos"
 IMPORT_PATHS="$TEMP_PROTO_DIR/protodef"
 PROTO_FILE="$IMPORT_PATHS/envoy/service/ext_proc/v3/external_processor.proto"
-REQUEST_DATA='{"request_body":{"body":"b3JpZ2luYWwtYm9keQ==","end_of_stream":true}}'
+
+# For add-body example, we need to test both request_body and response_body handling
+REQUEST_DATA='{
+  "response_body": {
+    "body": "b3JpZ2luYWwtYm9keQ==",
+    "end_of_stream": true
+  }
+}'
+
 TOTAL_REQUESTS=${1:-1000}
 CONCURRENT=${2:-20}
 OUTPUT_FILE="$SCRIPT_DIR/results/$(date +%Y%m%d_%H%M%S).json"
+
+# Function to process test results
+process_results() {
+    local result_file=$1
+    
+    if [ -f "$result_file" ]; then
+        echo "Summary:"
+        if command -v jq &> /dev/null; then
+            local count=$(jq '.count' "$result_file")
+            local total=$(jq '.total' "$result_file")
+            local average=$(jq '.average' "$result_file")
+            local rps=$(jq '.rps' "$result_file")
+            
+            # Get success count from statusCodeDistribution
+            local ok_count=$(jq '.statusCodeDistribution.OK' "$result_file")
+            
+            # Calculate success rate
+            local success_rate="0.00"
+            if [ "$count" != "0" ] && [ ! -z "$ok_count" ] && [ "$ok_count" != "null" ]; then
+                success_rate=$(echo "scale=2; ($ok_count / $count) * 100" | bc)
+            fi
+            
+            local total_ms=$(echo "scale=2; $total / 1000000" | bc)
+            local average_ms=$(echo "scale=2; $average / 1000000" | bc)
+            
+            printf "Total requests: %d\n" "$count"
+            printf "Total time: %s ms\n" "$total_ms"
+            printf "Average latency: %s ms\n" "$average_ms"
+            printf "Requests per second: %s\n" "$rps"
+            printf "Success rate: %s%%\n" "$success_rate"
+        else
+            echo "Install jq for detailed summary: sudo apt install jq"
+            echo "Raw results: $result_file"
+        fi
+    else
+        echo "Test results not available"
+    fi
+}
 
 # Function to recursively copy protos
 copy_proto() {
@@ -81,9 +127,6 @@ copy_proto "envoy/config/core/v3/address.proto"
 copy_proto "envoy/config/core/v3/socket_option.proto"
 copy_proto "envoy/type/v3/range.proto"
 
-# Skip Google protobuf files that cause errors
-# They are not needed as they're included with ghz
-
 # Run load test
 echo "Starting load test with $TOTAL_REQUESTS requests and $CONCURRENT concurrent connections"
 ghz --insecure "$HOST:$PORT" \
@@ -93,41 +136,17 @@ ghz --insecure "$HOST:$PORT" \
   -d "$REQUEST_DATA" \
   -n "$TOTAL_REQUESTS" \
   -c "$CONCURRENT" \
+  --timeout=5s \
+  --connect-timeout=3s \
   -O json \
   -o "$OUTPUT_FILE"
 
-# Process results
-if [ $? -eq 0 ]; then
-    echo "Success! Results saved to $OUTPUT_FILE"
-    echo "Summary:"
-    
-    if command -v jq &> /dev/null; then
-        count=$(jq '.count' "$OUTPUT_FILE")
-        total=$(jq '.total' "$OUTPUT_FILE")
-        average=$(jq '.average' "$OUTPUT_FILE")
-        rps=$(jq '.rps' "$OUTPUT_FILE")
-        
-        # Convert nanoseconds to milliseconds
-        total_ms=$(echo "scale=2; $total / 1000000" | bc)
-        average_ms=$(echo "scale=2; $average / 1000000" | bc)
-        
-        printf "Total requests: %d\n" "$count"
-        printf "Total time: %s ms\n" "$total_ms"
-        printf "Average latency: %s ms\n" "$average_ms"
-        printf "Requests per second: %s\n" "$rps"
+test_result=$?
 
-        # Calculate success rate
-        if jq -e '.statusCodeDistribution.OK' "$OUTPUT_FILE" >/dev/null; then
-            ok_count=$(jq '.statusCodeDistribution.OK' "$OUTPUT_FILE")
-            success_rate=$(echo "scale=2; ($ok_count / $count) * 100" | bc)
-            printf "Success rate: %s%%\n" "$success_rate"
-        else
-            echo "Success rate: 0.00%"
-        fi
-    else
-        echo "Install jq for detailed summary: sudo apt install jq"
-        echo "Raw results: $OUTPUT_FILE"
-    fi
+# Process results
+if [ $test_result -eq 0 ] || [ -f "$OUTPUT_FILE" ]; then
+    echo "Results saved to $OUTPUT_FILE"
+    process_results "$OUTPUT_FILE"
 else
     echo "Load test failed."
     exit 1
