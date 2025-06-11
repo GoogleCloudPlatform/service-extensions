@@ -17,6 +17,7 @@ Provides a customizeable, out of the box, service callout server.
 Takes in service callouts and performs header and body transformations.
 Bundled with an optional health check server.
 Can be set up to use ssl certificates.
+Uses multiprocessing for improved concurrency.
 """
 
 from concurrent import futures
@@ -24,8 +25,10 @@ from http.server import BaseHTTPRequestHandler
 from http.server import HTTPServer
 import logging
 import ssl
-from typing import Iterator, Union
-from typing import Iterable
+from typing import Iterator, Union, Iterable, Any
+
+import multiprocessing
+import os
 
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpBody
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpHeaders
@@ -39,7 +42,6 @@ from envoy.service.ext_proc.v3.external_processor_pb2_grpc import (
 from envoy.service.ext_proc.v3.external_processor_pb2_grpc import (
     ExternalProcessorServicer,)
 import grpc
-from google.protobuf.struct_pb2 import Struct
 from grpc import ServicerContext
 
 
@@ -62,6 +64,28 @@ class HealthCheckService(BaseHTTPRequestHandler):
     """Returns an empty page with 200 status code."""
     self.send_response(200)
     self.end_headers()
+
+
+def run_grpc_worker_entrypoint(
+  callout_server_class: type['CalloutServer'],
+  worker_init_kwargs: dict[str, Any],
+  shutdown_event: multiprocessing.Event
+):
+  logging.basicConfig(level=logging.INFO,
+                      format='%(asctime)s - %(levelname)s - %(processName)s (%(process)d) - %(message)s')
+  processor_instance = callout_server_class(**worker_init_kwargs)
+  logging.info("gRPC worker process started with recreated processor instance.")
+  grpc_service_instance = _GRPCCalloutService(processor=processor_instance)
+  grpc_service_instance.start()
+  try:
+    shutdown_event.wait()
+    logging.info("Shutdown event received in worker, stopping gRPC server.")
+  except KeyboardInterrupt:
+    logging.info("KeyboardInterrupt in worker process, stopping gRPC server.")
+  finally:
+    logging.info("Worker process ensuring gRPC server is stopped.")
+    grpc_service_instance.stop()
+    logging.info("gRPC server in worker process stopped.")
 
 
 class CalloutServer:
@@ -106,14 +130,13 @@ class CalloutServer:
       private_key: bytes | None = None,
       private_key_path: str = './extproc/ssl_creds/privatekey.pem',
       server_thread_count: int = 2,
+      num_processes: int | None = None,
+      is_worker_processor_instance: bool = False
   ):
-    self._setup = False
-    self._shutdown = False
-    self._closed = False
-    self._health_check_server: HTTPServer | None = None
+    self._is_worker_processor_instance = is_worker_processor_instance
     default_ip = default_ip or '0.0.0.0'
 
-    self.address: tuple[str, int] = address or (default_ip, 443)
+    self.address: tuple[str, int] = address or (default_ip, 8443)
     if port:
       self.address = (self.address[0], port)
 
@@ -137,80 +160,176 @@ class CalloutServer:
       return None
 
     self.server_thread_count = server_thread_count
-    self.secure_health_check = secure_health_check
-    # Read cert data.
-    self.private_key = private_key or _read_cert_file(private_key_path)
-    self.cert_chain = cert_chain or _read_cert_file(cert_chain_path)
+    self.private_key = private_key if private_key is not None else _read_cert_file(
+      private_key_path)
+    self.cert_chain = cert_chain if cert_chain is not None else _read_cert_file(
+      cert_chain_path)
 
-    if secure_health_check:
-      if not private_key_path:
-        logging.error("Secure health check requires a private_key_path.")
-        return
-      if not cert_chain_path:
-        logging.error("Secure health check requires a cert_chain_path.")
-        return
-      self.health_check_ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-      self.health_check_ssl_context.load_cert_chain(certfile=cert_chain_path,
-                                                    keyfile=private_key_path)
+    if not self._is_worker_processor_instance:
+      self._setup = False
+      self._shutdown_initiated = False
+      self._closed = False
+      self._health_check_server: HTTPServer | None = None
 
-    self._callout_server = _GRPCCalloutService(self)
+
+      self.num_processes = num_processes if num_processes is not None else os.cpu_count()
+      if self.num_processes is None or self.num_processes < 1:
+        logging.warning(
+          "Could not determine CPU count or invalid num_processes, defaulting to 1 worker.")
+        self.num_processes = 1
+
+      self._grpc_shutdown_event = multiprocessing.Event()
+      self._grpc_worker_processes: list[multiprocessing.Process] = []
+
+
+
+      self.secure_health_check = secure_health_check
+      if self.secure_health_check:
+        if not (private_key_path or self.private_key) or not (
+          cert_chain_path or self.cert_chain):
+          logging.error(
+            "Secure health check requires private key and certificate chain.")
+          self.secure_health_check = False
+        else:
+          try:
+            self.health_check_ssl_context = ssl.SSLContext(
+              ssl.PROTOCOL_TLS_SERVER)
+            keyfile_for_hc = private_key_path if private_key_path else None
+            certfile_for_hc = cert_chain_path if cert_chain_path else None
+            if not keyfile_for_hc or not certfile_for_hc:
+              logging.error(
+                "Secure health check requires private_key_path and cert_chain_path for SSLContext.")
+              self.secure_health_check = False
+            else:
+              self.health_check_ssl_context.load_cert_chain(
+                certfile=certfile_for_hc, keyfile=keyfile_for_hc)
+          except Exception as e:
+            logging.error(
+              f"Failed to load SSL context for secure health check: {e}")
+            self.secure_health_check = False
+
+      if self.private_key is None or self.cert_chain is None:
+        logging.warning(
+          "Main Server: Private key or certificate chain is not fully loaded. Secure gRPC server might not start if these are required by workers.")
 
   def run(self) -> None:
     """Start all requested servers and listen for new connections; blocking."""
+
+    if self._is_worker_processor_instance: logging.error(
+      "run() should not be called on a worker."); return
+    if self._setup and not self._closed: logging.warning(
+      "Server is already running."); return
+    if self._closed: logging.error(
+      "Server has been shutdown and cannot be restarted."); return
+
+    self._grpc_shutdown_event.clear()
     self._start_servers()
     self._setup = True
+    self._closed = False
+    logging.info("CalloutServer: All servers/processes initiated.")
     try:
       self._loop_server()
     except KeyboardInterrupt:
-      logging.info('Server interrupted')
+      logging.info(
+        'CalloutServer: KeyboardInterrupt received, initiating shutdown.')
     finally:
-      self._stop_servers()
+      logging.info('CalloutServer: Initiating shutdown sequence.')
+      self.shutdown()
       self._closed = True
+      logging.info('CalloutServer: Shutdown complete.')
 
   def _start_servers(self) -> None:
     """Start the requested servers."""
+    if self._is_worker_processor_instance: return
+
     if self.health_check_address:
       self._health_check_server = HTTPServer(self.health_check_address,
                                              HealthCheckService)
       protocol = 'HTTP'
-      if self.secure_health_check:
-        protocol = 'HTTPS'
-        self._health_check_server.socket = (
-          self.health_check_ssl_context.wrap_socket(
-            sock=self._health_check_server.socket,))
-
+      if self.secure_health_check and hasattr(self, 'health_check_ssl_context'):
+        try:
+          self._health_check_server.socket = (
+            self.health_check_ssl_context.wrap_socket(
+              sock=self._health_check_server.socket, server_side=True))
+          protocol = 'HTTPS'
+        except Exception as e:
+          logging.error(
+            f"Failed to wrap health check socket with SSL: {e}. Starting as HTTP.")
       logging.info('%s health check server bound to %s.', protocol,
                    _addr_to_str(self.health_check_address))
-    self._callout_server.start()
 
-  def _stop_servers(self) -> None:
-    """Close the sockets of all servers, and trigger shutdowns."""
-    if self._health_check_server:
-      self._health_check_server.server_close()
-      self._health_check_server.shutdown()
-      logging.info('Health check server stopped.')
+    worker_init_kwargs = {
+      'address': self.address, 'plaintext_address': self.plaintext_address,
+      'disable_plaintext': self.plaintext_address is None,
+      'cert_chain': self.cert_chain, 'private_key': self.private_key,
+      'cert_chain_path': None, 'private_key_path': None,
+      'server_thread_count': self.server_thread_count,
+      'is_worker_processor_instance': True,
+    }
 
-    if self._callout_server:
-      self._callout_server.stop()
+    logging.info(
+      f"Starting {self.num_processes} gRPC worker process(es).")
+    for i in range(self.num_processes):
+      process_name = f'gRPCWorker-{i + 1}'
+      process = multiprocessing.Process(
+        target=run_grpc_worker_entrypoint,
+        args=(self.__class__, worker_init_kwargs, self._grpc_shutdown_event),
+        name=process_name
+      )
+      self._grpc_worker_processes.append(process)
+      process.start()
+      logging.info(f"Process {process_name} (PID {process.pid}) started.")
 
   def _loop_server(self) -> None:
     """Loop server forever, calling shutdown will cause the server to stop."""
 
     # We chose the main serving thread based on what server configuration
     # was requested. Defaults to the health check thread.
+    if self._is_worker_processor_instance: return
     if self._health_check_server:
       logging.info("Health check server started.")
       self._health_check_server.serve_forever()
+      logging.info("Health check server has stopped serving.")
     else:
-      # If the only server requested is a grpc callout server, we wait on the grpc server.
-      self._callout_server.loop()
+      logging.info(
+        "Main process waiting for shutdown signal (no health check server).")
+      self._grpc_shutdown_event.wait()
+      logging.info("Main process received shutdown signal.")
 
   def shutdown(self) -> None:
     """Tell the server to shutdown, ending all serving threads."""
-    if self._health_check_server:
+    if self._is_worker_processor_instance: return
+    if self._shutdown_initiated: logging.info(
+      "Shutdown already in progress."); return
+    self._shutdown_initiated = True
+    logging.info("CalloutServer: Starting shutdown...")
+
+    if hasattr(self, '_grpc_shutdown_event'): self._grpc_shutdown_event.set()
+
+    if hasattr(self, '_health_check_server') and self._health_check_server:
+      logging.info("Shutting down health check server...")
       self._health_check_server.shutdown()
-    if self._callout_server:
-      self._callout_server.stop()
+      self._health_check_server.server_close()
+      logging.info('Health check server stopped.')
+      self._health_check_server = None
+
+    if hasattr(self, '_grpc_worker_processes'):
+      logging.info("Joining gRPC worker processes...")
+      for process in self._grpc_worker_processes:
+        if process.is_alive():
+          logging.info(f"Joining process {process.name} (PID {process.pid})...")
+          process.join(timeout=25)
+          if process.is_alive():
+            logging.warning(
+              f"Process {process.name} did not exit gracefully, terminating.")
+            process.terminate()
+            process.join()
+          else:
+            logging.info(f"Process {process.name} joined successfully.")
+        else:
+          logging.info(f"Process {process.name} was already stopped.")
+      self._grpc_worker_processes = []
+      logging.info("All gRPC worker processes joined/terminated.")
 
   def process(
       self,
@@ -235,7 +354,7 @@ class CalloutServer:
         case HeadersResponse() | None as header_response:
           return ProcessingResponse(request_headers=header_response)
         case _:
-          logging.warn("MALFORMED CALLOUT %s", callout)
+          logging.warning("MALFORMED CALLOUT %s", callout)
     elif callout.HasField('response_headers'):
       return ProcessingResponse(response_headers=self.on_response_headers(
           callout.response_headers, context))
@@ -246,7 +365,7 @@ class CalloutServer:
         case BodyResponse() | None as body_response:
           return ProcessingResponse(request_body=body_response)
         case _:
-          logging.warn("MALFORMED CALLOUT %s", callout)
+          logging.warning("MALFORMED CALLOUT %s", callout)
     elif callout.HasField('response_body'):
       return ProcessingResponse(
           response_body=self.on_response_body(callout.response_body, context))
@@ -319,30 +438,48 @@ class CalloutServer:
 
 class _GRPCCalloutService(ExternalProcessorServicer):
   """GRPC based Callout server implementation."""
-
-  def __init__(self, processor, *args, **kwargs):
+  def __init__(self, processor: CalloutServer, *args, **kwargs):
     self._processor = processor
+    server_options = (('grpc.so_reuseport', 1),)
     self._server = grpc.server(
-        futures.ThreadPoolExecutor(max_workers=processor.server_thread_count))
+      futures.ThreadPoolExecutor(max_workers=processor.server_thread_count),
+      options=server_options)
     add_ExternalProcessorServicer_to_server(self, self._server)
-    server_credentials = grpc.ssl_server_credentials(
-        private_key_certificate_chain_pairs=[(processor.private_key,
-                                              processor.cert_chain)])
-    address_str = _addr_to_str(processor.address)
-    self._server.add_secure_port(address_str, server_credentials)
-    self._start_msg = f'GRPC callout server started, listening on {address_str}.'
+    self._start_msg = ""
+    can_start_secure = False
+    if processor.private_key and processor.cert_chain:
+      try:
+        creds = grpc.ssl_server_credentials(
+          [(processor.private_key, processor.cert_chain)])
+        addr_str = _addr_to_str(processor.address)
+        self._server.add_secure_port(addr_str, creds)
+        self._start_msg = f'gRPC callout server (secure) listening on {addr_str}'
+        can_start_secure = True
+      except Exception as e:
+        logging.error(f"Failed to add secure port {processor.address}: {e}")
+        self._start_msg = 'gRPC (secure port FAILED)'
+    else:
+      self._start_msg = 'gRPC (secure port NOT configured)'
+      logging.info(self._start_msg)
+
+    can_start_plaintext = False
     if processor.plaintext_address:
-      plaintext_address_str = _addr_to_str(processor.plaintext_address)
-      self._server.add_insecure_port(plaintext_address_str)
-      self._start_msg += f' (secure) and {plaintext_address_str} (plaintext)'
+      addr_str_plain = _addr_to_str(processor.plaintext_address)
+      try:
+        self._server.add_insecure_port(addr_str_plain)
+        current_status = self._start_msg + " | " if self._start_msg and not (
+            'NOT configured' in self._start_msg or 'FAILED' in self._start_msg) else ""
+        self._start_msg = f'{current_status}gRPC (plaintext) listening on {addr_str_plain}'
+        can_start_plaintext = True
+      except Exception as e:
+        logging.error(f"Failed to add insecure port {addr_str_plain}: {e}")
+        self._start_msg += " | (plaintext port FAILED)"
+    if not can_start_secure and not can_start_plaintext: self._start_msg = "gRPC server NOT started: No valid config."
 
   def stop(self) -> None:
     self._server.stop(grace=10)
     self._server.wait_for_termination(timeout=10)
     logging.info('GRPC server stopped.')
-
-  def loop(self) -> None:
-    self._server.wait_for_termination()
 
   def start(self) -> None:
     self._server.start()
