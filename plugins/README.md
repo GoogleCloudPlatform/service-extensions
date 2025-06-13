@@ -98,6 +98,8 @@ for your own plugin. Extend them to fit your particular use case.
 *   [Log each Wasm call](samples/log_calls): Don't change anything about the
     traffic (noop plugin). Log each wasm invocation, including lifecycle
     callbacks.
+*   [Hello World](samples/local_reply): Immediately response with "Hello World"
+    upon request.
 *   [Add HTTP request & response headers](samples/add_header): Add a header on
     both the client request and server response paths. Also check for existing
     headers.
