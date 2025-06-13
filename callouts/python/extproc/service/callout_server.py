@@ -71,6 +71,17 @@ def run_grpc_worker_entrypoint(
   worker_init_kwargs: dict[str, Any],
   shutdown_event: multiprocessing.Event
 ):
+  """Entry point for gRPC worker processes.
+
+  Args:
+    callout_server_class: The class type of the callout server (typically
+      `CalloutServer` or a subclass thereof) that will handle requests
+      within this worker process.
+    worker_init_kwargs: A dictionary containing keyword arguments needed to
+      initialize the `callout_server_class` instance within the worker.
+    shutdown_event: A `multiprocessing.Event` object. The main process
+      sets this event to signal all worker processes to shut down.
+  """
   logging.basicConfig(level=logging.INFO,
                       format='%(asctime)s - %(levelname)s - %(processName)s (%(process)d) - %(message)s')
   processor_instance = callout_server_class(**worker_init_kwargs)
@@ -112,6 +123,12 @@ class CalloutServer:
     private_key: PEM private key of the server.
     private_key_path: Relative file path pointing to a file containing private_key data.
     server_thread_count: Threads allocated to the main grpc service.
+    num_processes: The number of gRPC worker processes to spawn by the main instance.
+      If None, defaults to the number of CPUs available. Set to 1 to effectively
+      disable multiprocessing for gRPC workers.
+    is_worker_processor_instance: Internal flag. True if this instance of
+      CalloutServer is running within a worker process. This is set internally
+      and should not typically be modified by the user.
   """
   def __init__(
       self,
@@ -136,7 +153,7 @@ class CalloutServer:
     self._is_worker_processor_instance = is_worker_processor_instance
     default_ip = default_ip or '0.0.0.0'
 
-    self.address: tuple[str, int] = address or (default_ip, 8443)
+    self.address: tuple[str, int] = address or (default_ip, 443)
     if port:
       self.address = (self.address[0], port)
 
@@ -283,8 +300,6 @@ class CalloutServer:
   def _loop_server(self) -> None:
     """Loop server forever, calling shutdown will cause the server to stop."""
 
-    # We chose the main serving thread based on what server configuration
-    # was requested. Defaults to the health check thread.
     if self._is_worker_processor_instance: return
     if self._health_check_server:
       logging.info("Health check server started.")
@@ -411,7 +426,7 @@ class CalloutServer:
     """Process an incoming request body.
 
     Args:
-      headers: Request body to process.
+      body: Request body to process.
       context: RPC context of the incoming callout.
 
     Returns:
@@ -427,7 +442,7 @@ class CalloutServer:
     """Process an incoming response body.
 
     Args:
-      headers: Response body to process.
+      body: Response body to process.
       context: RPC context of the incoming callout.
 
     Returns:
