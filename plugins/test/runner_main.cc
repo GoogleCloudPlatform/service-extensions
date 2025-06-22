@@ -24,8 +24,18 @@
 // - Support wasm profiling (https://v8.dev/docs/profile)
 // - Tune v8 compiler (v8_flags.liftoff_only, precompile, etc)
 
+#include <cstdint>
+#include <iostream>
+#include <optional>
+#include <ostream>
+#include <string>
+
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "benchmark/benchmark.h"
 #include "google/protobuf/text_format.h"
@@ -44,6 +54,10 @@ ABSL_FLAG(service_extensions_samples::pb::Env::LogLevel, loglevel,
           "Override log_level.");
 ABSL_FLAG(bool, test, true, "Option to disable config-requested tests.");
 ABSL_FLAG(bool, bench, true, "Option to disable config-requested benchmarks.");
+ABSL_FLAG(uint64_t, num_background_streams, 0,
+          "Number of background streams to run in benchmarks.");
+ABSL_FLAG(std::optional<uint64_t>, background_stream_advance_rate, std::nullopt,
+          "Number of background streams to advance per benchmark iteration.");
 
 namespace service_extensions_samples {
 
@@ -82,6 +96,9 @@ absl::StatusOr<pb::TestSuite> ParseInputs(int argc, char** argv) {
   std::string config_override = absl::GetFlag(FLAGS_config);
   pb::Env::LogLevel mll_override = absl::GetFlag(FLAGS_loglevel);
   std::string logfile = absl::GetFlag(FLAGS_logfile);
+  uint64_t num_background_streams = absl::GetFlag(FLAGS_num_background_streams);
+  std::optional<uint64_t> background_stream_advance_rate =
+      absl::GetFlag(FLAGS_background_stream_advance_rate);
   if (!plugin_override.empty()) {
     tests.mutable_env()->set_wasm_path(plugin_override);
   }
@@ -93,6 +110,13 @@ absl::StatusOr<pb::TestSuite> ParseInputs(int argc, char** argv) {
   }
   if (!logfile.empty()) {
     tests.mutable_env()->set_log_path(logfile);
+  }
+  if (num_background_streams > 0) {
+    tests.mutable_env()->set_num_background_streams(num_background_streams);
+  }
+  if (background_stream_advance_rate.has_value()) {
+    tests.mutable_env()->set_background_stream_advance_rate(
+        *background_stream_advance_rate);
   }
   if (tests.env().log_level() == pb::Env::TRACE) {
     std::cout << "TRACE from runner: final config:\n" << tests.DebugString();
