@@ -148,12 +148,19 @@ message Env {
   string log_path = 5;
   // Fixed timestamp in Unix seconds. If unset it will be the Unix epoch.
   optional uint64 time_secs = 6;
-  // Number of background streams to run in benchmarks. If unset, no background
-  // streams will be run.
-  optional uint64 num_background_streams = 7;
-  // If there are background streams, this controls the number of background
-  // streams that are advanced per iteration of the benchmark loop.
-  optional uint64 background_stream_advance_rate = 8;
+  // Number of additional streams to run in benchmarks. If unset, no additional
+  // streams will be run. CPU time incurred by additional streams is not
+  // included in benchmark results, but memory usage is. This is to enable
+  // testing the CPU cost of a single stream while the plugin is loaded with
+  // other streams, which may catch memory usage issues or performance issues
+  // with algorithmic inefficiencies with a large number of in-flight requests.
+  optional uint64 num_additional_streams = 7;
+  // If there are additional streams, this controls the number of additional
+  // streams that are advanced per iteration of the benchmark loop. E.g. if set
+  // to 3, then with each benchmark cycle, 3 randomly chosen additional streams
+  // will perform a plugin callback to send request or response headers, or
+  // deliver a body chunk.
+  optional uint64 additional_stream_advance_rate = 8;
 }
 
 message TestSuite {

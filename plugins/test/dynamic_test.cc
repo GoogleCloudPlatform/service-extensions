@@ -121,8 +121,9 @@ class LogTestBounds {
   ContextOptions& options_;
 };
 
-// Class that manages the state for a background stream running in a benchmark.
-class BackgroundStream {
+// Class that manages the state for an additional stream running in a
+// benchmark.
+class AdditionalStream {
  public:
   enum class NextAction {
     kCreate,
@@ -133,7 +134,7 @@ class BackgroundStream {
     kDestroy,
   };
 
-  BackgroundStream(std::shared_ptr<proxy_wasm::PluginHandleBase> handle,
+  AdditionalStream(std::shared_ptr<proxy_wasm::PluginHandleBase> handle,
                    const TestHttpContext::Headers* request_headers,
                    const TestHttpContext::Headers* response_headers,
                    const std::vector<std::string>* request_body_chunks,
@@ -143,10 +144,10 @@ class BackgroundStream {
         response_headers_(response_headers),
         request_body_chunks_(request_body_chunks),
         response_body_chunks_(response_body_chunks) {}
-  BackgroundStream(BackgroundStream&& other) = default;
-  ~BackgroundStream() = default;
+  AdditionalStream(AdditionalStream&& other) = default;
+  ~AdditionalStream() = default;
 
-  // Advance the state of the background stream, e.g. by writing headers or a
+  // Advance the state of the AdditionalStream, e.g. by writing headers or a
   // body chunk.
   absl::Status Advance();
 
@@ -154,17 +155,22 @@ class BackgroundStream {
 
  private:
   std::shared_ptr<proxy_wasm::PluginHandleBase> handle_;
+
+  // These fields are owned by the caller, and assumed to remain valid and not
+  // change over the lifetime of the AdditionalStream.
   const TestHttpContext::Headers* request_headers_;
   const TestHttpContext::Headers* response_headers_;
   const std::vector<std::string>* request_body_chunks_;
   const std::vector<std::string>* response_body_chunks_;
+
+  // Mutable fields that change as the stream advances state.
   std::deque<std::string> remaining_request_body_chunks_;
   std::deque<std::string> remaining_response_body_chunks_;
   std::unique_ptr<TestHttpContext> stream_;
   NextAction next_action_ = NextAction::kCreate;
 };
 
-absl::Status BackgroundStream::Advance() {
+absl::Status AdditionalStream::Advance() {
   while (true) {  // cycle through actions until one is performed
     switch (next_action_) {
       case NextAction::kCreate:
@@ -466,13 +472,13 @@ void DynamicTest::BenchStreamLifecycle(benchmark::State& state) {
   BM_RETURN_IF_ERROR(plugin_init);
   BM_RETURN_IF_FAILED(handle);
 
-  std::vector<BackgroundStream> background_streams;
-  for (int i = 0; i < env_.num_background_streams(); ++i) {
-    background_streams.emplace_back(handle, /*request_headers=*/nullptr,
+  std::vector<AdditionalStream> additional_streams;
+  for (int i = 0; i < env_.num_additional_streams(); ++i) {
+    additional_streams.emplace_back(handle, /*request_headers=*/nullptr,
                                     /*response_headers=*/nullptr,
                                     /*request_body_chunks=*/nullptr,
                                     /*response_body_chunks=*/nullptr);
-    BM_RETURN_IF_ERROR(background_streams.back().Advance());
+    BM_RETURN_IF_ERROR(additional_streams.back().Advance());
   }
 
   // Benchmark stream initialization and teardown.
@@ -521,23 +527,21 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
       PrepBodyCallbackBenchmark(cfg_, cfg_.response_body());
   BM_RETURN_IF_ERROR(response_body_chunks.status());
 
-  std::vector<BackgroundStream> background_streams;
-  if (env_.num_background_streams() > 0) {
-    for (int i = 0; i < env_.num_background_streams(); ++i) {
-      background_streams.emplace_back(
-          handle, request_headers.has_value() ? &*request_headers : nullptr,
-          response_headers.has_value() ? &*response_headers : nullptr,
-          &*request_body_chunks, &*response_body_chunks);
-      // Advance twice, once to create the TestHttpContext and once to perform
-      // an HTTP handler callback.
-      BM_RETURN_IF_ERROR(background_streams.back().Advance());
-      BM_RETURN_IF_ERROR(background_streams.back().Advance());
-    }
+  std::vector<AdditionalStream> additional_streams;
+  for (int i = 0; i < env_.num_additional_streams(); ++i) {
+    additional_streams.emplace_back(
+      handle, request_headers.has_value() ? &*request_headers : nullptr,
+      response_headers.has_value() ? &*response_headers : nullptr,
+      &*request_body_chunks, &*response_body_chunks);
+    // Advance twice, once to create the TestHttpContext and once to perform
+    // an HTTP handler callback.
+    BM_RETURN_IF_ERROR(additional_streams.back().Advance());
+    BM_RETURN_IF_ERROR(additional_streams.back().Advance());
   }
 
-  int background_stream_advance_rate =
-      env_.has_background_stream_advance_rate()
-          ? env_.background_stream_advance_rate()
+  int additional_stream_advance_rate =
+    (env_.additional_stream_advance_rate() > 0)
+          ? env_.additional_stream_advance_rate()
           : 3;
 
   std::optional<TestHttpContext> stream;
@@ -551,12 +555,12 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
     std::vector<std::string> response_body_chunks_copies =
         *response_body_chunks;
 
-    // Advance a fraction of background streams, if present.
-    if (!background_streams.empty()) {
-      for (int i = 0; i < background_stream_advance_rate; ++i) {
+    // Advance a fraction of additional streams, if present.
+    if (!additional_streams.empty()) {
+      for (int i = 0; i < additional_stream_advance_rate; ++i) {
         BM_RETURN_IF_ERROR(
-            background_streams[absl::Uniform(bitgen_, 0U,
-                                             background_streams.size())]
+            additional_streams[absl::Uniform(bitgen_, 0U,
+                                             additional_streams.size())]
                 .Advance());
       }
     }
