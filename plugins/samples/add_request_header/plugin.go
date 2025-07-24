@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [START serviceextensions_plugin_docs_first_plugin]
+// [START serviceextensions_plugin_add_request_header]
 package main
 
 import (
@@ -39,50 +39,30 @@ type httpContext struct {
 	types.DefaultHttpContext
 }
 
-func (*vmContext) NewPluginContext(contextID uint32) types.PluginContext {
+func (vc *vmContext) NewPluginContext(contextID uint32) types.PluginContext {
 	return &pluginContext{}
 }
 
-func (*pluginContext) NewHttpContext(uint32) types.HttpContext {
+func (pc *pluginContext) NewHttpContext(contextID uint32) types.HttpContext {
 	return &httpContext{}
 }
 
 func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) types.Action {
 	defer func() {
-		err := recover()
-		if err != nil {
+		if err := recover(); err != nil {
 			proxywasm.SendHttpResponse(500, [][2]string{}, []byte(fmt.Sprintf("%v", err)), 0)
 		}
 	}()
-	proxywasm.LogInfof("onRequestHeaders: hello from wasm")
 
-	// Route Extension example: host rewrite
-	err := proxywasm.ReplaceHttpRequestHeader(":authority", "service-extensions.com")
-	if err != nil {
+	// Add and replace headers.
+	if err := proxywasm.AddHttpRequestHeader("Message", "hello"); err != nil {
 		panic(err)
 	}
-	err = proxywasm.ReplaceHttpRequestHeader(":path", "/")
-	if err != nil {
+	if err := proxywasm.ReplaceHttpRequestHeader("Welcome", "warm"); err != nil {
 		panic(err)
 	}
+
 	return types.ActionContinue
 }
 
-func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) types.Action {
-	defer func() {
-		err := recover()
-		if err != nil {
-			proxywasm.SendHttpResponse(500, [][2]string{}, []byte(fmt.Sprintf("%v", err)), 0)
-		}
-	}()
-	proxywasm.LogInfof("onResponseHeaders: hello from wasm")
-
-	// Traffic Extension example: add response header
-	err := proxywasm.AddHttpResponseHeader("hello", "service-extensions")
-	if err != nil {
-		panic(err)
-	}
-	return types.ActionContinue
-}
-
-// [END serviceextensions_plugin_docs_first_plugin]
+// [END serviceextensions_plugin_add_request_header]
