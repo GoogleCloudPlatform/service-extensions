@@ -79,5 +79,5 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            plugin_path=bazel-bin/samples/${{ matrix.dir }}/${{ matrix.target }}
+            plugin_path=./plugins/bazel-bin/samples/${{ matrix.dir }}/${{ matrix.target }}
 
