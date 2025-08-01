@@ -1,3 +1,2 @@
 FROM scratch
-ARG plugin_path
-COPY $plugin_path plugin.wasm
+COPY plugin.wasm plugin.wasm

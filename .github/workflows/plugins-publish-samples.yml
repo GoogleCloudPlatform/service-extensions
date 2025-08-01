@@ -52,6 +52,13 @@ jobs:
           --verbose_failures
           //samples/${{ matrix.dir }}:${{ matrix.target }}
 
+      # Copy output to avoid Docker-incompatible bazel symlink
+      - name: Copy wasm plugin
+        shell: bash
+        working-directory: ./plugins
+        run: >
+          cp -f bazel-bin/samples/${{ matrix.dir }}/${{ matrix.target }} plugin.wasm
+
       # Get metadata: https://github.com/docker/metadata-action#about
       # The `images` value provides the base name for tags and labels.
       - name: Extract metadata for Docker
@@ -78,6 +85,4 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            plugin_path=./plugins/bazel-bin/samples/${{ matrix.dir }}/${{ matrix.target }}
 
