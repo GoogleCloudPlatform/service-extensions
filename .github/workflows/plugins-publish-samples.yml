@@ -103,7 +103,7 @@ jobs:
           gcloud artifacts attachments delete \
             ${{ matrix.image }}-licenses \
             --location=us --repository=${{ env.REPOSITORY }} \
-            --quiet;
+            --quiet || true;  # Allow failure
           gcloud artifacts attachments create \
             ${{ matrix.image }}-licenses \
             --location=us --repository=${{ env.REPOSITORY }} \
