@@ -106,5 +106,5 @@ jobs:
             --repository=${{ env.REPOSITORY }}
             --target=${{ fromJSON(steps.meta.outputs.json).tags[0] }}
             --attachment-type=text/LICENSES
-            --files=$(ls samples/${{ matrix.dir }}/licenses/* | tr '\n' ',')
+            --files=samples/local_reply/licenses/LICENSE.abseil,samples/local_reply/licenses/LICENSE.proxywasm
 
