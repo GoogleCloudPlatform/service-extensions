@@ -100,11 +100,11 @@ jobs:
         shell: bash
         working-directory: ./plugins
         run: >
-          gcloud artifacts attachments create
-            ${{ matrix.image }}-licenses
-            --location=us
-            --repository=${{ env.REPOSITORY }}
-            --target=${{ fromJSON(steps.meta.outputs.json).tags[0] }}
-            --attachment-type=text/LICENSES
+          gcloud artifacts attachments create \
+            ${{ matrix.image }}-licenses \
+            --location=us \
+            --repository=${{ env.REPOSITORY }} \
+            --target=${{ fromJSON(steps.meta.outputs.json).tags[0] }} \
+            --attachment-type=text/LICENSES \
             --files=samples/local_reply/licenses/LICENSE.abseil,samples/local_reply/licenses/LICENSE.proxywasm
 
