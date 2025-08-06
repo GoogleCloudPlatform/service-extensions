@@ -18,6 +18,7 @@
 
 #include <boost/filesystem/path.hpp>
 
+#include "absl/random/distributions.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/substitute.h"
 #include "benchmark/benchmark.h"
@@ -34,6 +35,7 @@
 
 namespace service_extensions_samples {
 namespace {
+
 // Helper to read data from a path which may be relative to the test config.
 absl::StatusOr<std::string> ReadContent(const std::string& path,
                                         const pb::Env& env) {
@@ -118,6 +120,138 @@ class LogTestBounds {
  private:
   ContextOptions& options_;
 };
+
+// Class that manages the state for an additional stream running in a
+// benchmark.
+class AdditionalStream {
+ public:
+  enum class NextAction {
+    kCreate,
+    kSendRequestHeaders,
+    kSendRequestBody,
+    kSendResponseHeaders,
+    kSendResponseBody,
+    kDestroy,
+  };
+
+  AdditionalStream(std::shared_ptr<proxy_wasm::PluginHandleBase> handle,
+                   const TestHttpContext::Headers* request_headers,
+                   const TestHttpContext::Headers* response_headers,
+                   const std::vector<std::string>* request_body_chunks,
+                   const std::vector<std::string>* response_body_chunks)
+      : handle_(handle),
+        request_headers_(request_headers),
+        response_headers_(response_headers),
+        request_body_chunks_(request_body_chunks),
+        response_body_chunks_(response_body_chunks) {}
+  AdditionalStream(AdditionalStream&& other) = default;
+  ~AdditionalStream() = default;
+
+  // Advance the state of the AdditionalStream, e.g. by writing headers or a
+  // body chunk.
+  absl::Status Advance();
+
+  NextAction next_action() { return next_action_; }
+
+ private:
+  std::shared_ptr<proxy_wasm::PluginHandleBase> handle_;
+
+  // These fields are owned by the caller, and assumed to remain valid and not
+  // change over the lifetime of the AdditionalStream.
+  const TestHttpContext::Headers* request_headers_;
+  const TestHttpContext::Headers* response_headers_;
+  const std::vector<std::string>* request_body_chunks_;
+  const std::vector<std::string>* response_body_chunks_;
+
+  // Mutable fields that change as the stream advances state.
+  std::deque<std::string> remaining_request_body_chunks_;
+  std::deque<std::string> remaining_response_body_chunks_;
+  std::unique_ptr<TestHttpContext> stream_;
+  NextAction next_action_ = NextAction::kCreate;
+};
+
+absl::Status AdditionalStream::Advance() {
+  while (true) {  // cycle through actions until one is performed
+    switch (next_action_) {
+      case NextAction::kCreate:
+        stream_ = std::make_unique<TestHttpContext>(handle_);
+        if (request_body_chunks_ != nullptr) {
+          remaining_request_body_chunks_.assign(request_body_chunks_->begin(),
+                                                request_body_chunks_->end());
+        }
+        if (response_body_chunks_ != nullptr) {
+          remaining_response_body_chunks_.assign(response_body_chunks_->begin(),
+                                                 response_body_chunks_->end());
+        }
+        next_action_ = NextAction::kSendRequestHeaders;
+        return absl::OkStatus();
+
+      case NextAction::kSendRequestHeaders: {
+        if (request_headers_ == nullptr) {
+          next_action_ = NextAction::kSendRequestBody;
+          continue;
+        }
+        auto res = stream_->SendRequestHeaders(*request_headers_);
+        benchmark::DoNotOptimize(res);
+        next_action_ = NextAction::kSendRequestBody;
+        return handle_->wasm()->isFailed() ? absl::InternalError("VM failed!")
+                                           : absl::OkStatus();
+      }
+
+      case NextAction::kSendRequestBody: {
+        if (!remaining_request_body_chunks_.empty()) {
+          std::string chunk = std::move(remaining_request_body_chunks_.front());
+          remaining_request_body_chunks_.pop_front();
+          auto res = stream_->SendRequestBody(
+              chunk, /*end_of_stream=*/remaining_request_body_chunks_.empty());
+          benchmark::DoNotOptimize(res);
+          return handle_->wasm()->isFailed() ? absl::InternalError("VM failed!")
+                                             : absl::OkStatus();
+        }
+        next_action_ = NextAction::kSendResponseHeaders;
+        continue;
+      }
+
+      case NextAction::kSendResponseHeaders: {
+        if (response_headers_ == nullptr) {
+          next_action_ = NextAction::kSendResponseBody;
+          continue;
+        }
+        auto res = stream_->SendResponseHeaders(*response_headers_);
+        benchmark::DoNotOptimize(res);
+        next_action_ = NextAction::kSendResponseBody;
+        return handle_->wasm()->isFailed() ? absl::InternalError("VM failed!")
+                                           : absl::OkStatus();
+      }
+
+      case NextAction::kSendResponseBody: {
+        if (!remaining_response_body_chunks_.empty()) {
+          std::string chunk =
+              std::move(remaining_response_body_chunks_.front());
+          remaining_response_body_chunks_.pop_front();
+          auto res = stream_->SendResponseBody(
+              chunk, /*end_of_stream=*/remaining_response_body_chunks_.empty());
+          benchmark::DoNotOptimize(res);
+          return handle_->wasm()->isFailed() ? absl::InternalError("VM failed!")
+                                             : absl::OkStatus();
+        }
+        next_action_ = NextAction::kDestroy;
+        continue;
+      }
+
+      case NextAction::kDestroy:
+        stream_.reset();
+        next_action_ = NextAction::kCreate;
+        return handle_->wasm()->isFailed() ? absl::InternalError("VM failed!")
+                                           : absl::OkStatus();
+
+      default:
+        return absl::InternalError(
+            absl::StrCat("Unexpected next_action_: ", next_action_));
+    }
+  }
+}
+
 }  // namespace
 
 absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>>
@@ -229,8 +363,10 @@ void DynamicTest::TestBody() {
       } else {
         chunks = {*complete_input_body};
       }
-      for (std::string& body_chunk : chunks) {
-        TestHttpContext::Result res = invoke_wasm(std::move(body_chunk));
+      for (int i = 0; i < chunks.size(); ++i) {
+        // When there are no trailers, the last body chunk is end of stream.
+        TestHttpContext::Result res =
+            invoke_wasm(std::move(chunks[i]), i == chunks.size() - 1);
         ASSERT_VM_HEALTH(phase, handle, stream);
         body_result.body = body_result.body.append(res.body);
       }
@@ -238,9 +374,11 @@ void DynamicTest::TestBody() {
     }
   };
 
-  ASSERT_NO_FATAL_FAILURE(run_body_test(
-      "request_body", cfg_.request_body(),
-      [&stream](std::string chunk) { return stream.SendRequestBody(chunk); }));
+  ASSERT_NO_FATAL_FAILURE(
+      run_body_test("request_body", cfg_.request_body(),
+                    [&stream](std::string chunk, bool end_of_stream) {
+                      return stream.SendRequestBody(chunk, end_of_stream);
+                    }));
 
   if (cfg_.has_response_headers()) {
     const auto& invoke = cfg_.response_headers();
@@ -251,9 +389,11 @@ void DynamicTest::TestBody() {
     CheckPhaseResults("response_headers", invoke.result(), stream, res);
   }
 
-  ASSERT_NO_FATAL_FAILURE(run_body_test(
-      "response_body", cfg_.response_body(),
-      [&stream](std::string chunk) { return stream.SendResponseBody(chunk); }));
+  ASSERT_NO_FATAL_FAILURE(
+      run_body_test("response_body", cfg_.response_body(),
+                    [&stream](std::string chunk, bool end_of_stream) {
+                      return stream.SendResponseBody(chunk, end_of_stream);
+                    }));
 
   // Tear down HTTP context.
   stream.TearDown();
@@ -332,6 +472,15 @@ void DynamicTest::BenchStreamLifecycle(benchmark::State& state) {
   BM_RETURN_IF_ERROR(plugin_init);
   BM_RETURN_IF_FAILED(handle);
 
+  std::vector<AdditionalStream> additional_streams;
+  for (int i = 0; i < env_.num_additional_streams(); ++i) {
+    additional_streams.emplace_back(handle, /*request_headers=*/nullptr,
+                                    /*response_headers=*/nullptr,
+                                    /*request_body_chunks=*/nullptr,
+                                    /*response_body_chunks=*/nullptr);
+    BM_RETURN_IF_ERROR(additional_streams.back().Advance());
+  }
+
   // Benchmark stream initialization and teardown.
   bool first = true;
   for (auto _ : state) {
@@ -378,6 +527,23 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
       PrepBodyCallbackBenchmark(cfg_, cfg_.response_body());
   BM_RETURN_IF_ERROR(response_body_chunks.status());
 
+  std::vector<AdditionalStream> additional_streams;
+  for (int i = 0; i < env_.num_additional_streams(); ++i) {
+    additional_streams.emplace_back(
+      handle, request_headers.has_value() ? &*request_headers : nullptr,
+      response_headers.has_value() ? &*response_headers : nullptr,
+      &*request_body_chunks, &*response_body_chunks);
+    // Advance twice, once to create the TestHttpContext and once to perform
+    // an HTTP handler callback.
+    BM_RETURN_IF_ERROR(additional_streams.back().Advance());
+    BM_RETURN_IF_ERROR(additional_streams.back().Advance());
+  }
+
+  int additional_stream_advance_rate =
+    (env_.additional_stream_advance_rate() > 0)
+          ? env_.additional_stream_advance_rate()
+          : 3;
+
   std::optional<TestHttpContext> stream;
   for (auto _ : state) {
     // Pausing timing is not recommended. One way we could avoid it:
@@ -388,6 +554,16 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
     std::vector<std::string> request_body_chunks_copies = *request_body_chunks;
     std::vector<std::string> response_body_chunks_copies =
         *response_body_chunks;
+
+    // Advance a fraction of additional streams, if present.
+    if (!additional_streams.empty()) {
+      for (int i = 0; i < additional_stream_advance_rate; ++i) {
+        BM_RETURN_IF_ERROR(
+            additional_streams[absl::Uniform(bitgen_, 0U,
+                                             additional_streams.size())]
+                .Advance());
+      }
+    }
     state.ResumeTiming();
 
     if (request_headers) {
@@ -395,8 +571,10 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
-    for (std::string& body : request_body_chunks_copies) {
-      auto res = stream->SendRequestBody(std::move(body));
+    for (int i = 0; i < request_body_chunks_copies.size(); ++i) {
+      std::string& body = request_body_chunks_copies[i];
+      auto res = stream->SendRequestBody(
+        std::move(body), i == request_body_chunks_copies.size() - 1);
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
@@ -405,23 +583,15 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
-    for (std::string& body : response_body_chunks_copies) {
-      auto res = stream->SendResponseBody(std::move(body));
+    for (int i = 0; i < response_body_chunks_copies.size(); ++i) {
+      std::string& body = response_body_chunks_copies[i];
+      auto res = stream->SendResponseBody(
+        std::move(body), i == response_body_chunks_copies.size() - 1);
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
   }
 
-  // TODO: the above doesn't give a realistic view of memory usage under load,
-  // because in a real environment there may be many streams in flight, each
-  // storing some state between callbacks. Consider:
-  //
-  // 1. Holding a configurable number of open streams. This would capture any
-  // state accumulated (and not cleaned up) per stream.
-  //
-  // 2. Interleaving callbacks for those open streams. This would capture any
-  // ephemeral state in each stream (combined allocation peaks). This might
-  // throw off benchmark times.
   EmitStats(state, *handle, *stream);
 }
 
