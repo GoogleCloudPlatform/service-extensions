@@ -100,12 +100,8 @@ jobs:
         shell: bash
         working-directory: ./plugins
         run: >
-          gcloud artifacts attachments delete \
-            ${{ matrix.image }}-licenses \
-            --location=us --repository=${{ env.REPOSITORY }} \
-            --quiet || true;  # Allow failure
           gcloud artifacts attachments create \
-            ${{ matrix.image }}-licenses \
+            ${{ matrix.image }}-licenses-${{ github.sha }} \
             --location=us --repository=${{ env.REPOSITORY }} \
             --target=${{ fromJSON(steps.meta.outputs.json).tags[0] }} \
             --attachment-type=text/LICENSES \
