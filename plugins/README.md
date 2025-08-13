@@ -77,6 +77,7 @@ Tips:
 -   To disable benchmarking for faster iteration, add `--nobench`.
 -   To disable unit testing for cleaner output, add `--notest`.
 -   To optionally specify plugin config data, add `--config=<path>`.
+-   To test memory with high concurrency, add `--num_additional_streams=500`.
 
 You can also run tests using Bazel. This is **much slower** the first time,
 because this builds both the tester and the V8 runtime from scratch. Use the
