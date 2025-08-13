@@ -8,6 +8,7 @@ proxy_wasm_plugin_rust(
     deps = [
         "//bazel/cargo/remote:log",
         "//bazel/cargo/remote:proxy-wasm",
+        "//bazel/cargo/remote:regex",
     ],
 )
 

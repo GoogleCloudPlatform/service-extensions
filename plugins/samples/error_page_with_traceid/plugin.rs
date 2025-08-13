@@ -15,6 +15,7 @@
 // [START serviceextensions_plugin_error_page_with_traceid]
 use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
+use regex::Regex;
 
 // Custom HTML template for error pages
 const ERROR_TEMPLATE: &str = r#"
@@ -112,7 +113,8 @@ impl ErrorPageWithTraceId {
         if let Some(w3c_trace) = self.get_http_request_header("traceparent") {
             // Format: version-trace_id-parent_id-flags
             let parts: Vec<&str> = w3c_trace.split('-').collect();
-            if parts.len() >= 4 && parts[1].len() == 32 {
+            let hex_regex = Regex::new(r"^[0-9a-fA-F]{32}$").unwrap();
+            if parts.len() == 4 && hex_regex.is_match(parts[1]) {
                 return parts[1].to_string(); // Return trace ID (second part)
             }
             return "invalid-trace-format".to_string();
