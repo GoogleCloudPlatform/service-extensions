@@ -1,4 +1,4 @@
-// Copyright 2024 Google LLC
+// Copyright 2025 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [START serviceextensions_plugin_docs_first_plugin]
+// [START serviceextensions_plugin_local_reply]
 #include "proxy_wasm_intrinsics.h"
 
 class MyHttpContext : public Context {
@@ -23,22 +23,12 @@ class MyHttpContext : public Context {
                                        bool end_of_stream) override {
     LOG_INFO("onRequestHeaders: hello from wasm");
 
-    // Route Extension example: host rewrite
-    replaceRequestHeader(":authority", "service-extensions.com");
-    replaceRequestHeader(":path", "/");
-    return FilterHeadersStatus::Continue;
+    sendLocalResponse(400, "", "Hello World", {});
+    return FilterHeadersStatus::StopAllIterationAndWatermark;
   }
 
-  FilterHeadersStatus onResponseHeaders(uint32_t headers,
-                                        bool end_of_stream) override {
-    LOG_INFO("onResponseHeaders: hello from wasm");
-
-    // Traffic Extension example: add response header
-    addResponseHeader("hello", "service-extensions");
-    return FilterHeadersStatus::Continue;
-  }
 };
 
 static RegisterContextFactory register_StaticContext(
     CONTEXT_FACTORY(MyHttpContext), ROOT_FACTORY(RootContext));
-// [END serviceextensions_plugin_docs_first_plugin]
+// [END serviceextensions_plugin_local_reply]
