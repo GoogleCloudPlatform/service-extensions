@@ -16,10 +16,9 @@
 #include <openssl/hmac.h>
 #include <string>
 #include <vector>
-#include <sstream>
-#include <iomanip>
 
 #include "absl/strings/escaping.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "absl/time/clock.h"
@@ -31,7 +30,6 @@ public:
       : RootContext(id, root_id) {}
 
   bool onConfigure(size_t) override {
-    LOG_DEBUG("HMAC validation plugin configured");
     return true;
   }
   
@@ -52,8 +50,6 @@ public:
       : Context(id, root), root_(static_cast<HmacValidationRootContext*>(root)) {}
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers_size, bool end_of_stream) override {
-    LOG_DEBUG(absl::StrCat("Processing request with ", headers_size, " headers"));
-
     // 1. Check if Authorization header exists
     auto auth_header = getRequestHeader("authorization");
     if (!auth_header || auth_header->view().empty()) {
@@ -68,8 +64,7 @@ public:
     std::string_view auth_value = auth_header->view();
     const std::string prefix = "HMAC ";
     
-    if (auth_value.size() < prefix.size() || 
-        !absl::EqualsIgnoreCase(auth_value.substr(0, prefix.size()), absl::string_view(prefix))) {
+    if (!absl::StartsWithIgnoreCase(auth_value, prefix)) {
       sendLocalResponse(400, 
                        "", 
                        "Invalid Authorization scheme. Use 'HMAC'", 
@@ -79,7 +74,9 @@ public:
 
     // 3. Parse token parts (timestamp:hmac)
     std::string token = std::string(auth_value.substr(prefix.size()));
-    std::vector<std::string> token_parts = absl::StrSplit(token, absl::MaxSplits(':', 1)); 
+    std::vector<std::string> token_parts = absl::StrSplit(token, absl::MaxSplits(':', 1));
+    const std::string& token_timestamp_str = token_parts[0];
+    const std::string& token_hmac = token_parts[1];
     
     if (token_parts.size() != 2) {
       sendLocalResponse(400, "", "Invalid token format: expected 'timestamp:hmac'", {});
@@ -88,7 +85,7 @@ public:
 
     // 4. Validate timestamp format
     int64_t token_timestamp;
-    if (!absl::SimpleAtoi(token_parts[0], &token_timestamp)) {
+    if (!absl::SimpleAtoi(token_timestamp_str, &token_timestamp)) {
       sendLocalResponse(400, "", "Invalid timestamp", {});
       return FilterHeadersStatus::StopIteration;
     }
@@ -109,33 +106,22 @@ public:
     }
 
     // 7. Calculate expected HMAC and compare with provided token
-    std::string message = absl::StrCat(method->view(), path->view(), token_parts[0]);
+    std::string message = absl::StrCat(method->view(), path->view(), token_timestamp_str);
     std::string expected_hmac = computeHmacMd5(message, root_->secret_key_);
 
     if (expected_hmac.empty()) {
-      LOG_ERROR(absl::StrCat("Failed to compute HMAC for request path: ", path->view()));
       sendLocalResponse(500, "", "Internal server error during authentication", {});
       return FilterHeadersStatus::StopIteration;
     }
-
-    LOG_DEBUG(absl::StrCat(
-      "HMAC validation: method=", method->view(),
-      ", path=", path->view(),
-      ", timestamp=", token_parts[0],
-      ", received=", token_parts[1],
-      ", expected=", expected_hmac
-    ));
-
+    
     // 8. Reject request if HMAC signatures don't match
-    if (expected_hmac != token_parts[1]) {
+    if (expected_hmac != token_hmac) {
       auto remote_addr = getRequestHeader("x-forwarded-for");
       std::string client_ip = remote_addr ? std::string(remote_addr->view()) : "unknown";
-      LOG_WARN(absl::StrCat("Invalid HMAC for request from ", client_ip));
       sendLocalResponse(403, "", "Invalid HMAC", {});
       return FilterHeadersStatus::StopIteration;
     }
 
-    LOG_INFO(absl::StrCat("Successful authentication for path: ", path->view()));
     return FilterHeadersStatus::Continue;
   }
 
@@ -148,9 +134,7 @@ private:
     unsigned char hash[EVP_MAX_MD_SIZE];
     unsigned int hash_len = 0;
     
-    // Verify input parameters
     if (message.empty() || key.empty()) {
-      LOG_ERROR("HMAC calculation failed: Empty message or key");
       return "";
     }
     
@@ -161,25 +145,10 @@ private:
                                      hash, &hash_len);
     
     if (hmac_result == nullptr || hash_len == 0) {
-      LOG_ERROR("OpenSSL HMAC calculation failed");
       return "";
     }
     
-    LOG_DEBUG(absl::StrCat("Generated HMAC for message of length: ", message.size()));
-    
-    // Pre-allocate to avoid reallocations
-    std::string result;
-    result.reserve(hash_len * 2);
-    
-    // Use direct hex conversion for better performance
-    static const char hex_chars[] = "0123456789abcdef";
-    
-    for (unsigned int i = 0; i < hash_len; i++) {
-      result.push_back(hex_chars[(hash[i] >> 4) & 0xF]);
-      result.push_back(hex_chars[hash[i] & 0xF]);
-    }
-    
-    return result;
+    return absl::BytesToHexString(absl::string_view(reinterpret_cast<const char*>(hash), hash_len));
   }
 };
 
