@@ -7,7 +7,7 @@ proxy_wasm_plugin_cpp(
     srcs = ["plugin.cc"],
     deps = [
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/time",
+        "@com_google_re2//:re2",
     ],
     linkopts = [
         "-sUSE_PTHREADS=0",
