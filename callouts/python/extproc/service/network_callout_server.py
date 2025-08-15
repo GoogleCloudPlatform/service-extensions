@@ -105,21 +105,21 @@ class NetworkCalloutServer:
     self._shutdown = False
     self._closed = False
     self._health_check_server: HTTPServer | None = None
-    default_ip = default_ip or '127.0.0.1'
+    default_ip = default_ip or '0.0.0.0'
 
-    self.address: tuple[str, int] = address or (default_ip, 12222)
+    self.address: tuple[str, int] = address or (default_ip, 443)
     if port:
       self.address = (self.address[0], port)
 
     self.plaintext_address: tuple[str, int] | None = None
     if not disable_plaintext:
-      self.plaintext_address = plaintext_address or (default_ip, 8081)
+      self.plaintext_address = plaintext_address or (default_ip, 8080)
       if plaintext_port:
         self.plaintext_address = (self.plaintext_address[0], plaintext_port)
 
     self.health_check_address: tuple[str, int] | None = None
     if not combined_health_check:
-      self.health_check_address = health_check_address or (default_ip, 10000)
+      self.health_check_address = health_check_address or (default_ip, 80)
       if health_check_port:
         self.health_check_address = (self.health_check_address[0],
                                      health_check_port)
