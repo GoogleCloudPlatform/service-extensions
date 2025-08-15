@@ -22,7 +22,7 @@ from envoy.service.ext_proc.v3.external_processor_pb2 import HeadersResponse
 from extproc.service.callout_server import CalloutServer
 from extproc.service.callout_tools import add_header_mutation
 from extproc.service.callout_tools import add_body_mutation
-from extproc.service.callout_tools import add_command_line_args
+from extproc.service.command_line_tools import add_command_line_args
 
 
 class BasicCalloutServer(CalloutServer):
