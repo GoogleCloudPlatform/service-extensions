@@ -311,34 +311,6 @@ Setting `--network host` tells docker to connect the image to the `0.0.0.0` or `
 >
 > Will run the health check for `basic/service_callout_example.py` combined with the main grpc server.
 
-# Docker with TCP extension
-
-The basic Docker image contains arguments for pointing to and running python modules.
-For example, to build
-[extproc/l4_example/basic/network_service_callout_example.py](extproc/l4_example/basic/network_service_callout_example.py) run:
-
-``` bash
-docker build \
-  -f ./extproc/l4_example/Dockerfile \
-  -t service-callout-example-network \
-  --build-arg copy_path=extproc/l4_example/basic/ \
-  --build-arg run_module=network_service_callout_example .
-```
-
-`--build-arg` specifies the following:
-
-* `copy_path`: Required files to copy to the docker image.
-* `run_module`: The python module to run on startup.
-
-The above example makes a copy of `extproc/l4_example/basic/network_service_callout_example.py`
-and sets up the image to run `network_service_callout_example.py` on startup.
-
-The image can then be run with:
-
-``` bash
-docker run -P -it --network host service-callout-example-network:latest
-```
-
 ## Examples with unique dependencies
 
 The `cloud_log` and `jwt_auth` examples require additional libraries to function.
@@ -388,4 +360,32 @@ and then the `jwt_auth` image:
 docker build \
   -f ./extproc/example/jwt_auth/Dockerfile \
   -t service-callout-jwt-example-python .
+```
+
+# Docker with TCP extension
+
+The basic Docker image contains arguments for pointing to and running python modules.
+For example, to build
+[extproc/l4_example/basic/network_service_callout_example.py](extproc/l4_example/basic/network_service_callout_example.py) run:
+
+``` bash
+docker build \
+  -f ./extproc/l4_example/Dockerfile \
+  -t service-callout-example-network \
+  --build-arg copy_path=extproc/l4_example/basic/ \
+  --build-arg run_module=network_service_callout_example .
+```
+
+`--build-arg` specifies the following:
+
+* `copy_path`: Required files to copy to the docker image.
+* `run_module`: The python module to run on startup.
+
+The above example makes a copy of `extproc/l4_example/basic/network_service_callout_example.py`
+and sets up the image to run `network_service_callout_example.py` on startup.
+
+The image can then be run with:
+
+``` bash
+docker run -P -it --network host service-callout-example-network:latest
 ```
