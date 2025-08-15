@@ -1,0 +1,43 @@
+env {
+  log_level: INFO
+}
+
+test {
+  name: "Should generate signed URL when header is present"
+  request_headers {
+    input {
+      header { key: ":path" value: "/test" }
+      header { key: "X-Original-URL" value: "https://media.example.com/secret-video.mp4" }
+    }
+    result {
+      has_header { key: ":path" value: "/test" }
+      has_header { key: "X-Original-URL" value: "https://media.example.com/secret-video.mp4" }
+      headers { regex: "X-Signed-URL: https://media\\.example\\.com/secret-video\\.mp4\\?URLPrefix=.*&Expires=\\d+&KeyName=test-key&Signature=.*" }
+      log { regex: "Generating signed URL for: https://media.example.com/secret-video.mp4" }
+    }
+  }
+}
+
+test {
+  name: "Should not add signed URL header when original URL header is missing"
+  request_headers {
+    input {
+      header { key: ":path" value: "/test" }
+    }
+    result {
+      has_header { key: ":path" value: "/test" }
+      no_header { key: "X-Signed-URL" }
+      log { regex: "URL header not found or empty: X-Original-URL" }
+    }
+  }
+}
+
+benchmark {
+  name: "Benchmark token generation"
+  request_headers {
+    input {
+      header { key: ":path" value: "/test" }
+      header { key: "X-Original-URL" value: "https://media.example.com/secret-video.mp4" }
+    }
+  }
+}

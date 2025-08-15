@@ -1,0 +1,7 @@
+{
+  "privateKey": "mO9BH59zXD0rJjYGZ4ult7GrwZc/EoX4VpNcwWPp0JQ=",
+  "keyName": "test-key",
+  "expirySeconds": 3600,
+  "urlHeaderName": "X-Original-URL",
+  "outputHeaderName": "X-Signed-URL"
+}
