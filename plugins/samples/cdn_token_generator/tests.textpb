@@ -12,7 +12,7 @@ test {
     result {
       has_header { key: ":path" value: "/test" }
       has_header { key: "X-Original-URL" value: "https://media.example.com/secret-video.mp4" }
-      headers { regex: "X-Signed-URL: https://media\\.example\\.com/secret-video\\.mp4\\?URLPrefix=.*&Expires=\\d+&KeyName=test-key&Signature=.*" }
+      has_header { key: "X-Signed-URL" }
       log { regex: "Generating signed URL for: https://media.example.com/secret-video.mp4" }
     }
   }

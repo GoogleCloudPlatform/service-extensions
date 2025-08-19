@@ -13,5 +13,5 @@ proxy_wasm_tests(
     plugins = [
         ":plugin_go.wasm",
     ],
-    tests = "tests.textpb",
+    tests = ":tests.textpb",
 )
