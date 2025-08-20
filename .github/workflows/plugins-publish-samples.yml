@@ -25,7 +25,7 @@ jobs:
     strategy:
       matrix:
         include:
-        - image: 'hello-world-plugin'
+        - image: 'local-reply'
           dir: 'local_reply'
           target: 'plugin_cpp.wasm'
 
