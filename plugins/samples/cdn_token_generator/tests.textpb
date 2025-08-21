@@ -31,13 +31,3 @@ test {
     }
   }
 }
-
-benchmark {
-  name: "Benchmark token generation"
-  request_headers {
-    input {
-      header { key: ":path" value: "/test" }
-      header { key: "X-Original-URL" value: "https://media.example.com/secret-video.mp4" }
-    }
-  }
-}
