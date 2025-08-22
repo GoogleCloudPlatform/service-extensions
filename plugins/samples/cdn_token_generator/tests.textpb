@@ -30,3 +30,78 @@ test {
     }
   }
 }
+
+test {
+  name: "Should handle empty URL header"
+  request_headers {
+    input {
+      header { key: ":path" value: "/test" }
+      header { key: "X-Original-URL" value: "" }
+    }
+    result {
+      has_header { key: ":path" value: "/test" }
+      no_header { key: "X-Signed-URL" }
+      log { regex: "URL header not found or empty: X-Original-URL" }
+    }
+  }
+}
+
+test {
+  name: "Should handle malformed URL"
+  request_headers {
+    input {
+      header { key: ":path" value: "/test" }
+      header { key: "X-Original-URL" value: "not-a-valid-url" }
+    }
+    result {
+      has_header { key: ":path" value: "/test" }
+      no_header { key: "X-Signed-URL" }
+      log { regex: "Invalid URL provided" }
+    }
+  }
+}
+
+test {
+  name: "Should handle URL too long"
+  request_headers {
+    input {
+      header { key: ":path" value: "/test" }
+      header { key: "X-Original-URL" value: "https://media.example.com/${'a' * 3000}.mp4" }
+    }
+    result {
+      has_header { key: ":path" value: "/test" }
+      no_header { key: "X-Signed-URL" }
+      log { regex: "Invalid URL provided" }
+    }
+  }
+}
+
+test {
+  name: "Should reject localhost URLs"
+  request_headers {
+    input {
+      header { key: ":path" value: "/test" }
+      header { key: "X-Original-URL" value: "https://localhost/secret-video.mp4" }
+    }
+    result {
+      has_header { key: ":path" value: "/test" }
+      no_header { key: "X-Signed-URL" }
+      log { regex: "Invalid URL provided" }
+    }
+  }
+}
+
+test {
+  name: "Should handle different valid URL formats"
+  request_headers {
+    input {
+      header { key: ":path" value: "/test" }
+      header { key: "X-Original-URL" value: "http://cdn.example.org/video/file.mp4" }
+    }
+    result {
+      has_header { key: ":path" value: "/test" }
+      has_header { key: "X-Original-URL" value: "http://cdn.example.org/video/file.mp4" }
+      log { regex: "Generating signed URL for: http://cdn\\.example\\.org/video/file\\.mp4" }
+    }
+  }
+}
