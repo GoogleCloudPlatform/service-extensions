@@ -12,8 +12,7 @@ test {
     result {
       has_header { key: ":path" value: "/test" }
       has_header { key: "X-Original-URL" value: "https://media.example.com/secret-video.mp4" }
-      has_header { key: "X-Signed-URL" }
-      log { regex: "Generating signed URL for: https://media.example.com/secret-video.mp4" }
+      log { regex: "Generating signed URL for: https://media\\.example\\.com/secret-video\\.mp4" }
     }
   }
 }

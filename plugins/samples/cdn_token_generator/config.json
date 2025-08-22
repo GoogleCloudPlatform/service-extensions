@@ -1,6 +1,6 @@
 {
-  "privateKey": "mO9BH59zXD0rJjYGZ4ult7GrwZc/EoX4VpNcwWPp0JQ=",
-  "keyName": "test-key",
+  "privateKeyHex": "d8ef411f9f735c3d2b263606678ba5b7b1abc1973f1285f856935cc163e9d094",
+  "keyName": "test-key", 
   "expirySeconds": 3600,
   "urlHeaderName": "X-Original-URL",
   "outputHeaderName": "X-Signed-URL"
