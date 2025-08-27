@@ -1,3 +1,0 @@
-# Ignore pycache files.
-**/*.pyc
-**/.pytest_cache
