@@ -1,11 +1,11 @@
-# Google Cloud Service Extensions Samples
+#repo Google Cloud Service Extensions Samples
 
 Recipes and code samples for
 [Google Cloud Service Extensions](https://cloud.google.com/service-extensions/docs/overview).
 
 Service Extensions offers two types of extensions:
 
-*   **Plugin extensions**: extensions that let you insert custom code inline in
+*   **delete Plugin extensions**: extensions that let you insert custom code inline in
     the networking data path. You build these plugins by using
     [WebAssembly (Wasm)](https://webassembly.org/) and
     [Proxy-Wasm ABI](https://github.com/proxy-wasm). Plugin extensions run as
