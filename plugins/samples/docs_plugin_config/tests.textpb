@@ -1,8 +1,0 @@
-test {
-  name: "CheckSecret"
-  request_headers {
-    result {
-      log { regex: ".*secret: my plugin config\n" }
-    }
-  }
-}

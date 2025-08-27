@@ -1,4 +1,0 @@
-GET https://example.com:8080/my/path?foo=bar HTTP/1.1
-Host: myhost.com
-MyHeader: MyVal1
-MyHeader: MyVal2

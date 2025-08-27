@@ -1,5 +1,0 @@
-# Domain redirects
-# source_domain target_domain
-abc.com xyz.com
-old-domain.com new-domain.com
-legacy.example.org example.org
