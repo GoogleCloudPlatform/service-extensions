@@ -288,7 +288,7 @@ class NetworkCalloutServer:
       data: bytes,
       end_of_stream: bool,
       context: ServicerContext,
-  ) -> Tuple[bytes, bool]:
+  ) -> ProcessingResult:
     """Process data from client to server (read path).
     
     Override this method to implement custom processing logic.
@@ -309,7 +309,7 @@ class NetworkCalloutServer:
       data: bytes,
       end_of_stream: bool,
       context: ServicerContext,
-  ) -> Tuple[bytes, bool]:
+  ) -> ProcessingResult:
     """Process data from server to client (write path).
     
     Override this method to implement custom processing logic.
