@@ -279,6 +279,7 @@ For example, to build
 docker build \
   -f ./extproc/example/Dockerfile \
   -t service-callout-example-python \
+  --build-arg proto_path=envoy/service/ext_proc/v3/external_processor.proto \
   --build-arg copy_path=extproc/example/basic/ \
   --build-arg run_module=service_callout_example .
 ```
@@ -327,6 +328,7 @@ specifying the folder `extproc/example/cloud_log` as the `copy_path`.
 docker build \
   -f ./extproc/example/Dockerfile \
   -t service-callout-example-python \
+  --build-arg proto_path=envoy/service/ext_proc/v3/external_processor.proto \
   --build-arg copy_path=extproc/example/cloud_log \
   --build-arg run_module=service_callout_example .
 ```
@@ -425,8 +427,9 @@ For example, to build
 
 ``` bash
 docker build \
-  -f ./extproc/l4_example/Dockerfile \
+  -f ./extproc/example/Dockerfile \
   -t service-callout-example-network \
+  --build-arg proto_path=envoy/service/network_ext_proc/v3/network_external_processor.proto
   --build-arg copy_path=extproc/l4_example/basic/ \
   --build-arg run_module=network_service_callout_example .
 ```
