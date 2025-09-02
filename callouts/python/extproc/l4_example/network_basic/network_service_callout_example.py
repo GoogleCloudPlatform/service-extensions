@@ -40,7 +40,7 @@ class BasicCalloutServer(NetworkCalloutServer):
         context: gRPC context
         
     Returns:
-        Tuple of (processed_data, modified)
+        A ProcessingResult containing the processed data and modification status.
     """
     # Just log and pass through.
     logging.debug("geting read data: %s, from ext_proc", data)
@@ -60,7 +60,7 @@ class BasicCalloutServer(NetworkCalloutServer):
         context: gRPC context
         
     Returns:
-        Tuple of (processed_data, modified)
+        A ProcessingResult containing the processed data and modification status.
     """
     # Just log and pass through.
     logging.debug("geting write data: %s from ext_proc", data)
