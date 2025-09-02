@@ -18,6 +18,7 @@ Extends the base callout server functionality for network-level data.
 """
 
 from concurrent import futures
+from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
 from http.server import HTTPServer
 import logging
@@ -35,7 +36,17 @@ from envoy.service.network_ext_proc.v3.network_external_processor_pb2_grpc impor
 import grpc
 from google.protobuf.struct_pb2 import Struct
 from grpc import ServicerContext
-# from envoy.config.core.v3.base_pb2 import Metadata
+
+@dataclass
+class ProcessingResult:
+  """Holds the result of data processing from a callout handler.
+
+  Attributes:
+    processed_data: The data after processing, which may be modified.
+    modified: A boolean indicating if the data was changed.
+  """
+  processed_data: bytes
+  modified: bool
 
 
 def _addr_to_str(address: tuple[str, int]) -> str:
@@ -288,10 +299,10 @@ class NetworkCalloutServer:
         context: gRPC context
         
     Returns:
-        Tuple of (processed_data, modified)
+        A ProcessingResult containing the processed data and modification status.
     """
     # Default: pass through unchanged
-    return data, False
+    return ProcessingResult(processed_data=data, modified=False)
 
   def on_write_data(
       self,
@@ -309,11 +320,11 @@ class NetworkCalloutServer:
         context: gRPC context
         
     Returns:
-        Tuple of (processed_data, modified)
+        A ProcessingResult containing the processed data and modification status.
     """
     # Default: pass through unchanged
-    return data, False
-  
+    return ProcessingResult(processed_data=data, modified=False)
+
   def should_close_connection(
       self,
       data: bytes,

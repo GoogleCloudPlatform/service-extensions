@@ -18,6 +18,7 @@ from typing import Tuple
 from grpc import ServicerContext
 from extproc.service import command_line_tools
 from extproc.service.network_callout_server import NetworkCalloutServer
+from extproc.service.network_callout_server import ProcessingResult
 
 class BasicCalloutServer(NetworkCalloutServer):
   """Example callout server.
@@ -30,11 +31,9 @@ class BasicCalloutServer(NetworkCalloutServer):
       data: bytes,
       end_of_stream: bool,
       context: ServicerContext,
-  ) -> Tuple[bytes, bool]:
-    """Process data from client to server (read path).
-    
-    Override this method to implement custom processing logic.
-    
+  ) -> ProcessingResult:
+    """Log the data from client to server (read path).
+
     Args:
         data: Raw bytes from the client
         end_of_stream: Whether this is the last data frame
@@ -43,19 +42,17 @@ class BasicCalloutServer(NetworkCalloutServer):
     Returns:
         Tuple of (processed_data, modified)
     """
-    # Default: pass through unchanged
+    # Just log and pass through.
     logging.debug("geting read data: %s, from ext_proc", data)
-    return data, False
+    return ProcessingResult(processed_data=data, modified=False)
 
   def on_write_data(
       self,
       data: bytes,
       end_of_stream: bool,
       context: ServicerContext,
-  ) -> Tuple[bytes, bool]:
-    """Process data from server to client (write path).
-    
-    Override this method to implement custom processing logic.
+  ) -> ProcessingResult:
+    """Log the data from server to client (write path).
     
     Args:
         data: Raw bytes from the server
@@ -65,10 +62,9 @@ class BasicCalloutServer(NetworkCalloutServer):
     Returns:
         Tuple of (processed_data, modified)
     """
-
+    # Just log and pass through.
     logging.debug("geting write data: %s from ext_proc", data)
-    # Default: pass through unchanged
-    return data, False
+    return ProcessingResult(processed_data=data, modified=False)
 
 if __name__ == '__main__':
   # Useful command line args.
