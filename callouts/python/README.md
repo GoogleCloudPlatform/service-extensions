@@ -83,16 +83,16 @@ The server will then run until interrupted, for example, by inputting `Ctrl-C`.
 
 # Examples
 
-Examples for various styles of callout server are located under [extproc/example/](./extproc/example/).
+Examples for various styles of L7 callout server are located under [extproc/example/](./extproc/example/).
 
-# Developing Callouts
+# Developing L7 Callouts
 
 This repository provides the following files to be extended to fit the needs of the user:
 
 * [extproc/service/callout_server.py](extproc/service/callout_server.py) Baseline service callout server.
 * [extproc/service/callout_tools.py](extproc/service/callout_tools.py) Common functions used in many callout server codepaths.
 
-## Making a new server
+## Making a new L7 server
 
 Create a new python script `server.py` and import the `CalloutServer` class from [extproc/service/callout_server.py](extproc/service/callout_server.py)
 
