@@ -2,8 +2,12 @@ __Copyrights and Licences__
 
 Files using Copyright 2023 Google LLC & Apache License Version 2.0:
 
-* [service_callout.py](./extproc/service/callout_server.py)
+* [service_callout.py](./extproc/service/callout_server.py) (This is only HTTP layer callouts)
+* [network_callout_server.py](./extproc/service/network_callout_server.py) (This is for TCP layer callouts)
 * [callout_tools.py](./extproc/service/callout_tools.py)
+* [command_line_tools.py](./extproc/service/command_line_tools.py)
+
+Note: This document will focus on two types of callouts: L7 and L4. The interface for each type is different.
 
 # Requirements
 
@@ -14,7 +18,7 @@ Files using Copyright 2023 Google LLC & Apache License Version 2.0:
 > [!NOTE]
 > All commands are expected to be run from within the `callouts/python` directory.
 
-# Quick start
+# L7 HTTP Quick start
 
 The minimal operation of this Python-based ext_proc server requires the `grpcio` python package as well as the protobuf generator tool [buf](https://buf.build/docs/introduction).
 
@@ -79,16 +83,16 @@ The server will then run until interrupted, for example, by inputting `Ctrl-C`.
 
 # Examples
 
-Examples for various styles of callout server are located under [extproc/example/](./extproc/example/).
+Examples for various styles of L7 callout server are located under [extproc/example/](./extproc/example/).
 
-# Developing Callouts
+# Developing L7 Callouts
 
 This repository provides the following files to be extended to fit the needs of the user:
 
 * [extproc/service/callout_server.py](extproc/service/callout_server.py) Baseline service callout server.
 * [extproc/service/callout_tools.py](extproc/service/callout_tools.py) Common functions used in many callout server codepaths.
 
-## Making a new server
+## Making a new L7 server
 
 Create a new python script `server.py` and import the `CalloutServer` class from [extproc/service/callout_server.py](extproc/service/callout_server.py)
 
@@ -275,6 +279,7 @@ For example, to build
 docker build \
   -f ./extproc/example/Dockerfile \
   -t service-callout-example-python \
+  --build-arg proto_path=envoy/service/ext_proc/v3/external_processor.proto \
   --build-arg copy_path=extproc/example/basic/ \
   --build-arg run_module=service_callout_example .
 ```
@@ -323,6 +328,7 @@ specifying the folder `extproc/example/cloud_log` as the `copy_path`.
 docker build \
   -f ./extproc/example/Dockerfile \
   -t service-callout-example-python \
+  --build-arg proto_path=envoy/service/ext_proc/v3/external_processor.proto \
   --build-arg copy_path=extproc/example/cloud_log \
   --build-arg run_module=service_callout_example .
 ```
@@ -359,4 +365,85 @@ and then the `jwt_auth` image:
 docker build \
   -f ./extproc/example/jwt_auth/Dockerfile \
   -t service-callout-jwt-example-python .
+```
+
+# L4 TCP Quick Start
+
+Similar to L7 Quick Start, the minimal operation of this Python-based ext_proc server requires the `grpcio` python package as well as the protobuf generator tool [buf](https://buf.build/docs/introduction).
+
+The preferred method of installation is through a virtual environment, `venv`. To set up the virtual environment run:
+
+```shell
+cd service-extensions/callouts/python
+python -m venv env
+source env/bin/activate
+```
+
+Then the packages can be installed with:
+
+```shell
+pip install -r requirements.txt
+```
+
+`buf` can be installed from [here](https://buf.build/docs/installation).
+
+The network level proto library files are generated with `buf` using:
+
+```shell
+buf -v generate \
+  https://github.com/envoyproxy/envoy.git#subdir=api \
+  --path envoy/service/network_ext_proc/v3/network_external_processor.proto \
+  --include-imports
+```
+
+> The default template file `buf.gen.yaml` will not generate `pyright` compatible proto stubs.
+> If you plan to develop callouts with a similar type checker and not just build them,
+> we suggest you run the command with the alternative development template using
+> `--template=buf_dev.gen.yaml`:
+>
+> ```shell
+> buf -v generate \
+>  https://github.com/envoyproxy/envoy.git#subdir=api \
+>  --path envoy/service/network_ext_proc/v3/network_external_processor.proto \
+>  --include-imports --template=buf_dev.gen.yaml
+> ```
+>
+> You may need to run `python -m pip uninstall ./protodef` after re-generating the proto files
+> to get the linter to update.
+
+The proto files are then installed as a local package:
+
+```shell
+python -m pip install ./protodef
+```
+
+We install the proto files as a local package to allow for absolute imports within the generated python code.
+
+# Docker with TCP extension
+
+The basic Docker image contains arguments for pointing to and running python modules.
+For example, to build
+[extproc/l4_example/basic/network_service_callout_example.py](extproc/l4_example/basic/network_service_callout_example.py) run:
+
+``` bash
+docker build \
+  -f ./extproc/example/Dockerfile \
+  -t service-callout-example-network \
+  --build-arg proto_path=envoy/service/network_ext_proc/v3/network_external_processor.proto
+  --build-arg copy_path=extproc/l4_example/basic/ \
+  --build-arg run_module=network_service_callout_example .
+```
+
+`--build-arg` specifies the following:
+
+* `copy_path`: Required files to copy to the docker image.
+* `run_module`: The python module to run on startup.
+
+The above example makes a copy of `extproc/l4_example/basic/network_service_callout_example.py`
+and sets up the image to run `network_service_callout_example.py` on startup.
+
+The image can then be run with:
+
+``` bash
+docker run -P -it --network host service-callout-example-network:latest
 ```
