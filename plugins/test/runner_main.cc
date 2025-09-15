@@ -36,6 +36,8 @@
 #include "test/dynamic_test.h"
 #include "test/framework.h"
 #include "test/runner.pb.h"
+#include <yaml-cpp/yaml.h>
+#include <sstream> 
 
 ABSL_FLAG(std::string, proto, "", "Path to test config. Required.");
 ABSL_FLAG(std::string, plugin, "", "Override path to plugin wasm.");
@@ -50,6 +52,8 @@ ABSL_FLAG(uint64_t, num_additional_streams, 0,
           "Number of additional streams to run in benchmarks.");
 ABSL_FLAG(uint64_t, additional_stream_advance_rate, 0,
           "Number of additional streams to advance per benchmark iteration.");
+ABSL_FLAG(std::string, yaml, "", "Path to a YAML test input file");
+
 
 namespace service_extensions_samples {
 
@@ -196,8 +200,38 @@ absl::Status main(int argc, char** argv) {
 
 }  // namespace service_extensions_samples
 
+std::string ConvertYamlNodeToJson(const YAML::Node &node) {
+    nlohmann::json j;
+
+    if (node.IsScalar()) {
+        return "\"" + node.as<std::string>() + "\"";
+    } else if (node.IsSequence()) {
+        nlohmann::json arr = nlohmann::json::array();
+        for (const auto &item : node) {
+            arr.push_back(YAML::Load(ConvertYamlNodeToJson(item)));
+        }
+        j = arr;
+    } else if (node.IsMap()) {
+        nlohmann::json obj;
+        for (const auto &kv : node) {
+            obj[kv.first.as<std::string>()] = YAML::Load(ConvertYamlNodeToJson(kv.second));
+        }
+        j = obj;
+    }
+
+    return j.dump();
+}
+
 int main(int argc, char** argv) {
   absl::Status res = service_extensions_samples::main(argc, argv);
+
+if (!absl::GetFlag(FLAGS_yaml).empty()) {
+    std::string yaml_file = absl::GetFlag(FLAGS_yaml);
+    YAML::Node root = YAML::LoadFile(yaml_file);
+
+    std::string json_str = ConvertYamlNodeToJson(root);
+}
+
   if (!res.ok()) {
     std::cerr << res << std::endl;
     return 1;

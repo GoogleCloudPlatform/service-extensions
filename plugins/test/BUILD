@@ -16,6 +16,7 @@ cc_library(
         "@com_google_googletest//:gtest",
         "@proxy_wasm_cpp_host//:base_lib",
         "@proxy_wasm_cpp_host//test:utility_lib",
+        "@com_github_jbeder_yaml_cpp//:yaml-cpp",
     ],
 )
 
