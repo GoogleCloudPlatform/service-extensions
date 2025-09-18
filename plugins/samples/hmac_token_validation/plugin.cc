@@ -74,14 +74,14 @@ public:
 
     // 3. Parse token parts (timestamp:hmac)
     std::string token = std::string(auth_value.substr(prefix.size()));
-    std::vector<std::string> token_parts = absl::StrSplit(token, absl::MaxSplits(':', 1));
-    const std::string& token_timestamp_str = token_parts[0];
-    const std::string& token_hmac = token_parts[1];
+    std::vector<std::string> token_parts(absl::StrSplit(token, absl::MaxSplits(':', 1)));
     
     if (token_parts.size() != 2) {
       sendLocalResponse(400, "", "Invalid token format: expected 'timestamp:hmac'", {});
       return FilterHeadersStatus::StopIteration;
     }
+    
+    auto& [token_timestamp_str, token_hmac] = reinterpret_cast<std::pair<std::string, std::string>&>(token_parts[0]);
 
     // 4. Validate timestamp format
     int64_t token_timestamp;
