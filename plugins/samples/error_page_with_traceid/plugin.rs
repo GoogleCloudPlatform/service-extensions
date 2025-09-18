@@ -111,13 +111,12 @@ impl ErrorPageWithTraceId {
 
         // Try W3C Trace Context standard
         if let Some(w3c_trace) = self.get_http_request_header("traceparent") {
-            // Format: version-trace_id-parent_id-flags
-            let parts: Vec<&str> = w3c_trace.split('-').collect();
-            let hex_regex = Regex::new(r"^[0-9a-fA-F]{32}$").unwrap();
-            if parts.len() == 4 && hex_regex.is_match(parts[1]) {
-                return parts[1].to_string(); // Return trace ID (second part)
+            // Use regex to match the entire traceparent value and extract trace ID
+            let re = Regex::new(r"^[0-9a-f]{2}-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}$").unwrap();
+            if let Some(caps) = re.captures(&w3c_trace) {
+                return caps[1].to_string(); // Return trace ID (second part)
             }
-            return "invalid-trace-format".to_string();
+            return "not-available".to_string();
         }
 
         "not-available".to_string()
