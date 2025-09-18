@@ -77,6 +77,7 @@ Tips:
 -   To disable benchmarking for faster iteration, add `--nobench`.
 -   To disable unit testing for cleaner output, add `--notest`.
 -   To optionally specify plugin config data, add `--config=<path>`.
+-   To test memory with high concurrency, add `--num_additional_streams=500`.
 
 You can also run tests using Bazel. This is **much slower** the first time,
 because this builds both the tester and the V8 runtime from scratch. Use the
@@ -98,6 +99,8 @@ for your own plugin. Extend them to fit your particular use case.
 *   [Log each Wasm call](samples/log_calls): Don't change anything about the
     traffic (noop plugin). Log each wasm invocation, including lifecycle
     callbacks.
+*   [Hello World](samples/local_reply): Immediately response with "Hello World"
+    upon request.
 *   [Add HTTP request & response headers](samples/add_header): Add a header on
     both the client request and server response paths. Also check for existing
     headers.
@@ -192,7 +195,7 @@ Support will grow over time. The current feature set includes:
 
 In support of unit testing, this repo contains an `HttpTest` fixture with a
 `TestWasm` host implementation and `TestHttpContext` stream handler. These
-minimal implementations loosely match GCP Service Extension execution
+minimal implementations loosely match the GCP Service Extension execution
 environment. The contexts implement the ABI / feature set described above
 (mainly HTTP headers and logging), but often in a simple way (behaviors may not
 match GCP exactly).
