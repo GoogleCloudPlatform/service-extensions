@@ -17,7 +17,7 @@ load("@rules_rust//crate_universe:defs.bzl", "crates_vendor")
 exports_files(
     [
         "Cargo.toml",
-        # "Cargo.Bazel.lock",  # Comentar temporalmente
+        "Cargo.Bazel.lock",
     ],
 )
 
@@ -25,7 +25,7 @@ exports_files(
 # $ bazelisk run bazel/cargo:crates_vendor -- --repin
 crates_vendor(
     name = "crates_vendor",
-    # cargo_lockfile = ":Cargo.Bazel.lock",  # Comentar temporalmente
+    cargo_lockfile = ":Cargo.Bazel.lock",
     generate_target_compatible_with = False,
     manifests = [":Cargo.toml"],
     mode = "remote",
