@@ -25,6 +25,7 @@ from grpc import ServicerContext
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from extproc.service import callout_server
 from extproc.service import callout_tools
+from extproc.service import command_line_tools
 
 
 def extract_jwt_token(
@@ -146,7 +147,7 @@ class CalloutServerExample(callout_server.CalloutServer):
 
 if __name__ == '__main__':
   # Useful command line args.
-  args = callout_tools.add_command_line_args().parse_args()
+  args = command_line_tools.add_command_line_args().parse_args()
   # Set the logging debug level.
   logging.basicConfig(level=logging.DEBUG)
   # Run the gRPC service.

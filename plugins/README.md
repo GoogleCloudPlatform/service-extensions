@@ -195,7 +195,7 @@ Support will grow over time. The current feature set includes:
 
 In support of unit testing, this repo contains an `HttpTest` fixture with a
 `TestWasm` host implementation and `TestHttpContext` stream handler. These
-minimal implementations loosely match GCP Service Extension execution
+minimal implementations loosely match the GCP Service Extension execution
 environment. The contexts implement the ABI / feature set described above
 (mainly HTTP headers and logging), but often in a simple way (behaviors may not
 match GCP exactly).
