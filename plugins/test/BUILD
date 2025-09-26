@@ -16,7 +16,6 @@ cc_library(
         "@com_google_googletest//:gtest",
         "@proxy_wasm_cpp_host//:base_lib",
         "@proxy_wasm_cpp_host//test:utility_lib",
-        "@com_github_jbeder_yaml_cpp//:yaml-cpp",
     ],
 )
 
@@ -46,11 +45,25 @@ cc_library(
         ":dynamic_test",
         ":framework",
         ":runner_cc_proto",
+        ":yaml_proto_converter",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/flags:parse",
         "@com_google_benchmark//:benchmark",
         "@com_google_googletest//:gtest",
         "@com_google_protobuf//:protobuf",
+    ],
+)
+
+cc_library(
+    name = "yaml_proto_converter",
+    srcs = ["yaml_proto_converter.cpp"],
+    hdrs = ["yaml_proto_converter.h"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@yaml_cpp//:yaml-cpp",
+        "//test:runner_cc_proto",
     ],
 )
 

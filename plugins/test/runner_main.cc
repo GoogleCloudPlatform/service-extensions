@@ -36,10 +36,10 @@
 #include "test/dynamic_test.h"
 #include "test/framework.h"
 #include "test/runner.pb.h"
-#include <yaml-cpp/yaml.h>
-#include <sstream> 
+#include "test/yaml_proto_converter.h"
 
 ABSL_FLAG(std::string, proto, "", "Path to test config. Required.");
+ABSL_FLAG(std::string, yaml, "", "Path to test config (.yaml format).");
 ABSL_FLAG(std::string, plugin, "", "Override path to plugin wasm.");
 ABSL_FLAG(std::string, config, "", "Override path to plugin config.");
 ABSL_FLAG(std::string, logfile, "", "Emit plugin logs to disk or stdio.");
@@ -52,7 +52,6 @@ ABSL_FLAG(uint64_t, num_additional_streams, 0,
           "Number of additional streams to run in benchmarks.");
 ABSL_FLAG(uint64_t, additional_stream_advance_rate, 0,
           "Number of additional streams to advance per benchmark iteration.");
-ABSL_FLAG(std::string, yaml, "", "Path to a YAML test input file");
 
 
 namespace service_extensions_samples {
@@ -68,23 +67,93 @@ std::string AbslUnparseFlag(pb::Env::LogLevel ll) {
 }
 }  // namespace pb
 
+// Determines input format based on file extension
+enum class InputFormat {
+  TEXTPROTO,
+  YAML,
+  UNKNOWN
+};
+
+InputFormat DetectInputFormat(const std::string& file_path) {
+  if (file_path.length() >= 10 &&
+      file_path.substr(file_path.length() - 10) == ".textproto") {
+    return InputFormat::TEXTPROTO;
+  }
+  if (file_path.length() >= 5 &&
+      (file_path.substr(file_path.length() - 5) == ".yaml" ||
+       file_path.substr(file_path.length() - 4) == ".yml")) {
+    return InputFormat::YAML;
+  }
+  return InputFormat::UNKNOWN;
+}
+
 absl::StatusOr<pb::TestSuite> ParseInputs(int argc, char** argv) {
   auto params = absl::ParseCommandLine(argc, argv);
 
-  // Parse test config.
-  std::string cfg_path = absl::GetFlag(FLAGS_proto);
-  if (cfg_path.empty()) {
-    return absl::InvalidArgumentError("Flag --proto is required.");
+  // Determine input file and format
+  std::string cfg_path;
+  InputFormat format = InputFormat::UNKNOWN;
+
+  std::string proto_path = absl::GetFlag(FLAGS_proto);
+  std::string yaml_path = absl::GetFlag(FLAGS_yaml);
+
+  // Validate input flags
+  if (!proto_path.empty() && !yaml_path.empty()) {
+    return absl::InvalidArgumentError(
+        "Cannot specify both --proto and --yaml flags. Use only one.");
   }
 
+  if (proto_path.empty() && yaml_path.empty()) {
+    return absl::InvalidArgumentError(
+        "Either --proto or --yaml flag is required.");
+  }
+
+  if (!proto_path.empty()) {
+    cfg_path = proto_path;
+    format = InputFormat::TEXTPROTO;
+  } else {
+    cfg_path = yaml_path;
+    format = InputFormat::YAML;
+  }
+
+  // Double-check format based on file extension if auto-detection is needed
+  if (format == InputFormat::UNKNOWN) {
+    format = DetectInputFormat(cfg_path);
+    if (format == InputFormat::UNKNOWN) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Cannot determine format for file: ", cfg_path,
+                       ". Use .textproto, .yaml, or .yml extension."));
+    }
+  }
+
+  // Read input file
   auto cfg_bytes = ReadDataFile(cfg_path);
   if (!cfg_bytes.ok()) {
     return cfg_bytes.status();
   }
+
+  // Parse based on format
   pb::TestSuite tests;
-  if (!google::protobuf::TextFormat::ParseFromString(*cfg_bytes, &tests)) {
-    return absl::InvalidArgumentError("Failed to parse input proto");
+  switch (format) {
+    case InputFormat::TEXTPROTO: {
+      if (!google::protobuf::TextFormat::ParseFromString(*cfg_bytes, &tests)) {
+        return absl::InvalidArgumentError("Failed to parse input textproto");
+      }
+      break;
+    }
+    case InputFormat::YAML: {
+      auto yaml_result = pb::YamlProtoConverter::ConvertYamlToTestSuite(*cfg_bytes);
+      if (!yaml_result.ok()) {
+        return absl::InvalidArgumentError(
+            absl::StrCat("Failed to parse input YAML: ", yaml_result.status().message()));
+      }
+      tests = std::move(*yaml_result);
+      break;
+    }
+    default:
+      return absl::InvalidArgumentError("Unsupported input format");
   }
+
   tests.mutable_env()->set_test_path(cfg_path);
 
   // Apply flag overrides.
@@ -200,38 +269,8 @@ absl::Status main(int argc, char** argv) {
 
 }  // namespace service_extensions_samples
 
-std::string ConvertYamlNodeToJson(const YAML::Node &node) {
-    nlohmann::json j;
-
-    if (node.IsScalar()) {
-        return "\"" + node.as<std::string>() + "\"";
-    } else if (node.IsSequence()) {
-        nlohmann::json arr = nlohmann::json::array();
-        for (const auto &item : node) {
-            arr.push_back(YAML::Load(ConvertYamlNodeToJson(item)));
-        }
-        j = arr;
-    } else if (node.IsMap()) {
-        nlohmann::json obj;
-        for (const auto &kv : node) {
-            obj[kv.first.as<std::string>()] = YAML::Load(ConvertYamlNodeToJson(kv.second));
-        }
-        j = obj;
-    }
-
-    return j.dump();
-}
-
 int main(int argc, char** argv) {
   absl::Status res = service_extensions_samples::main(argc, argv);
-
-if (!absl::GetFlag(FLAGS_yaml).empty()) {
-    std::string yaml_file = absl::GetFlag(FLAGS_yaml);
-    YAML::Node root = YAML::LoadFile(yaml_file);
-
-    std::string json_str = ConvertYamlNodeToJson(root);
-}
-
   if (!res.ok()) {
     std::cerr << res << std::endl;
     return 1;
