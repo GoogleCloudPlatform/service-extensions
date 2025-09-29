@@ -36,7 +36,7 @@ class JwtAuthServer(CalloutServerAuth):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._load_public_key('../../ssl_creds/publickey.pem')
+        self._load_public_key('ssl_creds/publickey.pem')
 
     def _load_public_key(self, path: str) -> None:
         """Load the public key used for JWT validation."""
@@ -94,7 +94,7 @@ class JwtAuthServer(CalloutServerAuth):
     def extract_jwt_token(self, request: auth_pb2.CheckRequest) -> Union[str, None]:
         """Extract JWT token from Authorization header.
         
-        Args:extract_jwt_token
+        Args:
             request: The authorization check request
             
         Returns:
@@ -104,14 +104,20 @@ class JwtAuthServer(CalloutServerAuth):
         if hasattr(request.attributes.request.http, 'headers'):
             auth_header = request.attributes.request.http.headers.get('authorization')
             if auth_header:
-                return auth_header.strip().split(' ')[-1]  # Extract token part after "Bearer"
+                # Extract token part after "Bearer"
+                parts = auth_header.strip().split(' ')
+                if len(parts) == 2 and parts[0].lower() == 'bearer':
+                    return parts[1]
         
         # Try to access headers through header_map structure
         if hasattr(request.attributes.request.http, 'header_map'):
             for header in request.attributes.request.http.header_map.headers:
                 if header.key.lower() == 'authorization':
-                    auth_value = header.raw_value.decode('utf-8') or header.value
-                    return auth_value.strip().split(' ')[-1]  # Extract token part after "Bearer"
+                    auth_value = header.raw_value.decode('utf-8') if header.raw_value else header.value
+                    if auth_value:
+                        parts = auth_value.strip().split(' ')
+                        if len(parts) == 2 and parts[0].lower() == 'bearer':
+                            return parts[1]
         
         return None
 
@@ -122,7 +128,7 @@ class JwtAuthServer(CalloutServerAuth):
             token: JWT token string to validate
             
         Returns:
-            Decoded JWT payload if valid, None otherwiseextract_jwt_token
+            Decoded JWT payload if valid, None otherwise
         """
         if not self.public_key:
             logging.error("Public key not loaded, cannot validate token")
