@@ -68,13 +68,13 @@ class CalloutServerAuth:
       defaults to default_ip:443.
     port: If specified, overrides the port of address.
     health_check_address: The health check serving address,
-      defaults to default_ip:8085.
+      defaults to default_ip:80.
     health_check_port: If set, overrides the port of health_check_address.
     combined_health_check: If True, does not create a separate health check server.
     secure_health_check: If True, will use HTTPS as the protocol of the health check server.
       Requires cert_chain_path and private_key_path to be set.
     plaintext_address: The non-authenticated address to listen to,
-      defaults to default_ip:50051.
+      defaults to default_ip:8080.
     plaintext_port: If set, overrides the port of plaintext_address.
     disable_plaintext: If true, disables the plaintext address of the server.
     default_ip: If left None, defaults to '0.0.0.0'.
@@ -116,13 +116,13 @@ class CalloutServerAuth:
 
     self.plaintext_address: tuple[str, int] | None = None
     if not disable_plaintext:
-      self.plaintext_address = plaintext_address or (default_ip, 50051)
+      self.plaintext_address = plaintext_address or (default_ip, 8080)
       if plaintext_port:
         self.plaintext_address = (self.plaintext_address[0], plaintext_port)
 
     self.health_check_address: tuple[str, int] | None = None
     if not combined_health_check:
-      self.health_check_address = health_check_address or (default_ip, 8085)
+      self.health_check_address = health_check_address or (default_ip, 80)
       if health_check_port:
         self.health_check_address = (self.health_check_address[0],
                                      health_check_port)
@@ -150,7 +150,6 @@ class CalloutServerAuth:
     self.private_key = private_key or _read_cert_file(private_key_path)
     self.cert_chain = cert_chain or _read_cert_file(cert_chain_path)
 
-    # If we couldn't read one of the certificate files, disable secure connections
     if (cert_chain_path and not self.cert_chain) or (private_key_path and not self.private_key):
       logging.warning("One or both certificate files could not be read. Secure connections will be disabled.")
       self.cert_chain = None
@@ -268,7 +267,6 @@ class _GRPCAuthService(auth_pb2_grpc.AuthorizationServicer):
     
     address_str = _addr_to_str(processor.address)
     
-    # Add secure port only if both cert_chain and private_key are available
     if processor.cert_chain and processor.private_key:
       server_credentials = grpc.ssl_server_credentials(
           private_key_certificate_chain_pairs=[(processor.private_key,
@@ -281,13 +279,11 @@ class _GRPCAuthService(auth_pb2_grpc.AuthorizationServicer):
         self._server.add_insecure_port(plaintext_address_str)
         self._start_msg += f' and {plaintext_address_str} (plaintext)'
     else:
-      # If no certificates are available, use plaintext only
       if processor.plaintext_address:
         plaintext_address_str = _addr_to_str(processor.plaintext_address)
         self._server.add_insecure_port(plaintext_address_str)
         self._start_msg = f'GRPC auth server started, listening on {plaintext_address_str} (plaintext only)'
       else:
-        # If no plaintext address is configured, use the default address for plaintext
         self._server.add_insecure_port(address_str)
         self._start_msg = f'GRPC auth server started, listening on {address_str} (plaintext only)'
 

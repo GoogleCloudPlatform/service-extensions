@@ -55,11 +55,6 @@ class CalloutServerExample(CalloutServerAuth):
                     status_code=http_status_pb2.StatusCode.Forbidden,
                     headers=[('x-client-ip-allowed', 'false')]
                 )
-            else:
-                logging.info(f"Request allowed for IP: {client_ip}")
-                return allow_request(
-                    headers_to_add=[('x-client-ip-allowed', 'true')]
-                )
         except Exception as e:
             logging.error(f"Error in Check method: {str(e)}")
             logging.error(traceback.format_exc())
