@@ -31,7 +31,7 @@ impl HttpContext for MyHttpContext {
         info!("onRequestHeaders: hello from wasm");
 
         // Route extension example: host rewrite
-        self.set_http_request_header(":host", Some("service-extensions.com"));
+        self.set_http_request_header(":authority", Some("service-extensions.com"));
         self.set_http_request_header(":path", Some("/"));
         return Action::Continue;
     }
