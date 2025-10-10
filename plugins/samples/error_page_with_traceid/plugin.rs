@@ -16,54 +16,52 @@
 use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
 use regex::Regex;
-
-// Custom HTML template for error pages
-const ERROR_TEMPLATE: &str = r#"
-<html>
-<head>
-  <title>Error {STATUS_CODE}</title>
-  <style>
-    body { font-family: sans-serif; margin: 2rem; }
-    .container { max-width: 800px; margin: 0 auto; }
-    .trace-id { 
-      background-color: #f5f5f5; 
-      padding: 1rem; 
-      font-family: monospace;
-      word-break: break-all;
-      margin-top: 2rem;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>Error {STATUS_CODE}</h1>
-    <p>We're sorry, something went wrong with your request.</p>
-    
-    <div class="trace-id">
-      <strong>Trace ID:</strong> {TRACE_ID}
-    </div>
-    
-    <p>Please provide this trace ID to support for assistance.</p>
-  </div>
-</body>
-</html>
-"#;
+use std::rc::Rc;
 
 proxy_wasm::main! {{
     proxy_wasm::set_log_level(LogLevel::Debug);
-    proxy_wasm::set_http_context(|_, _| -> Box<dyn HttpContext> { Box::new(ErrorPageWithTraceId::default()) });
+    proxy_wasm::set_root_context(|_| -> Box<dyn RootContext> {
+        Box::new(ErrorPageRootContext::default())
+    });
 }}
+
+struct ErrorPageRootContext {
+    traceparent_regex: Option<Rc<Regex>>,
+}
+
+impl Default for ErrorPageRootContext {
+    fn default() -> Self {
+        Self {
+            traceparent_regex: None,
+        }
+    }
+}
+
+impl Context for ErrorPageRootContext {}
+
+impl RootContext for ErrorPageRootContext {
+    fn on_configure(&mut self, _: usize) -> bool {
+        self.traceparent_regex = Some(Rc::new(
+            Regex::new(r"^[0-9a-f]{2}-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}$").unwrap()
+        ));
+        true
+    }
+
+    fn create_http_context(&self, _context_id: u32) -> Option<Box<dyn HttpContext>> {
+        Some(Box::new(ErrorPageWithTraceId {
+            trace_id: "not-available".to_string(),
+            traceparent_regex: self.traceparent_regex.as_ref().unwrap().clone(),
+        }))
+    }
+
+    fn get_type(&self) -> Option<ContextType> {
+        Some(ContextType::HttpContext)
+    }
+}
 
 struct ErrorPageWithTraceId {
     trace_id: String,
-}
-
-impl Default for ErrorPageWithTraceId {
-    fn default() -> Self {
-        Self {
-            trace_id: "not-available".to_string(),
-        }
-    }
+    traceparent_regex: Rc<Regex>,
 }
 
 impl Context for ErrorPageWithTraceId {}
@@ -109,11 +107,9 @@ impl ErrorPageWithTraceId {
             return trace_header;
         }
 
-        // Try W3C Trace Context standard
+        // Try W3C Trace Context standard using precompiled regex
         if let Some(w3c_trace) = self.get_http_request_header("traceparent") {
-            // Use regex to match the entire traceparent value and extract trace ID
-            let re = Regex::new(r"^[0-9a-f]{2}-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}$").unwrap();
-            if let Some(caps) = re.captures(&w3c_trace) {
+            if let Some(caps) = self.traceparent_regex.captures(&w3c_trace) {
                 return caps[1].to_string(); // Return trace ID (second part)
             }
             return "not-available".to_string();
@@ -122,4 +118,36 @@ impl ErrorPageWithTraceId {
         "not-available".to_string()
     }
 }
+
+// Custom HTML template for error pages
+const ERROR_TEMPLATE: &str = r#"
+<html>
+<head>
+  <title>Error {STATUS_CODE}</title>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; }
+    .container { max-width: 800px; margin: 0 auto; }
+    .trace-id { 
+      background-color: #f5f5f5; 
+      padding: 1rem; 
+      font-family: monospace;
+      word-break: break-all;
+      margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Error {STATUS_CODE}</h1>
+    <p>We're sorry, something went wrong with your request.</p>
+    
+    <div class="trace-id">
+      <strong>Trace ID:</strong> {TRACE_ID}
+    </div>
+    
+    <p>Please provide this trace ID to support for assistance.</p>
+  </div>
+</body>
+</html>
+"#;
 // [END serviceextensions_plugin_error_page_with_traceid]
