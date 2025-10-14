@@ -24,7 +24,7 @@ class MyHttpContext : public Context {
     LOG_INFO("onRequestHeaders: hello from wasm");
 
     // Route Extension example: host rewrite
-    replaceRequestHeader(":host", "service-extensions.com");
+    replaceRequestHeader(":authority", "service-extensions.com");
     replaceRequestHeader(":path", "/");
     return FilterHeadersStatus::Continue;
   }
