@@ -54,12 +54,13 @@ C++ builds may require a specific toolchain: `--config=clang` or `--config=gcc`.
 
 # Testing and benchmarking
 
-1.  Write a plugin test file (text proto) to specify the plugin's functional
-    expectations ([example](samples/testing/tests.textpb)). Consult the plugin
-    tester [proto API](test/runner.proto) as needed.
-1.  Add `benchmark: true` to tests that exemplify common wasm operations
+1. Write a plugin test file (text proto) to specify the plugin's functional
+    expectations ([example](samples/testing/tests.textpb)). 
+2. YAML test file is also supported ([example](samples/testing/tests.yaml)).
+3. Consult the plugin tester [proto API](test/runner.proto) as needed.
+4. Add `benchmark: true` to tests that exemplify common wasm operations
     ([example](samples/add_header/tests.textpb)).
-1.  Run + Test + Benchmark your wasm plugin as follows!
+5. Run + Test + Benchmark your wasm plugin as follows!
 
 ```bash
 docker run -it -v $(pwd):/mnt \
