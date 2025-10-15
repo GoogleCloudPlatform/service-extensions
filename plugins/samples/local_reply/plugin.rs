@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2025 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [START serviceextensions_plugin_add_header]
+// [START serviceextensions_plugin_hello_world]
 use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
 
@@ -27,21 +27,13 @@ impl Context for MyHttpContext {}
 
 impl HttpContext for MyHttpContext {
     fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
-        // Always be a friendly proxy.
-        self.add_http_request_header("Message", "hello");
-        self.set_http_request_header("Welcome", Some("warm"));
-        return Action::Continue;
-    }
-
-    fn on_http_response_headers(&mut self, _: usize, _: bool) -> Action {
-        // Conditionally add to a header value.
-        let msg = self.get_http_response_header("Message");
-        if msg.unwrap_or_default() == "foo" {
-            self.add_http_response_header("Message", "bar");
-        }
-        // Unconditionally remove a header.
-        self.set_http_response_header("Welcome", None);
-        return Action::Continue;
+        // Set the response headers and status code
+        self.send_http_response(
+            200, 
+            vec![("Content-Type", "text/plain")], 
+            Some(b"Hello World")
+        );
+        Action::Pause
     }
 }
-// [END serviceextensions_plugin_add_header]
+// [END serviceextensions_plugin_hello_world]
