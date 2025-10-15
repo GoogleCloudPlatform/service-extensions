@@ -129,8 +129,6 @@ func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) t
 		if err := proxywasm.SendHttpResponse(301, headers, body, -1); err != nil {
 			proxywasm.LogErrorf("Failed to send redirect response: %v", err)
 		}
-
-		return types.ActionContinue
 	}
 
 	return types.ActionContinue
