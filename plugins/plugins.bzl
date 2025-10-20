@@ -67,10 +67,10 @@ def proxy_wasm_tests(
     # Determine the appropriate flag based on file extension
     if tests.endswith((".yaml", ".yml")):
         test_flag = "--yaml=$(rootpath %s)" % tests
-    elif tests.endswith(".textpb"):
+    elif tests.endswith((".txtpb", ".textpb", ".textproto", ".pbtxt")):
         test_flag = "--proto=$(rootpath %s)" % tests
     else:
-        fail("Unsupported test file format: %s. Supported formats: .yaml, .yml, .textpb" % tests)
+        fail("Unsupported test file format: %s. Supported formats: .yaml, .yml, .txtpb, .textpb, .textproto, .pbtxt" % tests)
     """Generates cc_test targets for each provided wasm plugin.
 
     Args:

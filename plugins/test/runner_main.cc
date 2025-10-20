@@ -74,19 +74,6 @@ enum class InputFormat {
   UNKNOWN
 };
 
-InputFormat DetectInputFormat(const std::string& file_path) {
-  if (file_path.length() >= 10 &&
-      file_path.substr(file_path.length() - 10) == ".textproto") {
-    return InputFormat::TEXTPROTO;
-  }
-  if (file_path.length() >= 5 &&
-      (file_path.substr(file_path.length() - 5) == ".yaml" ||
-       file_path.substr(file_path.length() - 4) == ".yml")) {
-    return InputFormat::YAML;
-  }
-  return InputFormat::UNKNOWN;
-}
-
 absl::StatusOr<pb::TestSuite> ParseInputs(int argc, char** argv) {
   auto params = absl::ParseCommandLine(argc, argv);
 
@@ -94,36 +81,23 @@ absl::StatusOr<pb::TestSuite> ParseInputs(int argc, char** argv) {
   std::string cfg_path;
   InputFormat format = InputFormat::UNKNOWN;
 
-  std::string proto_path = absl::GetFlag(FLAGS_proto);
-  std::string yaml_path = absl::GetFlag(FLAGS_yaml);
-
-  // Validate input flags
-  if (!proto_path.empty() && !yaml_path.empty()) {
-    return absl::InvalidArgumentError(
-        "Cannot specify both --proto and --yaml flags. Use only one.");
-  }
-
-  if (proto_path.empty() && yaml_path.empty()) {
-    return absl::InvalidArgumentError(
-        "Either --proto or --yaml flag is required.");
-  }
-
-  if (!proto_path.empty()) {
+  if (std::string proto_path = absl::GetFlag(FLAGS_proto); !proto_path.empty()) {
     cfg_path = proto_path;
     format = InputFormat::TEXTPROTO;
-  } else {
+  }
+
+  if (std::string yaml_path = absl::GetFlag(FLAGS_yaml); !yaml_path.empty()) {
+    if (format != InputFormat::UNKNOWN) {
+      return absl::InvalidArgumentError(
+          "Cannot specify both --proto and --yaml flags");
+    }
     cfg_path = yaml_path;
     format = InputFormat::YAML;
   }
 
-  // Double-check format based on file extension if auto-detection is needed
   if (format == InputFormat::UNKNOWN) {
-    format = DetectInputFormat(cfg_path);
-    if (format == InputFormat::UNKNOWN) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("Cannot determine format for file: ", cfg_path,
-                       ". Use .textproto, .yaml, or .yml extension."));
-    }
+    return absl::InvalidArgumentError(
+        "Either --proto or --yaml flag is required.");
   }
 
   // Read input file
@@ -142,7 +116,7 @@ absl::StatusOr<pb::TestSuite> ParseInputs(int argc, char** argv) {
       break;
     }
     case InputFormat::YAML: {
-      auto yaml_result = pb::YamlProtoConverter::ConvertYamlToTestSuite(*cfg_bytes);
+      auto yaml_result = pb::ConvertYamlToTestSuite(*cfg_bytes);
       if (!yaml_result.ok()) {
         return absl::InvalidArgumentError(
             absl::StrCat("Failed to parse input YAML: ", yaml_result.status().message()));
