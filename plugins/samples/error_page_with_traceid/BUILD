@@ -5,6 +5,7 @@ licenses(["notice"])  # Apache 2
 proxy_wasm_plugin_go(
     name = "plugin_go.wasm",
     srcs = ["plugin.go"],
+)
 
 proxy_wasm_plugin_cpp(
     name = "plugin_cpp.wasm",
