@@ -1,14 +1,10 @@
 test {
-  name: "Basics"
+  name: "SendHelloWorldResponse"
   request_headers {
-    result {
-      log { regex: ".*onRequestHeaders: hello from wasm" }
-      body {
-        exact: "Hello World"
-      }
-      immediate {
-        http_status: 400
-      }
+    result { 
+      immediate { http_status: 200 details: "" }
+      body { regex: "Hello World" }
+      has_header { key: "Content-Type" value: "text/plain" }      
     }
   }
 }

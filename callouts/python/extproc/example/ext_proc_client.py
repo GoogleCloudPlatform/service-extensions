@@ -22,7 +22,7 @@ from envoy.service.ext_proc.v3.external_processor_pb2 import (
   ProcessingResponse,
 )
 from extproc.service.callout_server import _addr_to_str
-from extproc.service.callout_tools import _addr
+from extproc.service.command_line_tools import _addr
 from envoy.service.ext_proc.v3.external_processor_pb2_grpc import (
   ExternalProcessorStub,
 )

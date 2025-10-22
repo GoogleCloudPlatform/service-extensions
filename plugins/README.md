@@ -54,12 +54,12 @@ C++ builds may require a specific toolchain: `--config=clang` or `--config=gcc`.
 
 # Testing and benchmarking
 
-1.  Write a plugin test file (text proto) to specify the plugin's functional
-    expectations ([example](samples/testing/tests.textpb)). Consult the plugin
-    tester [proto API](test/runner.proto) as needed.
-1.  Add `benchmark: true` to tests that exemplify common wasm operations
+1. Write a plugin test file to specify the plugin's functional expectations. 
+   This file can either be in text proto format ([example](samples/testing/tests.textpb)) or YAML ([example](samples/testing/tests.yaml)). 
+   Consult the plugin tester [proto API](test/runner.proto) as needed.
+2. Add `benchmark: true` to tests that exemplify common wasm operations
     ([example](samples/add_header/tests.textpb)).
-1.  Run + Test + Benchmark your wasm plugin as follows!
+3. Run + Test + Benchmark your wasm plugin as follows!
 
 ```bash
 docker run -it -v $(pwd):/mnt \
@@ -195,7 +195,7 @@ Support will grow over time. The current feature set includes:
 
 In support of unit testing, this repo contains an `HttpTest` fixture with a
 `TestWasm` host implementation and `TestHttpContext` stream handler. These
-minimal implementations loosely match GCP Service Extension execution
+minimal implementations loosely match the GCP Service Extension execution
 environment. The contexts implement the ABI / feature set described above
 (mainly HTTP headers and logging), but often in a simple way (behaviors may not
 match GCP exactly).
