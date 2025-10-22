@@ -63,6 +63,7 @@ uint64_t TestContext::getMonotonicTimeNanoseconds() {
 }
 proxy_wasm::WasmResult TestContext::log(uint32_t log_level,
                                         std::string_view message) {
+  logging_entries_++;
   logging_bytes_ += message.size();
   if (wasmVm()->cmpLogLevel(proxy_wasm::LogLevel::trace)) {
     std::cout << "TRACE from testcontext: [log] " << message << std::endl;

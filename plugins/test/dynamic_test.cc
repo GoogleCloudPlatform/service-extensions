@@ -428,6 +428,7 @@ void DynamicTest::EmitStats(benchmark::State& state,
   state.counters["LogsSizeB"] =
       benchmark::Counter(context.logging_bytes(), benchmark::Counter::kDefaults,
                          benchmark::Counter::kIs1024);
+  state.counters["LogEntries"] = context.logging_entries();
   state.counters["WasmSizeB"] = benchmark::Counter(
       std::filesystem::file_size(env_.wasm_path()),
       benchmark::Counter::kDefaults, benchmark::Counter::kIs1024);
