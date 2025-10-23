@@ -1,0 +1,8 @@
+test {
+  name: "Enable reCAPTCHA action"
+  num_chunks:10
+  response_body {
+    input { file: "response_body.data" }
+    result { body { file: "action_key_expected_response_body.data" } }
+  }
+}
