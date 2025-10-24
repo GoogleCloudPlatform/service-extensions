@@ -22,6 +22,8 @@
 #include <boost/dll/runtime_symbol_info.hpp>
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
 
 namespace service_extensions_samples {
 
