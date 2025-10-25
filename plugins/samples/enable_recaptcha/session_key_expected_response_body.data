@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<script src="https://www.google.com/recaptcha/enterprise.js?render=123456789"></script>
+<script src="https://www.google.com/recaptcha/enterprise.js?render=&waf=1234-abcd" async defer></script>
 
 <title>Page Title</title>
 </head>
