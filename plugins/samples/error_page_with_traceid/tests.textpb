@@ -1,0 +1,95 @@
+# Test specific status codes (e.g., 502 Bad Gateway)
+test {
+  name: "ErrorPage502Status"
+  request_headers {
+    input {
+      header { key: "x-cloud-trace-context" value: "abcdef123456789" }
+    }
+  }
+  response_headers {
+    input {
+      header { key: ":status" value: "502" }
+    }
+    result {
+      immediate { http_status: 502 }
+      body { regex: "(?s).*Error 502.*abcdef123456789.*" }
+    }
+  }
+}
+
+# Test that 2xx responses don't trigger custom error page
+test {
+  name: "NoErrorPageFor200"
+  request_headers {
+    input {
+      header { key: "x-cloud-trace-context" value: "abcdef123456789" }
+    }
+  }
+  response_headers {
+    input {
+      header { key: ":status" value: "200" }
+    }
+    # For normal responses, we expect the filter to allow the request to continue
+    # without modification, so no explicit result needed
+  }
+}
+
+# Test with additional response headers
+test {
+  name: "ErrorPagePreservesContentType"
+  request_headers {
+    input {
+      header { key: "traceparent" value: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01" }
+    }
+  }
+  response_headers {
+    input {
+      header { key: ":status" value: "500" }
+      header { key: "content-type" value: "application/json" }
+      header { key: "x-custom-header" value: "test-value" }
+    }
+    result {
+      immediate { http_status: 500 }
+      body { regex: "(?s).*Error 500.*4bf92f3577b34da6a3ce929d0e0e4736.*" }
+    }
+  }
+}
+
+# Test precedence when both trace headers are present
+test {
+  name: "MultipleDifferentTraceHeaders"
+  request_headers {
+    input {
+      header { key: "x-cloud-trace-context" value: "cloud-trace-id/1" }
+      header { key: "traceparent" value: "00-w3c-trace-id-00f067aa0ba902b7-01" }
+    }
+  }
+  response_headers {
+    input {
+      header { key: ":status" value: "429" }
+    }
+    result {
+      immediate { http_status: 429 }
+      body { regex: "(?s).*cloud-trace-id.*" }
+    }
+  }
+}
+
+# Test different Google Cloud Trace formats
+test {
+  name: "GoogleTraceWithoutSpan"
+  request_headers {
+    input {
+      header { key: "x-cloud-trace-context" value: "trace-without-span-id" }
+    }
+  }
+  response_headers {
+    input {
+      header { key: ":status" value: "500" }
+    }
+    result {
+      immediate { http_status: 500 }
+      body { regex: "(?s).*trace-without-span-id.*" }
+    }
+  }
+}
