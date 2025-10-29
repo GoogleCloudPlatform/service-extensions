@@ -435,3 +435,4 @@ static RegisterContextFactory register_JWTPlugin(
     CONTEXT_FACTORY(JWTPluginContext),
     ROOT_FACTORY(JWTPluginRootContext)
 );
+// [END serviceextensions_plugin_drafting_jwt_token]
