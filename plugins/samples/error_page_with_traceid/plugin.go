@@ -17,8 +17,9 @@ package main
 
 import (
 	"bytes"
+	"regexp"
 	"strconv"
-	"sync"
+	"strings"
 
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm"
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm/types"
@@ -55,22 +56,12 @@ const errorTemplate = `
 </html>
 `
 
-var (
-	errorTemplateBytes []byte
-	templateOnce       sync.Once
-)
+var w3cTraceRegex = regexp.MustCompile(`^[0-9a-f]{2}-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}$`)
 
 func getErrorTemplate(statusCode, traceID string) []byte {
-	templateOnce.Do(func() {
-		errorTemplateBytes = []byte(errorTemplate)
-	})
-
-	result := make([]byte, len(errorTemplateBytes))
-	copy(result, errorTemplateBytes)
-
+	result := []byte(errorTemplate)
 	result = bytes.ReplaceAll(result, []byte("{STATUS_CODE}"), []byte(statusCode))
 	result = bytes.ReplaceAll(result, []byte("{TRACE_ID}"), []byte(traceID))
-
 	return result
 }
 
@@ -110,23 +101,18 @@ func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) t
 
 func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) types.Action {
 	status, err := proxywasm.GetHttpResponseHeader(":status")
-	if err != nil || len(status) < 3 {
+	if err != nil || status == "" {
 		return types.ActionContinue
 	}
 
-	// Check for error status codes (4xx or 5xx)
-	if status[0] != '4' && status[0] != '5' {
+	statusCode, err := strconv.Atoi(status)
+	if err != nil || statusCode < 400 {
 		return types.ActionContinue
 	}
 
 	errorPage := getErrorTemplate(status, ctx.traceID)
 	headers := [][2]string{
 		{"Content-Type", "text/html; charset=utf-8"},
-	}
-
-	statusCode, err := strconv.ParseUint(status, 10, 32)
-	if err != nil {
-		statusCode = 500
 	}
 
 	if err := proxywasm.SendHttpResponse(uint32(statusCode), headers, errorPage, -1); err != nil {
@@ -137,26 +123,23 @@ func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) 
 }
 
 func extractTraceID() string {
-	// Try Google Cloud trace header first
-	if traceHeader, err := proxywasm.GetHttpRequestHeader("x-cloud-trace-context"); err == nil {
-		for i := 0; i < len(traceHeader); i++ {
-			if traceHeader[i] == '/' {
-				return traceHeader[:i]
-			}
+	// Try standard Google Cloud trace header first
+	// Format: TRACE_ID/SPAN_ID;o=TRACE_TRUE
+	if traceHeader, err := proxywasm.GetHttpRequestHeader("x-cloud-trace-context"); err == nil && traceHeader != "" {
+		if traceID, _, found := strings.Cut(traceHeader, "/"); found {
+			return traceID
 		}
 		return traceHeader
 	}
 
-	// Try W3C Trace Context
-	if w3cTrace, err := proxywasm.GetHttpRequestHeader("traceparent"); err == nil {
-		if len(w3cTrace) >= 55 && w3cTrace[2] == '-' {
-			start := 3
-			end := start + 32
-			if end <= len(w3cTrace) && w3cTrace[end] == '-' {
-				return w3cTrace[start:end]
-			}
+	// Try W3C Trace Context standard
+	// Format: version-trace_id-parent_id-flags
+	if w3cTrace, err := proxywasm.GetHttpRequestHeader("traceparent"); err == nil && w3cTrace != "" {
+		matches := w3cTraceRegex.FindStringSubmatch(w3cTrace)
+		if len(matches) > 1 {
+			return matches[1]
 		}
-		return "invalid-trace-format"
+		return "not-available"
 	}
 
 	return "not-available"
