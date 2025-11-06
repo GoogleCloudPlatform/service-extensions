@@ -31,7 +31,7 @@ class CalloutServerExample(CalloutServerAuth):
     def on_check(self, request: auth_pb2.CheckRequest, context) -> auth_pb2.CheckResponse:
         try:
             client_ip = self.extract_client_ip(request)
-            
+
             # Reject if no client IP could be extracted
             if client_ip is None:
                 logging.info("Request denied: could not extract client IP")
@@ -39,7 +39,7 @@ class CalloutServerExample(CalloutServerAuth):
                     status_code=http_status_pb2.StatusCode.Forbidden,
                     headers=[('x-client-ip-allowed', 'false')]
                 )
-            
+
             # Reject if IP is invalid
             if not self.is_valid_ip(client_ip):
                 logging.info(f"Request denied: invalid IP address: {client_ip}")
@@ -47,7 +47,7 @@ class CalloutServerExample(CalloutServerAuth):
                     status_code=http_status_pb2.StatusCode.Forbidden,
                     headers=[('x-client-ip-allowed', 'false')]
                 )
-            
+
             # Reject if IP is in blocked range
             if self.is_ip_blocked(client_ip):
                 logging.info(f"Request denied for blocked IP: {client_ip}")
@@ -55,10 +55,18 @@ class CalloutServerExample(CalloutServerAuth):
                     status_code=http_status_pb2.StatusCode.Forbidden,
                     headers=[('x-client-ip-allowed', 'false')]
                 )
+
+            # ALLOW the request if all checks pass
+            logging.info(f"Request allowed for IP: {client_ip}")
+            return allow_request(headers_to_add=[('x-client-ip-allowed', 'true')])
+
         except Exception as e:
             logging.error(f"Error in Check method: {str(e)}")
             logging.error(traceback.format_exc())
-            return deny_request()
+            return deny_request(
+                status_code=http_status_pb2.StatusCode.InternalServerError,
+                headers=[('x-client-ip-allowed', 'false')]
+            )
 
     def extract_client_ip(self, request: auth_pb2.CheckRequest) -> str:
         """Extracts the client IP address from the 'x-forwarded-for' header."""
@@ -70,14 +78,14 @@ class CalloutServerExample(CalloutServerAuth):
                     ips = header.raw_value.decode('utf-8').split(',')
                     if ips:
                         return ips[0].strip()
-        
+
         # Fallback: try to access headers through the dictionary
         if hasattr(request.attributes.request.http, 'headers'):
             headers = request.attributes.request.http.headers
             xff_header = headers.get('x-forwarded-for', '')
             if xff_header:
                 return xff_header.split(',')[0].strip()
-        
+
         return None
 
     def is_valid_ip(self, ip_str: str) -> bool:

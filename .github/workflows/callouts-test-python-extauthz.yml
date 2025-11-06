@@ -1,0 +1,46 @@
+# This workflow will install Python dependencies and run tests for extauthz callouts
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Callouts test Python SDK - ExtAuthz
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+    - 'callouts/python/extauthz/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+    - 'callouts/python/extauthz/**'
+
+# Default permissions are read only.
+permissions: read-all
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: bufbuild/buf-setup-action@v1
+      with:
+        version: 1.32.2
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+    - name: Install dependencies
+      working-directory: ./callouts/python
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest grpcio grpcio-tools
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
+    - name: Generate protodefs for extauthz
+      working-directory: ./callouts/python
+      run: |
+        buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api --path envoy/service/auth/v3/external_auth.proto --include-imports
+        python -m pip install ./protodef
+    - name: Test extauthz with pytest
+      working-directory: ./callouts/python
+      run: |
+        pytest extauthz/tests/ -v

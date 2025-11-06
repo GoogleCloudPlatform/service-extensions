@@ -19,13 +19,10 @@ permissions: read-all
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     permissions:
       # Workflow can publish documentation
       contents: write
-
     steps:
     - uses: actions/checkout@v4
     - uses: bufbuild/buf-setup-action@v1
@@ -42,17 +39,10 @@ jobs:
         pip install flake8 pytest
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
-    - name: Generate protodefs for extproc
+    - name: Generate protodefs
       working-directory: ./callouts/python
       run: |
         buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api --path envoy/service/ext_proc/v3/external_processor.proto --include-imports
-    - name: Generate protodefs for extauthz
-      working-directory: ./callouts/python
-      run: |
-        buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api --path envoy/service/auth/v3/external_auth.proto --include-imports
-    - name: Install generated protodefs
-      working-directory: ./callouts/python
-      run: |
         python -m pip install ./protodef
     - name: Install sphinx dependencies
       run: |
