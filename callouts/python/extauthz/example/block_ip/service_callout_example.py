@@ -28,6 +28,9 @@ class CalloutServerExample(CalloutServerAuth):
 
     BLOCKED_IP_RANGE = ipaddress.ip_network('10.0.0.0/24')
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     def on_check(self, request: auth_pb2.CheckRequest, context) -> auth_pb2.CheckResponse:
         try:
             client_ip = self.extract_client_ip(request)
