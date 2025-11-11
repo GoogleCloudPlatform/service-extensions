@@ -155,31 +155,41 @@ impl<'a> MyHttpContext<'a> {
         recaptcha_config: Rc<RefCell<RecaptchaConfig>>,
         completed_script_injection: Rc<RefCell<bool>>,
     ) -> Vec<(Cow<'a, Selector>, ElementContentHandlers<'a>)> {
-        if (*recaptcha_config.borrow()).recaptcha_key_type == "SESSION" {
-            return vec![element!("head", move |el| {
-                el.prepend(
+        let key_type = (*recaptcha_config.borrow()).recaptcha_key_type.clone();
+        let content_handler = match (*recaptcha_config.borrow()).recaptcha_key_type.as_str() {
+            "SESSION" => {
+                let key_value = (*recaptcha_config.borrow()).recaptcha_key_value.clone();
+                vec![element!("head", move |el| {
+                    el.prepend(
                             format!("\n<script src=\"https://www.google.com/recaptcha/enterprise.js?render=&waf={}\" async defer></script>\n",
-                            (*recaptcha_config.borrow()).recaptcha_key_value).as_str(),
+                            key_value).as_str(),
                             ContentType::Html,
                             );
-                *completed_script_injection.borrow_mut() = true;
-                Ok(())
-            })];
-        } else if (*recaptcha_config.borrow()).recaptcha_key_type == "ACTION" {
-            return vec![element!("head", move |el| {
-                el.prepend(
+                    *completed_script_injection.borrow_mut() = true;
+                    Ok(())
+                })]
+            }
+            "ACTION" => {
+                let key_value = (*recaptcha_config.borrow()).recaptcha_key_value.clone();
+                vec![element!("head", move |el| {
+                    el.prepend(
                             format!("\n<script src=\"https://www.google.com/recaptcha/enterprise.js?render={}\"></script>\n",
-                            (*recaptcha_config.borrow()).recaptcha_key_value).as_str(),
+                            key_value).as_str(),
                             ContentType::Html,
                             );
+                    *completed_script_injection.borrow_mut() = true;
+                    Ok(())
+                })]
+            }
+            _ => {
+                // Setting completed_script_injection to true to indicate no parsing/modification
+                // of body will occur.
                 *completed_script_injection.borrow_mut() = true;
-                Ok(())
-            })];
-        } else {
-            *completed_script_injection.borrow_mut() = true;
-            // Element handler will never be used because body will not be parsed.
-            return vec![element!("foo", move |_el| { Ok(()) })];
-        }
+                // Element handler will never be used because body will not be parsed.
+                Vec::new()
+            }
+        };
+        return content_handler;
     }
 
     fn parse_chunk(&mut self, body_bytes: Bytes) -> Result<(), Box<dyn Error>> {
@@ -223,7 +233,6 @@ impl<'a> HttpContext for MyHttpContext<'a> {
                 if *self.completed_script_injection.borrow() {
                     if let Err(e) = self.end_rewriter() {
                         error!("Error while ending HtmlRewriter: {}", e.to_string());
-                        *self.completed_script_injection.borrow_mut() = true;
                         return Action::Pause;
                     }
                     // Replace section of body to be modified with data emitted by the rewriter.
