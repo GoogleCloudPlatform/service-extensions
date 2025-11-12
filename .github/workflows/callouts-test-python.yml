@@ -1,31 +1,28 @@
 # This workflow will install Python dependencies, run tests and lint with a single version of Python
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 
-name: Callouts test Python SDK
+name: Callouts test Python SDK - ExtProc
 
 on:
   push:
     branches: [ "main" ]
     paths:
-    - callouts/python/**
-    - docs/python/**
+    - 'callouts/python/extproc/**'
+    - 'docs/python/**'
   pull_request:
     branches: [ "main" ]
     paths:
-    - callouts/python/**
+    - 'callouts/python/extproc/**'
 
 # Default permissions are read only.
 permissions: read-all
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     permissions:
       # Workflow can publish documentation
       contents: write
-
     steps:
     - uses: actions/checkout@v4
     - uses: bufbuild/buf-setup-action@v1
@@ -63,13 +60,7 @@ jobs:
         destination_dir: python/_build
         keep_files: false
         force_orphan: false
-    #- name: Lint with flake8
-    #  run: |
-    #    # stop the build if there are Python syntax errors or undefined names
-    #    flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-    #    # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-    #    flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       working-directory: ./callouts/python
       run: |
-        pytest
+        pytest extproc/tests/ -v
