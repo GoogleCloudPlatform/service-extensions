@@ -11,58 +11,133 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import pytest
-import grpc
-import sys
-import os
+from __future__ import print_function
+
+import datetime
+from http.server import BaseHTTPRequestHandler
+from http.server import HTTPServer
+import threading
 import time
-from concurrent import futures
+from typing import Iterator, Callable, Any, Mapping
+import urllib.request
+import ssl
+from unittest.mock import patch
+
 from envoy.service.auth.v3 import external_auth_pb2 as auth_pb2
 from envoy.service.auth.v3 import external_auth_pb2_grpc as auth_pb2_grpc
 from envoy.service.auth.v3 import attribute_context_pb2 as attr_pb2
-from envoy.config.core.v3 import base_pb2
 from envoy.type.v3 import http_status_pb2
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import grpc
+import pytest
 
-from example.jwt_auth.service_callout_example import JwtAuthServer
+from extauthz.example.jwt_auth.service_callout_example import (
+    JwtAuthServer as CalloutServerTest,
+)
+from extauthz.service.callout_server import CalloutServerAuth, _addr_to_str
 
-# Test data
-VALID_JWT_TOKEN = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTcxMjE3MzQ2MSwiZXhwIjoyMDc1NjU4MjYxfQ.Vv-Lwn1z8BbVBGm-T1EKxv6T3XKCeRlvRrRmdu8USFdZUoSBK_aThzwzM2T8hlpReYsX9YFdJ3hMfq6OZTfHvfPLXvAt7iSKa03ZoPQzU8bRGzYy8xrb0ZQfrejGfHS5iHukzA8vtI2UAJ_9wFQiY5_VGHOBv9116efslbg-_gItJ2avJb0A0yr5uUwmE336rYEwgm4DzzfnTqPt8kcJwkONUsjEH__mePrva1qDT4qtfTPQpGa35TW8n9yZqse3h1w3xyxUfJd3BlDmoz6pQp2CvZkhdQpkWA1bnwpdqSDC7bHk4tYX6K5Q19na-2ff7gkmHZHJr0G9e_vAhQiE5w"
-INVALID_JWT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkphbmUgRG9lIn0.kD4LNVVCOJOiOH6_9x_CFH-R4MId-i_LiJ9My4G4Crs"
 
-# Create a direct test server instance
-def create_test_server():
-    """Create a test server and client."""
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    
-    # Initialize the server with a mocked public key path for testing
-    server_instance = JwtAuthServer(
-        cert_chain_path=None,
-        private_key_path=None
-    )
-    
-    # Mock the public key method for testing
-    server_instance._load_public_key = lambda path: None
-    # Use the public key from test_certs folder or mock it directly
-    server_instance.public_key = os.path.join(os.path.dirname(__file__), 'test_certs/publickey.pem')
-    
-    auth_pb2_grpc.add_AuthorizationServicer_to_server(server_instance, server)
-    port = server.add_insecure_port('[::]:0')
-    server.start()
-    
-    # Create a client channel
-    channel = grpc.insecure_channel(f'localhost:{port}')
-    stub = auth_pb2_grpc.AuthorizationStub(channel)
-    
-    return server, stub, channel, server_instance
+class ServerSetupException(Exception):
+    pass
 
-# Setup and teardown for all tests
-server, client, channel, server_instance = create_test_server()
 
-def teardown_module(module):
-    """Tear down resources after all tests."""
-    channel.close()
-    server.stop(0)
+class NoResponseError(Exception):
+    pass
+
+
+default_kwargs: dict = {
+    'address': ('localhost', 8443),
+    'plaintext_address': ('localhost', 8080),
+    'health_check_address': ('localhost', 8000)
+}
+# Arguments for running a custom CalloutServer with testing parameters.
+_local_test_args: dict = {
+    "kwargs": default_kwargs,
+    "test_class": CalloutServerTest
+}
+
+
+def get_plaintext_channel(server: CalloutServerAuth) -> grpc.Channel:
+    """From a CalloutServer, obtain the plaintext address and create a grpc channel pointing to it.
+
+    Args:
+        server: Server to connect to.
+    Returns:
+        grpc.Channel: Open channel to the server.
+    """
+    addr = server.plaintext_address
+    return grpc.insecure_channel(_addr_to_str(addr) if addr else '')
+
+
+def wait_till_server(server_check: Callable[[], bool], timeout: int = 10):
+    """Wait until the `server_check` function returns true.
+
+    Used for blocking until the server reaches a given state.
+    Times out after a given time.
+
+    Args:
+        server_check: Function to check.
+        timeout: Wait time. Defaults to 10.
+    """
+    expiration = datetime.datetime.now() + datetime.timedelta(seconds=timeout)
+    while not server_check() and datetime.datetime.now() < expiration:
+        time.sleep(1)
+
+
+def _start_server(server: CalloutServerAuth) -> threading.Thread:
+    # Start the server in a background thread
+    thread = threading.Thread(target=server.run)
+    thread.daemon = True
+    thread.start()
+    # Wait for the server to start
+    wait_till_server(lambda: getattr(server, '_setup', False))
+    return thread
+
+
+def _stop_server(server: CalloutServerAuth, thread: threading.Thread):
+    # Stop the server
+    server.shutdown()
+    thread.join(timeout=5)
+
+
+@pytest.fixture(scope='class', name='server')
+def setup_server(request) -> Iterator[CalloutServerAuth]:
+    """Set up basic CalloutServer.
+
+    Takes in two optional pytest parameters.
+    'kwargs': Arguments passed into the server constructor. 
+      Default is the value of default_kwargs.
+    'test_class': Class to use when constructing the server.
+      Default is the base CalloutServer.
+
+    Yields:
+        Iterator[CalloutServerAuth]: The server to test with.
+    """
+    params: dict = request.param or {'kwargs': {}, 'test_class': None}
+    kwargs: Mapping[str, Any] = default_kwargs | params['kwargs']
+    # Either use the provided class or create a server using the default CalloutServer class.
+    server = (params['test_class'] or CalloutServerAuth)(**kwargs)
+    try:
+        thread = _start_server(server)
+        yield server
+        _stop_server(server, thread)
+    finally:
+        del server
+
+
+def make_request(stub: auth_pb2_grpc.AuthorizationStub, request: auth_pb2.CheckRequest) -> auth_pb2.CheckResponse:
+    """Make a request to the server.
+
+    Args:
+        stub: The server stub.
+        request: The CheckRequest to send.
+
+    Returns: The CheckResponse returned from the server.
+    """
+    try:
+        return stub.Check(request)
+    except Exception as e:
+        raise NoResponseError(f"Request failed: {e}")
+
 
 def create_request_with_auth_header(auth_header: str) -> auth_pb2.CheckRequest:
     """Helper to create a request with Authorization header."""
@@ -76,64 +151,78 @@ def create_request_with_auth_header(auth_header: str) -> auth_pb2.CheckRequest:
         )
     )
 
-def test_valid_jwt_token():
-    """Test that requests with valid JWT tokens are allowed."""
-    # Mock the validate_jwt_token method to return a valid decoded token
-    original_validate_method = server_instance.validate_jwt_token
-    server_instance.validate_jwt_token = lambda token: {
-        'sub': '1234567890',
-        'name': 'John Doe',
-        'admin': True
-    }
-    
-    auth_header = f"Bearer {VALID_JWT_TOKEN}"
-    request = create_request_with_auth_header(auth_header)
-    response = client.Check(request)
-    
-    # Restore the original method
-    server_instance.validate_jwt_token = original_validate_method
-    
-    assert response.HasField('ok_response')
-    # Verify decoded fields were added as headers
-    assert any(h.header.key == 'decoded-sub' and h.header.value == '1234567890' 
-               for h in response.ok_response.headers)
-    assert any(h.header.key == 'decoded-name' and h.header.value == 'John Doe' 
-               for h in response.ok_response.headers)
-    assert any(h.header.key == 'decoded-admin' and h.header.value == 'True' 
-               for h in response.ok_response.headers)
 
-def test_invalid_jwt_token():
-    """Test that requests with invalid JWT tokens are denied."""
-    # Mock the validate_jwt_token method to return None (invalid token)
-    original_validate_method = server_instance.validate_jwt_token
-    server_instance.validate_jwt_token = lambda token: None
-    
-    auth_header = f"Bearer {INVALID_JWT_TOKEN}"
-    request = create_request_with_auth_header(auth_header)
-    response = client.Check(request)
-    
-    # Restore the original method
-    server_instance.validate_jwt_token = original_validate_method
-    
-    assert response.HasField('denied_response')
-    assert response.denied_response.status.code == http_status_pb2.StatusCode.Unauthorized
-    assert response.denied_response.body == "Authorization token is invalid."
+class TestJwtAuthServer(object):
+    """Test server functionality for JWT authentication."""
 
-def test_missing_jwt_token():
-    """Test that requests without JWT tokens are denied."""
-    # Create a request without the Authorization header
-    request = auth_pb2.CheckRequest(
-        attributes=attr_pb2.AttributeContext(
-            request=attr_pb2.AttributeContext.Request(
-                http=attr_pb2.AttributeContext.HttpRequest(
-                    headers={}
+    @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
+    def test_valid_jwt_token(self, server: CalloutServerTest) -> None:
+        """Test that requests with valid JWT tokens are allowed."""
+        # Mock the validate_jwt_token method to return a valid decoded token
+        with patch.object(server, 'validate_jwt_token', return_value={
+            'sub': '1234567890',
+            'name': 'John Doe', 
+            'admin': True,
+            'iat': 1712173461,
+            'exp': 2075658261
+        }):
+            with get_plaintext_channel(server) as channel:
+                stub = auth_pb2_grpc.AuthorizationStub(channel)
+                
+                auth_header = "Bearer valid_token"
+                request = create_request_with_auth_header(auth_header)
+                response = make_request(stub, request)
+
+                assert response.HasField('ok_response')
+                # Verify decoded fields were added as headers
+                ok_headers = {header.header.key: header.header.value for header in response.ok_response.headers}
+                assert ok_headers.get('decoded-sub') == '1234567890'
+                assert ok_headers.get('decoded-name') == 'John Doe'
+                assert ok_headers.get('decoded-admin') == 'True'
+
+    @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
+    def test_invalid_jwt_token(self, server: CalloutServerTest) -> None:
+        """Test that requests with invalid JWT tokens are denied."""
+        # Mock the validate_jwt_token method to return None (invalid token)
+        with patch.object(server, 'validate_jwt_token', return_value=None):
+            with get_plaintext_channel(server) as channel:
+                stub = auth_pb2_grpc.AuthorizationStub(channel)
+                
+                auth_header = "Bearer invalid_token"
+                request = create_request_with_auth_header(auth_header)
+                response = make_request(stub, request)
+
+                assert response.HasField('denied_response')
+                assert response.denied_response.status.code == http_status_pb2.StatusCode.Unauthorized
+                assert "Authorization token is invalid" in response.denied_response.body
+
+    @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
+    def test_missing_jwt_token(self, server: CalloutServerTest) -> None:
+        """Test that requests without JWT tokens are denied."""
+        with get_plaintext_channel(server) as channel:
+            stub = auth_pb2_grpc.AuthorizationStub(channel)
+            
+            # Create a request without the Authorization header
+            request = auth_pb2.CheckRequest(
+                attributes=attr_pb2.AttributeContext(
+                    request=attr_pb2.AttributeContext.Request(
+                        http=attr_pb2.AttributeContext.HttpRequest(
+                            headers={}
+                        )
+                    )
                 )
             )
-        )
-    )
-    
-    response = client.Check(request)
-    
-    assert response.HasField('denied_response')
-    assert response.denied_response.status.code == http_status_pb2.StatusCode.Unauthorized
-    assert response.denied_response.body == "No Authorization token found."
+            response = make_request(stub, request)
+
+            assert response.HasField('denied_response')
+            assert response.denied_response.status.code == http_status_pb2.StatusCode.Unauthorized
+            assert "No Authorization token found" in response.denied_response.body
+
+    @pytest.mark.parametrize('server', [_local_test_args], indirect=True)
+    def test_basic_server_health_check(self, server: CalloutServerTest) -> None:
+        """Test that the health check sub server returns the expected 200 code."""
+        assert server.health_check_address is not None
+        response = urllib.request.urlopen(
+            f'http://{_addr_to_str(server.health_check_address)}')
+        assert not response.read()
+        assert response.getcode() == 200
