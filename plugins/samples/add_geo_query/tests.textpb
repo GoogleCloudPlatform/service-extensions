@@ -1,0 +1,149 @@
+# Test basic country parameter addition with X-Country header
+test {
+  name: "AddCountryParameterWithXCountryHeader"
+  request_headers {
+    input {
+      header { key: ":path" value: "/api/data" }
+      header { key: "X-Country" value: "BR" }
+    }
+    result {
+      has_header { key: ":path" value: "/api/data?country=BR" }
+      log { regex: ".*country: BR.*" }
+    }
+  }
+}
+
+# Test CloudFront header takes precedence when X-Country missing
+test {
+  name: "UseCloudFrontHeaderWhenXCountryMissing"
+  request_headers {
+    input {
+      header { key: ":path" value: "/api/data" }
+      header { key: "CloudFront-Viewer-Country" value: "US" }
+    }
+    result {
+      has_header { key: ":path" value: "/api/data?country=US" }
+      log { regex: ".*country: US.*" }
+    }
+  }
+}
+
+# Test fallback to unknown when no country headers
+test {
+  name: "FallbackToUnknownWhenNoCountryHeaders"
+  request_headers {
+    input {
+      header { key: ":path" value: "/api/data" }
+    }
+    result {
+      has_header { key: ":path" value: "/api/data?country=unknown" }
+      log { regex: ".*country: unknown.*" }
+    }
+  }
+}
+
+# Test appending to existing query string
+test {
+  name: "AppendCountryToExistingQueryString"
+  request_headers {
+    input {
+      header { key: ":path" value: "/api/data?page=1&limit=10" }
+      header { key: "X-Country" value: "DE" }
+    }
+    result {
+      has_header { key: ":path" value: "/api/data?page=1&limit=10&country=DE" }
+      log { regex: ".*country: DE.*" }
+    }
+  }
+}
+
+# Test header priority - X-Country should be preferred over CloudFront
+test {
+  name: "XCountryHeaderPriorityOverCloudFront"
+  request_headers {
+    input {
+      header { key: ":path" value: "/api/data" }
+      header { key: "X-Country" value: "FR" }
+      header { key: "CloudFront-Viewer-Country" value: "IT" }
+    }
+    result {
+      has_header { key: ":path" value: "/api/data?country=FR" }
+      log { regex: ".*country: FR.*" }
+    }
+  }
+}
+
+# Test X-Client-Geo-Location header as fallback
+test {
+  name: "UseXClientGeoLocationAsThirdOption"
+  request_headers {
+    input {
+      header { key: ":path" value: "/api/data" }
+      header { key: "X-Client-Geo-Location" value: "JP" }
+    }
+    result {
+      has_header { key: ":path" value: "/api/data?country=JP" }
+      log { regex: ".*country: JP.*" }
+    }
+  }
+}
+
+# Test X-AppEngine-Country header as fourth option
+test {
+  name: "UseXAppEngineCountryAsFourthOption"
+  request_headers {
+    input {
+      header { key: ":path" value: "/api/data" }
+      header { key: "X-AppEngine-Country" value: "CA" }
+    }
+    result {
+      has_header { key: ":path" value: "/api/data?country=CA" }
+      log { regex: ".*country: CA.*" }
+    }
+  }
+}
+
+# Test root path without query string
+test {
+  name: "AddCountryToRootPath"
+  request_headers {
+    input {
+      header { key: ":path" value: "/" }
+      header { key: "X-Country" value: "MX" }
+    }
+    result {
+      has_header { key: ":path" value: "/?country=MX" }
+      log { regex: ".*country: MX.*" }
+    }
+  }
+}
+
+# Test special characters in country code
+test {
+  name: "HandleSpecialCharactersInCountryCode"
+  request_headers {
+    input {
+      header { key: ":path" value: "/api/data" }
+      header { key: "X-Country" value: "UK" }
+    }
+    result {
+      has_header { key: ":path" value: "/api/data?country=UK" }
+      log { regex: ".*country: UK.*" }
+    }
+  }
+}
+
+# Test empty path scenario
+test {
+  name: "HandleEmptyPath"
+  request_headers {
+    input {
+      header { key: ":path" value: "" }
+      header { key: "X-Country" value: "AU" }
+    }
+    result {
+      has_header { key: ":path" value: "?country=AU" }
+      log { regex: ".*country: AU.*" }
+    }
+  }
+}
