@@ -221,9 +221,9 @@ def test_custom_server_config() -> None:
   server: CalloutServer | None = None
   try:
     ip = '0.0.0.0'
-    port = 8444
-    plaintext_port = 8081
-    health_check_port = 8001
+    port = 8445
+    plaintext_port = 8082
+    health_check_port = 8002
 
     server = test_server = CalloutServerTest(
         address=(ip, port),

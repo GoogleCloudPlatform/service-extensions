@@ -16,6 +16,10 @@
 
 #include "test/dynamic_test.h"
 
+#include <memory>
+#include <string>
+#include <vector>
+
 #include <boost/filesystem/path.hpp>
 
 #include "absl/random/distributions.h"
@@ -135,11 +139,13 @@ class AdditionalStream {
   };
 
   AdditionalStream(std::shared_ptr<proxy_wasm::PluginHandleBase> handle,
+                   const pb::Test* cfg,
                    const TestHttpContext::Headers* request_headers,
                    const TestHttpContext::Headers* response_headers,
                    const std::vector<std::string>* request_body_chunks,
                    const std::vector<std::string>* response_body_chunks)
       : handle_(handle),
+        cfg_(*cfg),
         request_headers_(request_headers),
         response_headers_(response_headers),
         request_body_chunks_(request_body_chunks),
@@ -155,6 +161,7 @@ class AdditionalStream {
 
  private:
   std::shared_ptr<proxy_wasm::PluginHandleBase> handle_;
+  const pb::Test& cfg_;
 
   // These fields are owned by the caller, and assumed to remain valid and not
   // change over the lifetime of the AdditionalStream.
@@ -174,7 +181,7 @@ absl::Status AdditionalStream::Advance() {
   while (true) {  // cycle through actions until one is performed
     switch (next_action_) {
       case NextAction::kCreate:
-        stream_ = std::make_unique<TestHttpContext>(handle_);
+        stream_ = std::make_unique<TestHttpContext>(handle_, &cfg_);
         if (request_body_chunks_ != nullptr) {
           remaining_request_body_chunks_.assign(request_body_chunks_->begin(),
                                                 request_body_chunks_->end());
@@ -321,7 +328,7 @@ void DynamicTest::TestBody() {
   CheckSideEffects("plugin_init", cfg_.plugin_init(), *root_context);
 
   // Initialize stream.
-  auto stream = TestHttpContext(handle);
+  auto stream = TestHttpContext(handle, &cfg_);
   ASSERT_VM_HEALTH("stream_init", handle, stream);
   CheckSideEffects("stream_init", cfg_.stream_init(), stream);
 
@@ -475,7 +482,7 @@ void DynamicTest::BenchStreamLifecycle(benchmark::State& state) {
 
   std::vector<AdditionalStream> additional_streams;
   for (int i = 0; i < env_.num_additional_streams(); ++i) {
-    additional_streams.emplace_back(handle, /*request_headers=*/nullptr,
+    additional_streams.emplace_back(handle, &cfg_, /*request_headers=*/nullptr,
                                     /*response_headers=*/nullptr,
                                     /*request_body_chunks=*/nullptr,
                                     /*response_body_chunks=*/nullptr);
@@ -485,7 +492,7 @@ void DynamicTest::BenchStreamLifecycle(benchmark::State& state) {
   // Benchmark stream initialization and teardown.
   bool first = true;
   for (auto _ : state) {
-    auto stream = TestHttpContext(handle);
+    auto stream = TestHttpContext(handle, &cfg_);
     benchmark::DoNotOptimize(stream);
     BM_RETURN_IF_FAILED(handle);
     stream.TearDown();
@@ -531,9 +538,10 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
   std::vector<AdditionalStream> additional_streams;
   for (int i = 0; i < env_.num_additional_streams(); ++i) {
     additional_streams.emplace_back(
-      handle, request_headers.has_value() ? &*request_headers : nullptr,
-      response_headers.has_value() ? &*response_headers : nullptr,
-      &*request_body_chunks, &*response_body_chunks);
+        handle, &cfg_,
+        request_headers.has_value() ? &*request_headers : nullptr,
+        response_headers.has_value() ? &*response_headers : nullptr,
+        &*request_body_chunks, &*response_body_chunks);
     // Advance twice, once to create the TestHttpContext and once to perform
     // an HTTP handler callback.
     BM_RETURN_IF_ERROR(additional_streams.back().Advance());
@@ -551,7 +559,7 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
     // - include stream context create/destroy cost in handler benchmarks
     // - don't hand ownership of body chunks to stream context
     state.PauseTiming();
-    stream.emplace(handle);  // create/destroy TestHttpContext
+    stream.emplace(handle, &cfg_);  // create/destroy TestHttpContext
     std::vector<std::string> request_body_chunks_copies = *request_body_chunks;
     std::vector<std::string> response_body_chunks_copies =
         *response_body_chunks;
