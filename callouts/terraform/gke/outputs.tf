@@ -24,5 +24,5 @@ output "test_command_main" {
 
 output "test_command_secondary" {
   description = "Command to test the secondary application via route extension"
-  value       = "curl -k -v https://${google_compute_address.main_lb_ip.address}/ -H \"x-route-to: secondary\""
+  value       = "curl -k -v -H 'x-route-to: secondary' https://${google_compute_address.main_lb_ip.address}/"
 }
