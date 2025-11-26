@@ -97,7 +97,7 @@ resource "google_compute_instance_template" "callout_app_template" {
 spec:
   containers:
     - name: callout-container
-      image: var.callout_image
+      image: ${var.callout_image}
       ports:
         - containerPort: 80
           hostPort: 80
@@ -194,7 +194,7 @@ resource "google_compute_instance_template" "route_callout_template" {
 spec:
   containers:
     - name: route-callout-container
-      image: var.callout_image
+      image: ${var.callout_image}
       ports:
         - containerPort: 80
           hostPort: 80
