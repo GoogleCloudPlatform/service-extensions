@@ -78,7 +78,7 @@ LB_IP=$(terraform output -raw load_balancer_ip)
 curl -k -v https://$LB_IP
 
 # Command to test the secondary application via route extension
-curl -k -v https://$LB_IP -H \"x-route-to: secondary\"
+curl -k -v -H 'x-route-to: secondary' https://$LB_IP
 ```
 
 ## Cleanup

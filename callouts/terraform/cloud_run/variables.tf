@@ -32,11 +32,11 @@ variable "callout_image" {
 variable "main_app_image" {
   description = "The container image for the main application."
   type        = string
-  default     = "us-docker.pkg.dev/cloudrun/container/hello"
+  default     = "gcr.io/google-samples/hello-app:1.0"
 }
 
 variable "secondary_app_image" {
   description = "The container image for the secondary application."
   type        = string
-  default     = "gcr.io/google-samples/hello-app:1.0"
+  default     = "gcr.io/google-samples/hello-app:2.0"
 }
