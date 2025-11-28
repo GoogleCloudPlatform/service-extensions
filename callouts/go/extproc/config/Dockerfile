@@ -62,8 +62,8 @@ COPY extproc/ssl_creds ./extproc/ssl_creds
 ARG EXAMPLE_TYPE
 ENV EXAMPLE_TYPE=${EXAMPLE_TYPE}
 
-# Expose port 8443, 8181, and 8000
-EXPOSE 8443 8181 8000
+# Expose port 443, 8080, and 80
+EXPOSE 443 8080 80
 
 # Command to run the executable
 CMD ["./main"]

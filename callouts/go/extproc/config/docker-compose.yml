@@ -22,9 +22,9 @@ services:
       args:
         EXAMPLE_TYPE: ${EXAMPLE_TYPE}
     ports:
-      - "8443:8443"
-      - "8181:8181"
-      - "8000:8000"
+      - "443:443"
+      - "8080:8080"
+      - "80:80"
     environment:
       - GO_VERSION=1.22.3
       - EXAMPLE_TYPE=${EXAMPLE_TYPE}
