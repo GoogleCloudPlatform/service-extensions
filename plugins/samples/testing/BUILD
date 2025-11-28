@@ -28,3 +28,16 @@ proxy_wasm_tests(
     ],
     tests = ":tests.textpb",
 )
+
+proxy_wasm_tests(
+    name = "testsyaml",
+    data = [
+        ":request_headers.data",
+        ":response_headers.data",
+    ],
+    plugins = [
+        ":plugin_cpp.wasm",
+        ":plugin_rust.wasm",
+    ],
+    tests = ":tests.yaml",
+)
