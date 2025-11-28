@@ -10,7 +10,7 @@ Files using Copyright 2024 Google LLC & Apache License Version 2.0:
 
 ## Requirements
 
-* Go 1.22+
+* Go 1.23+
 * Docker
 * Docker Compose
 
@@ -142,7 +142,12 @@ func main() {
 }
 ```
 ## Additional Details
-The ``CalloutServer`` class has many options to customize the security information as well as port settings. The default CalloutServer listens on port 8443 for gRPC traffic, 8000 for health checks, and 8181 for insecure traffic.
+The ``CalloutServer`` class has many options to customize the security information as well as port settings. The default CalloutServer listens on port 8080 for plaintext traffic and 80 for health checks.
+
+TLS is disabled by default. To enable TLS, set ``EnableTLS`` to ``true`` in the ``Config`` struct.
+When enabled, the secure server listens on port 443 by default.
+
+> For production environments, it is strongly recommended to enable TLS to ensure secure communication.
 
 ## Using the Proto Files
 The Go classes can be imported using the relative envoy/api path:
