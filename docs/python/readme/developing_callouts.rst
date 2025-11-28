@@ -116,7 +116,7 @@ Creating a New Server
 Additional Details
 ------------------
 
-:ref:`CalloutServer <callout_server>` has many options to customize the security information as well as port settings. The default ``CalloutServer`` listens on port ``8443`` for grpc traffic, ``8000`` for health checks, and ``8080`` for plaintext traffic. Please see the ``CalloutServer`` docstring for more information.
+:ref:`CalloutServer <callout_server>` has many options to customize the security information as well as port settings. The default ``CalloutServer`` listens on port ``8080`` for plaintext gRPC traffic and ``80`` for health checks. Secure gRPC traffic (TLS) is disabled by default but can be enabled on port ``443``. Please see the ``CalloutServer`` docstring for more information.
 
 The ``on_request_headers`` and ``on_request_body`` methods also accept `ImmediateResponse <https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto#envoy-v3-api-field-service-ext-proc-v3-processingresponse-immediate-response>`_ values as a return value.
 
