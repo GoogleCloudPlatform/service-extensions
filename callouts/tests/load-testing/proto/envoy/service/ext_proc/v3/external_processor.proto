@@ -1,0 +1,185 @@
+syntax = "proto3";
+
+package envoy.service.ext_proc.v3;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/duration.proto";
+import "envoy/config/core/v3/base.proto";
+
+service ExternalProcessor {
+  rpc Process(stream ProcessingRequest) returns (stream ProcessingResponse);
+}
+
+message ProcessingRequest {
+  oneof request {
+    HttpHeaders request_headers = 2;
+    HttpBody request_body = 3;
+    HttpHeaders response_headers = 4;
+    HttpBody response_body = 5;
+    HttpTrailers request_trailers = 6;
+    HttpTrailers response_trailers = 7;
+  }
+}
+
+message ProcessingResponse {
+  google.protobuf.Struct dynamic_metadata = 1;
+  ProcessingMode mode_override = 2;
+  google.protobuf.Duration override_message_timeout = 3;
+  
+  oneof response {
+    HeadersResponse request_headers = 4;
+    BodyResponse request_body = 5;
+    HeadersResponse response_headers = 6;
+    BodyResponse response_body = 7;
+    TrailersResponse request_trailers = 8;
+    TrailersResponse response_trailers = 9;
+    ImmediateResponse immediate_response = 10;
+  }
+}
+
+message HttpHeaders {
+  envoy.config.core.v3.HeaderMap headers = 1;
+  // Deprecated: use attributes
+  map<string, string> attributes = 2 [deprecated = true];
+  bool end_of_stream = 3;
+}
+
+message HttpBody {
+  bytes body = 1;
+  bool end_of_stream = 2;
+}
+
+message HttpTrailers {
+  envoy.config.core.v3.HeaderMap trailers = 1;
+}
+
+message HeadersResponse {
+  CommonResponse response = 1;
+}
+
+message BodyResponse {
+  CommonResponse response = 1;
+}
+
+message TrailersResponse {
+  HeaderMutation header_mutation = 1;
+}
+
+message CommonResponse {
+  enum ResponseStatus {
+    CONTINUE = 0;
+    CONTINUE_AND_REPLACE = 1;
+  }
+  ResponseStatus status = 1;
+  HeaderMutation header_mutation = 2;
+  BodyMutation body_mutation = 3;
+  envoy.config.core.v3.HeaderMap trailers = 4;
+  bool clear_route_cache = 5;
+}
+
+message ImmediateResponse {
+  HttpStatus status = 1;
+  envoy.config.core.v3.HeaderMap headers = 2;
+  string body = 3;
+  string details = 4;
+  GrpcStatus grpc_status = 5;
+}
+
+message GrpcStatus {
+  uint32 status = 1;
+}
+
+message HttpStatus {
+  enum StatusCode {
+    Empty = 0;
+    Continue = 100;
+    OK = 200;
+    Created = 201;
+    Accepted = 202;
+    NonAuthoritativeInformation = 203;
+    NoContent = 204;
+    ResetContent = 205;
+    PartialContent = 206;
+    MultiStatus = 207;
+    AlreadyReported = 208;
+    IMUsed = 226;
+    MultipleChoices = 300;
+    MovedPermanently = 301;
+    Found = 302;
+    SeeOther = 303;
+    NotModified = 304;
+    UseProxy = 305;
+    TemporaryRedirect = 307;
+    PermanentRedirect = 308;
+    BadRequest = 400;
+    Unauthorized = 401;
+    PaymentRequired = 402;
+    Forbidden = 403;
+    NotFound = 404;
+    MethodNotAllowed = 405;
+    NotAcceptable = 406;
+    ProxyAuthenticationRequired = 407;
+    RequestTimeout = 408;
+    Conflict = 409;
+    Gone = 410;
+    LengthRequired = 411;
+    PreconditionFailed = 412;
+    PayloadTooLarge = 413;
+    URITooLong = 414;
+    UnsupportedMediaType = 415;
+    RangeNotSatisfiable = 416;
+    ExpectationFailed = 417;
+    MisdirectedRequest = 421;
+    UnprocessableEntity = 422;
+    Locked = 423;
+    FailedDependency = 424;
+    UpgradeRequired = 426;
+    PreconditionRequired = 428;
+    TooManyRequests = 429;
+    RequestHeaderFieldsTooLarge = 431;
+    InternalServerError = 500;
+    NotImplemented = 501;
+    BadGateway = 502;
+    ServiceUnavailable = 503;
+    GatewayTimeout = 504;
+    HTTPVersionNotSupported = 505;
+    VariantAlsoNegotiates = 506;
+    InsufficientStorage = 507;
+    LoopDetected = 508;
+    NotExtended = 510;
+    NetworkAuthenticationRequired = 511;
+  }
+  StatusCode code = 1;
+}
+
+message HeaderMutation {
+  repeated envoy.config.core.v3.HeaderValueOption set_headers = 1;
+  repeated string remove_headers = 2;
+}
+
+message BodyMutation {
+  oneof mutation {
+    bytes body = 1;
+    bool clear_body = 2;
+  }
+}
+
+message ProcessingMode {
+  enum HeaderSendMode {
+    DEFAULT = 0;
+    SEND = 1;
+    SKIP = 2;
+  }
+  enum BodySendMode {
+    NONE = 0;
+    STREAMED = 1;
+    BUFFERED = 2;
+    BUFFERED_PARTIAL = 3;
+  }
+  HeaderSendMode request_header_mode = 1;
+  HeaderSendMode response_header_mode = 2;
+  BodySendMode request_body_mode = 3;
+  BodySendMode response_body_mode = 4;
+  HeaderSendMode request_trailer_mode = 5;
+  HeaderSendMode response_trailer_mode = 6;
+}
