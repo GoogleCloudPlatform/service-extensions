@@ -66,10 +66,11 @@ public class ServiceCallout {
     private String certKeyPath;
     private int serverThreadCount;
     private boolean enablePlainTextPort;
+    private boolean enableTls;
 
     protected ServiceCallout(Builder<?> builder) {
         this.ip = Optional.ofNullable(builder.ip).orElse("0.0.0.0");
-        this.port = Optional.ofNullable(builder.port).orElse(443);
+        this.port = Optional.ofNullable(builder.port).orElse(443); // Only used if enableTls is true
         this.plaintextPort = Optional.ofNullable(builder.plaintextPort).orElse(8080);
         this.healthCheckIp = Optional.ofNullable(builder.healthCheckIp).orElse("0.0.0.0");
         this.healthCheckPort = Optional.ofNullable(builder.healthCheckPort).orElse(80);
@@ -88,6 +89,7 @@ public class ServiceCallout {
 
         this.serverThreadCount = Optional.ofNullable(builder.serverThreadCount).orElse(2);
         this.enablePlainTextPort = Optional.ofNullable(builder.enablePlainTextPort).orElse(true);
+        this.enableTls = Optional.ofNullable(builder.enableTls).orElse(false);
 
         // Initialize health check server if enabled
         if (!this.combinedHealthCheck) {
@@ -115,6 +117,7 @@ public class ServiceCallout {
         private String certKeyPath;
         private Integer serverThreadCount;
         private Boolean enablePlainTextPort;
+        private Boolean enableTls;
 
         public T setIp(String ip) {
             this.ip = ip;
@@ -181,6 +184,11 @@ public class ServiceCallout {
             return self();
         }
 
+        public T setEnableTls(Boolean enableTls) {
+            this.enableTls = enableTls;
+            return self();
+        }
+
         // Return type is generic to allow subclass builders to work correctly
         protected T self() {
             return (T) this;
@@ -212,7 +220,7 @@ public class ServiceCallout {
     public void start() throws IOException {
         ExternalProcessorImpl processor = new ExternalProcessorImpl();
 
-        if (cert != null && certKey != null) {
+        if (enableTls && cert != null && certKey != null) {
             logger.info("Secure server starting...");
 
             server = NettyServerBuilder.forPort(port)
