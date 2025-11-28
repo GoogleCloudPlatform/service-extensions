@@ -69,7 +69,7 @@ class CalloutServer:
 
   Attributes:
     address: Address that the main secure server will attempt to connect to,
-      defaults to default_ip:443.
+      defaults to default_ip:443. Only used if enable_tls is True.
     port: If specified, overrides the port of address.
     health_check_address: The health check serving address,
       defaults to default_ip:80.
@@ -88,24 +88,27 @@ class CalloutServer:
     private_key: PEM private key of the server.
     private_key_path: Relative file path pointing to a file containing private_key data.
     server_thread_count: Threads allocated to the main grpc service.
+    enable_tls: If True, the secure server will be started on the specified address/port.
   """
+
   def __init__(
-      self,
-      address: tuple[str, int] | None = None,
-      port: int | None = None,
-      health_check_address: tuple[str, int] | None = None,
-      health_check_port: int | None = None,
-      combined_health_check: bool = False,
-      secure_health_check: bool = False,
-      plaintext_address: tuple[str, int] | None = None,
-      plaintext_port: int | None = None,
-      disable_plaintext: bool = False,
-      default_ip: str | None = None,
-      cert_chain: bytes | None = None,
-      cert_chain_path: str | None = './extproc/ssl_creds/chain.pem',
-      private_key: bytes | None = None,
-      private_key_path: str = './extproc/ssl_creds/privatekey.pem',
-      server_thread_count: int = 2,
+    self,
+    address: tuple[str, int] | None = None,
+    port: int | None = None,
+    health_check_address: tuple[str, int] | None = None,
+    health_check_port: int | None = None,
+    combined_health_check: bool = False,
+    secure_health_check: bool = False,
+    plaintext_address: tuple[str, int] | None = None,
+    plaintext_port: int | None = None,
+    disable_plaintext: bool = False,
+    enable_tls: bool = False,
+    default_ip: str | None = None,
+    cert_chain: bytes | None = None,
+    cert_chain_path: str | None = './extproc/ssl_creds/chain.pem',
+    private_key: bytes | None = None,
+    private_key_path: str = './extproc/ssl_creds/privatekey.pem',
+    server_thread_count: int = 2,
   ):
     self._setup = False
     self._shutdown = False
@@ -129,6 +132,8 @@ class CalloutServer:
       if health_check_port:
         self.health_check_address = (self.health_check_address[0],
                                      health_check_port)
+
+    self.enable_tls = enable_tls
 
     def _read_cert_file(path: str | None) -> bytes | None:
       if path:
@@ -325,16 +330,18 @@ class _GRPCCalloutService(ExternalProcessorServicer):
     self._server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=processor.server_thread_count))
     add_ExternalProcessorServicer_to_server(self, self._server)
-    server_credentials = grpc.ssl_server_credentials(
+    self._start_msg = 'GRPC callout server started'
+    if processor.enable_tls:
+      server_credentials = grpc.ssl_server_credentials(
         private_key_certificate_chain_pairs=[(processor.private_key,
                                               processor.cert_chain)])
-    address_str = _addr_to_str(processor.address)
-    self._server.add_secure_port(address_str, server_credentials)
-    self._start_msg = f'GRPC callout server started, listening on {address_str}.'
+      address_str = _addr_to_str(processor.address)
+      self._server.add_secure_port(address_str, server_credentials)
+      self._start_msg += f', listening on {address_str} (secure)'
     if processor.plaintext_address:
       plaintext_address_str = _addr_to_str(processor.plaintext_address)
       self._server.add_insecure_port(plaintext_address_str)
-      self._start_msg += f' (secure) and {plaintext_address_str} (plaintext)'
+      self._start_msg += f', listening on {plaintext_address_str} (plaintext)'
 
   def stop(self) -> None:
     self._server.stop(grace=10)
