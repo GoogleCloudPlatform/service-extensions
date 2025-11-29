@@ -183,7 +183,8 @@ proxy_wasm::WasmResult TestHttpContext::sendLocalResponse(
     std::string_view details) {
   if (current_callback_ != RequestHeaders &&
       current_callback_ != ResponseHeaders &&
-      current_callback_ != RequestBody) {
+      current_callback_ != RequestBody &&
+      current_callback_ != ResponseBody) {
     return proxy_wasm::WasmResult::BadArgument;
   }
   sent_local_response_ = true;
@@ -213,15 +214,23 @@ TestHttpContext::Result TestHttpContext::SendRequestHeaders(
 TestHttpContext::Result TestHttpContext::SendRequestBody(std::string body,
                                                          bool end_of_stream) {
   phase_logs_.clear();
-  result_ = Result{};
-  if (sent_local_response_) {
-    return Result{};
-  }
+
   body_buffer_.setOwned(std::move(body));
   current_callback_ = TestHttpContext::CallbackType::RequestBody;
-  result_.body_status = onRequestBody(body_buffer_.size(), end_of_stream);
-    result_.body = body_buffer_.release();
-  return std::move(result_);
+
+  // Call Wasm's onRequestBody.
+  proxy_wasm::FilterDataStatus returned_data_status = onRequestBody(body_buffer_.size(), end_of_stream);
+
+  Result final_result_to_return = this->result_;
+
+  final_result_to_return.body_status = returned_data_status;
+
+  if (!sent_local_response_) {
+    final_result_to_return.body = body_buffer_.release();
+    final_result_to_return.http_code = 0;
+  }
+
+  return final_result_to_return;
 }
 
 TestHttpContext::Result TestHttpContext::SendResponseHeaders(
@@ -243,15 +252,24 @@ TestHttpContext::Result TestHttpContext::SendResponseHeaders(
 TestHttpContext::Result TestHttpContext::SendResponseBody(std::string body,
                                                          bool end_of_stream) {
   phase_logs_.clear();
-  result_ = Result{};
-  if (sent_local_response_) {
-    return Result{};
-  }
+
+  // Prepare the input buffer for the onResponseBody callback
   body_buffer_.setOwned(std::move(body));
   current_callback_ = TestHttpContext::CallbackType::ResponseBody;
-  result_.body_status = onResponseBody(body_buffer_.size(), end_of_stream);
-  result_.body = body_buffer_.release();
-  return std::move(result_);
+
+  // Call Wasm's onResponseBody.
+  proxy_wasm::FilterDataStatus returned_data_status = onResponseBody(body_buffer_.size(), end_of_stream);
+
+  Result final_result_to_return = this->result_;
+
+  final_result_to_return.body_status = returned_data_status;
+
+  if (!sent_local_response_) {
+    final_result_to_return.body = body_buffer_.release();
+    final_result_to_return.http_code = 0;
+  }
+
+  return final_result_to_return;
 }
 
 absl::StatusOr<std::string> ReadDataFile(const std::string& path) {
