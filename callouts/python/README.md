@@ -204,7 +204,7 @@ python -m server
 
 [CalloutServer](extproc/service/callout_server.py) has many options to customize the security information as well as port settings.
 The default `CalloutServer` listens on port `8080` for plaintext traffic and `80` for health checks.
-TLS is disabled by default. To enable TLS, set `enable_tls=True` in the `CalloutServer` constructor.
+TLS is disabled by default. To enable TLS, set `disable_tls=False` in the `CalloutServer` constructor.
 When enabled, the secure server listens on port `443` by default.
 
 > For production environments, it is strongly recommended to enable TLS to ensure secure communication.

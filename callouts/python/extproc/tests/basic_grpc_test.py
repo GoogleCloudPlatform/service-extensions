@@ -50,7 +50,7 @@ class NoResponseError(Exception):
 default_kwargs: dict = {
     'address': ('localhost', 8443),
     'health_check_address': ('localhost', 8000),
-    'enable_tls': True
+    'disable_tls': False
 }
 # Arguments for running a custom CalloutServer with testing parameters.
 _local_test_args: dict = {

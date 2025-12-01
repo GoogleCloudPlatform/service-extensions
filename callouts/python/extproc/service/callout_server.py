@@ -69,7 +69,7 @@ class CalloutServer:
 
   Attributes:
     address: Address that the main secure server will attempt to connect to,
-      defaults to default_ip:443. Only used if enable_tls is True.
+      defaults to default_ip:443. Only used if disable_tls is False.
     port: If specified, overrides the port of address.
     health_check_address: The health check serving address,
       defaults to default_ip:80.
@@ -88,7 +88,7 @@ class CalloutServer:
     private_key: PEM private key of the server.
     private_key_path: Relative file path pointing to a file containing private_key data.
     server_thread_count: Threads allocated to the main grpc service.
-    enable_tls: If True, the secure server will be started on the specified address/port.
+    disable_tls: If True, disables the secure (TLS) server. Defaults to True (TLS disabled).
   """
 
   def __init__(
@@ -102,7 +102,7 @@ class CalloutServer:
     plaintext_address: tuple[str, int] | None = None,
     plaintext_port: int | None = None,
     disable_plaintext: bool = False,
-    enable_tls: bool = False,
+    disable_tls: bool = True,
     default_ip: str | None = None,
     cert_chain: bytes | None = None,
     cert_chain_path: str | None = './extproc/ssl_creds/chain.pem',
@@ -133,9 +133,9 @@ class CalloutServer:
         self.health_check_address = (self.health_check_address[0],
                                      health_check_port)
 
-    self.enable_tls = enable_tls
+    self.disable_tls = disable_tls
 
-    if not self.enable_tls and self.plaintext_address is None:
+    if self.disable_tls and self.plaintext_address is None:
       raise ValueError(
           'At least one of secure (TLS) or plaintext listeners must be enabled.')
 
@@ -151,7 +151,7 @@ class CalloutServer:
     self.private_key = private_key or _read_cert_file(private_key_path)
     self.cert_chain = cert_chain or _read_cert_file(cert_chain_path)
 
-    if self.enable_tls:
+    if not self.disable_tls:
       if not self.private_key:
         raise ValueError(
             'TLS is enabled but private key is not provided. '
@@ -345,7 +345,7 @@ class _GRPCCalloutService(ExternalProcessorServicer):
         futures.ThreadPoolExecutor(max_workers=processor.server_thread_count))
     add_ExternalProcessorServicer_to_server(self, self._server)
     self._start_msg = 'GRPC callout server started'
-    if processor.enable_tls:
+    if not processor.disable_tls:
       server_credentials = grpc.ssl_server_credentials(
         private_key_certificate_chain_pairs=[(processor.private_key,
                                               processor.cert_chain)])
