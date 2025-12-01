@@ -32,6 +32,7 @@ message StringMatcher {
   }
 }
 
+// HTTP header.
 message Header {
   string key = 1;
   bytes value = 2;
@@ -90,6 +91,14 @@ message Invocation {
   Expectation result = 2;
 }
 
+// Value to be returned by getProperty() hostcalls when the path matches.
+message Property {
+  // Path that names the property. The '.' char acts as a path segment
+  // separator.
+  string path = 1;
+  bytes value = 2;
+}
+
 // Tests to run for a single HTTP request/response.
 message Test {
   // Unique name to identify test results.
@@ -104,6 +113,9 @@ message Test {
     int32 num_chunks = 10;
     int64 chunk_size = 11;
   }
+  // Properties to return from getProperty() hostcalls in stream-level Wasm
+  // invocations (i.e. HTTP phases, stream_init, and stream_destroy).
+  repeated Property properties = 12;
   // Wasm invocations of various HTTP phases. If multiple phases are provided,
   // they are executed in sequence on the same HttpContext. Each phase specifies
   // its own expectations. If any phase results in an immediate response,

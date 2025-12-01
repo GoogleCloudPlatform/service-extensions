@@ -8,6 +8,7 @@ cc_library(
     srcs = ["framework.cc"],
     hdrs = ["framework.h"],
     deps = [
+        ":runner_cc_proto",
         "@boost//:algorithm",
         "@boost//:dll",
         "@boost//:filesystem",
