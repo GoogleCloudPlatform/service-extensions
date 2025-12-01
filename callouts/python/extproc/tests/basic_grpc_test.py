@@ -49,7 +49,8 @@ class NoResponseError(Exception):
 # Replace the default ports of the server so that they do not clash with running programs.
 default_kwargs: dict = {
     'address': ('localhost', 8443),
-    'health_check_address': ('localhost', 8000)
+    'health_check_address': ('localhost', 8000),
+    'enable_tls': True
 }
 # Arguments for running a custom CalloutServer with testing parameters.
 _local_test_args: dict = {

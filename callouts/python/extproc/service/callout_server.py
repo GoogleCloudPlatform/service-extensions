@@ -135,6 +135,10 @@ class CalloutServer:
 
     self.enable_tls = enable_tls
 
+    if not self.enable_tls and self.plaintext_address is None:
+      raise ValueError(
+          'At least one of secure (TLS) or plaintext listeners must be enabled.')
+
     def _read_cert_file(path: str | None) -> bytes | None:
       if path:
         with open(path, 'rb') as file:
@@ -146,6 +150,16 @@ class CalloutServer:
     # Read cert data.
     self.private_key = private_key or _read_cert_file(private_key_path)
     self.cert_chain = cert_chain or _read_cert_file(cert_chain_path)
+
+    if self.enable_tls:
+      if not self.private_key:
+        raise ValueError(
+            'TLS is enabled but private key is not provided. '
+            'Please provide private_key or private_key_path.')
+      if not self.cert_chain:
+        raise ValueError(
+            'TLS is enabled but certificate chain is not provided. '
+            'Please provide cert_chain or cert_chain_path.')
 
     if secure_health_check:
       if not private_key_path:
