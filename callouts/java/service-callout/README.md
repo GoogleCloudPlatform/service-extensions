@@ -86,7 +86,7 @@ docker run -p 8080:8080 -p 80:80 service-callout:1.0-SNAPSHOT example.BasicCallo
 If you need to pass JVM options (e.g., setting the maximum heap size), use the -e JAVA_OPTS flag:
 
 ```sh
-docker run -p 80:80 -p 8080:8080 \
+docker run -p 8080:8080 -p 80:80 \
  -e JAVA_OPTS="-Xmx512m" \
  service-callout:1.0-SNAPSHOT example.BasicCalloutServer
 ```
