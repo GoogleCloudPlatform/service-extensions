@@ -55,17 +55,16 @@ impl RootContext for MyRootContext {
     fn on_configure(&mut self, _: usize) -> bool {
         if let Some(config) = self.get_plugin_configuration() {
             // Config file contains JSON formatted recaptcha config.
-            // Use of .unwrap() is fine here, since failure in on_configure
-            // should result in plugin crash.
+            // Failure to read config as UTF-8 or parse as JSON will cause plugin
+            // to panic and crash.
             let config_lines = String::from_utf8(config).unwrap();
             let recaptcha_config: RecaptchaConfig = serde_json::from_str(&config_lines).unwrap();
+            // Valid JSON, but invalid recaptcha_key_type will cause the plugin to crash.
             if recaptcha_config.recaptcha_key_type != "SESSION"
                 && recaptcha_config.recaptcha_key_type != "ACTION"
             {
-                error!(
-                    "Invalid recaptcha_key_type found. on_response_body will be \"
-                    treated as a no-op meaning body will not be parsed or \
-                    modified by plugin. recaptcha_key_type={}",
+                panic!(
+                    "Invalid recaptcha_key_type found. Plugin crashed. recaptcha_key_type={}",
                     recaptcha_config.recaptcha_key_type
                 )
             }
@@ -156,7 +155,7 @@ impl<'a> MyHttpContext<'a> {
         completed_script_injection: Rc<RefCell<bool>>,
     ) -> Vec<(Cow<'a, Selector>, ElementContentHandlers<'a>)> {
         let key_type = (*recaptcha_config.borrow()).recaptcha_key_type.clone();
-        let content_handler = match (*recaptcha_config.borrow()).recaptcha_key_type.as_str() {
+        let content_handler = match key_type.as_str() {
             "SESSION" => {
                 let key_value = (*recaptcha_config.borrow()).recaptcha_key_value.clone();
                 vec![element!("head", move |el| {
@@ -228,12 +227,12 @@ impl<'a> HttpContext for MyHttpContext<'a> {
                     // Prefer logging errors instead of panicking to avoid plugin crashes.
                     error!("Error while writing to HtmlRewriter: {}", e.to_string());
                     *self.completed_script_injection.borrow_mut() = true;
-                    return Action::Pause;
+                    return Action::Continue;
                 }
                 if *self.completed_script_injection.borrow() {
                     if let Err(e) = self.end_rewriter() {
                         error!("Error while ending HtmlRewriter: {}", e.to_string());
-                        return Action::Pause;
+                        return Action::Continue;
                     }
                     // Replace section of body to be modified with data emitted by the rewriter.
                     self.set_http_response_body(
