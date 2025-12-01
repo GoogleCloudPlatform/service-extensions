@@ -16,7 +16,7 @@
 FROM marketplace.gcr.io/google/debian12 AS builder
 
 # Set the Go version
-ENV GO_VERSION 1.22.3
+ENV GO_VERSION 1.23.0
 
 # Install Go
 RUN apt-get update && apt-get install -y wget \
@@ -58,7 +58,7 @@ COPY --from=builder /app/main .
 # Copy SSL certificates
 COPY extproc/ssl_creds ./extproc/ssl_creds
 
-#Set environment variable for runtine
+# Set environment variable for runtime
 ARG EXAMPLE_TYPE
 ENV EXAMPLE_TYPE=${EXAMPLE_TYPE}
 
