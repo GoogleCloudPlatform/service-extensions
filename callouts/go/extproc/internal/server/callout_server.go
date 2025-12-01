@@ -38,20 +38,6 @@ type Config struct {
 	EnableTLS bool
 }
 
-// loadConfig loads the server configuration from environment variables or uses defaults.
-func loadConfig() Config {
-	return Config{
-		// Address is the address for the secure gRPC server. Only used if EnableTLS is true.
-		Address:              "0.0.0.0:443",
-		InsecureAddress:      "0.0.0.0:8080",
-		HealthCheckAddress:   "0.0.0.0:80",
-		CertFile:             "extproc/ssl_creds/localhost.crt",
-		KeyFile:              "extproc/ssl_creds/localhost.key",
-		EnableInsecureServer: true,
-		EnableTLS:            false,
-	}
-}
-
 // CalloutServer represents a server that handles callouts.
 type CalloutServer struct {
 	Config Config
@@ -63,7 +49,8 @@ func NewCalloutServer(config Config) *CalloutServer {
 	var cert tls.Certificate
 	var err error
 
-	if config.CertFile != "" && config.KeyFile != "" {
+	// Only load TLS certificates if TLS is enabled
+	if config.EnableTLS && config.CertFile != "" && config.KeyFile != "" {
 		cert, err = tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
 		if err != nil {
 			log.Fatalf("Failed to load server certificate: %v", err)
