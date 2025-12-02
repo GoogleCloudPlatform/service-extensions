@@ -486,6 +486,19 @@ run_load_test() {
     # Start service
     SERVICE_CONTAINER_ID=$(start_service_container "$service_type" "$scenario" "$service_config")
     
+    # Verify we got a valid container ID (64-char hex string)
+    if [ -z "$SERVICE_CONTAINER_ID" ] || [ ${#SERVICE_CONTAINER_ID} -ne 64 ]; then
+        # Fallback: get the container ID from docker ps using the name pattern
+        log_warning "Container ID capture may have failed, looking up by name..."
+        SERVICE_CONTAINER_ID=$(docker ps --filter "name=ext-proc-service-test-" --format "{{.ID}}" | head -1)
+        if [ -z "$SERVICE_CONTAINER_ID" ]; then
+            log_error "Failed to determine container ID"
+            exit 1
+        fi
+    fi
+    
+    log_info "Service container ID: ${SERVICE_CONTAINER_ID:0:12}..."
+    
     if ! wait_for_healthy "$health_port" "$DEFAULT_WAIT_TIMEOUT"; then
         exit 1
     fi
@@ -602,6 +615,11 @@ run_load_test() {
         log_info "Service kept running (ID: $SERVICE_CONTAINER_ID)"
         trap - EXIT INT TERM
         SERVICE_CONTAINER_ID=""
+        SERVICE_CONTAINER_NAME=""
+    else
+        # Explicitly cleanup after report generation if not keeping service
+        log_info "Cleaning up service container after test completion..."
+        cleanup_service
     fi
 }
 
