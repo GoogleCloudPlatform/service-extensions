@@ -8,7 +8,6 @@ Deploy serverless containers with Service Extensions.
 - Terraform >= 1.0
 - `gcloud` CLI authenticated
 - Required APIs will be enabled automatically
-- [Google Cloud Terraform Best Practices](https://cloud.google.com/docs/terraform/best-practices)
 
 ## Deployment
 
@@ -41,38 +40,38 @@ terraform apply -var-file="terraform.tfvars"
 ## What Gets Created
 
 ### Serverless Infrastructure
-- **Cloud Run Service**: Fully managed serverless platform
-- **Container Image**: Sample web application
+- **Cloud Run Services**: Main app, secondary app, and callout services
+- **Container Images**: Sample web applications
 - **Auto-scaling**: 0 to 10 instances based on traffic
-- **VPC Connector**: Secure connection to VPC resources
 
 ### Networking
 - **VPC Network**: `service-extensions-vpc-cloudrun`
 - **Subnets**: Main subnet + proxy subnet for load balancer
-- **Firewall Rules**: HTTP/HTTPS access + health checks
+- **Serverless NEGs**: Network Endpoint Groups for Cloud Run services
 
 ### Load Balancing
 - **Regional External Load Balancer**
-- **Backend Service** with Cloud Run NEG
-- **Service Extensions** for traffic processing
-- **Health Checks** for service readiness
+- **Backend Services** with Cloud Run NEGs
+- **Service Extensions** for traffic and route processing
+- **SSL Certificate** for HTTPS traffic
 
 ### Security & IAM
-- **Service Accounts** with minimal permissions
-- **IAM Bindings** for Cloud Run and service extensions
-- **VPC Security** with private networking options
+- **IAM Bindings** for Cloud Run invoker permissions
+- **Service Extensions** integration for traffic processing
 
 ## Outputs
 
 | Output | Description |
 |--------|-------------|
-| `load_balancer_ip` | External IP of the load balancer |
+| `main_application_load_balancer_ip` | External IP of the load balancer |
+| `test_command_main` | Command to test the main application |
+| `test_command_secondary` | Command to test the secondary application via route extension |
 
 ## Test Application
 
 ```bash
 # Get the IP
-LB_IP=$(terraform output -raw load_balancer_ip)
+LB_IP=$(terraform output -raw main_application_load_balancer_ip)
 
 # Command to test the main application
 curl -k -v https://$LB_IP

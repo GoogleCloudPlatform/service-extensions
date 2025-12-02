@@ -56,7 +56,7 @@ After Terraform completes, you **must** run the NEG attachment script:
 ## What Gets Created
 
 ### Kubernetes Infrastructure
-- **GKE Cluster**: Regional cluster with 2 nodes
+- **GKE Cluster**: Regional cluster with auto-scaling (1-3 nodes per zone)
 - **Node Pool**: e2-medium instances with auto-scaling
 - **VPC-native networking** with IP aliasing
 - **Workload Identity** for secure pod authentication
@@ -73,21 +73,23 @@ After Terraform completes, you **must** run the NEG attachment script:
 - **Health Checks** for pod readiness
 
 ### Application Workloads
-- **Deployment**: Sample web application (3 replicas)
-- **Service**: ClusterIP service for internal communication
-- **Ingress**: Exposes application via load balancer
+- **Deployments**: Main app, secondary app, and callout services (2 replicas each)
+- **Services**: ClusterIP services for internal communication
+- **NEGs**: Network Endpoint Groups for load balancer integration
 
 ## Outputs
 
 | Output | Description |
 |--------|-------------|
-| `load_balancer_ip` | External IP of the load balancer |
+| `main_application_load_balancer_ip` | External IP of the load balancer |
+| `test_command_main` | Command to test the main application |
+| `test_command_secondary` | Command to test the secondary application via route extension |
 
 ### Test Application
 
 ```bash
 # Get the IP
-LB_IP=$(terraform output -raw load_balancer_ip)
+LB_IP=$(terraform output -raw main_application_load_balancer_ip)
 
 # Command to test the main application
 curl -k -v https://$LB_IP

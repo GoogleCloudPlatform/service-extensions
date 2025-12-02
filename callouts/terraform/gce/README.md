@@ -45,9 +45,9 @@ terraform apply -var-file="terraform.tfvars"
 - **Firewall Rules**: HTTP/HTTPS access + health checks
 
 ### Compute Resources
-- **VM Instances**: 2 instances with web server
-- **Instance Template**: For consistent configuration
-- **Instance Group**: Managed instance group for scaling
+- **VM Instances**: 4 instances (main app, secondary app, and 2 callout services)
+- **Instance Templates**: For consistent configuration
+- **Managed Instance Groups**: For each service with auto-scaling potential
 
 ### Load Balancing
 - **Regional External Load Balancer**
@@ -56,21 +56,22 @@ terraform apply -var-file="terraform.tfvars"
 - **Service Extensions** for traffic processing
 
 ### Security & IAM
-- **Service Accounts** with minimal permissions
-- **IAM Bindings** for service extensions
-- **Firewall Rules** for secure access
+- **Service Accounts**: Uses default Compute Engine service account
+- **Firewall Rules**: For health checks and proxy access
 
 ## Outputs
 
 | Output | Description |
 |--------|-------------|
-| `load_balancer_ip` | External IP of the load balancer |
+| `main_application_load_balancer_ip` | External IP of the load balancer |
+| `test_command_main` | Command to test the main application |
+| `test_command_secondary` | Command to test the secondary application via route extension |
 
 ## Test Application
 
 ```bash
 # Get the IP
-LB_IP=$(terraform output -raw load_balancer_ip)
+LB_IP=$(terraform output -raw main_application_load_balancer_ip)
 
 # Command to test the main application
 curl -k -v https://$LB_IP
