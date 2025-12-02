@@ -16,7 +16,12 @@ start_service_container() {
     local host_port=$(echo "$service_config" | jq -r '.port')
     local container_port=$(echo "$service_config" | jq -r '.container_port // .port // "8080"')
     local health_port=$(echo "$service_config" | jq -r '.health_check_port // .container_port // .port // "80"')
-    local command=$(echo "$service_config" | jq -r 'if (.command | length) > 0 then .command | @sh else "" end' | tr -d "'")
+    
+    # Parse command array safely using mapfile
+    local -a command_args=()
+    if [ "$(echo "$service_config" | jq -r '.command | length')" -gt 0 ]; then
+        mapfile -t command_args < <(echo "$service_config" | jq -r '.command[]')
+    fi
 
     local cpu_limit=$(echo "$service_config" | jq -r '.resources.cpu_limit // "2.0"')
     local memory_limit=$(echo "$service_config" | jq -r '.resources.memory_limit // "512m"')
@@ -51,8 +56,8 @@ start_service_container() {
         done <<< "$env_keys"
     fi
 
-    if [ -n "$command" ]; then
-        SERVICE_CONTAINER_ID=$(docker run "${docker_run_args[@]}" "$image" $command)
+    if [ ${#command_args[@]} -gt 0 ]; then
+        SERVICE_CONTAINER_ID=$(docker run "${docker_run_args[@]}" "$image" "${command_args[@]}")
     else
         SERVICE_CONTAINER_ID=$(docker run "${docker_run_args[@]}" "$image")
     fi
@@ -92,7 +97,7 @@ cleanup_service() {
 
 # Collect Docker stats in background
 start_docker_stats_collection() {
-    local container_name="$1"
+    local container_id="$1"
     local duration="$2"
     local interval="${3:-2}"
     local output_file="$4"
@@ -109,8 +114,8 @@ start_docker_stats_collection() {
         local timestamp_counter=0
         
         while [ $(date +%s) -lt $end_time ]; do
-            # Use container name pattern to find the container
-            local stats=$(docker stats --no-stream --format '{"timestamp":'$timestamp_counter',"name":"{{.Name}}","cpu":"{{.CPUPerc}}","memory":"{{.MemPerc}}","mem_usage":"{{.MemUsage}}","net_io":"{{.NetIO}}","block_io":"{{.BlockIO}}"}' 2>/dev/null | grep -i "ext-proc-service" | head -1)
+            # Use container ID directly for reliable stats collection
+            local stats=$(docker stats --no-stream --format '{"timestamp":'$timestamp_counter',"name":"{{.Name}}","cpu":"{{.CPUPerc}}","memory":"{{.MemPerc}}","mem_usage":"{{.MemUsage}}","net_io":"{{.NetIO}}","block_io":"{{.BlockIO}}"}' "$container_id" 2>/dev/null)
             if [ -n "$stats" ]; then
                 echo "$stats" >> "$temp_file"
                 timestamp_counter=$((timestamp_counter + interval))

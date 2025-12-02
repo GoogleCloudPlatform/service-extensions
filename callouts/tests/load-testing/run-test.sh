@@ -297,6 +297,8 @@ run_load_test() {
     log_info "Running load test with ghz..."
     local test_start=$(date +%s)
     local duration_seconds="${TEST_DURATION%s}"
+    local ghz_exit_code=0
+    local ghz_stderr_file="$RESULTS_DIR/${file_prefix}_ghz_stderr.log"
 
     ghz --insecure \
         --proto "$SCRIPT_DIR/proto/envoy/service/ext_proc/v3/external_processor.proto" \
@@ -307,10 +309,21 @@ run_load_test() {
         --duration="${duration_seconds}s" \
         --format=json \
         --output="$RESULTS_DIR/${file_prefix}_ghz_results.json" \
-        "ext-proc-service:${container_port}" 2>&1 || true
+        "ext-proc-service:${container_port}" 2>"$ghz_stderr_file" || ghz_exit_code=$?
 
     local test_end=$(date +%s)
     local test_duration=$((test_end - test_start))
+    
+    if [ $ghz_exit_code -ne 0 ]; then
+        log_warning "ghz exited with code $ghz_exit_code"
+        if [ -s "$ghz_stderr_file" ]; then
+            log_warning "ghz stderr output:"
+            cat "$ghz_stderr_file" >&2
+        fi
+    else
+        rm -f "$ghz_stderr_file"
+    fi
+    
     log_success "Load test completed in ${test_duration}s"
 
     # Stop metrics collection and analyze

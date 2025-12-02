@@ -20,8 +20,8 @@ services:
         echo "Usage: ./run-test.sh -s <service> -m <mode> [OPTIONS]"
         echo
         echo "Examples:"
-        echo "  ./run-test.sh -s jwt_auth -m quick -c valid_jwt"
-        echo "  ./run-test.sh -s basic -m stress"
+        echo "  ./run-test.sh -s python_basic -m quick"
+        echo "  ./run-test.sh -s python_basic -m stress"
         echo "  ./run-test.sh -l  # List available services"
         echo "  ./run-test.sh -L  # List available test modes"
         echo

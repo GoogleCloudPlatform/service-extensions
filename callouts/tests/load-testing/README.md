@@ -10,6 +10,8 @@ A comprehensive Docker-based load testing framework for gRPC services using [ghz
 - At least 4GB RAM available
 - Linux, macOS, or Windows with WSL2
 
+> **⚠️ Security Note:** This framework mounts the Docker socket (`/var/run/docker.sock`) to manage test containers dynamically. This grants the load-tester container root-level access to the host's Docker daemon. Only run this framework in trusted environments (development/CI) and never in production. Consider using Docker-in-Docker or rootless Docker for enhanced security.
+
 ## Quick Start
 
 ### 1. Start the Load Testing Environment
