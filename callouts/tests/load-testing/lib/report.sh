@@ -1,6 +1,30 @@
 #!/bin/bash
 # Report generation functions for load testing framework
 
+# Helper function for floating-point comparison
+# Returns 0 (true) if $1 > $2, 1 (false) otherwise
+# Uses bc if available, falls back to awk
+_float_gt() {
+    local a="$1"
+    local b="$2"
+    if command -v bc >/dev/null 2>&1; then
+        (( $(echo "$a > $b" | bc -l) ))
+    else
+        awk "BEGIN {exit !($a > $b)}"
+    fi
+}
+
+# Returns 0 (true) if $1 < $2, 1 (false) otherwise
+_float_lt() {
+    local a="$1"
+    local b="$2"
+    if command -v bc >/dev/null 2>&1; then
+        (( $(echo "$a < $b" | bc -l) ))
+    else
+        awk "BEGIN {exit !($a < $b)}"
+    fi
+}
+
 # Generate markdown report
 generate_markdown_report() {
     local service_type="$1"
@@ -152,30 +176,34 @@ generate_comparison_report() {
 
 | Metric | Run 1 | Run 2 | Change |
 |--------|-------|-------|--------|
-| Requests/sec | $(echo "$data" | jq -r '.run1.throughput.rps | round') | $(echo "$data" | jq -r '.run2.throughput.rps | round') | $(echo "$data" | jq -r '.comparison.rps_change_percent | . * 100 | round / 100')% |
-| Avg Latency | $(echo "$data" | jq -r '.run1.response_times.average | . * 100 | round / 100')ms | $(echo "$data" | jq -r '.run2.response_times.average | . * 100 | round / 100')ms | $(echo "$data" | jq -r '.comparison.avg_latency_change_percent | . * 100 | round / 100')% |
-| P95 Latency | $(echo "$data" | jq -r '.run1.response_times.p95 | . * 100 | round / 100')ms | $(echo "$data" | jq -r '.run2.response_times.p95 | . * 100 | round / 100')ms | $(echo "$data" | jq -r '.comparison.p95_latency_change_percent | . * 100 | round / 100')% |
-| Error Rate | $(echo "$data" | jq -r '.run1.requests.error_rate_percent | . * 100 | round / 100')% | $(echo "$data" | jq -r '.run2.requests.error_rate_percent | . * 100 | round / 100')% | $(echo "$data" | jq -r '.comparison.error_rate_change | . * 100 | round / 100')pp |
+| Requests/sec | $(echo "$data" | jq -r '.run1.throughput.rps | round') | $(echo "$data" | jq -r '.run2.throughput.rps | round') | $(echo "$data" | jq -r '.comparison.rps_change_percent | if . == null then "N/A" else ((. * 100 | round) / 100 | tostring) + "%" end') |
+| Avg Latency | $(echo "$data" | jq -r '.run1.response_times.average | (. * 100 | round) / 100')ms | $(echo "$data" | jq -r '.run2.response_times.average | (. * 100 | round) / 100')ms | $(echo "$data" | jq -r '.comparison.avg_latency_change_percent | if . == null then "N/A" else ((. * 100 | round) / 100 | tostring) + "%" end') |
+| P95 Latency | $(echo "$data" | jq -r '.run1.response_times.p95 | (. * 100 | round) / 100')ms | $(echo "$data" | jq -r '.run2.response_times.p95 | (. * 100 | round) / 100')ms | $(echo "$data" | jq -r '.comparison.p95_latency_change_percent | if . == null then "N/A" else ((. * 100 | round) / 100 | tostring) + "%" end') |
+| Error Rate | $(echo "$data" | jq -r '.run1.requests.error_rate_percent | (. * 100 | round) / 100')% | $(echo "$data" | jq -r '.run2.requests.error_rate_percent | (. * 100 | round) / 100')% | $(echo "$data" | jq -r '.comparison.error_rate_change // 0 | (. * 100 | round) / 100')pp |
 
 ## Analysis
 
 EOF
 
-    # Add analysis based on comparison
-    local rps_change=$(echo "$data" | jq -r '.comparison.rps_change_percent')
-    local latency_change=$(echo "$data" | jq -r '.comparison.avg_latency_change_percent')
+    # Add analysis based on comparison (handle null values from zero baseline)
+    local rps_change=$(echo "$data" | jq -r '.comparison.rps_change_percent // empty')
+    local latency_change=$(echo "$data" | jq -r '.comparison.avg_latency_change_percent // empty')
 
-    if (( $(echo "$rps_change > 5" | bc -l) )); then
+    if [ -z "$rps_change" ] || [ "$rps_change" = "null" ]; then
+        echo "- ℹ️ **Throughput:** Cannot compare (baseline was zero)" >> "$output_file"
+    elif _float_gt "$rps_change" 5; then
         echo "- ✅ **Throughput improved** by ${rps_change}%" >> "$output_file"
-    elif (( $(echo "$rps_change < -5" | bc -l) )); then
+    elif _float_lt "$rps_change" -5; then
         echo "- ⚠️ **Throughput decreased** by ${rps_change}%" >> "$output_file"
     else
         echo "- ℹ️ **Throughput stable** (change: ${rps_change}%)" >> "$output_file"
     fi
 
-    if (( $(echo "$latency_change < -5" | bc -l) )); then
+    if [ -z "$latency_change" ] || [ "$latency_change" = "null" ]; then
+        echo "- ℹ️ **Latency:** Cannot compare (baseline was zero)" >> "$output_file"
+    elif _float_lt "$latency_change" -5; then
         echo "- ✅ **Latency improved** by ${latency_change}%" >> "$output_file"
-    elif (( $(echo "$latency_change > 5" | bc -l) )); then
+    elif _float_gt "$latency_change" 5; then
         echo "- ⚠️ **Latency increased** by ${latency_change}%" >> "$output_file"
     else
         echo "- ℹ️ **Latency stable** (change: ${latency_change}%)" >> "$output_file"

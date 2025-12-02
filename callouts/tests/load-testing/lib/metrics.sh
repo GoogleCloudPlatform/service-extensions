@@ -134,15 +134,24 @@ compare_runs() {
         return 1
     fi
 
+    # Calculate comparison metrics with zero-division protection
+    # If baseline value is 0, use null to indicate comparison is not meaningful
     jq -s '
+    def safe_percent_change(new; old):
+        if old == 0 or old == null then
+            if new == 0 or new == null then 0
+            else null  # Cannot calculate % change from zero baseline
+            end
+        else ((new - old) / old * 100)
+        end;
     {
         run1: .[0],
         run2: .[1],
         comparison: {
-            rps_change_percent: ((.[1].throughput.rps - .[0].throughput.rps) / .[0].throughput.rps * 100),
-            avg_latency_change_percent: ((.[1].response_times.average - .[0].response_times.average) / .[0].response_times.average * 100),
-            p95_latency_change_percent: ((.[1].response_times.p95 - .[0].response_times.p95) / .[0].response_times.p95 * 100),
-            error_rate_change: (.[1].requests.error_rate_percent - .[0].requests.error_rate_percent)
+            rps_change_percent: safe_percent_change(.[1].throughput.rps; .[0].throughput.rps),
+            avg_latency_change_percent: safe_percent_change(.[1].response_times.average; .[0].response_times.average),
+            p95_latency_change_percent: safe_percent_change(.[1].response_times.p95; .[0].response_times.p95),
+            error_rate_change: ((.[1].requests.error_rate_percent // 0) - (.[0].requests.error_rate_percent // 0))
         }
     }
     ' "$metrics1" "$metrics2" > "$output_file"

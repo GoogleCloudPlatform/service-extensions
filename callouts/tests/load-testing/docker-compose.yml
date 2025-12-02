@@ -32,3 +32,5 @@ services:
 networks:
   load-test-network:
     driver: bridge
+    labels:
+      com.service-extensions.load-testing: "true"

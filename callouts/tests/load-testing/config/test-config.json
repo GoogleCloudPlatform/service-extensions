@@ -46,7 +46,7 @@
         "memory_reservation": "512m"
       },
       "request_data": {
-        "type": "headers_only",
+        "type": "request_headers",
         "headers": {
           "headers": [
             {"key": ":path", "value": "/"},
@@ -70,7 +70,7 @@
         "memory_reservation": "512m"
       },
       "request_data": {
-        "type": "headers_only",
+        "type": "request_headers",
         "headers": {
           "headers": [
             {"key": ":path", "value": "/"},
@@ -97,7 +97,7 @@
         "memory_reservation": "512m"
       },
       "request_data": {
-        "type": "headers_only",
+        "type": "request_headers",
         "headers": {
           "headers": [
             {"key": ":path", "value": "/"},
@@ -121,7 +121,7 @@
         "memory_reservation": "512m"
       },
       "request_data": {
-        "type": "headers_only",
+        "type": "request_headers",
         "headers": {
           "headers": [
             {"key": ":path", "value": "/"},

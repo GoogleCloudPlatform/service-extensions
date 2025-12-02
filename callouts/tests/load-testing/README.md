@@ -64,9 +64,9 @@ cat results/latest/*_load_test_report.md
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `-n, --scenario <name>` | Scenario name | `default` |
-| `-d, --duration <time>` | Override test duration | From test mode |
+| `-d, --duration <time>` | Override test duration (supports s/m/h) | From test mode |
 | `-v, --vus <number>` | Override virtual users | From test mode |
-| `-w, --warmup <time>` | Override warmup duration | From test mode |
+| `-w, --warmup <time>` | Override warmup duration (supports s/m/h) | From test mode |
 | `-e, --export <formats>` | Export formats (comma-separated) | `json` |
 | `-c, --collect-metrics` | Collect Docker metrics | Enabled |
 | `-k, --keep-service` | Keep service running after test | Disabled |
@@ -75,6 +75,18 @@ cat results/latest/*_load_test_report.md
 | `-L, --list-modes` | List available test modes | - |
 | `-S, --show-config` | Show full configuration | - |
 | `-h, --help` | Show help message | - |
+
+### Duration Formats
+
+The `-d` (duration) and `-w` (warmup) arguments accept flexible time formats:
+
+| Format | Examples | Description |
+|--------|----------|-------------|
+| Seconds | `30s`, `60s`, `120s`, `30` | Duration in seconds |
+| Minutes | `5m`, `10m`, `30m` | Duration in minutes |
+| Hours | `1h`, `2h` | Duration in hours |
+
+All durations are internally converted to seconds for consistency.
 
 ### Examples
 
@@ -85,17 +97,20 @@ cat results/latest/*_load_test_report.md
 # List available test modes (with warmup info)
 ./run-test.sh -L
 
-# Run quick test on java_basic service
+# Run quick test on python_basic service
 ./run-test.sh -s python_basic -m quick
 
 # Run with Prometheus and InfluxDB export for Grafana
 ./run-test.sh -s python_basic -m standard -e json,prometheus,influxdb
 
-# Run test with custom warmup
-./run-test.sh -s python_basic -m quick -w 5s
+# Run test with 30 second warmup
+./run-test.sh -s python_basic -m quick -w 30s
 
-# Run stress test with custom duration
-./run-test.sh -s python_basic -m stress -d 300s
+# Run 5 minute test with 1 minute warmup
+./run-test.sh -s python_basic -m quick -d 5m -w 1m
+
+# Run 1 hour soak test
+./run-test.sh -s python_basic -m soak -d 1h
 
 # Compare two test runs
 ./run-test.sh --compare results/run1 results/run2
@@ -143,9 +158,63 @@ load_test,service=java_basic,mode=quick requests_total=151861i,rps=15186.04,late
 ```
 
 
+### Service Image Types
+
+The load testing framework supports two types of service images:
+
+#### 1. **Remote Images** (Pre-built, ready to use)
+
+These images are hosted on a container registry and can be pulled automatically. No build step required.
+
+**Example from config:**
+```json
+{
+  "python_basic": {
+    "image": "us-docker.pkg.dev/service-extensions-samples/callouts/python-example-basic:main",
+    "description": "Basic python example of service extensions"
+  }
+}
+```
+
+**Available remote images examples:**
+- `python_basic` - Basic Python service extension example
+- `python_jwt_auth` - Python JWT authentication example
+
+#### 2. **Local Images** (Require building first)
+
+These images must be built locally before running tests. The framework expects specific image names.
+
+**Example from config:**
+```json
+{
+  "go_basic": {
+    "image": "go-callout-example:local",
+    "description": "Basic Go example"
+  },
+  "java_basic": {
+    "image": "java-callout-example:local",
+    "description": "Basic Java example"
+  }
+}
+```
+
+**Building local images:**
+
+Before testing Go or Java services, you must build the images:
+
+```bash
+# Build Go example (from the callouts/go directory)
+cd ../../go
+docker build -t go-callout-example:local .
+
+# Build Java example (from the callouts/java directory)
+cd ../../java
+docker build -t java-callout-example:local .
+```
+
 ### Adding a New Service
 
-> **⚠️ Note**: Make sure your custom service image is built and available before adding it to the configuration.
+> **⚠️ Note**: Make sure your custom service image is built and available (either pulled from a registry or built locally) before adding it to the configuration.
 
 Edit `config/test-config.json`:
 
@@ -169,7 +238,7 @@ Edit `config/test-config.json`:
         "memory_reservation": "512m"
       },
       "request_data": {
-        "type": "headers_only",
+        "type": "request_headers",
         "headers": {
           "headers": [
             {"key": "some-header", "value": "some-value"}
@@ -184,13 +253,22 @@ Edit `config/test-config.json`:
 
 #### Request Data Types
 
-The `request_data.type` field determines what data is sent in the gRPC request:
+The `request_data.type` field determines what data is sent in the gRPC ProcessingRequest message. The external processor protocol supports testing both request and response processing phases.
 
-##### 1. **`headers_only`** - Headers Only (Default)
+| Type | Description |
+|------|-------------|
+| `request_headers` | Request headers only (default) |
+| `request_body` | Request body only |
+| `request_combined` | Request headers followed by body |
+| `response_headers` | Response headers only |
+| `response_body` | Response body only |
+| `response_combined` | Response headers followed by body |
+
+##### Example: Request Headers (Default)
 ```json
 {
   "request_data": {
-    "type": "headers_only",
+    "type": "request_headers",
     "headers": {
       "headers": [
         {"key": ":path", "value": "/test"},
@@ -202,38 +280,54 @@ The `request_data.type` field determines what data is sent in the gRPC request:
 }
 ```
 
-##### 2. **`combined`** - Headers and Body
+##### Example: Request Combined (Headers + Body)
 ```json
 {
   "request_data": {
-    "type": "combined",
+    "type": "request_combined",
     "headers": {
       "headers": [
         {"key": "content-type", "value": "application/json"}
       ]
     },
     "body": {
-      "body": "eyJrZXkiOiJ2YWx1ZSJ9",
-      "end_of_stream": true
-    }
+      "body": "eyJrZXkiOiJ2YWx1ZSJ9"
+    },
+    "end_of_stream": true
   }
 }
 ```
 
-##### 3. **`body_only`** - Body Only
+##### Example: Response Headers
 ```json
 {
   "request_data": {
-    "type": "body_only",
-    "body": {
-      "body": "SGVsbG8gV29ybGQ=",
-      "end_of_stream": true
-    }
+    "type": "response_headers",
+    "headers": {
+      "headers": [
+        {"key": ":status", "value": "200"},
+        {"key": "content-type", "value": "application/json"}
+      ]
+    },
+    "end_of_stream": true
   }
 }
 ```
 
-> **Tip**: Use `value` for string values or `raw_value` for Base64 encoded binary data.
+##### Example: Response Body
+```json
+{
+  "request_data": {
+    "type": "response_body",
+    "body": {
+      "body": "SGVsbG8gV29ybGQ="
+    },
+    "end_of_stream": true
+  }
+}
+```
+
+> **Tip**: Use `value` for string header values or `raw_value` for Base64 encoded binary data. Body data should be Base64 encoded.
 
 ## Understanding Results
 

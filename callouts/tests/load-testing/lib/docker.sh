@@ -4,7 +4,36 @@
 # Global variables
 SERVICE_CONTAINER_ID=""
 DOCKER_STATS_PID=""
-NETWORK_NAME="${NETWORK_NAME:-load-testing_load-test-network}"
+
+# Calculate CPU shares from reservation value (e.g., "0.5" -> 512, "1.0" -> 1024)
+# Uses bc if available, falls back to awk for portability
+_calc_cpu_shares() {
+    local cpu_reservation="$1"
+    local shares
+    
+    if command -v bc >/dev/null 2>&1; then
+        shares=$(echo "$cpu_reservation * 1024" | bc 2>/dev/null | cut -d. -f1)
+    else
+        # Fallback using awk (more portable)
+        shares=$(awk "BEGIN {printf \"%.0f\", $cpu_reservation * 1024}")
+    fi
+    
+    # Default to 512 if calculation fails
+    echo "${shares:-512}"
+}
+
+# Dynamically discover the Docker network (supports any directory name)
+# The network is labeled in docker-compose.yml for reliable discovery
+_discover_network() {
+    local network
+    network=$(docker network ls --filter "label=com.service-extensions.load-testing=true" --format "{{.Name}}" 2>/dev/null | head -1)
+    if [ -z "$network" ]; then
+        # Fallback: try common patterns
+        network=$(docker network ls --format "{{.Name}}" 2>/dev/null | grep -E "load-test.*network|load-testing.*network" | head -1)
+    fi
+    echo "${network:-load-testing_load-test-network}"
+}
+NETWORK_NAME="${NETWORK_NAME:-$(_discover_network)}"
 
 # Start the service container
 start_service_container() {
@@ -14,8 +43,8 @@ start_service_container() {
 
     local image=$(echo "$service_config" | jq -r '.image')
     local host_port=$(echo "$service_config" | jq -r '.port')
-    local container_port=$(echo "$service_config" | jq -r '.container_port // .port // "8080"')
-    local health_port=$(echo "$service_config" | jq -r '.health_check_port // .container_port // .port // "80"')
+    local container_port=$(echo "$service_config" | jq -r '.container_port // "8080"')
+    local health_port=$(echo "$service_config" | jq -r '.health_check_port // "80"')
     
     # Parse command array safely using mapfile
     local -a command_args=()
@@ -43,7 +72,7 @@ start_service_container() {
         -p "${health_port}:${health_port}"
         --cpus="$cpu_limit"
         --memory="$memory_limit"
-        --cpu-shares="$(echo "$cpu_reservation * 1024" | bc | cut -d. -f1)"
+        --cpu-shares="$(_calc_cpu_shares "$cpu_reservation")"
         --memory-reservation="$memory_reservation"
     )
 
