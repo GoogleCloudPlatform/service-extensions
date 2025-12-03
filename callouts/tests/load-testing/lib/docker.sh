@@ -45,7 +45,8 @@ start_service_container() {
     local image=$(echo "$service_config" | jq -r '.image')
     local host_port=$(echo "$service_config" | jq -r '.port')
     local container_port=$(echo "$service_config" | jq -r '.container_port // "8080"')
-    local health_port=$(echo "$service_config" | jq -r '.health_check_port // "80"')
+    local health_check_host_port=$(echo "$service_config" | jq -r '.health_check_port // "80"')
+    local health_check_container_port=$(echo "$service_config" | jq -r '.health_check_container_port // "80"')
     
     # Parse command array safely using mapfile
     local -a command_args=()
@@ -70,7 +71,7 @@ start_service_container() {
         -e SERVICE_TYPE="$service_type"
         -e SCENARIO="$scenario"
         -p "${host_port}:${container_port}"
-        -p "${health_port}:${health_port}"
+        -p "${health_check_host_port}:${health_check_container_port}"
         --cpus="$cpu_limit"
         --memory="$memory_limit"
         --cpu-shares="$(_calc_cpu_shares "$cpu_reservation")"
@@ -100,13 +101,13 @@ start_service_container() {
 
 # Wait for service to be healthy
 wait_for_healthy() {
-    local health_port="$1"
+    local health_check_container_port="$1"
     local max_wait="${2:-60}"
     
     log_info "Waiting for service to be healthy..."
     local waited=0
     while [ $waited -lt $max_wait ]; do
-        if curl -sf "http://ext-proc-service:${health_port}/" >/dev/null 2>&1; then
+        if curl -sf "http://ext-proc-service:${health_check_container_port}/" >/dev/null 2>&1; then
             log_success "Service is healthy!"
             return 0
         fi

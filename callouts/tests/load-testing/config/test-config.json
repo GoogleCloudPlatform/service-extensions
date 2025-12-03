@@ -38,6 +38,7 @@
       "port": 8080,
       "container_port": 8080,
       "health_check_port": 80,
+      "health_check_container_port": 80,
       "command": [],
       "resources": {
         "cpu_limit": "2.0",
@@ -62,6 +63,7 @@
       "port": 8080,
       "container_port": 8080,
       "health_check_port": 80,
+      "health_check_container_port": 80,
       "command": [],
       "resources": {
         "cpu_limit": "2.0",
@@ -86,6 +88,7 @@
       "port": 8080,
       "container_port": 8080,
       "health_check_port": 80,
+      "health_check_container_port": 80,
       "command": [],
       "env": {
         "EXAMPLE_TYPE": "add_header"
@@ -113,6 +116,7 @@
       "port": 8080,
       "container_port": 8080,
       "health_check_port": 80,
+      "health_check_container_port": 80,
       "command": [],
       "resources": {
         "cpu_limit": "2.0",

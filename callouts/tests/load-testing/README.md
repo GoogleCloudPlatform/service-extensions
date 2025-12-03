@@ -182,7 +182,7 @@ These images are hosted on a container registry and can be pulled automatically.
 
 #### 2. **Local Images** (Require building first)
 
-These images must be built locally before running tests. The framework expects specific image names.
+These images must be built locally before running tests.
 
 **Example from config:**
 ```json
@@ -196,20 +196,6 @@ These images must be built locally before running tests. The framework expects s
     "description": "Basic Java example"
   }
 }
-```
-
-**Building local images:**
-
-Before testing Go or Java services, you must build the images:
-
-```bash
-# Build Go example (from the callouts/go directory)
-cd ../../go
-docker build -t go-callout-example:local .
-
-# Build Java example (from the callouts/java directory)
-cd ../../java
-docker build -t java-callout-example:local .
 ```
 
 ### Adding a New Service
@@ -226,7 +212,8 @@ Edit `config/test-config.json`:
       "description": "My custom service",
       "port": 8080,
       "container_port": 8080,
-      "health_check_port": 80,
+      "health_check_port": 80, 
+      "health_check_container_port": 80,
       "command": [],
       "env": {
         "MY_VAR": "value"

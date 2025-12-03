@@ -471,7 +471,7 @@ run_load_test() {
     WARMUP_DURATION="${warmup:-$(echo "$test_mode_config" | jq -r '.warmup // "0s"')}"
 
     local container_port=$(echo "$service_config" | jq -r '.container_port // .port // "8080"')
-    local health_port=$(echo "$service_config" | jq -r '.health_check_port // "80"')
+    local health_check_container_port=$(echo "$service_config" | jq -r '.health_check_container_port // "80"')
 
     print_section "Load Test: $service_type/$test_mode/$scenario"
     log_info "Duration: $TEST_DURATION, VUs: $TEST_VUS, Warmup: $WARMUP_DURATION"
@@ -499,7 +499,7 @@ run_load_test() {
     
     log_info "Service container ID: ${SERVICE_CONTAINER_ID:0:12}..."
     
-    if ! wait_for_healthy "$health_port" "$DEFAULT_WAIT_TIMEOUT"; then
+    if ! wait_for_healthy "$health_check_container_port" "$DEFAULT_WAIT_TIMEOUT"; then
         exit 1
     fi
 
