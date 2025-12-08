@@ -88,6 +88,39 @@ You can customize the server configuration by modifying the example code or by s
 RUST_LOG=info cargo run --example basic
 ```
 
+## Server Configuration
+
+The server runs three endpoints by default:
+- **Plaintext gRPC** on port `8080` (enabled by default)
+- **Health check HTTP** on port `80` (enabled by default)
+- **TLS gRPC** on port `443` (disabled by default)
+
+### Configuration Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enable_plaintext_server` | `true` | Enable plaintext gRPC server on port 8080 |
+| `enable_tls` | `false` | Enable TLS gRPC server on port 443 |
+| `address` | `0.0.0.0:443` | TLS server address |
+| `plaintext_address` | `0.0.0.0:8080` | Plaintext server address |
+| `health_check_address` | `0.0.0.0:80` | Health check server address |
+
+### Enabling TLS
+
+To enable the TLS server, set `enable_tls: true` in your configuration:
+
+```rust
+use ext_proc::server::{CalloutServer, Config};
+
+let config = Config {
+    enable_tls: true,
+    ..Config::default()
+};
+let server = CalloutServer::new(config);
+```
+
+> **Note**: For production deployments, you should enable TLS to encrypt traffic between your load balancer and the callout server. The plaintext server is intended for local development and testing only.
+
 ## Docker
 
 ### Build the Docker Image
@@ -177,13 +210,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let server = CalloutServer::with_default_config();
     let processor = MyProcessor::new();
     
-    let secure_handle = server.spawn_grpc(processor.clone()).await;
+    // Plaintext server starts by default, TLS is disabled
     let plaintext_handle = server.spawn_plaintext_grpc(processor.clone()).await;
+    let secure_handle = server.spawn_grpc(processor.clone()).await;
     let health_handle = server.spawn_health_check().await;
     
     tokio::select! {
-        _ = secure_handle => {},
         _ = plaintext_handle => {},
+        _ = secure_handle => {},
         _ = health_handle => {},
     }
     

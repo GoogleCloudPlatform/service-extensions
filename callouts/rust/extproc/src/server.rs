@@ -21,8 +21,8 @@
 //!
 //! The `CalloutServer` is responsible for:
 //!
-//! - Setting up a secure gRPC server with TLS for production use
-//! - Optionally providing a plaintext gRPC server for development/testing
+//! - Running a plaintext gRPC server (default, enabled by default)
+//! - Optionally providing a secure TLS gRPC server when enabled via `enable_tls`
 //! - Running a simple HTTP health check endpoint
 //! - Managing the lifecycle of these servers
 //!
@@ -63,16 +63,19 @@ pub struct Config {
     /// Path to the TLS key file
     pub key_file: PathBuf,
 
-    /// Whether to enable the plaintext gRPC server
+    /// Whether to enable the plaintext gRPC server (default: true)
     pub enable_plaintext_server: bool,
+
+    /// Whether to enable the TLS gRPC server (default: false)
+    pub enable_tls: bool,
 }
 
 impl Default for Config {
     /// Creates a default configuration for the `CalloutServer`.
     ///
     /// Default values:
-    /// - Secure gRPC server on 0.0.0.0:443
-    /// - Plaintext gRPC server on 0.0.0.0:8080 (enabled)
+    /// - Plaintext gRPC server on 0.0.0.0:8080 (enabled by default)
+    /// - TLS gRPC server on 0.0.0.0:443 (disabled by default)
     /// - Health check server on 0.0.0.0:80
     /// - TLS certificates at "extproc/ssl_creds/localhost.crt" and "extproc/ssl_creds/localhost.key"
     fn default() -> Self {
@@ -83,6 +86,7 @@ impl Default for Config {
             cert_file: "extproc/ssl_creds/localhost.crt".into(),
             key_file: "extproc/ssl_creds/localhost.key".into(),
             enable_plaintext_server: true,
+            enable_tls: false,
         }
     }
 }
@@ -234,11 +238,17 @@ impl CalloutServer {
         &self,
         processor: P,
     ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
-        // Check if certificate files exist
-        if !self.config.cert_file.exists() {
+        // Check if TLS server is enabled
+        if !self.config.enable_tls {
+            info!("TLS server is disabled");
+            return Ok(());
+        }
+
+        // Check if certificate files exist using async I/O
+        if !tokio::fs::try_exists(&self.config.cert_file).await.unwrap_or(false) {
             return Err(format!("Certificate file not found: {:?}", self.config.cert_file).into());
         }
-        if !self.config.key_file.exists() {
+        if !tokio::fs::try_exists(&self.config.key_file).await.unwrap_or(false) {
             return Err(format!("Key file not found: {:?}", self.config.key_file).into());
         }
 
@@ -294,18 +304,15 @@ impl CalloutServer {
             return Ok(());
         }
 
-        let addr = self
+        let plaintext_addr = self
             .config
             .plaintext_address
             .as_ref()
-            .ok_or("Plaintext address not configured")?
-            .parse()?;
+            .ok_or("Plaintext address not configured")?;
+        let addr = plaintext_addr.parse()?;
         let service = ExtProcService::new(processor);
 
-        info!(
-            "Starting plaintext gRPC server on {}",
-            self.config.plaintext_address.as_ref().unwrap()
-        );
+        info!("Starting plaintext gRPC server on {}", plaintext_addr);
         Server::builder()
             .add_service(service.into_server())
             .serve(addr)

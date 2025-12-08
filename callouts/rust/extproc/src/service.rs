@@ -81,7 +81,15 @@ impl ExternalProcessor for ExtProcService {
                         }
                     }
                     Err(e) => {
-                        let _ = tx.send(Err(Status::internal(e.to_string()))).await;
+                        let status = match e {
+                            crate::processor::ProcessingError::PermissionDenied(msg) => {
+                                Status::permission_denied(msg)
+                            }
+                            crate::processor::ProcessingError::Failed(msg) => {
+                                Status::internal(msg)
+                            }
+                        };
+                        let _ = tx.send(Err(status)).await;
                         break;
                     }
                 }

@@ -22,6 +22,7 @@ pub struct ServerConfig {
     pub cert_file: Option<PathBuf>,
     pub key_file: Option<PathBuf>,
     pub enable_plaintext_server: bool,
+    pub enable_tls: bool,
 }
 
 impl Default for ServerConfig {
@@ -33,6 +34,7 @@ impl Default for ServerConfig {
             cert_file: Some(PathBuf::from("extproc/ssl_creds/localhost.crt")),
             key_file: Some(PathBuf::from("extproc/ssl_creds/localhost.key")),
             enable_plaintext_server: true,
+            enable_tls: false,
         }
     }
 }

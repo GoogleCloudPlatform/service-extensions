@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Stage 1: Build the Rust application
-FROM rust:1.75-slim-bullseye AS builder
+FROM rust:1.82-slim-bullseye AS builder
 
 # Install required dependencies
 RUN apt-get update && apt-get install -y \

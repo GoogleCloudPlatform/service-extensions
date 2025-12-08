@@ -101,21 +101,10 @@ impl JWTAuthProcessor {
     ///
     /// # Returns
     ///
-    /// A new `JWTAuthProcessor` instance
-    ///
-    /// # Panics
-    ///
-    /// Panics if the public key file cannot be read
-    fn new(key_path: &str) -> Self {
-        let public_key = match fs::read(key_path) {
-            Ok(key) => key,
-            Err(e) => {
-                error!("Failed to load public key from {}: {}", key_path, e);
-                panic!("Failed to load public key");
-            }
-        };
-
-        Self { public_key }
+    /// A `Result` containing the new `JWTAuthProcessor` instance or an I/O error
+    fn new(key_path: &str) -> Result<Self, std::io::Error> {
+        let public_key = fs::read(key_path)?;
+        Ok(Self { public_key })
     }
 
     /// Extracts the JWT token from the request headers.
@@ -328,7 +317,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::default();
 
     let server = CalloutServer::new(config);
-    let processor = JWTAuthProcessor::new(key_path);
+    let processor = JWTAuthProcessor::new(key_path)?;
 
     // Start all services
     let secure = server.spawn_grpc(processor.clone()).await;
