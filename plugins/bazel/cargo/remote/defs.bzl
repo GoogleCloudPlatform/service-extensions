@@ -299,6 +299,8 @@ _NORMAL_DEPENDENCIES = {
             "lol_html": Label("@cu__lol_html-2.0.0//:lol_html"),
             "proxy-wasm": Label("@cu__proxy-wasm-0.2.1//:proxy_wasm"),
             "regex": Label("@cu__regex-1.9.6//:regex"),
+            "serde": Label("@cu__serde-1.0.228//:serde"),
+            "serde_json": Label("@cu__serde_json-1.0.145//:serde_json"),
             "url": Label("@cu__url-2.4.1//:url"),
             "uuid": Label("@cu__uuid-1.12.1//:uuid"),
         },
@@ -579,6 +581,16 @@ def crate_repositories():
         urls = ["https://static.crates.io/crates/itoa/0.4.8/download"],
         strip_prefix = "itoa-0.4.8",
         build_file = Label("@//bazel/cargo/remote:BUILD.itoa-0.4.8.bazel"),
+    )
+
+    maybe(
+        http_archive,
+        name = "cu__itoa-1.0.15",
+        sha256 = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c",
+        type = "tar.gz",
+        urls = ["https://static.crates.io/crates/itoa/1.0.15/download"],
+        strip_prefix = "itoa-1.0.15",
+        build_file = Label("@//bazel/cargo/remote:BUILD.itoa-1.0.15.bazel"),
     )
 
     maybe(
@@ -893,6 +905,16 @@ def crate_repositories():
 
     maybe(
         http_archive,
+        name = "cu__ryu-1.0.20",
+        sha256 = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f",
+        type = "tar.gz",
+        urls = ["https://static.crates.io/crates/ryu/1.0.20/download"],
+        strip_prefix = "ryu-1.0.20",
+        build_file = Label("@//bazel/cargo/remote:BUILD.ryu-1.0.20.bazel"),
+    )
+
+    maybe(
+        http_archive,
         name = "cu__selectors-0.22.0",
         sha256 = "df320f1889ac4ba6bc0cdc9c9af7af4bd64bb927bccdf32d81140dc1f9be12fe",
         type = "tar.gz",
@@ -909,6 +931,46 @@ def crate_repositories():
         urls = ["https://static.crates.io/crates/semver/1.0.25/download"],
         strip_prefix = "semver-1.0.25",
         build_file = Label("@//bazel/cargo/remote:BUILD.semver-1.0.25.bazel"),
+    )
+
+    maybe(
+        http_archive,
+        name = "cu__serde-1.0.228",
+        sha256 = "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e",
+        type = "tar.gz",
+        urls = ["https://static.crates.io/crates/serde/1.0.228/download"],
+        strip_prefix = "serde-1.0.228",
+        build_file = Label("@//bazel/cargo/remote:BUILD.serde-1.0.228.bazel"),
+    )
+
+    maybe(
+        http_archive,
+        name = "cu__serde_core-1.0.228",
+        sha256 = "41d385c7d4ca58e59fc732af25c3983b67ac852c1a25000afe1175de458b67ad",
+        type = "tar.gz",
+        urls = ["https://static.crates.io/crates/serde_core/1.0.228/download"],
+        strip_prefix = "serde_core-1.0.228",
+        build_file = Label("@//bazel/cargo/remote:BUILD.serde_core-1.0.228.bazel"),
+    )
+
+    maybe(
+        http_archive,
+        name = "cu__serde_derive-1.0.228",
+        sha256 = "d540f220d3187173da220f885ab66608367b6574e925011a9353e4badda91d79",
+        type = "tar.gz",
+        urls = ["https://static.crates.io/crates/serde_derive/1.0.228/download"],
+        strip_prefix = "serde_derive-1.0.228",
+        build_file = Label("@//bazel/cargo/remote:BUILD.serde_derive-1.0.228.bazel"),
+    )
+
+    maybe(
+        http_archive,
+        name = "cu__serde_json-1.0.145",
+        sha256 = "402a6f66d8c709116cf22f558eab210f5a50187f702eb4d7e5ef38d9a7f1c79c",
+        type = "tar.gz",
+        urls = ["https://static.crates.io/crates/serde_json/1.0.145/download"],
+        strip_prefix = "serde_json-1.0.145",
+        build_file = Label("@//bazel/cargo/remote:BUILD.serde_json-1.0.145.bazel"),
     )
 
     maybe(
@@ -1146,6 +1208,8 @@ def crate_repositories():
         struct(repo = "cu__lol_html-2.0.0", is_dev_dep = False),
         struct(repo = "cu__proxy-wasm-0.2.1", is_dev_dep = False),
         struct(repo = "cu__regex-1.9.6", is_dev_dep = False),
+        struct(repo = "cu__serde-1.0.228", is_dev_dep = False),
+        struct(repo = "cu__serde_json-1.0.145", is_dev_dep = False),
         struct(repo = "cu__url-2.4.1", is_dev_dep = False),
         struct(repo = "cu__uuid-1.12.1", is_dev_dep = False),
     ]
