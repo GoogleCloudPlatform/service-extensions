@@ -148,10 +148,14 @@ Configure the server using these command line flags:
   --server_address=0.0.0.0:443 \      # Secure endpoint (default: 0.0.0.0:443)
   --plaintext_address=0.0.0.0:8080 \  # Plaintext endpoint (default: 0.0.0.0:8080)
   --enable_plaintext=true \           # Whether to enable plaintext gRPC server (default: true)
+  --enable_tls=false \                # Whether to enable secure TLS gRPC server (default: false)
   --health_check_port=80 \            # Health check port (default: 80)
   --key_path=/path/to/key.pem \       # SSL private key (default: ssl_creds/privatekey.pem)
   --cert_path=/path/to/cert.pem       # SSL certificate (default: ssl_creds/chain.pem)
 ```
+
+> **Note**: TLS is disabled by default. To enable TLS, set `--enable_tls=true`.
+> For production environments, it is strongly recommended to enable TLS to ensure secure communication.
 
 ### Custom Ports and SSL
 
@@ -171,8 +175,8 @@ This repository provides the following files to be extended to fit the needs of 
 ### Making a New Server
 
 The provided `CalloutServer` class implements the `ExternalProcessor::Service` interface with:
-- Secure (TLS) endpoint on port 443
-- Insecure (plaintext) endpoint on port 8080
+- Insecure (plaintext) endpoint on port 8080 (enabled by default)
+- Secure (TLS) endpoint on port 443 (disabled by default, enable with `--enable_tls=true`)
 - HTTP health check on port 80
 - Configurable via command line flags
 

@@ -55,6 +55,7 @@ class CalloutServer : public ExternalProcessor::Service {
     std::string cert_path;
     std::string key_path;
     bool enable_plaintext;
+    bool enable_tls;
   };
 
   static ServerConfig DefaultConfig() {
@@ -64,7 +65,8 @@ class CalloutServer : public ExternalProcessor::Service {
         .health_check_address = "0.0.0.0:80",
         .cert_path = "ssl_creds/chain.pem",
         .key_path = "ssl_creds/privatekey.pem",
-        .enable_plaintext = true};
+        .enable_plaintext = true,
+        .enable_tls = false};
   }
 
   // Adds a request header field.
@@ -209,8 +211,8 @@ class CalloutServer : public ExternalProcessor::Service {
     std::unique_lock<std::mutex> lock(server_mutex_);
     bool server_started = false;
   
-    // Start secure server if credentials are available
-    if (!config.secure_address.empty()) {
+    // Start secure server only if TLS is enabled and credentials are available
+    if (config.enable_tls && !config.secure_address.empty()) {
       auto creds = CreateSecureServerCredentials(config.key_path, config.cert_path);
       if (creds) {
         secure_thread_ = std::thread([config, creds]() {

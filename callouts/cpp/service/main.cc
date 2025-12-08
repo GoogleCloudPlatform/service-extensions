@@ -35,6 +35,8 @@ ABSL_FLAG(std::string, key_path, "ssl_creds/privatekey.pem",
           "The SSL private key file path");
 ABSL_FLAG(std::string, cert_path, "ssl_creds/chain.pem",
           "The SSL certificate file path");
+ABSL_FLAG(bool, enable_tls, false,
+          "Whether to enable secure TLS gRPC server");
 
 void StartHttpHealthCheckServer(uint16_t port) {
   namespace beast = boost::beast;
@@ -97,9 +99,12 @@ int main(int argc, char** argv) {
   config.enable_plaintext = absl::GetFlag(FLAGS_enable_plaintext);
   config.plaintext_address = absl::GetFlag(FLAGS_plaintext_address);
 
-  if (!(!config.key_path.empty() && !config.cert_path.empty()) &&
-      !config.enable_plaintext) {
-    LOG(ERROR) << "No valid configuration";
+  // Set TLS configuration
+  config.enable_tls = absl::GetFlag(FLAGS_enable_tls);
+
+  if (!config.enable_plaintext && !config.enable_tls) {
+    LOG(ERROR) << "No valid configuration: at least one of --enable_plaintext "
+                  "or --enable_tls must be true";
     return 1;
   }
 
