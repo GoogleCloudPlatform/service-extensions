@@ -23,10 +23,9 @@
 
 // Cookie operation types
 enum class CookieOperation {
-  SET,      // Set or reset a cookie value
-  DELETE,   // Delete a cookie before CDN cache
-  OVERWRITE // Overwrite existing cookies
-};
+  SET,      
+  DELETE,   
+  OVERWRITE 
 
 // Cookie configuration based on Apache log format
 struct CookieConfig {
@@ -68,8 +67,7 @@ class CookieManagerRootContext : public RootContext {
  private:
   std::vector<CookieConfig> cookie_configs_;
 
-  // Parse configuration in Apache log format style
-  // Format: "cookie_name=value; Domain=example.com; Path=/; Max-Age=3600; Secure; HttpOnly"
+ 
   void parseConfiguration(std::string_view config) {
     for (absl::string_view line : absl::StrSplit(config, '\n')) {
       line = absl::StripAsciiWhitespace(line);

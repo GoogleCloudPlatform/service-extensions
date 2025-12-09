@@ -1,6 +1,6 @@
 load("//:plugins.bzl", "proxy_wasm_plugin_cpp", "proxy_wasm_tests")
 
-licenses(["notice"])  # Apache 2
+licenses(["notice"])  
 
 proxy_wasm_plugin_cpp(
     name = "plugin_cpp.wasm",
