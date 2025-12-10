@@ -141,6 +141,42 @@ http_archive(
     url = "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/" + PROXY_WASM_CPP_SDK_COMMIT + ".tar.gz",
 )
 
+# Zstd for compression
+http_archive(
+    name = "com_github_facebook_zstd",
+    build_file_content = """
+cc_library(
+    name = "zstd",
+    srcs = glob([
+        "lib/common/*.c",
+        "lib/compress/*.c",
+        "lib/decompress/*.c",
+        "lib/dictBuilder/*.c",
+    ]),
+    hdrs = glob([
+        "lib/*.h",
+        "lib/common/*.h",
+        "lib/compress/*.h",
+        "lib/decompress/*.h",
+        "lib/dictBuilder/*.h",
+    ]),
+    includes = [
+        "lib",
+        "lib/common",
+    ],
+    copts = [
+        "-DZSTD_DISABLE_ASM",
+        "-DZSTD_LEGACY_SUPPORT=0",
+        "-DXXH_NAMESPACE=ZSTD_",
+    ],
+    visibility = ["//visibility:public"],
+)
+""",
+    sha256 = "9c4396cc829cfae319a6e2615202e82aad41372073482fce286fac78646d3ee4",
+    strip_prefix = "zstd-1.5.5",
+    url = "https://github.com/facebook/zstd/releases/download/v1.5.5/zstd-1.5.5.tar.gz",
+)
+
 # Duplicate the ProxyWasm WORKSPACE files (dependencies)
 # Consider adopting bzlmod for this: https://docs.bazel.build/versions/5.0.0/bzlmod.html
 

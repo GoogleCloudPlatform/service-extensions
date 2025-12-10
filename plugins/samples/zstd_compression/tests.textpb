@@ -1,0 +1,306 @@
+# Test 1: Basic compression
+test {
+  name: "CompressTextWithZstd"
+  request_headers {
+    input {
+      header { key: "Accept-Encoding" value: "gzip, zstd, br" }
+    }
+  }
+  response_headers {
+    input {
+      header { key: "Content-Type" value: "text/html" }
+      header { key: "Content-Length" value: "100" }
+    }
+    result {
+      has_header { key: "Content-Encoding" value: "zstd" }
+      has_header { key: "Vary" value: "Accept-Encoding" }
+      no_header { key: "Content-Length" }
+    }
+  }
+  response_body {
+    input { content: "Hello World Hello World Hello World Hello World" }
+  }
+}
+
+# Test 2: No zstd support
+test {
+  name: "NoZstdSupport"
+  request_headers {
+    input {
+      header { key: "Accept-Encoding" value: "gzip, br" }
+    }
+  }
+  response_headers {
+    input {
+      header { key: "Content-Type" value: "text/html" }
+      header { key: "Content-Length" value: "100" }
+    }
+    result {
+      no_header { key: "Content-Encoding" }
+      has_header { key: "Content-Length" value: "100" }
+    }
+  }
+}
+
+# Test 3: Content too large
+test {
+  name: "ContentTooLarge"
+  request_headers {
+    input {
+      header { key: "Accept-Encoding" value: "zstd" }
+    }
+  }
+  response_headers {
+    input {
+      header { key: "Content-Type" value: "text/html" }
+      header { key: "Content-Length" value: "4000000" }
+    }
+    result {
+      no_header { key: "Content-Encoding" }
+    }
+  }
+}
+
+# Test 4: Non-text content
+test {
+  name: "NonTextContent"
+  request_headers {
+    input {
+      header { key: "Accept-Encoding" value: "zstd" }
+    }
+  }
+  response_headers {
+    input {
+      header { key: "Content-Type" value: "image/jpeg" }
+      header { key: "Content-Length" value: "100" }
+    }
+    result {
+      no_header { key: "Content-Encoding" }
+    }
+  }
+}
+
+# Test 5: Explicit rejection with q=0
+test {
+  name: "ZstdExplicitlyRejected"
+  request_headers {
+    input {
+      header { key: "Accept-Encoding" value: "gzip, zstd;q=0, br" }
+    }
+  }
+  response_headers {
+    input {
+      header { key: "Content-Type" value: "text/html" }
+      header { key: "Content-Length" value: "100" }
+    }
+    result {
+      no_header { key: "Content-Encoding" }
+    }
+  }
+}
+
+# Test 6: Already encoded content
+test {
+  name: "AlreadyEncoded"
+  request_headers {
+    input {
+      header { key: "Accept-Encoding" value: "zstd" }
+    }
+  }
+  response_headers {
+    input {
+      header { key: "Content-Type" value: "text/html" }
+      header { key: "Content-Length" value: "100" }
+      header { key: "Content-Encoding" value: "gzip" }
+    }
+    result {
+      has_header { key: "Content-Encoding" value: "gzip" }
+    }
+  }
+}
+
+# Test 7: SVG content (compressible)
+test {
+  name: "CompressSVG"
+  request_headers {
+    input {
+      header { key: "Accept-Encoding" value: "zstd" }
+    }
+  }
+  response_headers {
+    input {
+      header { key: "Content-Type" value: "image/svg+xml" }
+      header { key: "Content-Length" value: "500" }
+    }
+    result {
+      has_header { key: "Content-Encoding" value: "zstd" }
+      has_header { key: "Vary" value: "Accept-Encoding" }
+    }
+  }
+}
+
+# Test 8: JSON with +json suffix
+test {
+  name: "CompressJSONSuffix"
+  request_headers {
+    input {
+      header { key: "Accept-Encoding" value: "zstd" }
+    }
+  }
+  response_headers {
+    input {
+      header { key: "Content-Type" value: "application/ld+json" }
+      header { key: "Content-Length" value: "200" }
+    }
+    result {
+      has_header { key: "Content-Encoding" value: "zstd" }
+    }
+  }
+}
+
+# Test 9: No Content-Length (chunked encoding)
+test {
+  name: "NoContentLength"
+  request_headers {
+    input {
+      header { key: "Accept-Encoding" value: "zstd" }
+    }
+  }
+  response_headers {
+    input {
+      header { key: "Content-Type" value: "text/html" }
+      header { key: "Transfer-Encoding" value: "chunked" }
+    }
+    result {
+      no_header { key: "Content-Encoding" }
+    }
+  }
+}
+
+# Test 10: Empty body
+test {
+  name: "EmptyBody"
+  request_headers {
+    input {
+      header { key: "Accept-Encoding" value: "zstd" }
+    }
+  }
+  response_headers {
+    input {
+      header { key: "Content-Type" value: "text/html" }
+      header { key: "Content-Length" value: "0" }
+    }
+    result {
+      no_header { key: "Content-Encoding" }
+    }
+  }
+  response_body {
+    input { content: "" }
+  }
+}
+
+# Test 11: Q-values with decimals - zstd preferred (equal q-values)
+test {
+  name: "QValueDecimalZstdPreferred"
+  request_headers {
+    input {
+      header { key: "Accept-Encoding" value: "gzip;q=0.5, zstd;q=0.8, br;q=0.8" }
+    }
+  }
+  response_headers {
+    input {
+      header { key: "Content-Type" value: "text/html" }
+      header { key: "Content-Length" value: "100" }
+    }
+    result {
+      has_header { key: "Content-Encoding" value: "zstd" }
+      has_header { key: "Vary" value: "Accept-Encoding" }
+    }
+  }
+  response_body {
+    input { content: "Hello World Hello World Hello World Hello World" }
+  }
+}
+
+# Test 12: Q-values with decimals - br preferred over zstd
+test {
+  name: "QValueDecimalBrPreferred"
+  request_headers {
+    input {
+      header { key: "Accept-Encoding" value: "zstd;q=0.5, br;q=0.9, gzip;q=0.3" }
+    }
+  }
+  response_headers {
+    input {
+      header { key: "Content-Type" value: "text/html" }
+      header { key: "Content-Length" value: "100" }
+    }
+    result {
+      no_header { key: "Content-Encoding" }
+      has_header { key: "Content-Length" value: "100" }
+    }
+  }
+}
+
+# Test 13: Empty Accept-Encoding header
+test {
+  name: "EmptyAcceptEncoding"
+  request_headers {
+    input {
+      header { key: "Accept-Encoding" value: "" }
+    }
+  }
+  response_headers {
+    input {
+      header { key: "Content-Type" value: "text/html" }
+      header { key: "Content-Length" value: "100" }
+    }
+    result {
+      no_header { key: "Content-Encoding" }
+      has_header { key: "Content-Length" value: "100" }
+    }
+  }
+}
+
+# Test 14: No Accept-Encoding header at all
+test {
+  name: "NoAcceptEncodingHeader"
+  request_headers {
+    input {
+      header { key: "User-Agent" value: "TestClient/1.0" }
+    }
+  }
+  response_headers {
+    input {
+      header { key: "Content-Type" value: "text/html" }
+      header { key: "Content-Length" value: "100" }
+    }
+    result {
+      no_header { key: "Content-Encoding" }
+      has_header { key: "Content-Length" value: "100" }
+    }
+  }
+}
+
+# Test 15: Malformed q-value (non-numeric)
+test {
+  name: "MalformedQValueNonNumeric"
+  request_headers {
+    input {
+      header { key: "Accept-Encoding" value: "zstd;q=abc, gzip" }
+    }
+  }
+  response_headers {
+    input {
+      header { key: "Content-Type" value: "text/html" }
+      header { key: "Content-Length" value: "100" }
+    }
+    result {
+      has_header { key: "Content-Encoding" value: "zstd" }
+      has_header { key: "Vary" value: "Accept-Encoding" }
+    }
+  }
+  response_body {
+    input { content: "Hello World Hello World Hello World Hello World" }
+  }
+}
