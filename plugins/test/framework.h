@@ -272,6 +272,8 @@ class TestWasm : public proxy_wasm::WasmBase {
 
   ContextOptions& options() { return options_; }
 
+  bool load(std::string_view bytecode, bool allow_precompiled);
+
  private:
   ContextOptions options_;
 };
