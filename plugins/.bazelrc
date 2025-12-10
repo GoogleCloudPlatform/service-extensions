@@ -95,3 +95,5 @@ build:hermetic-llvm --extra_toolchains @emsdk//emscripten_toolchain:cc-toolchain
 # Enable symlinks and runfiles on Windows (enabled by default on other platforms).
 startup --windows_enable_symlinks
 build:windows --enable_runfiles
+
+build --override_repository=proxy_wasm_cpp_host=../../../proxy-wasm-cpp-host
