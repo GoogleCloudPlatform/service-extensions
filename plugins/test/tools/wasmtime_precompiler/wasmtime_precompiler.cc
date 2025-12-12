@@ -79,7 +79,7 @@ int main(int argc, char* argv[]) {
   // Use the wasmtime::Span type expected by the API.
   ::wasmtime::Span<uint8_t> input_code_span(input_data, input_size);
 
-  // 1. Compile the module (Slow Path)
+  // 1. Compile the module
   std::cout << "Compiling WASM module from: " << input_wasm_path << std::endl;
   
   Result<Module> module = Module::compile(*engine, input_code_span); 
@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
   }
   Module compiled_module = module.ok();
 
-  // 2. Serialize the module (Precompile)
+  // 2. Serialize the module
   std::cout << "Serializing module to cwasm format..." << std::endl;
   Result<std::vector<uint8_t>> cwasm_result = compiled_module.serialize();
   
@@ -112,13 +112,10 @@ int main(int argc, char* argv[]) {
 
   std::cout << "Precompilation successful. Size: " << cwasm_bytes.size() << " bytes." << std::endl;
 
-  // 3. Test Deserialization (Fast Path)
+  // 3. Test Deserialization
   std::cout << "Testing deserialization..." << std::endl;
   
-  // Create a span for the serialized bytes (cwasm_bytes) for the deserialize function.
-  // Since cwasm_bytes is non-const, we don't need const_cast here, but we still need the Span.
   ::wasmtime::Span<uint8_t> cwasm_span(cwasm_bytes.data(), cwasm_bytes.size());
-
   Result<Module> deserialized = Module::deserialize(*engine, cwasm_span);
 
   if (!deserialized) {
