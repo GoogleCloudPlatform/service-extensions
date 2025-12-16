@@ -13,6 +13,7 @@ url = "2.4"
 # Pin version 2.0.0 until rust-version includes https://github.com/rust-lang/rust/issues/119128
 lol_html = "=2.0.0"
 uuid = { version = "1.12.1", features = [ "v4" ] }
+zstd = "0.13"
 
 [lib]
 crate-type = ["cdylib"]
