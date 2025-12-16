@@ -1,0 +1,116 @@
+name: Plugins publish samples
+
+# Manually invoked. Permissions default to those with repo `write` access.
+# https://docs.github.com/en/actions/using-workflows/manually-running-a-workflow
+on: workflow_dispatch
+
+# Default permissions are read only.
+permissions: read-all
+
+# Variables. The workflow also depends on secrets.GAR_TOKEN.
+env:
+  REGISTRY: us-docker.pkg.dev
+  PROJECT: service-extensions-samples
+  REPOSITORY: ${{ github.repository_owner == 'GoogleCloudPlatform' && 'plugins-source' || 'plugins-testing-source' }}
+
+jobs:
+  build-and-push-images:
+    name: Publish plugins sample ${{ matrix.image }}
+    runs-on: ubuntu-latest
+
+    # Permissions granted to the `GITHUB_TOKEN` for the actions in this job.
+    permissions:
+      contents: read
+
+    strategy:
+      matrix:
+        include:
+        - image: 'local-reply'
+          dir: 'local_reply'
+          target: 'plugin_cpp.wasm'
+        - image: 'enable-recaptcha'
+          dir: 'enable_recaptcha'
+          target: 'plugin_rust.wasm'
+
+    steps:
+      # Get latest repo.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Authenticate to GCP.
+      - name: Login to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GAR_TOKEN }}
+
+      # Install gcloud CLI.
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # Authenticate to GAR.
+      - name: Login to Google Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: _json_key
+          password: ${{ secrets.GAR_TOKEN }}
+
+      # Build the plugin.
+      - name: Build wasm plugin
+        shell: bash
+        working-directory: ./plugins
+        run: >
+          bazel build
+          --verbose_failures
+          //samples/${{ matrix.dir }}:${{ matrix.target }}
+
+      # Copy output to avoid Docker-incompatible bazel symlink
+      - name: Copy wasm plugin
+        shell: bash
+        working-directory: ./plugins
+        run: >
+          cp -f bazel-bin/samples/${{ matrix.dir }}/${{ matrix.target }} plugin.wasm
+
+      # Get metadata: https://github.com/docker/metadata-action#about
+      # The `images` value provides the base name for tags and labels.
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.REPOSITORY }}/${{ matrix.image }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=public-image-,format=short
+          labels: |
+            org.opencontainers.image.title=${{ matrix.image }}
+            org.opencontainers.image.description=Plugins sample ${{ matrix.image }}
+
+      # Push Docker image: https://github.com/docker/build-push-action#about
+      # Uses the `tags` and `labels` from the `meta` step.
+      - name: Build and push Docker image
+        id: push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./plugins
+          file: ./plugins/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      # Attach license files.
+      - name: Attach license files
+        shell: bash
+        working-directory: ./plugins
+        run: >
+          gcloud artifacts attachments delete \
+            ${{ matrix.image }}-licenses-${{ github.sha }} \
+            --location=us --repository=${{ env.REPOSITORY }} \
+            --quiet || true;  # Allow failure
+          gcloud artifacts attachments create \
+            ${{ matrix.image }}-licenses-${{ github.sha }} \
+            --location=us --repository=${{ env.REPOSITORY }} \
+            --target=${{ fromJSON(steps.meta.outputs.json).tags[0] }} \
+            --attachment-type=text/LICENSES \
+            --files=$(ls samples/${{ matrix.dir }}/licenses/* | tr '\n' ',')
+
