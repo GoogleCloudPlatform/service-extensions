@@ -25,15 +25,12 @@
 #include "zstd.h"
 
 constexpr size_t kMaxSizeBytes = 3 * 1024 * 1024;  // 3MB limit
-constexpr int kZstdCompressionLevel = 3;
 
 // RAII wrapper for Zstd compression context.
 class ZstdContext {
  public:
   ZstdContext() : cctx_(ZSTD_createCCtx()) {
     if (cctx_) {
-      ZSTD_CCtx_setParameter(cctx_, ZSTD_c_compressionLevel,
-                             kZstdCompressionLevel);
       ZSTD_CCtx_setParameter(cctx_, ZSTD_c_contentSizeFlag, 1);
       ZSTD_CCtx_setParameter(cctx_, ZSTD_c_windowLog, 17);
     }
@@ -49,6 +46,17 @@ class ZstdContext {
  private:
   ZSTD_CCtx* cctx_;
 };
+
+// Get adaptive compression level based on input size.
+static int getCompressionLevel(size_t input_size) {
+  if (input_size <= 256 * 1024) {
+    return 3;  // < 256KB: maximum compression
+  } else if (input_size <= 1024 * 1024) {
+    return 2;  // 256KB-1MB: balanced
+  } else {
+    return 1;  // > 1MB: speed priority
+  }
+}
 
 // This plugin compresses HTTP responses using zstd when the client
 // supports it and the content type is compressible.
@@ -194,8 +202,6 @@ class MyHttpContext : public Context {
       if (encoding_part.empty()) continue;
 
       std::vector<std::string_view> parts = absl::StrSplit(encoding_part, ';');
-      if (parts.empty()) continue;
-
       std::string_view encoding = absl::StripAsciiWhitespace(parts[0]);
       float q_value = 1.0f;
 
@@ -239,6 +245,10 @@ class MyHttpContext : public Context {
     if (!ctx.isValid()) {
       return false;
     }
+
+    // Apply adaptive compression level based on input size.
+    int level = getCompressionLevel(input.size());
+    ZSTD_CCtx_setParameter(ctx.get(), ZSTD_c_compressionLevel, level);
 
     const size_t max_compressed_size = ZSTD_compressBound(input.size());
     if (max_compressed_size == 0) {

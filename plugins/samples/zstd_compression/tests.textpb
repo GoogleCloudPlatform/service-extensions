@@ -1,4 +1,4 @@
-# Test 1: Basic compression
+https://github.com/GoogleCloudPlatform/service-extensions/pull/303# Test 1: Basic compression
 test {
   name: "CompressTextWithZstd"
   request_headers {
