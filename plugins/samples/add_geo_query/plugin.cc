@@ -22,22 +22,15 @@ class MyHttpContext : public Context {
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
-    // Get country value from Cloud CDN headers or default to "unknown"
+    // Default country value if geo data is not available
     std::string country_value = "unknown";
-    
-    // Try common CDN country headers
-    const char* country_headers[] = {
-        "X-Country",
-        "CloudFront-Viewer-Country", 
-        "X-Client-Geo-Location",
-        "X-AppEngine-Country"
-    };
-    
-    for (const char* header : country_headers) {
-      auto country_header = getRequestHeader(header);
-      if (country_header && !country_header->view().empty()) {
-        country_value = country_header->view();
-        break;
+
+    // Try to read the client_region attribute from request properties.
+    auto client_region = getProperty({"request", "client_region"});
+    if (client_region) {
+      auto client_region_view = client_region.value()->view();
+      if (!client_region_view.empty()) {
+        country_value = std::string(client_region_view);
       }
     }
 
@@ -49,14 +42,14 @@ class MyHttpContext : public Context {
     if (path_header) {
       std::string new_path;
       auto path_view = path_header->view();
-      
+
       // Check if query string already exists
       if (path_view.find('?') == std::string_view::npos) {
         new_path = std::string(path_view) + "?country=" + country_value;
       } else {
         new_path = std::string(path_view) + "&country=" + country_value;
       }
-      
+
       replaceRequestHeader(":path", new_path);
     }
 
