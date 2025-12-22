@@ -49,7 +49,7 @@ func (*pluginContext) NewHttpContext(contextID uint32) types.HttpContext {
 }
 
 func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) types.Action {
-	// Get country value from Cloud CDN headers or default to "unknown"
+	// Get country value from or default to "unknown"
 	countryValue := ctx.getCountryValue()
 
 	// Log the country value for GCP logs
@@ -62,28 +62,21 @@ func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) t
 	}
 
 	newPath := ctx.addCountryParameter(path, countryValue)
-	proxywasm.ReplaceHttpRequestHeader(":path", newPath)
+	_ = proxywasm.ReplaceHttpRequestHeader(":path", newPath)
 
 	return types.ActionContinue
 }
 
 func (ctx *httpContext) getCountryValue() string {
-	// Try common CDN country headers
-	countryHeaders := []string{
-		"X-Country",
-		"CloudFront-Viewer-Country",
-		"X-Client-Geo-Location",
-		"X-AppEngine-Country",
+	const defaultCountry = "unknown"
+
+	// Geo information is provided via attributes exposed through getProperty().
+	value, err := proxywasm.GetProperty([]string{"request", "client_region"})
+	if err != nil || len(value) == 0 {
+		return defaultCountry
 	}
 
-	for _, header := range countryHeaders {
-		value, err := proxywasm.GetHttpRequestHeader(header)
-		if err == nil && value != "" {
-			return value
-		}
-	}
-
-	return "unknown"
+	return string(value)
 }
 
 func (ctx *httpContext) addCountryParameter(path, countryValue string) string {
