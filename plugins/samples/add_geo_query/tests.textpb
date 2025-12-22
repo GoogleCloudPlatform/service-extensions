@@ -1,10 +1,13 @@
-# Test basic country parameter addition with X-Country header
+# Test basic country parameter addition using request.client_region
 test {
-  name: "AddCountryParameterWithXCountryHeader"
+  name: "AddCountryParameterWithClientRegion"
+  properties {
+    path: "request.client_region"
+    value: "BR"
+  }
   request_headers {
     input {
       header { key: ":path" value: "/api/data" }
-      header { key: "X-Country" value: "BR" }
     }
     result {
       has_header { key: ":path" value: "/api/data?country=BR" }
@@ -13,24 +16,27 @@ test {
   }
 }
 
-# Test CloudFront header takes precedence when X-Country missing
+# Test fallback to unknown when client_region property is missing
 test {
-  name: "UseCloudFrontHeaderWhenXCountryMissing"
+  name: "FallbackToUnknownWhenNoClientRegion"
   request_headers {
     input {
       header { key: ":path" value: "/api/data" }
-      header { key: "CloudFront-Viewer-Country" value: "US" }
     }
     result {
-      has_header { key: ":path" value: "/api/data?country=US" }
-      log { regex: ".*country: US.*" }
+      has_header { key: ":path" value: "/api/data?country=unknown" }
+      log { regex: ".*country: unknown.*" }
     }
   }
 }
 
-# Test fallback to unknown when no country headers
+# Test fallback to unknown when client_region is present but empty
 test {
-  name: "FallbackToUnknownWhenNoCountryHeaders"
+  name: "FallbackToUnknownWhenClientRegionEmpty"
+  properties {
+    path: "request.client_region"
+    value: ""
+  }
   request_headers {
     input {
       header { key: ":path" value: "/api/data" }
@@ -45,60 +51,20 @@ test {
 # Test appending to existing query string
 test {
   name: "AppendCountryToExistingQueryString"
+  properties {
+    path: "request.client_region"
+    value: "DE"
+  }
   request_headers {
     input {
       header { key: ":path" value: "/api/data?page=1&limit=10" }
-      header { key: "X-Country" value: "DE" }
     }
     result {
-      has_header { key: ":path" value: "/api/data?page=1&limit=10&country=DE" }
+      has_header {
+        key: ":path"
+        value: "/api/data?page=1&limit=10&country=DE"
+      }
       log { regex: ".*country: DE.*" }
-    }
-  }
-}
-
-# Test header priority - X-Country should be preferred over CloudFront
-test {
-  name: "XCountryHeaderPriorityOverCloudFront"
-  request_headers {
-    input {
-      header { key: ":path" value: "/api/data" }
-      header { key: "X-Country" value: "FR" }
-      header { key: "CloudFront-Viewer-Country" value: "IT" }
-    }
-    result {
-      has_header { key: ":path" value: "/api/data?country=FR" }
-      log { regex: ".*country: FR.*" }
-    }
-  }
-}
-
-# Test X-Client-Geo-Location header as fallback
-test {
-  name: "UseXClientGeoLocationAsThirdOption"
-  request_headers {
-    input {
-      header { key: ":path" value: "/api/data" }
-      header { key: "X-Client-Geo-Location" value: "JP" }
-    }
-    result {
-      has_header { key: ":path" value: "/api/data?country=JP" }
-      log { regex: ".*country: JP.*" }
-    }
-  }
-}
-
-# Test X-AppEngine-Country header as fourth option
-test {
-  name: "UseXAppEngineCountryAsFourthOption"
-  request_headers {
-    input {
-      header { key: ":path" value: "/api/data" }
-      header { key: "X-AppEngine-Country" value: "CA" }
-    }
-    result {
-      has_header { key: ":path" value: "/api/data?country=CA" }
-      log { regex: ".*country: CA.*" }
     }
   }
 }
@@ -106,10 +72,13 @@ test {
 # Test root path without query string
 test {
   name: "AddCountryToRootPath"
+  properties {
+    path: "request.client_region"
+    value: "MX"
+  }
   request_headers {
     input {
       header { key: ":path" value: "/" }
-      header { key: "X-Country" value: "MX" }
     }
     result {
       has_header { key: ":path" value: "/?country=MX" }
@@ -118,13 +87,16 @@ test {
   }
 }
 
-# Test special characters in country code
+# Test special characters (still simple CLDR code, e.g. UK)
 test {
-  name: "HandleSpecialCharactersInCountryCode"
+  name: "HandleClientRegionCountryCodeUK"
+  properties {
+    path: "request.client_region"
+    value: "UK"
+  }
   request_headers {
     input {
       header { key: ":path" value: "/api/data" }
-      header { key: "X-Country" value: "UK" }
     }
     result {
       has_header { key: ":path" value: "/api/data?country=UK" }
@@ -136,10 +108,13 @@ test {
 # Test empty path scenario
 test {
   name: "HandleEmptyPath"
+  properties {
+    path: "request.client_region"
+    value: "AU"
+  }
   request_headers {
     input {
       header { key: ":path" value: "" }
-      header { key: "X-Country" value: "AU" }
     }
     result {
       has_header { key: ":path" value: "?country=AU" }

@@ -28,18 +28,11 @@ impl Context for MyHttpContext {}
 
 impl HttpContext for MyHttpContext {
     fn on_http_request_headers(&mut self, _num_headers: usize, _end_of_stream: bool) -> Action {
-        // Try common CDN country headers
-        const COUNTRY_HEADERS: [&str; 4] = [
-            "x-country",
-            "cloudfront-viewer-country", 
-            "x-client-geo-location",
-            "x-appengine-country",
-        ];
-
-        // Get country value from Cloud CDN headers or default to "unknown"
-        let country_value = COUNTRY_HEADERS
-            .iter()
-            .find_map(|header| self.get_http_request_header(header))
+        // Get country value from geo attributes or default to "unknown".
+        // This is provided to the plugin via getProperty() hostcall.
+        let country_value = self
+            .get_property(vec!["request", "client_region"])
+            .and_then(|bytes| String::from_utf8(bytes).ok())
             .filter(|value| !value.is_empty())
             .unwrap_or_else(|| "unknown".to_string());
 
@@ -53,7 +46,7 @@ impl HttpContext for MyHttpContext {
         } else {
             format!("{}?country={}", path, country_value)
         };
-        
+
         self.set_http_request_header(":path", Some(&new_path));
 
         Action::Continue
