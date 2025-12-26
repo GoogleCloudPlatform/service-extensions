@@ -28,6 +28,9 @@ jobs:
         - image: 'local-reply'
           dir: 'local_reply'
           target: 'plugin_cpp.wasm'
+        - image: 'enable-recaptcha'
+          dir: 'enable_recaptcha'
+          target: 'plugin_rust.wasm'
 
     steps:
       # Get latest repo.
