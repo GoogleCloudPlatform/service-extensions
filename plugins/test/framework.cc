@@ -229,6 +229,12 @@ proxy_wasm::WasmResult TestHttpContext::sendLocalResponse(
   return proxy_wasm::WasmResult::Ok;
 }
 
+absl::StatusOr<std::shared_ptr<TestWasm>> CreateVm(const std::string& engine, ContextOptions options) {
+  auto vm = proxy_wasm::TestVm::makeVm(engine);
+  auto wasm = std::make_shared<TestWasm>(std::move(vm), std::move(options));
+  return wasm;
+}
+
 TestHttpContext::Result TestHttpContext::SendRequestHeaders(
     TestHttpContext::Headers headers) {
   phase_logs_.clear();
