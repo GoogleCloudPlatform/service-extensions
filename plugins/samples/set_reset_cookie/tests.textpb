@@ -1,8 +1,20 @@
 test {
   name: "SetNewSessionCookie"
+  
+  config: """
+    cookies {
+      name: "session_id"
+      value: "12345"
+      path: "/"
+      http_only: true
+      operation: SET
+    }
+  """
+  
   request_headers {
     input { header { key: "Cookie" value: "other_cookie=some_value" } }
   }
+  
   response_headers {
     result { 
       header { key: "Set-Cookie" value: "session_id=12345; Path=/; HttpOnly" }
@@ -13,9 +25,24 @@ test {
 
 test {
   name: "SetPersistentDomainCookie"
+  
+  config: """
+    cookies {
+      name: "user_pref"
+      value: "dark_mode"
+      path: "/"
+      domain: "example.com"
+      max_age: 86400
+      http_only: true
+      secure: true
+      operation: SET
+    }
+  """
+  
   request_headers {
     input { header { key: "Cookie" value: "" } }
   }
+  
   response_headers {
     result { 
       header { key: "Set-Cookie" value: "user_pref=dark_mode; Path=/; Domain=example.com; Max-Age=86400; HttpOnly; Secure" }
@@ -26,6 +53,14 @@ test {
 
 test {
   name: "DeleteCookieBeforeCDNCache"
+  
+  config: """
+    cookies {
+      name: "old_cookie"
+      operation: DELETE
+    }
+  """
+  
   request_headers {
     input { 
       header { key: "Cookie" value: "session_id=abc123; old_cookie=expired; user_pref=value" }
@@ -35,6 +70,7 @@ test {
       log { regex: ".+Marking cookie for deletion before CDN cache: old_cookie" }
     }
   }
+  
   response_headers {
     result { 
       no_header { key: "Set-Cookie" }
@@ -44,9 +80,24 @@ test {
 
 test {
   name: "OverwriteExistingCookieWithNewValue"
+  
+  config: """
+    cookies {
+      name: "tracking_id"
+      value: "new_value"
+      path: "/"
+      domain: ".example.com"
+      max_age: 3600
+      http_only: true
+      secure: true
+      operation: OVERWRITE
+    }
+  """
+  
   request_headers {
     input { header { key: "Cookie" value: "tracking_id=old_value" } }
   }
+  
   response_headers {
     result { 
       header { key: "Set-Cookie" value: "tracking_id=new_value; Path=/; Domain=.example.com; Max-Age=3600; HttpOnly; Secure" }
@@ -57,9 +108,20 @@ test {
 
 test {
   name: "RemoveSetCookieDirectiveCompletely"
+  
+  config: """
+    cookies {
+      name: "remove_me"
+      value: ""
+      path: "/"
+      operation: OVERWRITE
+    }
+  """
+  
   request_headers {
     input { header { key: "Cookie" value: "remove_me=value" } }
   }
+  
   response_headers {
     result { 
       header { key: "Set-Cookie" value: "remove_me=; Path=/; Max-Age=0" }

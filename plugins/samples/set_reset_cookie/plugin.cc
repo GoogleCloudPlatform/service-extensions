@@ -15,38 +15,15 @@
 // [START serviceextensions_plugin_set_reset_cookie]
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
-#include "absl/strings/match.h"
-#include "absl/strings/strip.h"
 #include "proxy_wasm_intrinsics.h"
+#include "google/protobuf/text_format.h"
+#include "cookie_config.pb.h"
 #include <map>
 #include <vector>
 
-// Cookie operation types
-enum class CookieOperation {
-  SET,      
-  DELETE,   
-  OVERWRITE 
-
-// Cookie configuration based on Apache log format
-struct CookieConfig {
-  std::string name;
-  std::string value;
-  std::string domain;
-  std::string path;
-  int max_age;  // -1 for session cookie, >0 for persistent
-  bool secure;
-  bool http_only;
-  bool same_site_strict;
-  CookieOperation operation;
-
-  CookieConfig()
-      : path("/"),
-        max_age(-1),
-        secure(false),
-        http_only(true),
-        same_site_strict(false),
-        operation(CookieOperation::SET) {}
-};
+using serviceextensions::cookie_manager::CookieConfig;
+using serviceextensions::cookie_manager::CookieManagerConfig;
+using serviceextensions::cookie_manager::CookieOperation;
 
 class CookieManagerRootContext : public RootContext {
  public:
@@ -54,9 +31,71 @@ class CookieManagerRootContext : public RootContext {
       : RootContext(id, root_id) {}
 
   bool onConfigure(size_t config_size) override {
+    // Handle empty configuration
+    if (config_size == 0) {
+      LOG_WARN("Empty configuration provided, no cookies will be managed");
+      cookie_configs_.clear();
+      return true;  // Empty config is valid, just does nothing
+    }
+    
     auto configuration_data = getBufferBytes(WasmBufferType::PluginConfiguration,
                                             0, config_size);
-    parseConfiguration(configuration_data->view());
+    if (!configuration_data) {
+      LOG_ERROR("Failed to retrieve configuration data buffer");
+      return false;
+    }
+    
+    CookieManagerConfig config;
+    std::string config_string(configuration_data->view());
+    
+    // Attempt to parse the protobuf configuration
+    if (!google::protobuf::TextFormat::ParseFromString(config_string, &config)) {
+      LOG_ERROR("Failed to parse cookie manager configuration as text protobuf. "
+                "Please ensure configuration follows the text protobuf format. "
+                "Example: cookies { name: \"session\" value: \"abc\" }");
+      return false;
+    }
+    
+    // Validate parsed configuration
+    if (config.cookies_size() == 0) {
+      LOG_WARN("Configuration parsed successfully but contains no cookie definitions");
+      cookie_configs_.clear();
+      return true;
+    }
+    
+    // Store the parsed cookie configurations with validation
+    cookie_configs_.clear();
+    int valid_cookies = 0;
+    
+    for (const auto& cookie_config : config.cookies()) {
+      // Validate required fields based on operation type
+      if (cookie_config.name().empty()) {
+        LOG_ERROR("Cookie configuration missing required 'name' field, skipping");
+        continue;
+      }
+      
+      if (cookie_config.operation() == CookieOperation::SET || 
+          cookie_config.operation() == CookieOperation::OVERWRITE) {
+        if (cookie_config.value().empty()) {
+          LOG_WARN("Cookie '" + cookie_config.name() + "' has SET/OVERWRITE operation but empty value");
+        }
+      }
+      
+      cookie_configs_.push_back(cookie_config);
+      valid_cookies++;
+      
+      // Log configuration for debugging
+      LOG_DEBUG("Configured cookie: name=" + cookie_config.name() + 
+                ", operation=" + std::to_string(static_cast<int>(cookie_config.operation())));
+    }
+    
+    if (valid_cookies == 0) {
+      LOG_ERROR("No valid cookie configurations found after validation");
+      return false;
+    }
+    
+    LOG_INFO("Successfully loaded " + std::to_string(valid_cookies) + 
+             " cookie configuration(s)");
     return true;
   }
 
@@ -66,68 +105,6 @@ class CookieManagerRootContext : public RootContext {
 
  private:
   std::vector<CookieConfig> cookie_configs_;
-
- 
-  void parseConfiguration(std::string_view config) {
-    for (absl::string_view line : absl::StrSplit(config, '\n')) {
-      line = absl::StripAsciiWhitespace(line);
-      if (line.empty() || absl::StartsWith(line, "#")) {
-        continue;
-      }
-
-      CookieConfig cookie_config;
-      
-      // Parse each directive separated by semicolons
-      std::vector<std::string> directives = absl::StrSplit(line, "; ");
-      
-      for (size_t i = 0; i < directives.size(); ++i) {
-        std::string directive = directives[i];
-        
-        if (i == 0) {
-          // First directive is the cookie name=value or operation
-          if (absl::StartsWith(directive, "DELETE:")) {
-            cookie_config.operation = CookieOperation::DELETE;
-            cookie_config.name = directive.substr(7);
-          } else if (absl::StartsWith(directive, "OVERWRITE:")) {
-            cookie_config.operation = CookieOperation::OVERWRITE;
-            auto name_value = absl::StrSplit(directive.substr(10), '=');
-            auto parts = std::vector<std::string>(name_value.begin(), name_value.end());
-            if (parts.size() >= 2) {
-              cookie_config.name = parts[0];
-              cookie_config.value = parts[1];
-            }
-          } else {
-            cookie_config.operation = CookieOperation::SET;
-            auto name_value = absl::StrSplit(directive, '=');
-            auto parts = std::vector<std::string>(name_value.begin(), name_value.end());
-            if (parts.size() >= 2) {
-              cookie_config.name = parts[0];
-              cookie_config.value = parts[1];
-            }
-          }
-        } else {
-          // Parse cookie attributes
-          if (absl::StartsWith(directive, "Domain=")) {
-            cookie_config.domain = directive.substr(7);
-          } else if (absl::StartsWith(directive, "Path=")) {
-            cookie_config.path = directive.substr(5);
-          } else if (absl::StartsWith(directive, "Max-Age=")) {
-            cookie_config.max_age = std::stoi(directive.substr(8));
-          } else if (directive == "Secure") {
-            cookie_config.secure = true;
-          } else if (directive == "HttpOnly") {
-            cookie_config.http_only = true;
-          } else if (directive == "SameSite=Strict") {
-            cookie_config.same_site_strict = true;
-          } else if (directive == "Session") {
-            cookie_config.max_age = -1;
-          }
-        }
-      }
-      
-      cookie_configs_.push_back(cookie_config);
-    }
-  }
 };
 
 // Main HTTP context for cookie management
@@ -182,10 +159,10 @@ class CookieManagerHttpContext : public Context {
     const auto& configs = root_->getCookieConfigs();
     
     for (const auto& config : configs) {
-      if (config.operation == CookieOperation::DELETE) {
-        if (request_cookies_.find(config.name) != request_cookies_.end()) {
-          cookies_to_delete_.push_back(config.name);
-          LOG_INFO("Marking cookie for deletion before CDN cache: " + config.name);
+      if (config.operation() == CookieOperation::DELETE) {
+        if (request_cookies_.find(config.name()) != request_cookies_.end()) {
+          cookies_to_delete_.push_back(config.name());
+          LOG_INFO("Marking cookie for deletion before CDN cache: " + config.name());
         }
       }
     }
@@ -226,9 +203,9 @@ class CookieManagerHttpContext : public Context {
     const auto& configs = root_->getCookieConfigs();
     
     for (const auto& config : configs) {
-      if (config.operation == CookieOperation::SET) {
+      if (config.operation() == CookieOperation::SET) {
         setCookie(config);
-      } else if (config.operation == CookieOperation::OVERWRITE) {
+      } else if (config.operation() == CookieOperation::OVERWRITE) {
         overwriteCookie(config);
       }
     }
@@ -236,38 +213,38 @@ class CookieManagerHttpContext : public Context {
 
   // Set or reset a cookie
   void setCookie(const CookieConfig& config) {
-    std::string cookie_value = absl::StrCat(config.name, "=", config.value);
+    std::string cookie_value = absl::StrCat(config.name(), "=", config.value());
     
     // Add Path attribute
-    absl::StrAppend(&cookie_value, "; Path=", config.path);
+    absl::StrAppend(&cookie_value, "; Path=", config.path());
     
     // Add Domain attribute if specified
-    if (!config.domain.empty()) {
-      absl::StrAppend(&cookie_value, "; Domain=", config.domain);
+    if (!config.domain().empty()) {
+      absl::StrAppend(&cookie_value, "; Domain=", config.domain());
     }
     
     // Add Max-Age for persistent cookies (session if -1)
-    if (config.max_age > 0) {
-      absl::StrAppend(&cookie_value, "; Max-Age=", config.max_age);
+    if (config.max_age() > 0) {
+      absl::StrAppend(&cookie_value, "; Max-Age=", config.max_age());
     }
     
     // Add security attributes
-    if (config.http_only) {
+    if (config.http_only()) {
       absl::StrAppend(&cookie_value, "; HttpOnly");
     }
     
-    if (config.secure) {
+    if (config.secure()) {
       absl::StrAppend(&cookie_value, "; Secure");
     }
     
-    if (config.same_site_strict) {
+    if (config.same_site_strict()) {
       absl::StrAppend(&cookie_value, "; SameSite=Strict");
     }
     
     addResponseHeader("Set-Cookie", cookie_value);
     
-    std::string log_type = (config.max_age == -1) ? "session" : "persistent";
-    LOG_INFO("Setting " + log_type + " cookie: " + config.name + "=" + config.value);
+    std::string log_type = (config.max_age() == -1) ? "session" : "persistent";
+    LOG_INFO("Setting " + log_type + " cookie: " + config.name() + "=" + config.value());
   }
 
   // Overwrite or remove existing Set-Cookie headers
@@ -276,20 +253,20 @@ class CookieManagerHttpContext : public Context {
     removeResponseHeader("Set-Cookie");
     
     // If value is not empty, set the new cookie
-    if (!config.value.empty()) {
+    if (!config.value().empty()) {
       setCookie(config);
-      LOG_INFO("Overwriting existing cookie: " + config.name);
+      LOG_INFO("Overwriting existing cookie: " + config.name());
     } else {
       // Complete removal - set expired cookie
       std::string expire_cookie = absl::StrCat(
-          config.name, "=; Path=", config.path, "; Max-Age=0");
+          config.name(), "=; Path=", config.path(), "; Max-Age=0");
       
-      if (!config.domain.empty()) {
-        absl::StrAppend(&expire_cookie, "; Domain=", config.domain);
+      if (!config.domain().empty()) {
+        absl::StrAppend(&expire_cookie, "; Domain=", config.domain());
       }
       
       addResponseHeader("Set-Cookie", expire_cookie);
-      LOG_INFO("Removing Set-Cookie directive for: " + config.name);
+      LOG_INFO("Removing Set-Cookie directive for: " + config.name());
     }
   }
 };
