@@ -28,13 +28,13 @@ import (
 
 // Config holds the server configuration parameters.
 type Config struct {
-	Address              string
+	SecureAddress        string
 	InsecureAddress      string
 	HealthCheckAddress   string
 	CertFile             string
 	KeyFile              string
 	EnableInsecureServer bool
-	// EnableTLS enables the secure gRPC server on the specified Address.
+	// EnableTLS enables the secure gRPC server on the specified SecureAddress.
 	EnableTLS bool
 }
 
@@ -68,7 +68,7 @@ func (s *CalloutServer) StartGRPC(service extproc.ExternalProcessorServer) {
 	if !s.Config.EnableTLS {
 		return
 	}
-	lis, err := net.Listen("tcp", s.Config.Address)
+	lis, err := net.Listen("tcp", s.Config.SecureAddress)
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}

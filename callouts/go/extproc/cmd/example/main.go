@@ -57,7 +57,7 @@ func main() {
 	}
 
 	config := server.Config{
-		Address:              "0.0.0.0:443",
+		SecureAddress:        "0.0.0.0:443",
 		InsecureAddress:      "0.0.0.0:8080",
 		HealthCheckAddress:   "0.0.0.0:80",
 		CertFile:             "extproc/ssl_creds/localhost.crt",

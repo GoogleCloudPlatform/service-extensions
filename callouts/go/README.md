@@ -145,7 +145,7 @@ func main() {
 The ``CalloutServer`` class has many options to customize the security information as well as port settings. The default CalloutServer listens on port 8080 for plaintext traffic and 80 for health checks.
 
 TLS is disabled by default. To enable TLS, set ``EnableTLS`` to ``true`` in the ``Config`` struct.
-When enabled, the secure server listens on port 443 by default.
+When enabled, the secure server listens on the address specified by ``SecureAddress`` (port 443 by default).
 
 > For production environments, it is strongly recommended to enable TLS to ensure secure communication.
 

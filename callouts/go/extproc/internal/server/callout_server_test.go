@@ -46,7 +46,7 @@ func NewCalloutServerTestConfig() Config {
 // StartGRPCTestConfig returns a configuration for TestStartGRPC.
 func StartGRPCTestConfig() Config {
 	return Config{
-		Address:            "0.0.0.0:18443",
+		SecureAddress:      "0.0.0.0:18443",
 		InsecureAddress:    "0.0.0.0:18182",
 		HealthCheckAddress: "0.0.0.0:18001",
 		CertFile:           "../../ssl_creds/localhost.crt",
@@ -109,7 +109,7 @@ func TestStartGRPC(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	conn, err := grpc.Dial(config.Address, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(nil, "")))
+	conn, err := grpc.Dial(config.SecureAddress, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(nil, "")))
 	if err != nil {
 		t.Fatalf("Failed to dial: %v", err)
 	}
