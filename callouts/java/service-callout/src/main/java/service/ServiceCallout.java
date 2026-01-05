@@ -54,7 +54,7 @@ public class ServiceCallout {
     private Server plaintextServer;
     private HttpServer healthCheckServer;
     private String ip;
-    private int port;
+    private int securePort;
     private int plaintextPort;
     private String healthCheckIp;
     private int healthCheckPort;
@@ -70,7 +70,7 @@ public class ServiceCallout {
 
     protected ServiceCallout(Builder<?> builder) {
         this.ip = Optional.ofNullable(builder.ip).orElse("0.0.0.0");
-        this.port = Optional.ofNullable(builder.port).orElse(443); // Only used if enableTls is true
+        this.securePort = Optional.ofNullable(builder.securePort).orElse(443); // Only used if enableTls is true
         this.plaintextPort = Optional.ofNullable(builder.plaintextPort).orElse(8080);
         this.healthCheckIp = Optional.ofNullable(builder.healthCheckIp).orElse("0.0.0.0");
         this.healthCheckPort = Optional.ofNullable(builder.healthCheckPort).orElse(80);
@@ -105,7 +105,7 @@ public class ServiceCallout {
     // Builder class using Generics
     public static class Builder<T extends Builder<T>> {
         private String ip;
-        private Integer port;
+        private Integer securePort;
         private Integer plaintextPort;
         private String healthCheckIp;
         private Integer healthCheckPort;
@@ -124,8 +124,8 @@ public class ServiceCallout {
             return self();
         }
 
-        public T setPort(Integer port) {
-            this.port = port;
+        public T setSecurePort(Integer securePort) {
+            this.securePort = securePort;
             return self();
         }
 
@@ -223,14 +223,14 @@ public class ServiceCallout {
         if (enableTls && cert != null && certKey != null) {
             logger.info("Secure server starting...");
 
-            server = NettyServerBuilder.forPort(port)
+            server = NettyServerBuilder.forPort(securePort)
                     .sslContext(createSslContext(cert, certKey))
                     .addService(processor)
                     .executor(Executors.newFixedThreadPool(serverThreadCount)) // Configurable thread pool
                     .build()
                     .start();
 
-            logger.info("Secure Server started, listening on " + port);
+            logger.info("Secure Server started, listening on " + securePort);
 
         }
         if (enablePlainTextPort) {
