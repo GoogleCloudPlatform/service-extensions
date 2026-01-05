@@ -68,9 +68,8 @@ class CalloutServer:
   """Server wrapper for managing callout servers and processing callouts.
 
   Attributes:
-    address: Address that the main secure server will attempt to connect to,
+    secure_address: Address that the main secure (TLS) server will attempt to connect to,
       defaults to default_ip:443. Only used if disable_tls is False.
-    port: If specified, overrides the port of address.
     health_check_address: The health check serving address,
       defaults to default_ip:80.
     health_check_port: If set, overrides the port of health_check_address.
@@ -79,7 +78,6 @@ class CalloutServer:
       Requires cert_chain_path and private_key_path to be set.
     plaintext_address: The non-authenticated address to listen to,
       defaults to default_ip:8080.
-    plaintext_port: If set, overrides the port of plaintext_address.
     disable_plaintext: If true, disables the plaintext address of the server.
     default_ip: If left None, defaults to '0.0.0.0'.
     cert_chain: PEM Certificate chain used to authenticate secure connections,
@@ -93,14 +91,12 @@ class CalloutServer:
 
   def __init__(
     self,
-    address: tuple[str, int] | None = None,
-    port: int | None = None,
+    secure_address: tuple[str, int] | None = None,
     health_check_address: tuple[str, int] | None = None,
     health_check_port: int | None = None,
     combined_health_check: bool = False,
     secure_health_check: bool = False,
     plaintext_address: tuple[str, int] | None = None,
-    plaintext_port: int | None = None,
     disable_plaintext: bool = False,
     disable_tls: bool = True,
     default_ip: str | None = None,
@@ -116,15 +112,11 @@ class CalloutServer:
     self._health_check_server: HTTPServer | None = None
     default_ip = default_ip or '0.0.0.0'
 
-    self.address: tuple[str, int] = address or (default_ip, 443)
-    if port:
-      self.address = (self.address[0], port)
+    self.secure_address: tuple[str, int] = secure_address or (default_ip, 443)
 
     self.plaintext_address: tuple[str, int] | None = None
     if not disable_plaintext:
       self.plaintext_address = plaintext_address or (default_ip, 8080)
-      if plaintext_port:
-        self.plaintext_address = (self.plaintext_address[0], plaintext_port)
 
     self.health_check_address: tuple[str, int] | None = None
     if not combined_health_check:
@@ -349,7 +341,7 @@ class _GRPCCalloutService(ExternalProcessorServicer):
       server_credentials = grpc.ssl_server_credentials(
         private_key_certificate_chain_pairs=[(processor.private_key,
                                               processor.cert_chain)])
-      address_str = _addr_to_str(processor.address)
+      address_str = _addr_to_str(processor.secure_address)
       self._server.add_secure_port(address_str, server_credentials)
       self._start_msg += f', listening on {address_str} (secure)'
     if processor.plaintext_address:

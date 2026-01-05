@@ -31,26 +31,14 @@ def add_command_line_args() -> argparse.ArgumentParser:
   """
   parser = argparse.ArgumentParser()
   parser.add_argument(
-      '--address',
+      '--secure_address',
       type=_addr,
-      help='Address for the server with format: "0.0.0.0:443"',
-  )
-  parser.add_argument(
-      '--port',
-      type=int,
-      help=
-      'Port of the server, uses default_ip as the ip unless --address is specified.',
+      help='Address for the secure (TLS) server with format: "0.0.0.0:443"',
   )
   parser.add_argument(
       '--plaintext_address',
       type=_addr,
-      help='Address for the plaintext (non grpc) server: "0.0.0.0:443"',
-  )
-  parser.add_argument(
-      '--plaintext_port',
-      type=int,
-      help=
-      'Plaintext port of the server, uses default_ip as the ip unless --plaintext_address is specified.',
+      help='Address for the plaintext (non grpc) server: "0.0.0.0:8080"',
   )
   parser.add_argument(
       '--health_check_address',
