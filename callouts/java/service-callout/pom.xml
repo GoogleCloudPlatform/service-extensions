@@ -14,7 +14,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- Dependency Versions -->
-        <grpc.version>1.60.0</grpc.version>
+        <grpc.version>1.75.0</grpc.version>
     </properties>
 
     <dependencies>

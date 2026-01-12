@@ -14,9 +14,16 @@
 
 #include "test/framework.h"
 
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include <boost/dll/runtime_symbol_info.hpp>
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
 
 namespace service_extensions_samples {
 
@@ -153,6 +160,21 @@ proxy_wasm::WasmResult TestHttpContext::setHeaderMapPairs(
     addHeaderMapValue(type, key, val);
   }
   return proxy_wasm::WasmResult::Ok;
+}
+
+proxy_wasm::WasmResult TestHttpContext::getProperty(std::string_view path,
+                                                    std::string* result) {
+  // Proxy-Wasm SDKs use \0 as a path separator:
+  // https://github.com/proxy-wasm/spec/pull/94
+  std::string translated_path = absl::StrJoin(
+      absl::StrSplit(path, absl::string_view("\0", 1), absl::SkipEmpty()), ".");
+  for (const pb::Property& property : cfg_.properties()) {
+    if (property.path() == translated_path) {
+      *result = property.value();
+      return proxy_wasm::WasmResult::Ok;
+    }
+  }
+  return proxy_wasm::WasmResult::NotFound;
 }
 
 proxy_wasm::WasmResult TestHttpContext::sendLocalResponse(
