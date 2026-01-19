@@ -14,6 +14,8 @@
 
 // [START serviceextensions_plugin_country_query]
 #include <string>
+#include <string_view>
+
 #include "proxy_wasm_intrinsics.h"
 
 class MyHttpContext : public Context {
@@ -23,35 +25,36 @@ class MyHttpContext : public Context {
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
     // Default country value if geo data is not available
-    std::string country_value = "unknown";
+    std::string_view country_value = "unknown";
 
-    // Try to read the client_region attribute from request properties.
     auto client_region = getProperty({"request", "client_region"});
     if (client_region) {
       auto client_region_view = client_region.value()->view();
       if (!client_region_view.empty()) {
-        country_value = std::string(client_region_view);
+        country_value = client_region_view;
       }
     }
 
-    // Log the country value for GCP logs
-    LOG_INFO("country: " + country_value);
+    std::string log_msg = "country: ";
+    log_msg.append(country_value);
+    LOG_INFO(log_msg);
 
-    // Get current path and add country query parameter
     auto path_header = getRequestHeader(":path");
-    if (path_header) {
-      std::string new_path;
-      auto path_view = path_header->view();
+    std::string_view path_view = path_header ? path_header->view() : "";
 
-      // Check if query string already exists
-      if (path_view.find('?') == std::string_view::npos) {
-        new_path = std::string(path_view) + "?country=" + country_value;
-      } else {
-        new_path = std::string(path_view) + "&country=" + country_value;
-      }
+    std::string new_path;
+    new_path.reserve(path_view.size() + 10 + country_value.size());
+    new_path.append(path_view);
 
-      replaceRequestHeader(":path", new_path);
+    // Check if query string already exists
+    if (path_view.find('?') == std::string_view::npos) {
+      new_path.append("?country=");
+    } else {
+      new_path.append("&country=");
     }
+    new_path.append(country_value);
+
+    replaceRequestHeader(":path", new_path);
 
     return FilterHeadersStatus::Continue;
   }
