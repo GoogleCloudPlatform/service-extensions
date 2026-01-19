@@ -13,9 +13,11 @@
 // limitations under the License.
 
 // [START serviceextensions_plugin_country_query]
-use log::info;
-use proxy_wasm::traits::*;
-use proxy_wasm::types::*;
+use proxy_wasm::traits::{Context, HttpContext};
+use proxy_wasm::types::{Action, LogLevel};
+
+const CLIENT_REGION_PATH: &[&str] = &["request", "client_region"];
+const DEFAULT_COUNTRY: &str = "unknown";
 
 proxy_wasm::main! {{
     proxy_wasm::set_log_level(LogLevel::Trace);
@@ -28,28 +30,43 @@ impl Context for MyHttpContext {}
 
 impl HttpContext for MyHttpContext {
     fn on_http_request_headers(&mut self, _num_headers: usize, _end_of_stream: bool) -> Action {
-        // Get country value from geo attributes or default to "unknown".
-        // This is provided to the plugin via getProperty() hostcall.
-        let country_value = self
-            .get_property(vec!["request", "client_region"])
-            .and_then(|bytes| String::from_utf8(bytes).ok())
-            .filter(|value| !value.is_empty())
-            .unwrap_or_else(|| "unknown".to_string());
+        let country_value = self.get_country_value();
 
-        // Log the country value for GCP logs
-        info!("country: {}", country_value);
+        log::info!("country: {}", country_value);
 
-        // Get current path and add country query parameter
         let path = self.get_http_request_header(":path").unwrap_or_default();
-        let new_path = if path.contains('?') {
-            format!("{}&country={}", path, country_value)
-        } else {
-            format!("{}?country={}", path, country_value)
-        };
-
+        let new_path = self.add_country_parameter(&path, &country_value);
+        
         self.set_http_request_header(":path", Some(&new_path));
 
         Action::Continue
+    }
+}
+
+impl MyHttpContext {
+    fn get_country_value(&self) -> String {
+        if let Some(bytes) = self.get_property(CLIENT_REGION_PATH.to_vec()) {
+            if let Ok(country) = String::from_utf8(bytes) {
+                if !country.is_empty() {
+                    return country;
+                }
+            }
+        }
+        DEFAULT_COUNTRY.to_string()
+    }
+
+    fn add_country_parameter(&self, path: &str, country: &str) -> String {
+        let mut new_path = String::with_capacity(path.len() + country.len() + 10);
+        new_path.push_str(path);
+
+        if path.contains('?') {
+            new_path.push_str("&country=");
+        } else {
+            new_path.push_str("?country=");
+        }
+        new_path.push_str(country);
+
+        new_path
     }
 }
 // [END serviceextensions_plugin_country_query]
