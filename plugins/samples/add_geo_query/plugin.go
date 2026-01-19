@@ -22,6 +22,10 @@ import (
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm/types"
 )
 
+const defaultCountry = "unknown"
+
+var clientRegionPath = []string{"request", "client_region"}
+
 func main() {}
 
 func init() {
@@ -40,38 +44,29 @@ type httpContext struct {
 	types.DefaultHttpContext
 }
 
-func (*vmContext) NewPluginContext(contextID uint32) types.PluginContext {
+func (*vmContext) NewPluginContext(uint32) types.PluginContext {
 	return &pluginContext{}
 }
 
-func (*pluginContext) NewHttpContext(contextID uint32) types.HttpContext {
+func (*pluginContext) NewHttpContext(uint32) types.HttpContext {
 	return &httpContext{}
 }
 
-func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) types.Action {
-	// Get country value from or default to "unknown"
+func (ctx *httpContext) OnHttpRequestHeaders(int, bool) types.Action {
 	countryValue := ctx.getCountryValue()
 
-	// Log the country value for GCP logs
 	proxywasm.LogInfof("country: %s", countryValue)
 
-	// Get current path and add country query parameter
-	path, err := proxywasm.GetHttpRequestHeader(":path")
-	if err != nil {
-		return types.ActionContinue
-	}
-
+	path, _ := proxywasm.GetHttpRequestHeader(":path")
 	newPath := ctx.addCountryParameter(path, countryValue)
+
 	_ = proxywasm.ReplaceHttpRequestHeader(":path", newPath)
 
 	return types.ActionContinue
 }
 
 func (ctx *httpContext) getCountryValue() string {
-	const defaultCountry = "unknown"
-
-	// Geo information is provided via attributes exposed through getProperty().
-	value, err := proxywasm.GetProperty([]string{"request", "client_region"})
+	value, err := proxywasm.GetProperty(clientRegionPath)
 	if err != nil || len(value) == 0 {
 		return defaultCountry
 	}
@@ -80,11 +75,18 @@ func (ctx *httpContext) getCountryValue() string {
 }
 
 func (ctx *httpContext) addCountryParameter(path, countryValue string) string {
-	// Check if query string already exists
+	var builder strings.Builder
+	builder.Grow(len(path) + len(countryValue) + 10)
+	builder.WriteString(path)
+
 	if strings.Contains(path, "?") {
-		return path + "&country=" + countryValue
+		builder.WriteString("&country=")
+	} else {
+		builder.WriteString("?country=")
 	}
-	return path + "?country=" + countryValue
+	builder.WriteString(countryValue)
+
+	return builder.String()
 }
 
 // [END serviceextensions_plugin_country_query]
