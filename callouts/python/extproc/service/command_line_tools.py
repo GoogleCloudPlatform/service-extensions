@@ -43,14 +43,7 @@ def add_command_line_args() -> argparse.ArgumentParser:
   parser.add_argument(
       '--health_check_address',
       type=_addr,
-      help=('Health check address for the server with format: "0.0.0.0:80",' +
-            'if False, no health check will be run.'),
-  )
-  parser.add_argument(
-      '--health_check_port',
-      type=int,
-      help=
-      'Health check port of the server, uses default_ip as the ip unless --health_check_address is specified.',
+      help='Health check address for the server with format: "0.0.0.0:80"',
   )
   parser.add_argument(
       '--secure_health_check',

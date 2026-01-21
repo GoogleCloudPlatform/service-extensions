@@ -72,7 +72,6 @@ class CalloutServer:
       defaults to default_ip:443. Only used if disable_tls is False.
     health_check_address: The health check serving address,
       defaults to default_ip:80.
-    health_check_port: If set, overrides the port of health_check_address.
     combined_health_check: If True, does not create a separate health check server.
     secure_health_check: If True, will use HTTPS as the protocol of the health check server.
       Requires cert_chain_path and private_key_path to be set.
@@ -93,7 +92,6 @@ class CalloutServer:
     self,
     secure_address: tuple[str, int] | None = None,
     health_check_address: tuple[str, int] | None = None,
-    health_check_port: int | None = None,
     combined_health_check: bool = False,
     secure_health_check: bool = False,
     plaintext_address: tuple[str, int] | None = None,
@@ -121,9 +119,6 @@ class CalloutServer:
     self.health_check_address: tuple[str, int] | None = None
     if not combined_health_check:
       self.health_check_address = health_check_address or (default_ip, 80)
-      if health_check_port:
-        self.health_check_address = (self.health_check_address[0],
-                                     health_check_port)
 
     self.disable_tls = disable_tls
 
