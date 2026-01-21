@@ -78,7 +78,7 @@ docker build -t service-callout:1.0-SNAPSHOT .
 To run the BasicCalloutServer class for example, use the following command:
 
 ```sh
-docker run -p 80:80 -p 443:443 service-callout:1.0-SNAPSHOT example.BasicCalloutServer
+docker run -p 80:80 -p 8080:8080 service-callout:1.0-SNAPSHOT example.BasicCalloutServer
 ```
 
 ### Running with JVM Options
@@ -86,7 +86,7 @@ docker run -p 80:80 -p 443:443 service-callout:1.0-SNAPSHOT example.BasicCallout
 If you need to pass JVM options (e.g., setting the maximum heap size), use the -e JAVA_OPTS flag:
 
 ```sh
-docker run -p 80:80 -p 443:443 \
+docker run -p 80:80 -p 8080:8080 \
  -e JAVA_OPTS="-Xmx512m" \
  service-callout:1.0-SNAPSHOT example.BasicCalloutServer
 ```
@@ -185,7 +185,8 @@ public static void main(String[] args) throws Exception {
     // Create a builder for ServiceCallout with custom configuration
     Example server = new Example.Builder()
             .setIp("111.222.333.444")       // Customize IP
-            .setPort(8443)                  // Set the port for secure communication
+            .setEnableTls(true)             // Enable TLS
+            .setSecurePort(443)             // Set the port for secure communication
             .build();
 
     // Start the server and block until shutdown
@@ -193,6 +194,8 @@ public static void main(String[] args) throws Exception {
     server.blockUntilShutdown();
 }
 ```
+
+> For production environments, it is strongly recommended to enable TLS to ensure secure communication.
 
 ## Documentation
 
