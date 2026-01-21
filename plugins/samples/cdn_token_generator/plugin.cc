@@ -12,223 +12,278 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [START serviceextensions_plugin_cdn_token_generator_cpp]
-#include <string>
-#include <memory>
-#include <regex>
+// [START serviceextensions_plugin_cdn_token_generator]
+//
+// This plugin signs URLs embedded in response bodies (e.g., HLS/DASH manifests)
+// with HMAC-SHA256 tokens for Google Cloud Media CDN authentication.
+//
+// Use case: A video streaming service returns a manifest file (.m3u8 or .mpd)
+// from the origin containing segment URLs. This plugin intercepts the response,
+// finds all HTTP/HTTPS URLs, and replaces them with signed URLs that include
+// authentication tokens. This allows Media CDN to verify that requests for
+// video segments come from authorized clients.
+//
+// Configuration format (key:value, one per line):
+//   privateKeyHex: <hex-encoded HMAC key>
+//   keyName: <Media CDN key name>
+//   expirySeconds: <token validity in seconds>
+
+#include <openssl/hmac.h>
+
 #include <chrono>
-#include <map>
+#include <optional>
+#include <string>
+#include <utility>
 #include <vector>
-#include <algorithm>
-#include <iomanip>
-#include <sstream>
 
+#include "absl/strings/escaping.h"
+#include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_split.h"
 #include "proxy_wasm_intrinsics.h"
-#include "openssl/hmac.h"
+#include "re2/re2.h"
 
-// Security constants
-constexpr size_t MAX_URL_LENGTH = 2048;
-constexpr size_t MAX_KEY_LENGTH = 256;
-constexpr size_t MIN_KEY_LENGTH = 32;
-constexpr size_t MAX_CONFIG_SIZE = 4096;
-constexpr int MAX_EXPIRY_TIME = 86400;  // 24h
-constexpr int MIN_EXPIRY_TIME = 60;     // 1min
+// Security and operational limits.
+constexpr size_t kMaxKeyHexLength = 256;
+constexpr size_t kMinKeyHexLength = 32;
+constexpr int kMaxExpirySeconds = 86400;   // 24 hours
+constexpr int kMinExpirySeconds = 60;      // 1 minute
+constexpr int kDefaultExpirySeconds = 3600;
+// Maximum response body size to process (1MB). Larger bodies are passed through
+// unmodified to prevent excessive memory usage and processing time.
+constexpr size_t kMaxBodySize = 1024 * 1024;
 
-struct Config {
-  std::string privateKeyHex;
-  std::string keyName;
-  int expirySeconds = 3600;
-  std::string urlHeaderName;
-  std::string outputHeaderName;
+struct PluginConfig {
+  std::string private_key_hex;
+  std::string key_name;
+  int expiry_seconds = kDefaultExpirySeconds;
 };
 
-class CDNTokenRootContext : public RootContext {
+class CdnTokenRootContext : public RootContext {
  public:
-  explicit CDNTokenRootContext(uint32_t id, std::string_view root_id)
+  explicit CdnTokenRootContext(uint32_t id, std::string_view root_id)
       : RootContext(id, root_id) {}
 
-  bool onConfigure(size_t /* config_len */) override {
-    // SOLUCIÓN TEMPORAL: Usar configuración hardcodeada para bypasear cualquier error
-    config_.privateKeyHex = "d8ef411f9f735c3d2b263606678ba5b7b1abc1973f1285f856935cc163e9d094";
-    config_.keyName = "test-key";
-    config_.expirySeconds = 3600;
-    config_.urlHeaderName = "X-Original-URL";
-    config_.outputHeaderName = "X-Signed-URL";
-    
-    LOG_INFO("CDN Token Generator C++ plugin started with hardcoded configuration");
-    return true;
-  }
-
-  const Config& config() const { return config_; }
-
- private:
-  Config config_;
-
-  bool parseConfig(const std::string& json) {
-    // Simple parser (flat JSON)
-    std::map<std::string, std::string> kv;
-    size_t i = 0;
-    while (i < json.size()) {
-      i = json.find('"', i);
-      if (i == std::string::npos) break;
-      size_t j = json.find('"', i + 1);
-      if (j == std::string::npos) break;
-      std::string key = json.substr(i + 1, j - i - 1);
-      size_t k = json.find(':', j);
-      size_t l = json.find('"', k);
-      size_t m = json.find('"', l + 1);
-      if (l != std::string::npos && m != std::string::npos) {
-        std::string val = json.substr(l + 1, m - l - 1);
-        kv[key] = val;
-        i = m + 1;
-      } else {
-        break;
-      }
-    }
-    if (kv.count("privateKeyHex")) config_.privateKeyHex = kv["privateKeyHex"];
-    if (kv.count("keyName")) config_.keyName = kv["keyName"];
-    if (kv.count("expirySeconds")) config_.expirySeconds = std::stoi(kv["expirySeconds"]);
-    if (kv.count("urlHeaderName")) config_.urlHeaderName = kv["urlHeaderName"];
-    if (kv.count("outputHeaderName")) config_.outputHeaderName = kv["outputHeaderName"];
-    return !config_.privateKeyHex.empty() && !config_.keyName.empty()
-        && !config_.urlHeaderName.empty() && !config_.outputHeaderName.empty();
-  }
-};
-
-class CDNTokenHttpContext : public Context {
- public:
-  explicit CDNTokenHttpContext(uint32_t id, RootContext* root)
-      : Context(id, root),
-        config_(static_cast<CDNTokenRootContext*>(root)->config()) {}
-
-  // Función para loguear sin prefijos de archivo/línea
-  void logExact(const std::string& message) {
-    logInfo(message);  // Función de bajo nivel sin prefijos
-  }
-
-  FilterHeadersStatus onRequestHeaders(uint32_t, bool) override {
-    if (config_.privateKeyHex.empty()) {
-      logExact("Plugin configuration is null");
-      return FilterHeadersStatus::Continue;
-    }
-    auto originalURLPtr = getRequestHeader(config_.urlHeaderName);
-    std::string originalURL = originalURLPtr ? originalURLPtr->toString() : "";
-    if (originalURL.empty()) {
-      logExact("URL header not found or empty: " + config_.urlHeaderName);
-      return FilterHeadersStatus::Continue;
-    }
-    // Validate + sign URL
-    if (!validateURL(originalURL)) {
-      logExact("Invalid URL provided");
-      return FilterHeadersStatus::Continue;
-    }
-    logExact("Generating signed URL for: " + originalURL);
-
-    std::string signedURL = generateSignedURL(originalURL);
-    if (signedURL.empty()) {
-      logExact("Failed to generate signed URL");
-      return FilterHeadersStatus::Continue;
-    }
-    addRequestHeader(config_.outputHeaderName, signedURL);
-    return FilterHeadersStatus::Continue;
-  }
-
- private:
-  Config config_;
-
-  bool validateURL(const std::string& url) {
-    if (url.size() > MAX_URL_LENGTH) return false;
-    // Regex similar to Go
-    std::regex url_pattern(R"(^https?://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,}(/[^\s]*)?$)");
-    if (!std::regex_match(url, url_pattern)) return false;
-    // Basic internal host block
-    std::string lower = url;
-    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-    if (lower.find("localhost") != std::string::npos ||
-        lower.find("127.0.0.1") != std::string::npos ||
-        lower.find("::1") != std::string::npos) {
+  bool onConfigure(size_t config_len) override {
+    if (config_len == 0) {
+      LOG_ERROR("Configuration is required");
       return false;
     }
+
+    auto config_bytes =
+        getBufferBytes(WasmBufferType::PluginConfiguration, 0, config_len);
+    if (!config_bytes) {
+      LOG_ERROR("Failed to read plugin configuration");
+      return false;
+    }
+
+    if (!parseConfig(config_bytes->toString())) {
+      return false;
+    }
+
+    url_pattern_.emplace("(https?://[^\\s\"'<>]+)");
+    if (!url_pattern_->ok()) {
+      LOG_ERROR(absl::StrCat("Failed to compile URL regex: ",
+                             url_pattern_->error()));
+      return false;
+    }
+
+    LOG_INFO(absl::StrCat("CDN Token Generator configured: keyName=",
+                          config_.key_name,
+                          ", expirySeconds=", config_.expiry_seconds));
     return true;
   }
 
-  std::vector<uint8_t> hexToBytes(const std::string& hex) {
-    std::vector<uint8_t> bytes;
-    if (hex.size() % 2 != 0) return {};
-    for (size_t i = 0; i < hex.size(); i += 2) {
-      uint8_t byte = std::stoi(hex.substr(i, 2), nullptr, 16);
-      bytes.push_back(byte);
-    }
-    return bytes;
-  }
+  const PluginConfig& config() const { return config_; }
+  const re2::RE2& url_pattern() const { return *url_pattern_; }
 
-  std::string base64UrlEncode(const std::string& in) {
-    // Basic URL-safe base64 (no padding, - and _)
-    static const char table[] =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-    std::string out;
-    int val = 0, valb = -6;
-    for (uint8_t c : in) {
-      val = (val << 8) + c;
-      valb += 8;
-      while (valb >= 0) {
-        out.push_back(table[(val >> valb) & 0x3F]);
-        valb -= 6;
+ private:
+  PluginConfig config_;
+  std::optional<re2::RE2> url_pattern_;
+
+  bool parseConfig(const std::string& config_str) {
+
+    for (const auto& line : absl::StrSplit(config_str, '\n')) {
+      size_t colon_pos = line.find(':');
+      if (colon_pos == std::string::npos) continue;
+
+      std::string key(line.substr(0, colon_pos));
+      std::string value(line.substr(colon_pos + 1));
+
+      auto trim = [](std::string& s) {
+        s.erase(0, s.find_first_not_of(" \t\""));
+        s.erase(s.find_last_not_of(" \t\",\r\n") + 1);
+      };
+      trim(key);
+      trim(value);
+
+      if (key == "privateKeyHex") {
+        config_.private_key_hex = value;
+      } else if (key == "keyName") {
+        config_.key_name = value;
+      } else if (key == "expirySeconds") {
+        int expiry;
+        if (absl::SimpleAtoi(value, &expiry) &&
+            expiry >= kMinExpirySeconds && expiry <= kMaxExpirySeconds) {
+          config_.expiry_seconds = expiry;
+        }
       }
     }
-    if (valb > -6) out.push_back(table[((val << 8) >> (valb + 8)) & 0x3F]);
-    return out;
-  }
 
-  std::string generateSignedURL(const std::string& targetURL) {
-    // Parse scheme, host, path
-    std::regex rgx(R"(^(https?)://([^/\s]+)(/[^\s]*)?$)");
-    std::smatch match;
-    if (!std::regex_match(targetURL, match, rgx)) return "";
-    std::string scheme = match[1];
-    std::string host = match[2];
-    std::string path = match[3];
-    std::string urlPrefix = scheme + "://" + host + path;
-    std::string urlPrefixB64 = base64UrlEncode(urlPrefix);
+    if (config_.private_key_hex.empty()) {
+      LOG_ERROR("privateKeyHex is required in configuration");
+      return false;
+    }
+    if (config_.key_name.empty()) {
+      LOG_ERROR("keyName is required in configuration");
+      return false;
+    }
 
-    // Compute expiry
-    auto now = std::chrono::system_clock::now();
-    auto expiresAt = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count() + config_.expirySeconds;
+    if (config_.private_key_hex.length() < kMinKeyHexLength ||
+        config_.private_key_hex.length() > kMaxKeyHexLength) {
+      LOG_ERROR(absl::StrCat("privateKeyHex length must be between ",
+                             kMinKeyHexLength, " and ", kMaxKeyHexLength));
+      return false;
+    }
 
-    // Build string to sign
-    std::ostringstream oss;
-    oss << "URLPrefix=" << urlPrefixB64
-        << "&Expires=" << expiresAt
-        << "&KeyName=" << config_.keyName;
-    std::string stringToSign = oss.str();
-
-    // Decode key
-    std::vector<uint8_t> key = hexToBytes(config_.privateKeyHex);
-    if (key.size() < 16 || key.size() > 128) return ""; // Security
-
-    // Sign (HMAC-SHA256)
-    unsigned char result[32];
-    unsigned int result_len;
-    HMAC(EVP_sha256(), key.data(), key.size(),
-         reinterpret_cast<const unsigned char*>(stringToSign.data()), stringToSign.size(),
-         result, &result_len);
-
-    std::string signature(reinterpret_cast<char*>(result), result_len);
-    std::string signatureB64 = base64UrlEncode(signature);
-
-    // Compose final URL
-    std::string finalURL = targetURL;
-    std::string sep = (finalURL.find('?') == std::string::npos) ? "?" : "&";
-    finalURL += sep + "URLPrefix=" + urlPrefixB64 +
-                "&Expires=" + std::to_string(expiresAt) +
-                "&KeyName=" + config_.keyName +
-                "&Signature=" + signatureB64;
-    return finalURL;
+    return true;
   }
 };
 
-static RegisterContextFactory register_CDNTokenContext(
-    CONTEXT_FACTORY(CDNTokenHttpContext),
-    ROOT_FACTORY(CDNTokenRootContext)
-);
-// [END serviceextensions_plugin_cdn_token_generator_cpp]
+class CdnTokenHttpContext : public Context {
+ public:
+  explicit CdnTokenHttpContext(uint32_t id, RootContext* root)
+      : Context(id, root), root_(static_cast<CdnTokenRootContext*>(root)) {}
+
+  FilterDataStatus onResponseBody(size_t body_buffer_length,
+                                  bool end_of_stream) override {
+    // Buffer the response until we have the complete body.
+    if (!end_of_stream) {
+      return FilterDataStatus::StopIterationAndBuffer;
+    }
+
+    // Skip processing for very large bodies to prevent OOM.
+    if (body_buffer_length > kMaxBodySize) {
+      LOG_WARN(absl::StrCat("Response body too large (", body_buffer_length,
+                            " bytes), skipping URL signing"));
+      return FilterDataStatus::Continue;
+    }
+
+    auto body =
+        getBufferBytes(WasmBufferType::HttpResponseBody, 0, body_buffer_length);
+    if (!body) {
+      LOG_ERROR("Failed to read response body");
+      return FilterDataStatus::Continue;
+    }
+
+    std::string body_string = body->toString();
+    if (body_string.empty()) {
+      return FilterDataStatus::Continue;
+    }
+
+    // Find all URL matches and their positions.
+    std::vector<std::pair<size_t, std::string>> matches;
+    re2::StringPiece input(body_string);
+    re2::StringPiece match;
+
+    while (RE2::FindAndConsume(&input, root_->url_pattern(), &match)) {
+      size_t pos = match.data() - body_string.data();
+      matches.emplace_back(pos, std::string(match));
+    }
+
+    if (matches.empty()) {
+      return FilterDataStatus::Continue;
+    }
+
+    // Replace URLs from end to start to preserve positions.
+    std::string modified_body = body_string;
+    int replacements = 0;
+
+    for (auto it = matches.rbegin(); it != matches.rend(); ++it) {
+      const auto& [pos, url] = *it;
+      std::string signed_url = generateSignedUrl(url);
+      if (!signed_url.empty()) {
+        modified_body.replace(pos, url.length(), signed_url);
+        ++replacements;
+      }
+    }
+
+    if (replacements > 0) {
+      LOG_INFO(
+          absl::StrCat("Replaced ", replacements, " URLs with signed URLs"));
+      setBuffer(WasmBufferType::HttpResponseBody, 0, body_buffer_length,
+                modified_body);
+    }
+
+    return FilterDataStatus::Continue;
+  }
+
+ private:
+  const CdnTokenRootContext* root_;
+
+  // Generates a signed URL in Media CDN token format.
+  // See: https://cloud.google.com/media-cdn/docs/generate-tokens
+  std::string generateSignedUrl(const std::string& target_url) {
+    const PluginConfig& config = root_->config();
+
+    // Base64 URL-safe encode the URL prefix.
+    std::string url_prefix_b64 = base64UrlEncode(target_url);
+
+    // Calculate expiration timestamp.
+    auto now = std::chrono::system_clock::now();
+    auto expires_at =
+        std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch())
+            .count() +
+        config.expiry_seconds;
+
+    // Create the string to sign (Media CDN token format).
+    // Format: URLPrefix=<base64>~Expires=<timestamp>~KeyName=<key-name>
+    std::string string_to_sign =
+        absl::StrCat("URLPrefix=", url_prefix_b64, "~Expires=", expires_at,
+                     "~KeyName=", config.key_name);
+
+    // Decode the hex key.
+    std::string key_bytes;
+    if (!absl::HexStringToBytes(config.private_key_hex, &key_bytes)) {
+      LOG_ERROR("Failed to decode private key from hex");
+      return "";
+    }
+
+    // Compute HMAC-SHA256 signature.
+    unsigned char hmac_result[EVP_MAX_MD_SIZE];
+    unsigned int hmac_len;
+    HMAC(EVP_sha256(),
+         reinterpret_cast<const unsigned char*>(key_bytes.data()),
+         key_bytes.size(),
+         reinterpret_cast<const unsigned char*>(string_to_sign.data()),
+         string_to_sign.size(), hmac_result, &hmac_len);
+
+    // Convert HMAC to hexadecimal string (Media CDN uses hex, not base64).
+    std::string hmac_hex = absl::BytesToHexString(
+        std::string_view(reinterpret_cast<char*>(hmac_result), hmac_len));
+
+    // Build final signed URL with Edge-Cache-Token parameter.
+    // Format: <url>?Edge-Cache-Token=URLPrefix=<b64>~Expires=<ts>~KeyName=<n>~hmac=<hex>
+    std::string_view separator =
+        (target_url.find('?') == std::string::npos) ? "?" : "&";
+    return absl::StrCat(target_url, separator,
+                        "Edge-Cache-Token=", string_to_sign,
+                        "~hmac=", hmac_hex);
+  }
+
+  // URL-safe Base64 encoding without padding.
+  static std::string base64UrlEncode(const std::string& input) {
+    std::string encoded;
+    absl::WebSafeBase64Escape(input, &encoded);
+    // Remove padding ('=' characters).
+    size_t padding_pos = encoded.find('=');
+    if (padding_pos != std::string::npos) {
+      encoded.resize(padding_pos);
+    }
+    return encoded;
+  }
+};
+
+static RegisterContextFactory register_CdnTokenContext(
+    CONTEXT_FACTORY(CdnTokenHttpContext), ROOT_FACTORY(CdnTokenRootContext));
+// [END serviceextensions_plugin_cdn_token_generator]
