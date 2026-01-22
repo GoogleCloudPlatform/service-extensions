@@ -60,10 +60,7 @@ test {
       header { key: ":path" value: "/api/data?page=1&limit=10" }
     }
     result {
-      has_header {
-        key: ":path"
-        value: "/api/data?page=1&limit=10&country=DE"
-      }
+      headers { regex: ":path: /api/data\\?.*country=DE.*" }
       log { regex: ".*country: DE.*" }
     }
   }
@@ -87,7 +84,7 @@ test {
   }
 }
 
-# Test special characters (still simple CLDR code, e.g. UK)
+# Test special characters
 test {
   name: "HandleClientRegionCountryCodeUK"
   properties {
@@ -119,6 +116,24 @@ test {
     result {
       has_header { key: ":path" value: "?country=AU" }
       log { regex: ".*country: AU.*" }
+    }
+  }
+}
+
+# Test anti-spoofing: replaces existing country parameter
+test {
+  name: "RemoveExistingCountryParameter"
+  properties {
+    path: "request.client_region"
+    value: "US"
+  }
+  request_headers {
+    input {
+      header { key: ":path" value: "/api/data?country=SPOOFED&page=1" }
+    }
+    result {
+      headers { regex: ":path: /api/data\\?.*country=US.*" }
+      log { regex: ".*country: US.*" }
     }
   }
 }
