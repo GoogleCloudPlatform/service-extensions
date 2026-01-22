@@ -16,6 +16,8 @@
 #include <string>
 #include <string_view>
 
+#include "boost/url/parse.hpp"
+#include "boost/url/url.hpp"
 #include "proxy_wasm_intrinsics.h"
 
 class MyHttpContext : public Context {
@@ -35,26 +37,17 @@ class MyHttpContext : public Context {
       }
     }
 
-    std::string log_msg = "country: ";
-    log_msg.append(country_value);
-    LOG_INFO(log_msg);
+    LOG_INFO("country: " + std::string(country_value));
 
-    auto path_header = getRequestHeader(":path");
-    std::string_view path_view = path_header ? path_header->view() : "";
-
-    std::string new_path;
-    new_path.reserve(path_view.size() + 10 + country_value.size());
-    new_path.append(path_view);
-
-    // Check if query string already exists
-    if (path_view.find('?') == std::string_view::npos) {
-      new_path.append("?country=");
-    } else {
-      new_path.append("&country=");
+    WasmDataPtr path = getRequestHeader(":path");
+    if (path) {
+      boost::system::result<boost::urls::url> url =
+          boost::urls::parse_uri_reference(path->view());
+      if (url) {
+        url->params().set("country", country_value);
+        replaceRequestHeader(":path", url->buffer());
+      }
     }
-    new_path.append(country_value);
-
-    replaceRequestHeader(":path", new_path);
 
     return FilterHeadersStatus::Continue;
   }

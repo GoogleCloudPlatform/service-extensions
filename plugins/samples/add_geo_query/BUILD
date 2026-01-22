@@ -5,6 +5,11 @@ licenses(["notice"])  # Apache 2
 proxy_wasm_plugin_cpp(
     name = "plugin_cpp.wasm",
     srcs = ["plugin.cc"],
+    deps = [
+        "//:boost_exception",
+        "@boost//:url",
+        "@com_google_absl//absl/strings",
+    ],
 )
 
 proxy_wasm_tests(
