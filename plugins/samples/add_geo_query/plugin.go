@@ -16,7 +16,8 @@
 package main
 
 import (
-	"strings"
+	"fmt"
+	"net/url"
 
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm"
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm/types"
@@ -53,14 +54,32 @@ func (*pluginContext) NewHttpContext(uint32) types.HttpContext {
 }
 
 func (ctx *httpContext) OnHttpRequestHeaders(int, bool) types.Action {
+	defer func() {
+		err := recover()
+		if err != nil {
+			proxywasm.SendHttpResponse(500, [][2]string{}, []byte(fmt.Sprintf("%v", err)), 0)
+		}
+	}()
+
 	countryValue := ctx.getCountryValue()
 
 	proxywasm.LogInfof("country: %s", countryValue)
 
-	path, _ := proxywasm.GetHttpRequestHeader(":path")
-	newPath := ctx.addCountryParameter(path, countryValue)
+	path, err := proxywasm.GetHttpRequestHeader(":path")
+	if err != types.ErrorStatusNotFound {
+		if err != nil {
+			panic(err)
+		}
+		u, err := url.Parse(path)
+		if err != nil {
+			panic(err)
+		}
+		query := u.Query()
+		query.Set("country", countryValue)
+		u.RawQuery = query.Encode()
 
-	_ = proxywasm.ReplaceHttpRequestHeader(":path", newPath)
+		proxywasm.ReplaceHttpRequestHeader(":path", u.String())
+	}
 
 	return types.ActionContinue
 }
@@ -72,21 +91,6 @@ func (ctx *httpContext) getCountryValue() string {
 	}
 
 	return string(value)
-}
-
-func (ctx *httpContext) addCountryParameter(path, countryValue string) string {
-	var builder strings.Builder
-	builder.Grow(len(path) + len(countryValue) + 10)
-	builder.WriteString(path)
-
-	if strings.Contains(path, "?") {
-		builder.WriteString("&country=")
-	} else {
-		builder.WriteString("?country=")
-	}
-	builder.WriteString(countryValue)
-
-	return builder.String()
 }
 
 // [END serviceextensions_plugin_country_query]

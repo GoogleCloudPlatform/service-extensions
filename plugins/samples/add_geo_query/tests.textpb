@@ -62,7 +62,8 @@ test {
     result {
       has_header {
         key: ":path"
-        value: "/api/data?page=1&limit=10&country=DE"
+        # Go's url.Encode() sorts query params alphabetically
+        value: "/api/data?country=DE&limit=10&page=1"
       }
       log { regex: ".*country: DE.*" }
     }
