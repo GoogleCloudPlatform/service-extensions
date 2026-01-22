@@ -6,7 +6,7 @@ test {
   response_headers {
     result { 
       no_header { key: "Set-Cookie" }
-      log { regex: ".+This current request is for the existing session ID: 999999999" }
+      log { regex: ".*This current request is for the existing session ID: 999999999" }
     }
   }
 }
@@ -18,7 +18,7 @@ test {
   response_headers {
     result { 
       headers { regex: "Set-Cookie: my_cookie=\\d+; Path=/; HttpOnly" }
-      log { regex: ".+New session ID created for the current request: \\d+" }
+      log { regex: ".*New session ID created for the current request: \\d+" }
     }
   }
 }
