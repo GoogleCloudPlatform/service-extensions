@@ -1,0 +1,135 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+name: Callouts test C++ SDK
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - 'callouts/cpp/**'
+  pull_request:
+    branches: ["main"]
+    paths:
+      - 'callouts/cpp/**'
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: bazel test (${{ matrix.name }})
+    runs-on: ubuntu-22.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: 'opt'
+            flags: '--config=clang -c opt --define=crypto=system'
+          - name: 'ASan'
+            flags: '--config=clang-asan'
+          - name: 'TSan'
+            flags: '--config=clang-tsan'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Bazel
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apt-transport-https curl gnupg
+          curl -fsSL https://bazel.build/bazel-release.pub.gpg \
+            | gpg --dearmor > bazel.gpg
+          sudo mv bazel.gpg /etc/apt/trusted.gpg.d/
+          echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt \
+            stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
+          sudo apt-get update
+          sudo apt-get install -y bazel
+
+      - name: set cache name
+        id: vars
+        working-directory: ./callouts/cpp
+        run: |
+          echo "CACHE_TAG=bazel-cache-${{ matrix.name }}-${{
+            hashFiles('WORKSPACE', '.bazelrc', '.bazelversion')
+          }}" >> "$GITHUB_OUTPUT"
+
+      - name: bazel cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/bazel/cache
+          key: ${{ steps.vars.outputs.CACHE_TAG }}-${{ github.sha }}
+          restore-keys: |
+            ${{ steps.vars.outputs.CACHE_TAG }}-${{ github.sha }}
+            ${{ steps.vars.outputs.CACHE_TAG }}-
+            bazel-cache-${{ matrix.name }}-
+            bazel-cache-
+
+      - name: bazel test
+        shell: bash
+        working-directory: ./callouts/cpp
+        run: >
+          bazel test
+          --verbose_failures
+          --test_output=errors
+          --disk_cache /tmp/bazel/cache
+          ${{ matrix.flags }}
+          -- //...
+
+      - name: Install Doxygen
+        run: sudo apt-get install -y doxygen graphviz
+
+      - name: Generate Documentation
+        working-directory: ./callouts/cpp
+        run: |
+          mkdir -p docs/_build
+          doxygen Doxyfile
+
+      - name: Prepare Docs Directory
+        run: |
+          mkdir -p docs/cpp/_build
+          cp -r callouts/cpp/docs/_build/html/* docs/cpp/_build/
+
+      - name: Deploy to GitHub Pages
+        if: >
+          ${{
+            github.event_name == 'push' &&
+            (github.ref == 'refs/heads/main')
+          }}
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          publish_branch: gh-pages
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs/cpp/_build
+          destination_dir: cpp/_build
+          force_orphan: false
+          keep_files: false
+
+      - name: remove unaccessed files from cache
+        shell: bash
+        run: >
+          find /tmp/bazel/cache
+          -type f
+          -name '*'
+          -amin +300
+          -exec rm {} \;
+
+      - name: save bazel cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /tmp/bazel/cache
+          key: ${{ steps.vars.outputs.CACHE_TAG }}-${{ github.sha }}
