@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,7 +34,6 @@ class CookieManagerRootContext : public RootContext {
     // Handle empty configuration
     if (config_size == 0) {
       LOG_WARN("Empty configuration provided, no cookies will be managed");
-      cookie_configs_.clear();
       return true;  // Empty config is valid, just does nothing
     }
     
@@ -46,10 +45,9 @@ class CookieManagerRootContext : public RootContext {
     }
     
     CookieManagerConfig config;
-    std::string config_string(configuration_data->view());
     
     // Attempt to parse the protobuf configuration
-    if (!google::protobuf::TextFormat::ParseFromString(config_string, &config)) {
+    if (!google::protobuf::TextFormat::ParseFromString(configuration_data->toString(), &config)) {
       LOG_ERROR("Failed to parse cookie manager configuration as text protobuf. "
                 "Please ensure configuration follows the text protobuf format. "
                 "Example: cookies { name: \"session\" value: \"abc\" }");
@@ -59,12 +57,9 @@ class CookieManagerRootContext : public RootContext {
     // Validate parsed configuration
     if (config.cookies_size() == 0) {
       LOG_WARN("Configuration parsed successfully but contains no cookie definitions");
-      cookie_configs_.clear();
       return true;
     }
     
-    // Store the parsed cookie configurations with validation
-    cookie_configs_.clear();
     int valid_cookies = 0;
     
     for (const auto& cookie_config : config.cookies()) {
@@ -84,9 +79,11 @@ class CookieManagerRootContext : public RootContext {
       cookie_configs_.push_back(cookie_config);
       valid_cookies++;
       
-      // Log configuration for debugging
-      LOG_DEBUG("Configured cookie: name=" + cookie_config.name() + 
-                ", operation=" + std::to_string(static_cast<int>(cookie_config.operation())));
+     // Log configuration for debugging
+      LOG_DEBUG(absl::StrCat(
+        "Configure cookie name=", cookie_config.name(),
+        ", operation=", static_cast<int>(cookie_config.operation())
+      ));
     }
     
     if (valid_cookies == 0) {
@@ -94,8 +91,9 @@ class CookieManagerRootContext : public RootContext {
       return false;
     }
     
-    LOG_INFO("Successfully loaded " + std::to_string(valid_cookies) + 
-             " cookie configuration(s)");
+    LOG_INFO(absl::StrCat(
+      "Successfully loaded ", valid_cookies, " cookie configuration(s)"
+    ));         
     return true;
   }
 
