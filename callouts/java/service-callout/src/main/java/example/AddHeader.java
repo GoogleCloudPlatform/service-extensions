@@ -111,7 +111,7 @@ public class AddHeader extends ServiceCallout {
      * <pre>{@code
      * ServiceCallout.Builder builder = new ServiceCallout.Builder()
      *     .setIp("111.222.333.444")       // Customize IP
-     *     .setPort(8443)                  // Set the port for secure communication
+     *     .setSecurePort(8443)            // Set the port for secure communication
      *     .setEnablePlainTextPort(true)   // Enable an plaintext communication port
      *     .setServerThreadCount(4);       // Set the number of server threads
      * }</pre>
