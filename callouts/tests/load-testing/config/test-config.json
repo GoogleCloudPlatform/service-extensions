@@ -1,0 +1,150 @@
+{
+  "test_modes": {
+    "quick": {
+      "duration": "10s",
+      "vus": 10,
+      "warmup": "0s",
+      "description": "Quick smoke test"
+    },
+    "standard": {
+      "duration": "30s",
+      "vus": 50,
+      "warmup": "5s",
+      "description": "Standard load test with warmup"
+    },
+    "stress": {
+      "duration": "60s",
+      "vus": 100,
+      "warmup": "10s",
+      "description": "Stress test with warmup"
+    },
+    "full": {
+      "duration": "120s",
+      "vus": 200,
+      "warmup": "15s",
+      "description": "Full comprehensive test with warmup"
+    },
+    "soak": {
+      "duration": "300s",
+      "vus": 50,
+      "warmup": "30s",
+      "description": "Long-running soak test"
+    }
+  },
+  "service_types": {
+    "python_basic": {
+      "image": "us-docker.pkg.dev/service-extensions-samples/callouts/python-example-basic:main",
+      "description": "Basic python example of service extensions",
+      "port": 8080,
+      "container_port": 8080,
+      "health_check_port": 80,
+      "health_check_container_port": 80,
+      "command": [],
+      "resources": {
+        "cpu_limit": "2.0",
+        "memory_limit": "1g",
+        "cpu_reservation": "1.0",
+        "memory_reservation": "512m"
+      },
+      "request_data": {
+        "type": "request_headers",
+        "headers": {
+          "headers": [
+            {"key": ":path", "value": "/"},
+            {"key": "some-header", "value": "some-value"}
+          ]
+        },
+        "end_of_stream": true
+      }
+    },
+    "python_jwt_auth": {
+      "image": "us-docker.pkg.dev/service-extensions-samples/callouts/python-example-jwt-auth:main",
+      "description": "Service that validates JWT authentication",
+      "port": 8080,
+      "container_port": 8080,
+      "health_check_port": 80,
+      "health_check_container_port": 80,
+      "command": [],
+      "resources": {
+        "cpu_limit": "2.0",
+        "memory_limit": "1g",
+        "cpu_reservation": "1.0",
+        "memory_reservation": "512m"
+      },
+      "request_data": {
+        "type": "request_headers",
+        "headers": {
+          "headers": [
+            {"key": ":path", "value": "/"},
+            {"key": "authorization", "raw_value": "QmVhcmVyIGV5SmhiR2NpT2lKU1V6STFOaUlzSW5SNWNDSTZJa3BYVkNKOS5leUp6ZFdJaU9pSXhNak0wTlRZM09Ea3dJaXdpYm1GdFpTSTZJa3B2YUc0Z1JHOWxJaXdpWVdSdGFXNGlPblJ5ZFdVc0ltbGhkQ0k2TVRVeE5qSXpPVEF5TlgwLkt0Y0c5Sk9PRFNaYTB2SnlHdkdKNTNvbnRMd3Y4UXBLT0RyVFdja095WEtzOE80ZGxDSkJad2ZrTzNmVy15cGozOWlpR0xQZ3g1b3h0dUV1M0VSaXdZaXpqYjRiRjRrQkRPU0UtaU1SbkJrWndKY25ybi1qc0F3NTE1QWV4Y05DMVIya1hTZmR6OXpKMThCVHBFWDgtUk1VZF9MVHNJdS1HVGZVeU9USWIxSjlEVVhkMTBwanBhNGNpVjJVY2hBMUI5Tjh2OU9WejZqZzltWUtSTWxkVEFJS2xPbXFQcFFQYVBwOEp1RjdjZFFKZFBhWjVUeTM4WU5ac2xVSUUtOVd1c09nc1lMNmFMODJJR0l4c09QLXFHdWF6QTd3RllnYmk1V0J0X2hrTDVPdzJ4MmxBdUs4UVVybmdEQWNPWHMtRzBmeEhXT081amgtelhvQlBpYVMyZw=="}
+          ]
+        },
+        "end_of_stream": true
+      }
+    },
+    "go_basic": {
+      "image": "go-callout-example:local",
+      "description": "Basic Go example",
+      "port": 8080,
+      "container_port": 8080,
+      "health_check_port": 80,
+      "health_check_container_port": 80,
+      "command": [],
+      "env": {
+        "EXAMPLE_TYPE": "add_header"
+      },
+      "resources": {
+        "cpu_limit": "2.0",
+        "memory_limit": "1g",
+        "cpu_reservation": "1.0",
+        "memory_reservation": "512m"
+      },
+      "request_data": {
+        "type": "request_headers",
+        "headers": {
+          "headers": [
+            {"key": ":path", "value": "/"},
+            {"key": "some-header", "value": "some-value"}
+          ]
+        },
+        "end_of_stream": true
+      }
+    },
+    "java_basic": {
+      "image": "java-callout-example:local",
+      "description": "Basic Java example",
+      "port": 8080,
+      "container_port": 8080,
+      "health_check_port": 80,
+      "health_check_container_port": 80,
+      "command": [],
+      "resources": {
+        "cpu_limit": "2.0",
+        "memory_limit": "1g",
+        "cpu_reservation": "1.0",
+        "memory_reservation": "512m"
+      },
+      "request_data": {
+        "type": "request_headers",
+        "headers": {
+          "headers": [
+            {"key": ":path", "value": "/"},
+            {"key": "some-header", "value": "some-value"}
+          ]
+        },
+        "end_of_stream": true
+      }
+    }
+  },
+  "default_settings": {
+    "service_type": "python_basic",
+    "test_mode": "standard",
+    "scenario": "default",
+    "collect_metrics": true,
+    "wait_timeout": 60,
+    "results_dir": "./results",
+    "export_formats": ["json"],
+    "available_export_formats": ["json", "prometheus", "influxdb"]
+  }
+}
+

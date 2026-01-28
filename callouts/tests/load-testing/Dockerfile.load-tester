@@ -1,0 +1,39 @@
+FROM alpine:3.19
+
+USER root
+
+# ghz version for gRPC benchmarking
+ARG GHZ_VERSION=0.120.0
+
+# Install ghz (gRPC benchmarking tool) and dependencies
+# Downloads and verifies checksum from official release before extracting
+RUN apk add --no-cache \
+    curl \
+    jq \
+    bash \
+    docker-cli \
+    git \
+    procps \
+    htop \
+    bc \
+    && curl -sSL -o /tmp/ghz.tar.gz \
+       "https://github.com/bojand/ghz/releases/download/v${GHZ_VERSION}/ghz-linux-x86_64.tar.gz" \
+    && curl -sSL -o /tmp/ghz.sha256 \
+       "https://github.com/bojand/ghz/releases/download/v${GHZ_VERSION}/ghz-linux-x86_64.tar.gz.sha256" \
+    && cd /tmp \
+    && echo "$(cat ghz.sha256)  ghz.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/ghz.tar.gz -C /usr/local/bin ghz \
+    && rm /tmp/ghz.tar.gz /tmp/ghz.sha256
+
+WORKDIR /workspace
+
+COPY run-test.sh ./
+COPY lib/ ./lib/
+COPY config/test-config.json ./config/
+RUN chmod +x run-test.sh && chmod +x lib/*.sh
+
+COPY proto/ ./proto/
+
+RUN mkdir -p results
+
+CMD ["./run-test.sh", "-h"]

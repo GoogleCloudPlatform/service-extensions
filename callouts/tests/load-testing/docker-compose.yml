@@ -1,0 +1,36 @@
+services:
+  load-tester:
+    container_name: load-tester
+    build:
+      context: .
+      dockerfile: Dockerfile.load-tester
+    entrypoint: ["/bin/bash", "-c"]
+    volumes:
+      - ./:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./results:/workspace/results
+      - ./config:/workspace/config
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    command:
+      - |
+        echo "Load Testing Environment Ready"
+        echo
+        echo "Usage: ./run-test.sh -s <service> -m <mode> [OPTIONS]"
+        echo
+        echo "Examples:"
+        echo "  ./run-test.sh -s python_basic -m quick"
+        echo "  ./run-test.sh -s python_basic -m stress"
+        echo "  ./run-test.sh -l  # List available services"
+        echo "  ./run-test.sh -L  # List available test modes"
+        echo
+        exec /bin/bash
+    networks:
+      - load-test-network
+
+networks:
+  load-test-network:
+    driver: bridge
+    labels:
+      com.service-extensions.load-testing: "true"
