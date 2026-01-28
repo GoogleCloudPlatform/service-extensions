@@ -1,0 +1,139 @@
+test {
+  name: "NoAdInsertionForNonHtml"
+  response_headers {
+    input { 
+      header { key: "Content-Type" value: "application/json" }
+    }
+    result { 
+      has_header { key: "Content-Type" value: "application/json" }
+    }
+  }
+}
+
+test {
+  name: "NoAdInsertionForAdRequest"
+  request_headers {
+    input { 
+      header { key: ":path" value: "/ads/gam-loader.js" }
+    }
+  }
+  response_headers {
+    input { 
+      header { key: "Content-Type" value: "text/html" }
+    }
+    result { 
+      has_header { key: "Content-Type" value: "text/html" }
+    }
+  }
+  response_body {
+    input { content: "<html><body>Content</body></html>" }
+    result { body { exact: "<html><body>Content</body></html>" } }
+  }
+}
+
+test {
+  name: "AdInsertionInHeader"
+  response_headers {
+    input { 
+      header { key: "Content-Type" value: "text/html" }
+    }
+    result { 
+      has_header { key: "Content-Type" value: "text/html" }
+      no_header { key: "Content-Length" }
+    }
+  }
+  response_body {
+    input { content: "<html><body>Content</body></html>" }
+    result { body { 
+      regex: "[\\s\\S]*<div id=\"ad-container-header\"[\\s\\S]*googletag\\.defineSlot[\\s\\S]*/1234/header_ad[\\s\\S]*\\[728x90\\][\\s\\S]*</div>[\\s\\S]*" 
+    } }
+  }
+}
+
+test {
+  name: "AdInsertionInContent"
+  response_headers {
+    input { 
+      header { key: "Content-Type" value: "text/html" }
+    }
+    result { 
+      has_header { key: "Content-Type" value: "text/html" }
+      no_header { key: "Content-Length" }
+    }
+  }
+  response_body {
+    input { content: "<html><body><article>Content</article></body></html>" }
+    result { body { 
+      regex: "[\\s\\S]*<div id=\"ad-container-header\"[\\s\\S]*/1234/header_ad[\\s\\S]*<div id=\"ad-container-content\"[\\s\\S]*/1234/content_ad[\\s\\S]*\\[300x250\\][\\s\\S]*Content[\\s\\S]*<div id=\"ad-container-sidebar\"[\\s\\S]*/1234/sidebar_ad[\\s\\S]*\\[160x600\\][\\s\\S]*" 
+    } }
+  }
+}
+
+test {
+  name: "NoAdInsertionWhenMarkersMissing"
+  response_headers {
+    input { 
+      header { key: "Content-Type" value: "text/html" }
+    }
+    result { 
+      has_header { key: "Content-Type" value: "text/html" }
+      no_header { key: "Content-Length" }
+    }
+  }
+  response_body {
+    input { content: "<html><div>No body or article tags</div></html>" }
+    result { body { exact: "<html><div>No body or article tags</div></html>" } }
+  }
+}
+
+test {
+  name: "ContentLengthRemoved"
+  response_headers {
+    input { 
+      header { key: "Content-Type" value: "text/html" }
+      header { key: "Content-Length" value: "100" }
+    }
+    result { 
+      has_header { key: "Content-Type" value: "text/html" }
+      no_header { key: "Content-Length" }
+    }
+  }
+}
+
+test {
+  name: "GptLibraryInjection"
+  response_headers {
+    input { 
+      header { key: "Content-Type" value: "text/html" }
+    }
+    result { 
+      has_header { key: "Content-Type" value: "text/html" }
+      no_header { key: "Content-Length" }
+    }
+  }
+  response_body {
+    input { content: "<html><head></head><body>Content</body></html>" }
+    result { body { 
+      regex: "[\\s\\S]*<script async src=\"https://securepubads\\.g\\.doubleclick\\.net/tag/js/gpt\\.js\"></script>[\\s\\S]*" 
+    } }
+  }
+}
+
+test {
+  name: "GptLibraryFallbackToBody"
+  response_headers {
+    input { 
+      header { key: "Content-Type" value: "text/html" }
+    }
+    result { 
+      has_header { key: "Content-Type" value: "text/html" }
+      no_header { key: "Content-Length" }
+    }
+  }
+  response_body {
+    input { content: "<html><body>Content</body></html>" }
+    result { body { 
+      regex: "[\\s\\S]*<script async src=\"https://securepubads\\.g\\.doubleclick\\.net/tag/js/gpt\\.js\"></script>[\\s\\S]*<body>[\\s\\S]*" 
+    } }
+  }
+}
