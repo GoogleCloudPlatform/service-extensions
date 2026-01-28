@@ -15,7 +15,7 @@
 // [START serviceextensions_plugin_country_query]
 #include <string>
 #include <string_view>
-
+#include "absl/strings/str_cat.h"
 #include "boost/url/parse.hpp"
 #include "boost/url/url.hpp"
 #include "proxy_wasm_intrinsics.h"
@@ -37,7 +37,7 @@ class MyHttpContext : public Context {
       }
     }
 
-    LOG_INFO("country: " + std::string(country_value));
+    LOG_INFO(absl::StrCat("country: ", country_value));
 
     WasmDataPtr path = getRequestHeader(":path");
     if (path) {
