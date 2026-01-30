@@ -197,6 +197,30 @@ public static void main(String[] args) throws Exception {
 
 > For production environments, it is strongly recommended to enable TLS to ensure secure communication.
 
+### gRPC/Netty Performance Tuning
+
+The server includes configurable gRPC and Netty settings for performance tuning. These can be adjusted via the Builder:
+
+```java
+Example server = new Example.Builder()
+        .setMaxConcurrentCallsPerConnection(500)    // Max concurrent calls per connection
+        .setFlowControlWindow(2 * 1024 * 1024)      // Flow control window size (bytes)
+        .setMaxInboundMessageSize(8 * 1024 * 1024)  // Max inbound message size (bytes)
+        .setPermitKeepAliveTimeSeconds(120L)        // Min time between client pings (seconds)
+        .setPermitKeepAliveWithoutCalls(false)      // Allow pings without active calls
+        .build();
+```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `maxConcurrentCallsPerConnection` | 1000 | Maximum concurrent calls per gRPC connection |
+| `flowControlWindow` | 1MB | Flow control window size for backpressure |
+| `maxInboundMessageSize` | 4MB | Maximum size for incoming messages |
+| `permitKeepAliveTimeSeconds` | 60 | Minimum seconds between client keepalive pings |
+| `permitKeepAliveWithoutCalls` | false | Whether to allow pings when no calls are active |
+
+> Note: The default `permitKeepAliveTimeSeconds` of 60 seconds and `permitKeepAliveWithoutCalls` of false are conservative settings to prevent ping-flood DoS attacks. Adjust these carefully based on your network environment.
+
 ## Documentation
 
 Javadoc is a tool provided by Java for generating API documentation in HTML format from Java source code. 

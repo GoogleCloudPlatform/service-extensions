@@ -129,6 +129,14 @@
             <artifactId>bcpkix-jdk15on</artifactId>
             <version>1.70</version>
         </dependency>
+        <!-- Amazon Corretto Crypto Provider (ACCP) for native OpenSSL acceleration -->
+        <!-- Provides 2-3x faster RSA operations (Docker/Linux only) -->
+        <dependency>
+            <groupId>software.amazon.cryptools</groupId>
+            <artifactId>AmazonCorrettoCryptoProvider</artifactId>
+            <version>2.4.1</version>
+            <classifier>linux-x86_64</classifier>
+        </dependency>
         <!-- JUnit 5 -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -231,92 +239,5 @@
             </plugin>
         </plugins>
     </build>
-
-    <!--
-        Amazon Corretto Crypto Provider (ACCP) profiles for native OpenSSL acceleration.
-        Provides 2-3x faster RSA operations using native code.
-
-        Profiles auto-activate based on OS and architecture:
-        - Linux x86_64 and ARM64
-        - macOS x86_64 (Intel) and ARM64 (Apple Silicon)
-        - Windows: No ACCP available; falls back gracefully to default Java crypto
-    -->
-    <profiles>
-        <!-- Linux x86_64 -->
-        <profile>
-            <id>accp-linux-x86_64</id>
-            <activation>
-                <os>
-                    <name>linux</name>
-                    <arch>amd64</arch>
-                </os>
-            </activation>
-            <dependencies>
-                <dependency>
-                    <groupId>software.amazon.cryptools</groupId>
-                    <artifactId>AmazonCorrettoCryptoProvider</artifactId>
-                    <version>2.4.1</version>
-                    <classifier>linux-x86_64</classifier>
-                </dependency>
-            </dependencies>
-        </profile>
-
-        <!-- Linux ARM64 -->
-        <profile>
-            <id>accp-linux-aarch64</id>
-            <activation>
-                <os>
-                    <name>linux</name>
-                    <arch>aarch64</arch>
-                </os>
-            </activation>
-            <dependencies>
-                <dependency>
-                    <groupId>software.amazon.cryptools</groupId>
-                    <artifactId>AmazonCorrettoCryptoProvider</artifactId>
-                    <version>2.4.1</version>
-                    <classifier>linux-aarch_64</classifier>
-                </dependency>
-            </dependencies>
-        </profile>
-
-        <!-- macOS x86_64 (Intel) -->
-        <profile>
-            <id>accp-osx-x86_64</id>
-            <activation>
-                <os>
-                    <name>mac os x</name>
-                    <arch>x86_64</arch>
-                </os>
-            </activation>
-            <dependencies>
-                <dependency>
-                    <groupId>software.amazon.cryptools</groupId>
-                    <artifactId>AmazonCorrettoCryptoProvider</artifactId>
-                    <version>2.4.1</version>
-                    <classifier>osx-x86_64</classifier>
-                </dependency>
-            </dependencies>
-        </profile>
-
-        <!-- macOS ARM64 (Apple Silicon) -->
-        <profile>
-            <id>accp-osx-aarch64</id>
-            <activation>
-                <os>
-                    <name>mac os x</name>
-                    <arch>aarch64</arch>
-                </os>
-            </activation>
-            <dependencies>
-                <dependency>
-                    <groupId>software.amazon.cryptools</groupId>
-                    <artifactId>AmazonCorrettoCryptoProvider</artifactId>
-                    <version>2.4.1</version>
-                    <classifier>osx-aarch_64</classifier>
-                </dependency>
-            </dependencies>
-        </profile>
-    </profiles>
 
 </project>
