@@ -65,7 +65,6 @@ public class ServiceCallout {
     private String certPath;
     private byte[] certKey;
     private String certKeyPath;
-    private int serverThreadCount;
     private boolean enablePlainTextPort;
     private boolean enableTls;
 
@@ -88,8 +87,6 @@ public class ServiceCallout {
         this.certKey = Optional.ofNullable(builder.certKey)
                 .orElseGet(() -> readFileToBytes(this.certKeyPath)); // Read using final path
 
-        this.serverThreadCount = Optional.ofNullable(builder.serverThreadCount)
-                .orElse(Runtime.getRuntime().availableProcessors() * 2);
         this.enablePlainTextPort = Optional.ofNullable(builder.enablePlainTextPort).orElse(true);
         this.enableTls = Optional.ofNullable(builder.enableTls).orElse(false);
 
@@ -117,7 +114,6 @@ public class ServiceCallout {
         private String certPath;
         private byte[] certKey;
         private String certKeyPath;
-        private Integer serverThreadCount;
         private Boolean enablePlainTextPort;
         private Boolean enableTls;
 
@@ -173,11 +169,6 @@ public class ServiceCallout {
 
         public T setCertKeyPath(String certKeyPath) {
             this.certKeyPath = certKeyPath;
-            return self();
-        }
-
-        public T setServerThreadCount(Integer serverThreadCount) {
-            this.serverThreadCount = serverThreadCount;
             return self();
         }
 
