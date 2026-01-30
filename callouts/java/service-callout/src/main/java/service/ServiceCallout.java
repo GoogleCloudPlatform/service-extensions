@@ -24,6 +24,7 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
 import io.grpc.netty.NettyServerBuilder;
+import io.netty.channel.ChannelOption;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -87,7 +88,8 @@ public class ServiceCallout {
         this.certKey = Optional.ofNullable(builder.certKey)
                 .orElseGet(() -> readFileToBytes(this.certKeyPath)); // Read using final path
 
-        this.serverThreadCount = Optional.ofNullable(builder.serverThreadCount).orElse(2);
+        this.serverThreadCount = Optional.ofNullable(builder.serverThreadCount)
+                .orElse(Runtime.getRuntime().availableProcessors() * 2);
         this.enablePlainTextPort = Optional.ofNullable(builder.enablePlainTextPort).orElse(true);
         this.enableTls = Optional.ofNullable(builder.enableTls).orElse(false);
 
@@ -226,19 +228,32 @@ public class ServiceCallout {
             server = NettyServerBuilder.forPort(securePort)
                     .sslContext(createSslContext(cert, certKey))
                     .addService(processor)
-                    .executor(Executors.newFixedThreadPool(serverThreadCount)) // Configurable thread pool
+                    .executor(Executors.newVirtualThreadPerTaskExecutor())
+                    .maxConcurrentCallsPerConnection(1000)
+                    .flowControlWindow(1024 * 1024) // 1MB flow control window
+                    .maxInboundMessageSize(4 * 1024 * 1024) // 4MB max message
+                    .permitKeepAliveTime(10, TimeUnit.SECONDS)
+                    .permitKeepAliveWithoutCalls(true)
+                    .withChildOption(ChannelOption.SO_KEEPALIVE, true)
+                    .withChildOption(ChannelOption.TCP_NODELAY, true)
                     .build()
                     .start();
 
             logger.info("Secure Server started, listening on " + securePort);
-
         }
         if (enablePlainTextPort) {
             logger.info("Plaintext server starting...");
 
-            plaintextServer = ServerBuilder.forPort(plaintextPort)
+            plaintextServer = NettyServerBuilder.forPort(plaintextPort)
                     .addService(processor)
-                    .executor(Executors.newFixedThreadPool(serverThreadCount)) // Configurable thread pool
+                    .executor(Executors.newVirtualThreadPerTaskExecutor())
+                    .maxConcurrentCallsPerConnection(1000)
+                    .flowControlWindow(1024 * 1024) // 1MB flow control window
+                    .maxInboundMessageSize(4 * 1024 * 1024) // 4MB max message
+                    .permitKeepAliveTime(10, TimeUnit.SECONDS)
+                    .permitKeepAliveWithoutCalls(true)
+                    .withChildOption(ChannelOption.SO_KEEPALIVE, true)
+                    .withChildOption(ChannelOption.TCP_NODELAY, true)
                     .build()
                     .start();
 
