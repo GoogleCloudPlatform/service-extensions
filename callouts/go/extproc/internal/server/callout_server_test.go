@@ -15,6 +15,7 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -32,27 +33,49 @@ type MockExternalProcessorServer struct {
 	mock.Mock
 }
 
-// DefaultConfig returns a default server configuration.
-func DefaultConfig() Config {
+// NewCalloutServerTestConfig returns a configuration for TestNewCalloutServer.
+func NewCalloutServerTestConfig() Config {
 	return Config{
-		Address:            "0.0.0.0:8443",
-		InsecureAddress:    "0.0.0.0:8181",
-		HealthCheckAddress: "0.0.0.0:8000",
-		CertFile:           "../../ssl_creds/localhost.crt",
-		KeyFile:            "../../ssl_creds/localhost.key",
+		InsecureAddress:      "0.0.0.0:18181",
+		HealthCheckAddress:   "0.0.0.0:18000",
+		EnableInsecureServer: true,
+		EnableTLS:            false,
 	}
 }
 
-// InsecureConfig returns a configuration with only the insecure address set.
-func InsecureConfig() Config {
-	config := DefaultConfig()
-	config.Address = ""
-	return config
+// StartGRPCTestConfig returns a configuration for TestStartGRPC.
+func StartGRPCTestConfig() Config {
+	return Config{
+		SecureAddress:      "0.0.0.0:18443",
+		InsecureAddress:    "0.0.0.0:18182",
+		HealthCheckAddress: "0.0.0.0:18001",
+		CertFile:           "../../ssl_creds/localhost.crt",
+		KeyFile:            "../../ssl_creds/localhost.key",
+		EnableTLS:          true,
+	}
 }
 
-// TestNewCalloutServer tests the creation of a new callout server with the default configuration.
+// StartInsecureGRPCTestConfig returns a configuration for TestStartInsecureGRPC.
+func StartInsecureGRPCTestConfig() Config {
+	return Config{
+		InsecureAddress:      "0.0.0.0:18183",
+		HealthCheckAddress:   "0.0.0.0:18002",
+		EnableInsecureServer: true,
+	}
+}
+
+// StartHealthCheckTestConfig returns a configuration for TestStartHealthCheck.
+func StartHealthCheckTestConfig() Config {
+	return Config{
+		InsecureAddress:      "0.0.0.0:18184",
+		HealthCheckAddress:   "0.0.0.0:18003",
+		EnableInsecureServer: true,
+	}
+}
+
+// TestNewCalloutServer tests the creation of a new callout server with a basic configuration.
 func TestNewCalloutServer(t *testing.T) {
-	config := DefaultConfig()
+	config := NewCalloutServerTestConfig()
 
 	calloutServer := NewCalloutServer(config)
 	if calloutServer == nil {
@@ -65,7 +88,12 @@ func TestNewCalloutServer(t *testing.T) {
 
 // TestStartGRPC tests the start of the gRPC server with TLS.
 func TestStartGRPC(t *testing.T) {
-	config := DefaultConfig()
+	config := StartGRPCTestConfig()
+
+	// Skip this test if TLS certificates are not available
+	if config.CertFile == "" || config.KeyFile == "" {
+		t.Skip("Skipping TLS test: certificates not configured")
+	}
 
 	calloutServer := NewCalloutServer(config)
 	mockService := &MockExternalProcessorServer{}
@@ -81,7 +109,7 @@ func TestStartGRPC(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	conn, err := grpc.Dial(config.Address, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(nil, "")))
+	conn, err := grpc.Dial(config.SecureAddress, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(nil, "")))
 	if err != nil {
 		t.Fatalf("Failed to dial: %v", err)
 	}
@@ -95,7 +123,7 @@ func TestStartGRPC(t *testing.T) {
 
 // TestStartInsecureGRPC tests the start of the insecure gRPC server.
 func TestStartInsecureGRPC(t *testing.T) {
-	config := InsecureConfig()
+	config := StartInsecureGRPCTestConfig()
 
 	calloutServer := NewCalloutServer(config)
 	mockService := &MockExternalProcessorServer{}
@@ -125,7 +153,7 @@ func TestStartInsecureGRPC(t *testing.T) {
 
 // TestStartHealthCheck tests the start of the health check server.
 func TestStartHealthCheck(t *testing.T) {
-	config := DefaultConfig()
+	config := StartHealthCheckTestConfig()
 
 	calloutServer := NewCalloutServer(config)
 
@@ -133,7 +161,7 @@ func TestStartHealthCheck(t *testing.T) {
 
 	time.Sleep(time.Second)
 
-	resp, err := http.Get("http://0.0.0.0:8000")
+	resp, err := http.Get(fmt.Sprintf("http://%s", config.HealthCheckAddress))
 	if err != nil {
 		t.Fatalf("Failed to get health check: %v", err)
 	}
