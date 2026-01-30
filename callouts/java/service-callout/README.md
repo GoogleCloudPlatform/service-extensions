@@ -4,11 +4,11 @@
 
 ### Install Java
 
-Before you can build this project, you need to have Java 17 installed. Here are some resources to guide you through the installation process:
+Before you can build this project, you need to have Java 21 installed. Here are some resources to guide you through the installation process:
 
-- [Install Java on Windows](https://docs.oracle.com/en/java/javase/17/install/installation-jdk-microsoft-windows-platforms.html)
-- [Install Java on macOS](https://docs.oracle.com/en/java/javase/17/install/installation-jdk-macos.html)
-- [Install Java on Linux](https://docs.oracle.com/en/java/javase/17/install/installation-jdk-linux-platforms.html)
+- [Install Java on Windows](https://docs.oracle.com/en/java/javase/21/install/installation-jdk-microsoft-windows-platforms.html)
+- [Install Java on macOS](https://docs.oracle.com/en/java/javase/21/install/installation-jdk-macos.html)
+- [Install Java on Linux](https://docs.oracle.com/en/java/javase/21/install/installation-jdk-linux-platforms.html)
 
 ### Set JAVA_HOME
 
@@ -17,7 +17,7 @@ After installing Java, you need to set the `JAVA_HOME` environment variable to p
 - **Windows**
     1. Open the Start Search, type in "env", and select "Edit the system environment variables".
     2. In the System Properties window, click on the "Environment Variables" button.
-    3. Under System Variables, click "New" and enter `JAVA_HOME` as the variable name and the path to your JDK installation as the variable value (e.g., `C:\Program Files\Java\jdk-17`).
+    3. Under System Variables, click "New" and enter `JAVA_HOME` as the variable name and the path to your JDK installation as the variable value (e.g., `C:\Program Files\Java\jdk-21`).
     4. Click OK and apply the changes.
 
 - **macOS**
@@ -25,7 +25,7 @@ After installing Java, you need to set the `JAVA_HOME` environment variable to p
     2. Open or create the file `~/.bash_profile` or `~/.zshrc` (depending on your shell).
     3. Add the following line to the file:
        ```sh
-       export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+       export JAVA_HOME=$(/usr/libexec/java_home -v 21)
        ```
     4. Save the file and run `source ~/.bash_profile` or `source ~/.zshrc`.
 
@@ -34,7 +34,7 @@ After installing Java, you need to set the `JAVA_HOME` environment variable to p
     2. Open or create the file `~/.bashrc` or `~/.profile`.
     3. Add the following line to the file:
        ```sh
-       export JAVA_HOME=/path/to/your/jdk-17
+       export JAVA_HOME=/path/to/your/jdk-21
        export PATH=$JAVA_HOME/bin:$PATH
        ```
     4. Save the file and run `source ~/.bashrc` or `source ~/.profile`.

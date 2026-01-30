@@ -13,7 +13,8 @@
 # limitations under the License.
 
 # Stage 1: Build the Java application using Maven
-FROM maven:3.8.5-openjdk-17 AS builder
+# Using Amazon Corretto 21 for optimal ACCP compatibility and virtual threads
+FROM maven:3.9-amazoncorretto-21 AS builder
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -28,15 +29,8 @@ COPY src ./src
 # Build the application
 RUN mvn clean package -DskipTests
 
-# Stage 2: Create the runtime image
-FROM marketplace.gcr.io/google/debian12
-
-# Install necessary dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        openjdk-17-jre-headless \
-        ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+# Stage 2: Create the runtime image using Amazon Corretto for optimal ACCP compatibility
+FROM amazoncorretto:21
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -53,8 +47,11 @@ EXPOSE 80 443 8080
 # Environment variable for JVM options (optional)
 ENV JAVA_OPTS=""
 
-# Create a non-root user for running the application
-RUN groupadd -r appgroup && useradd -r -g appgroup appuser
+# Install shadow-utils for user management and create a non-root user
+RUN yum install -y shadow-utils && \
+    yum clean all && \
+    groupadd -r appgroup && \
+    useradd -r -g appgroup appuser
 
 # Change ownership and switch to the non-root user
 RUN chown -R appuser:appgroup /app
