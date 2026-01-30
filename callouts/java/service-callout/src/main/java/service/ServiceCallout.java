@@ -264,6 +264,9 @@ public class ServiceCallout {
         ExternalProcessorImpl processor = new ExternalProcessorImpl();
 
         // Create shared executor for virtual threads (managed lifecycle)
+        if (grpcExecutor != null) {
+            throw new IllegalStateException("Server already started");
+        }
         grpcExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
         if (enableTls && cert != null && certKey != null) {
