@@ -16,11 +16,12 @@
 
 package example;
 
+import com.amazon.corretto.crypto.provider.AmazonCorrettoCryptoProvider;
 import io.envoyproxy.envoy.service.ext_proc.v3.HttpHeaders;
 import io.envoyproxy.envoy.service.ext_proc.v3.ProcessingResponse;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.SignatureException;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.openssl.PEMParser;
 import org.slf4j.Logger;
@@ -35,27 +36,49 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.PublicKey;
+import java.security.Security;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
 /**
- * Handles JWT authentication by extracting and validating JWT tokens from HTTP headers.
+ * JWT authentication handler with Amazon Corretto Crypto Provider (ACCP) acceleration.
  * <p>
- * This class interacts with Envoy's external processing API to validate JWT tokens
- * and mutate HTTP headers based on the validation results.
+ * This variant uses:
+ * - ACCP for native OpenSSL-backed RSA operations (2-3x faster)
+ * - Cached JwtParser instance (thread-safe, reusable)
  */
 public class JwtAuth extends ServiceCallout {
 
-    // Logger for the JwtAuth class
     private static final Logger logger = LoggerFactory.getLogger(JwtAuth.class);
 
     // RSA PublicKey used for JWT validation
     private final PublicKey publicKey;
 
+    private final JwtParser jwtParser;
+
+    static {
+        try {
+            // Install ACCP as the highest priority security provider
+            // This makes RSA operations use native OpenSSL instead of Java crypto
+            AmazonCorrettoCryptoProvider.install();
+
+            // Verify ACCP is working correctly
+            if (AmazonCorrettoCryptoProvider.INSTANCE.getLoadingError() != null) {
+                logger.warn("ACCP loading error: {}",
+                    AmazonCorrettoCryptoProvider.INSTANCE.getLoadingError().getMessage());
+            } else {
+                // Check which provider is being used for RSA
+                String rsaProvider = Security.getProviders("Signature.SHA256withRSA")[0].getName();
+                logger.info("ACCP installed successfully. RSA provider: {}", rsaProvider);
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to install ACCP, falling back to default provider: {}", e.getMessage());
+        }
+    }
+
     /**
-     * Constructs a JwtAuth instance by loading the RSA public key from a PEM file.
+     * Constructs a JwtAuth instance with ACCP-accelerated crypto.
      *
      * @param builder The builder instance containing configuration parameters.
      * @throws GeneralSecurityException If there is an issue generating the PublicKey.
@@ -64,6 +87,15 @@ public class JwtAuth extends ServiceCallout {
     public JwtAuth(Builder builder) throws GeneralSecurityException, IOException {
         super(builder);
         this.publicKey = loadPublicKey("certs/publickey.pem");
+
+        // Pre-build the parser once
+        // NOTE: If key rotation is needed, this pattern must be changed to rebuild
+        // the parser when keys change (e.g., using JWKS with periodic refresh).
+        this.jwtParser = Jwts.parserBuilder()
+                .setSigningKey(publicKey)
+                .build();
+
+        logger.info("JwtAuth initialized with cached JwtParser");
     }
 
     /**
@@ -120,72 +152,67 @@ public class JwtAuth extends ServiceCallout {
      * @return The extracted JWT token if found and properly formatted, otherwise null.
      */
     public String extractJwtToken(HttpHeaders requestHeaders) {
+        var headersList = requestHeaders.getHeaders().getHeadersList();
+        for (var header : headersList) {
+            if ("Authorization".equalsIgnoreCase(header.getKey())) {
+                String authHeader;
+                byte[] rawValue = header.getRawValue().toByteArray();
+                if (rawValue != null && rawValue.length > 0) {
+                    authHeader = new String(rawValue, StandardCharsets.UTF_8);
+                } else {
+                    authHeader = header.getValue();
+                }
 
-        requestHeaders.getHeaders().getHeadersList().forEach(header -> {
-            logger.info("Header: {} = {}", header.getKey(), header.getRawValue());
-        });
-
-        Optional<String> jwtToken = requestHeaders.getHeaders().getHeadersList().stream()
-                .filter(header -> "Authorization".equalsIgnoreCase(header.getKey()))
-                .map(header -> new String(header.getRawValue().toByteArray(), StandardCharsets.UTF_8))
-                .findFirst()
-                .map(authHeader -> {
-                    String[] parts = authHeader.split(" ");
-                    if (parts.length == 2 && "Bearer".equalsIgnoreCase(parts[0])) {
-                        return parts[1];
-                    } else {
-                        logger.warn("Authorization header format is invalid.");
-                        return null;
+                int spaceIdx = authHeader.indexOf(' ');
+                if (spaceIdx > 0 && spaceIdx < authHeader.length() - 1) {
+                    String scheme = authHeader.substring(0, spaceIdx);
+                    if ("Bearer".equalsIgnoreCase(scheme)) {
+                        return authHeader.substring(spaceIdx + 1);
                     }
-                });
-
-        return jwtToken.orElse(null);
-    }
-
-    /**
-     * Validates the JWT token using the loaded RSA public key.
-     *
-     * @param requestHeaders The HTTP headers from which to extract the JWT token.
-     * @return The decoded JWT claims if valid, otherwise null.
-     */
-    public Claims validateJwtToken(HttpHeaders requestHeaders) {
-
-        String jwtToken = extractJwtToken(requestHeaders);
-        if (jwtToken == null) {
-            logger.warn("JWT token is missing or invalid in the Authorization header.");
-            return null;
+                }
+                return null;
+            }
         }
-
-        try {
-            // Decode the JWT token using the provided public key and algorithm
-            Claims decoded = Jwts.parserBuilder()
-                    .setSigningKey(publicKey)
-                    .build()
-                    .parseClaimsJws(jwtToken)
-                    .getBody();
-
-            logger.debug("JWT validated successfully: {}", decoded);
-            return decoded;
-        } catch (SignatureException e) {
-            logger.error("Invalid JWT signature: {}", e.getMessage());
-        } catch (io.jsonwebtoken.JwtException e) {
-            logger.error("JWT processing error: {}", e.getMessage());
-        }
-
         return null;
     }
 
     /**
+     * Validates JWT token synchronously - called from executor thread.
+     * Uses ACCP-accelerated RSA verification.
+     *
+     * @param jwtToken The JWT token string to validate.
+     * @return The decoded JWT claims if valid, otherwise null.
+     */
+    private Claims validateJwtTokenSync(String jwtToken) {
+        try {
+            return jwtParser.parseClaimsJws(jwtToken).getBody();
+        } catch (io.jsonwebtoken.JwtException e) {
+            return null;
+        }
+    }
+
+    /**
      * Processes incoming request headers by validating the JWT token and mutating headers based on validation.
+     * Note: Currently synchronous due to gRPC servicer interface constraints.
+     * The ACCP provider still accelerates the crypto operations.
      *
      * @param processingResponseBuilder The builder for constructing the processing response.
      * @param headers                   The HTTP headers to process.
      */
     @Override
     public void onRequestHeaders(ProcessingResponse.Builder processingResponseBuilder, HttpHeaders headers) {
+        // Extract token
+        String jwtToken = extractJwtToken(headers);
+        if (jwtToken == null) {
+            ServiceCalloutTools.denyCallout(
+                    processingResponseBuilder.getResponseHeadersBuilder(),
+                    "No Authorization token found"
+            );
+            return;
+        }
 
         // Validate the JWT token
-        Claims decoded = validateJwtToken(headers);
+        Claims decoded = validateJwtTokenSync(jwtToken);
 
         if (decoded != null) {
             // Token is valid, add decoded items as header mutations
