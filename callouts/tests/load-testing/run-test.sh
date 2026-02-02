@@ -7,6 +7,10 @@ set -e
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Proto directory (default: /opt/proto in Docker)
+PROTO_DIR="${PROTO_DIR:-/opt/proto}"
+[ -d "$PROTO_DIR" ] || PROTO_DIR="$PROTO_DIR"
+
 # ============================================================================
 # DEPENDENCY CHECKS
 # ============================================================================
@@ -14,13 +18,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Check for required dependencies
 check_dependencies() {
     local missing_deps=()
-    
+
     # Required tools
     command -v docker >/dev/null 2>&1 || missing_deps+=("docker")
     command -v jq >/dev/null 2>&1 || missing_deps+=("jq")
     command -v curl >/dev/null 2>&1 || missing_deps+=("curl")
     command -v bc >/dev/null 2>&1 || missing_deps+=("bc")
-    
+
     if [ ${#missing_deps[@]} -gt 0 ]; then
         echo "[ERROR] Missing required dependencies: ${missing_deps[*]}" >&2
         echo "[ERROR] Please install them before running this script." >&2
@@ -83,13 +87,13 @@ duration_to_seconds() {
     local value
     local unit
     local result
-    
+
     # If empty or zero, return 0
     if [ -z "$duration" ] || [ "$duration" = "0" ] || [ "$duration" = "0s" ]; then
         echo "0"
         return 0
     fi
-    
+
     # Strict format validation: must be <number>[unit] where unit is optional
     # Valid patterns: "30", "30s", "5m", "1h", "5.5m", "1.5h"
     # Also allow longer unit names: "min", "mins", "minute", "minutes", "sec", etc.
@@ -98,30 +102,30 @@ duration_to_seconds() {
         echo ""
         return 1
     fi
-    
+
     # Additional validation: unit must be at the end (no digits after letters)
     # This catches cases like "5m5" or "1h30m"
     if [[ "$duration" =~ [a-zA-Z][0-9] ]]; then
         echo ""
         return 1
     fi
-    
+
     # Extract numeric value (everything before letters) and unit (letters at end)
     value=$(echo "$duration" | sed 's/[a-zA-Z]*$//')
     unit=$(echo "$duration" | sed 's/^[0-9.]*//' | tr '[:upper:]' '[:lower:]')
-    
+
     # If no value found, return empty (error)
     if [ -z "$value" ]; then
         echo ""
         return 1
     fi
-    
+
     # Validate value is a valid number
     if ! [[ "$value" =~ ^[0-9]+\.?[0-9]*$ ]]; then
         echo ""
         return 1
     fi
-    
+
     # Convert based on unit
     case "$unit" in
         "h"|"hr"|"hrs"|"hour"|"hours")
@@ -139,13 +143,13 @@ duration_to_seconds() {
             return 1
             ;;
     esac
-    
+
     # Validate result is a positive integer
     if [ -z "$result" ] || ! [[ "$result" =~ ^[0-9]+$ ]]; then
         echo ""
         return 1
     fi
-    
+
     echo "$result"
     return 0
 }
@@ -156,15 +160,15 @@ validate_duration() {
     local duration="$1"
     local name="${2:-duration}"
     local seconds
-    
+
     seconds=$(duration_to_seconds "$duration")
-    
+
     if [ -z "$seconds" ]; then
         log_error "Invalid $name format: '$duration'"
         log_error "Supported formats: 30s (seconds), 5m (minutes), 1h (hours)"
         return 1
     fi
-    
+
     echo "$seconds"
     return 0
 }
@@ -420,11 +424,11 @@ run_warmup() {
     fi
 
     log_info "Running warmup phase (${warmup_duration})..."
-    
+
     # Run a short warmup with ghz (results discarded)
     ghz --insecure \
-        --proto "$SCRIPT_DIR/proto/envoy/service/ext_proc/v3/external_processor.proto" \
-        --import-paths "$SCRIPT_DIR/proto" \
+        --proto "$PROTO_DIR/envoy/service/ext_proc/v3/external_processor.proto" \
+        --import-paths "$PROTO_DIR" \
         --call "envoy.service.ext_proc.v3.ExternalProcessor/Process" \
         --data-file "$request_file" \
         --concurrency=5 \
@@ -485,7 +489,7 @@ run_load_test() {
 
     # Start service
     SERVICE_CONTAINER_ID=$(start_service_container "$service_type" "$scenario" "$service_config")
-    
+
     # Verify we got a valid container ID (64-char hex string)
     if [ -z "$SERVICE_CONTAINER_ID" ] || [ ${#SERVICE_CONTAINER_ID} -ne 64 ]; then
         # Fallback: get the container ID from docker ps using the name pattern
@@ -496,9 +500,9 @@ run_load_test() {
             exit 1
         fi
     fi
-    
+
     log_info "Service container ID: ${SERVICE_CONTAINER_ID:0:12}..."
-    
+
     if ! wait_for_healthy "$health_check_container_port" "$DEFAULT_WAIT_TIMEOUT"; then
         exit 1
     fi
@@ -517,19 +521,19 @@ run_load_test() {
     # validate_duration returns the seconds value or exits with error
     local duration_seconds
     local warmup_seconds
-    
+
     duration_seconds=$(validate_duration "$TEST_DURATION" "test duration")
     if [ $? -ne 0 ] || [ -z "$duration_seconds" ]; then
         log_error "Failed to parse test duration: '$TEST_DURATION'"
         exit 1
     fi
-    
+
     warmup_seconds=$(validate_duration "$WARMUP_DURATION" "warmup duration")
     if [ $? -ne 0 ] || [ -z "$warmup_seconds" ]; then
         log_error "Failed to parse warmup duration: '$WARMUP_DURATION'"
         exit 1
     fi
-    
+
     log_info "Test duration: ${duration_seconds}s, Warmup: ${warmup_seconds}s"
 
     # Start metrics collection
@@ -549,8 +553,8 @@ run_load_test() {
     local ghz_stderr_file="$RESULTS_DIR/${file_prefix}_ghz_stderr.log"
 
     ghz --insecure \
-        --proto "$SCRIPT_DIR/proto/envoy/service/ext_proc/v3/external_processor.proto" \
-        --import-paths "$SCRIPT_DIR/proto" \
+        --proto "$PROTO_DIR/envoy/service/ext_proc/v3/external_processor.proto" \
+        --import-paths "$PROTO_DIR" \
         --call "envoy.service.ext_proc.v3.ExternalProcessor/Process" \
         --data-file "$request_file" \
         --concurrency="$TEST_VUS" \
