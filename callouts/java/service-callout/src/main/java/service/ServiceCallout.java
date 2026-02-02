@@ -269,50 +269,55 @@ public class ServiceCallout {
         }
         grpcExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
-        if (enableTls && cert != null && certKey != null) {
-            logger.info("Secure server starting...");
+        try {
+            if (enableTls && cert != null && certKey != null) {
+                logger.info("Secure server starting...");
 
-            server = NettyServerBuilder.forPort(securePort)
-                    .sslContext(createSslContext(cert, certKey))
-                    .addService(processor)
-                    .executor(grpcExecutor)
-                    .maxConcurrentCallsPerConnection(maxConcurrentCallsPerConnection)
-                    .flowControlWindow(flowControlWindow)
-                    .maxInboundMessageSize(maxInboundMessageSize)
-                    .permitKeepAliveTime(permitKeepAliveTimeSeconds, TimeUnit.SECONDS)
-                    .permitKeepAliveWithoutCalls(permitKeepAliveWithoutCalls)
-                    .withChildOption(ChannelOption.SO_KEEPALIVE, true)
-                    .withChildOption(ChannelOption.TCP_NODELAY, true)
-                    .build()
-                    .start();
+                server = NettyServerBuilder.forPort(securePort)
+                        .sslContext(createSslContext(cert, certKey))
+                        .addService(processor)
+                        .executor(grpcExecutor)
+                        .maxConcurrentCallsPerConnection(maxConcurrentCallsPerConnection)
+                        .flowControlWindow(flowControlWindow)
+                        .maxInboundMessageSize(maxInboundMessageSize)
+                        .permitKeepAliveTime(permitKeepAliveTimeSeconds, TimeUnit.SECONDS)
+                        .permitKeepAliveWithoutCalls(permitKeepAliveWithoutCalls)
+                        .withChildOption(ChannelOption.SO_KEEPALIVE, true)
+                        .withChildOption(ChannelOption.TCP_NODELAY, true)
+                        .build()
+                        .start();
 
-            logger.info("Secure Server started, listening on " + securePort);
-        }
-        if (enablePlainTextPort) {
-            logger.info("Plaintext server starting...");
+                logger.info("Secure Server started, listening on " + securePort);
+            }
+            if (enablePlainTextPort) {
+                logger.info("Plaintext server starting...");
 
-            plaintextServer = NettyServerBuilder.forPort(plaintextPort)
-                    .addService(processor)
-                    .executor(grpcExecutor)
-                    .maxConcurrentCallsPerConnection(maxConcurrentCallsPerConnection)
-                    .flowControlWindow(flowControlWindow)
-                    .maxInboundMessageSize(maxInboundMessageSize)
-                    .permitKeepAliveTime(permitKeepAliveTimeSeconds, TimeUnit.SECONDS)
-                    .permitKeepAliveWithoutCalls(permitKeepAliveWithoutCalls)
-                    .withChildOption(ChannelOption.SO_KEEPALIVE, true)
-                    .withChildOption(ChannelOption.TCP_NODELAY, true)
-                    .build()
-                    .start();
+                plaintextServer = NettyServerBuilder.forPort(plaintextPort)
+                        .addService(processor)
+                        .executor(grpcExecutor)
+                        .maxConcurrentCallsPerConnection(maxConcurrentCallsPerConnection)
+                        .flowControlWindow(flowControlWindow)
+                        .maxInboundMessageSize(maxInboundMessageSize)
+                        .permitKeepAliveTime(permitKeepAliveTimeSeconds, TimeUnit.SECONDS)
+                        .permitKeepAliveWithoutCalls(permitKeepAliveWithoutCalls)
+                        .withChildOption(ChannelOption.SO_KEEPALIVE, true)
+                        .withChildOption(ChannelOption.TCP_NODELAY, true)
+                        .build()
+                        .start();
 
-            logger.info("Plaintext Server started, listening on " + plaintextPort);
-        }
+                logger.info("Plaintext Server started, listening on " + plaintextPort);
+            }
 
-
-
-        // Start Health Check Server if enabled
-        if (!combinedHealthCheck) {
-            healthCheckServer.start();
-            logger.info("Health Check Server started, listening on " + healthCheckIp + ":" + healthCheckPort + " at path " + healthCheckPath);
+            // Start Health Check Server if enabled
+            if (!combinedHealthCheck) {
+                healthCheckServer.start();
+                logger.info("Health Check Server started, listening on " + healthCheckIp + ":" + healthCheckPort + " at path " + healthCheckPath);
+            }
+        } catch (Exception e) {
+            // Clean up executor if startup fails to prevent thread leak
+            grpcExecutor.shutdownNow();
+            grpcExecutor = null;
+            throw e;
         }
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
