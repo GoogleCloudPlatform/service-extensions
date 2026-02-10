@@ -28,13 +28,11 @@ import (
 )
 
 const (
-	// WaitingRoomCookieName is the name of the cookie used to track users
+
 	WaitingRoomCookieName = "waiting_room_token"
 	
-	// WaitingRoomWaitTime is the duration users must wait before retrying (in seconds)
 	WaitingRoomWaitTime = 300 // 5 minutes
 	
-	// WaitingRoomPath is the path to the waiting room page
 	WaitingRoomPath = "/waiting-room"
 )
 
