@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import logging
-from re import DEBUG
-from typing import Union
+import os
+from concurrent.futures import ThreadPoolExecutor
+from typing import Union, Any
 
 import jwt
-
-from typing import Union, Any
 from jwt.exceptions import InvalidTokenError
 
 from grpc import ServicerContext
@@ -26,6 +26,10 @@ from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from extproc.service import callout_server
 from extproc.service import callout_tools
 from extproc.service import command_line_tools
+
+# Thread pool for CPU-bound JWT verification
+_num_workers = max(32, os.cpu_count() * 4 if os.cpu_count() else 32)
+_jwt_executor = ThreadPoolExecutor(max_workers=_num_workers)
 
 
 def extract_jwt_token(
@@ -99,6 +103,28 @@ def validate_jwt_token(
     return None
 
 
+def validate_jwt_token_sync(
+  key: bytes,
+  jwt_token: str,
+  algorithm: str,
+) -> Union[Any, None]:
+  """Synchronous JWT validation for use in thread pool.
+
+  Args:
+      key (bytes): The public key used for token validation.
+      jwt_token (str): The JWT token string to validate.
+      algorithm (str): The algorithm with which the JWT was signed (e.g., 'RS256').
+
+  Returns:
+      dict | None: The decoded JWT if validation is successful, None if invalid.
+  """
+  try:
+    decoded = jwt.decode(jwt_token, key, algorithms=[algorithm])
+    return decoded
+  except InvalidTokenError:
+    return None
+
+
 class CalloutServerExample(callout_server.CalloutServer):
   """Example callout server.
 
@@ -143,6 +169,46 @@ class CalloutServerExample(callout_server.CalloutServer):
       )
     else:
       callout_tools.deny_callout(context, 'Authorization token is invalid.')
+
+  async def on_request_headers_async(
+    self, headers: service_pb2.HttpHeaders, context: ServicerContext
+  ) -> Union[service_pb2.HeadersResponse, None]:
+    """Async JWT validation - offloads CPU-bound work to thread pool.
+
+    This method is called by the async gRPC server. JWT verification is
+    offloaded to a thread pool to avoid blocking the event loop.
+
+    See base method: :py:meth:`callouts.python.extproc.service.callout_server.CalloutServer.on_request_headers_async`.
+    """
+    logging.info(headers)
+
+    # Extract token first (fast, non-blocking)
+    jwt_token = extract_jwt_token(headers)
+    if jwt_token is None:
+      callout_tools.deny_callout(context, 'No Authorization token found.')
+      return None
+
+    # Offload CPU-bound JWT verification to thread pool
+    loop = asyncio.get_event_loop()
+    decoded = await loop.run_in_executor(
+      _jwt_executor,
+      validate_jwt_token_sync,
+      self.public_key,
+      jwt_token,
+      'RS256'
+    )
+
+    if decoded is not None:
+      logging.info('Approved - Decoded Values: %s', decoded)
+      decoded_items = [
+        ('decoded-' + key, str(value)) for key, value in decoded.items()
+      ]
+      return callout_tools.add_header_mutation(
+        add=decoded_items, clear_route_cache=True
+      )
+    else:
+      callout_tools.deny_callout(context, 'Authorization token is invalid.')
+      return None
 
 
 if __name__ == '__main__':
