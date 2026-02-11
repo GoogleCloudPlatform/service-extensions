@@ -39,7 +39,6 @@ RUN EXAMPLE_TYPE=${EXAMPLE_TYPE:-basic} && \
     --cxxopt='-std=c++17' \
     --cxxopt='-O3' \
     --cxxopt='-DNDEBUG' \
-    --cxxopt='-march=native' \
     //examples/${EXAMPLE_TYPE}:custom_callout_server_cpp && \
     mkdir -p /app/build_output && \
     cp bazel-bin/examples/${EXAMPLE_TYPE}/custom_callout_server_cpp /app/build_output/
