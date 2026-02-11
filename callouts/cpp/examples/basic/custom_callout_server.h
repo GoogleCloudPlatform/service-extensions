@@ -18,66 +18,70 @@
  * @ingroup basic_example
  */
 
- #include "envoy/service/ext_proc/v3/external_processor.pb.h"
- #include "service/callout_server.h"
- 
- using envoy::service::ext_proc::v3::ProcessingRequest;
- using envoy::service::ext_proc::v3::ProcessingResponse;
- 
- /**
-  * @class CustomCalloutServer
-  * @brief Custom implementation of callout server that modifies HTTP headers and bodies
-  *
-  * This server demonstrates basic request/response processing capabilities by:
-  * - Adding and modifying headers
-  * - Replacing request/response bodies
-  */
- class CustomCalloutServer : public CalloutServer {
-  public:
-   /**
-    * @brief Processes incoming request headers
-    * @param request The processing request containing headers
-    * @param response The response to populate with header modifications
-    */
-   void OnRequestHeader(ProcessingRequest* request,
-                        ProcessingResponse* response) override {
-     CalloutServer::AddRequestHeader(response, "add-header-request",
-                                     "Value-request");
-     CalloutServer::ReplaceRequestHeader(response, "replace-header-request",
-                                         "Value-request");
-   }
- 
-   /**
-    * @brief Processes outgoing response headers
-    * @param request The processing request containing headers
-    * @param response The response to populate with header modifications
-    */
-   void OnResponseHeader(ProcessingRequest* request,
-                         ProcessingResponse* response) override {
-     CalloutServer::AddResponseHeader(response, "add-header-response",
-                                      "Value-response");
-     CalloutServer::ReplaceResponseHeader(response, "replace-header-response",
-                                          "Value-response");
-   }
- 
-   /**
-    * @brief Processes incoming request body
-    * @param request The processing request containing the body
-    * @param response The response to populate with body modifications
-    */
-   void OnRequestBody(ProcessingRequest* request,
-                      ProcessingResponse* response) override {
-     CalloutServer::ReplaceRequestBody(response, "new-body-request");
-   }
- 
-   /**
-    * @brief Processes outgoing response body
-    * @param request The processing request containing the body
-    * @param response The response to populate with body modifications
-    */
-   void OnResponseBody(ProcessingRequest* request,
+#ifndef EXAMPLES_BASIC_CUSTOM_CALLOUT_SERVER_H_
+#define EXAMPLES_BASIC_CUSTOM_CALLOUT_SERVER_H_
+
+#include "envoy/service/ext_proc/v3/external_processor.pb.h"
+#include "service/callout_server.h"
+
+using envoy::service::ext_proc::v3::ProcessingRequest;
+using envoy::service::ext_proc::v3::ProcessingResponse;
+
+/**
+ * @class CustomCalloutServer
+ * @brief Custom implementation of callout server that modifies HTTP headers and bodies
+ *
+ * This server demonstrates basic request/response processing capabilities by:
+ * - Adding and modifying headers
+ * - Replacing request/response bodies
+ */
+class CustomCalloutServer : public CalloutServer {
+ public:
+  /**
+   * @brief Processes incoming request headers
+   * @param request The processing request containing headers
+   * @param response The response to populate with header modifications
+   */
+  void OnRequestHeader(ProcessingRequest* request,
                        ProcessingResponse* response) override {
-     CalloutServer::ReplaceResponseBody(response, "new-body-response");
-   }
- };
- 
+    CalloutServer::AddRequestHeader(response, "add-header-request",
+                                    "Value-request");
+    CalloutServer::ReplaceRequestHeader(response, "replace-header-request",
+                                        "Value-request");
+  }
+
+  /**
+   * @brief Processes outgoing response headers
+   * @param request The processing request containing headers
+   * @param response The response to populate with header modifications
+   */
+  void OnResponseHeader(ProcessingRequest* request,
+                        ProcessingResponse* response) override {
+    CalloutServer::AddResponseHeader(response, "add-header-response",
+                                     "Value-response");
+    CalloutServer::ReplaceResponseHeader(response, "replace-header-response",
+                                         "Value-response");
+  }
+
+  /**
+   * @brief Processes incoming request body
+   * @param request The processing request containing the body
+   * @param response The response to populate with body modifications
+   */
+  void OnRequestBody(ProcessingRequest* request,
+                     ProcessingResponse* response) override {
+    CalloutServer::ReplaceRequestBody(response, "new-body-request");
+  }
+
+  /**
+   * @brief Processes outgoing response body
+   * @param request The processing request containing the body
+   * @param response The response to populate with body modifications
+   */
+  void OnResponseBody(ProcessingRequest* request,
+                      ProcessingResponse* response) override {
+    CalloutServer::ReplaceResponseBody(response, "new-body-response");
+  }
+};
+
+#endif  // EXAMPLES_BASIC_CUSTOM_CALLOUT_SERVER_H_

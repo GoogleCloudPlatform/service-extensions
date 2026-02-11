@@ -16,6 +16,9 @@ ARG EXAMPLE_TYPE=basic
 
 FROM debian:12-slim AS builder
 
+# Re-declare ARG after FROM to make it available in this stage
+ARG EXAMPLE_TYPE
+
 # Install dependencies
 RUN apt-get update && apt-get install -y \
     wget clang g++ git python3 python3-pip \
@@ -29,9 +32,15 @@ RUN wget -O /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases
 WORKDIR /app
 COPY . .
 
-# Build with explicit output path
+# Build with release optimizations
 RUN EXAMPLE_TYPE=${EXAMPLE_TYPE:-basic} && \
-    bazel build --config=clang --cxxopt='-std=c++17' //examples/${EXAMPLE_TYPE}:custom_callout_server_cpp && \
+    bazel build -c opt \
+    --config=clang \
+    --cxxopt='-std=c++17' \
+    --cxxopt='-O3' \
+    --cxxopt='-DNDEBUG' \
+    --cxxopt='-march=native' \
+    //examples/${EXAMPLE_TYPE}:custom_callout_server_cpp && \
     mkdir -p /app/build_output && \
     cp bazel-bin/examples/${EXAMPLE_TYPE}/custom_callout_server_cpp /app/build_output/
 

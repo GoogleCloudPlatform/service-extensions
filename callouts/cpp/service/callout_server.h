@@ -12,12 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CALLOUT_SERVER_H_
-#define CALLOUT_SERVER_H_
-
-#include <grpcpp/grpcpp.h>
-#include <grpcpp/server_builder.h>
-#include <grpcpp/server_context.h>
+#ifndef SERVICE_CALLOUT_SERVER_H_
+#define SERVICE_CALLOUT_SERVER_H_
 
 #include <atomic>
 #include <condition_variable>
@@ -25,6 +21,12 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <vector>
+
+#include <grpcpp/alarm.h>
+#include <grpcpp/grpcpp.h>
+#include <grpcpp/server_builder.h>
+#include <grpcpp/server_context.h>
 
 #include "absl/log/log.h"
 #include "absl/status/statusor.h"
@@ -40,36 +42,28 @@ using envoy::service::ext_proc::v3::HeaderMutation;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
+// Forward declaration
+template <typename ProcessorType>
+class CallData;
+
 /**
  * @class CalloutServer
- * @brief Base class for implementing custom HTTP request/response processing logic
- * 
- * Provides default implementations for header/body processing operations and gRPC server setup.
+ * @brief Base class for implementing custom async HTTP request/response processing logic
+ *
+ * Override the virtual methods to implement custom processing.
+ * This class provides static helper methods for building responses
+ * and virtual callback methods for processing requests.
  */
-class CalloutServer : public ExternalProcessor::Service {
+class CalloutServer {
  public:
-  struct ServerConfig {
-    std::string secure_address;
-    std::string plaintext_address;
-    std::string health_check_address;
-    std::string cert_path;
-    std::string key_path;
-    bool enable_plaintext;
-    bool enable_tls;
-  };
+  virtual ~CalloutServer() = default;
 
-  static ServerConfig DefaultConfig() {
-    return {
-        .secure_address = "0.0.0.0:443",
-        .plaintext_address = "0.0.0.0:8080",
-        .health_check_address = "0.0.0.0:80",
-        .cert_path = "ssl_creds/chain.pem",
-        .key_path = "ssl_creds/privatekey.pem",
-        .enable_plaintext = true,
-        .enable_tls = false};
-  }
-
-  // Adds a request header field.
+  /**
+   * @brief Adds a header to the HTTP request
+   * @param response The ProcessingResponse to modify
+   * @param key Header name to add
+   * @param value Header value to add
+   */
   static void AddRequestHeader(ProcessingResponse* response,
                                std::string_view key, std::string_view value) {
     HeaderValue* new_header = response->mutable_request_headers()
@@ -178,6 +172,204 @@ class CalloutServer : public ExternalProcessor::Service {
   }
 
   /**
+   * @brief Handle HTTP request headers (override for custom processing)
+   * @param request Incoming processing request
+   * @param response Output response to populate
+   */
+  virtual void OnRequestHeader(ProcessingRequest* request,
+                               ProcessingResponse* response) {}
+
+  /**
+   * @brief Handle HTTP response headers (override for custom processing)
+   * @param request Incoming processing request
+   * @param response Output response to populate
+   */
+  virtual void OnResponseHeader(ProcessingRequest* request,
+                                ProcessingResponse* response) {}
+
+  /**
+   * @brief Handle HTTP request body (override for custom processing)
+   * @param request Incoming processing request
+   * @param response Output response to populate
+   */
+  virtual void OnRequestBody(ProcessingRequest* request,
+                             ProcessingResponse* response) {}
+
+  /**
+   * @brief Handle HTTP response body (override for custom processing)
+   * @param request Incoming processing request
+   * @param response Output response to populate
+   */
+  virtual void OnResponseBody(ProcessingRequest* request,
+                              ProcessingResponse* response) {}
+
+  void ProcessRequest(ProcessingRequest* request, ProcessingResponse* response) {
+    switch (request->request_case()) {
+      case ProcessingRequest::kRequestHeaders:
+        OnRequestHeader(request, response);
+        break;
+      case ProcessingRequest::kResponseHeaders:
+        OnResponseHeader(request, response);
+        break;
+      case ProcessingRequest::kRequestBody:
+        OnRequestBody(request, response);
+        break;
+      case ProcessingRequest::kResponseBody:
+        OnResponseBody(request, response);
+        break;
+      default:
+        LOG(WARNING) << "Received a ProcessingRequest with no request data.";
+        break;
+    }
+  }
+};
+
+/**
+ * @class CallData
+ * @brief Manages the lifecycle of a single async gRPC call
+ *
+ * Implements the state machine for bidirectional streaming:
+ * INIT -> READING -> WRITING -> READING -> ... -> DONE
+ *
+ * Uses a recycling model: after completing a call, the CallData
+ * re-registers for the next RPC instead of spawning new handlers.
+ */
+template <typename ProcessorType>
+class CallData {
+ public:
+  enum CallStatus {
+    INIT,       // Waiting for new RPC
+    READING,    // Async Read in progress
+    WRITING,    // Async Write in progress
+    FINISHING,  // Finishing the stream
+    DONE        // Ready to recycle
+  };
+
+  CallData(ExternalProcessor::AsyncService* service,
+           grpc::ServerCompletionQueue* cq)
+      : service_(service),
+        cq_(cq),
+        stream_(&ctx_),
+        status_(INIT) {
+    processor_ = std::make_unique<ProcessorType>();
+    // Register for incoming RPC
+    service_->RequestProcess(&ctx_, &stream_, cq_, cq_, this);
+  }
+
+  void Proceed(bool ok) {
+    switch (status_) {
+      case INIT:
+        if (!ok) {
+          // Server shutting down or error
+          delete this;
+          return;
+        }
+        // New RPC arrived, start reading
+        status_ = READING;
+        stream_.Read(&request_, this);
+        break;
+
+      case READING:
+        if (!ok) {
+          // Stream finished (client done sending) - finish and recycle
+          status_ = FINISHING;
+          stream_.Finish(grpc::Status::OK, this);
+          return;
+        }
+        // Process the request
+        response_.Clear();
+        processor_->ProcessRequest(&request_, &response_);
+        // Write response
+        status_ = WRITING;
+        stream_.Write(response_, this);
+        break;
+
+      case WRITING:
+        if (!ok) {
+          // Write failed, finish and recycle
+          status_ = FINISHING;
+          stream_.Finish(grpc::Status::OK, this);
+          return;
+        }
+        // Write completed, read next message
+        request_.Clear();
+        status_ = READING;
+        stream_.Read(&request_, this);
+        break;
+
+      case FINISHING:
+        // Stream finished, recycle this handler
+        Recycle();
+        break;
+
+      case DONE:
+        // Should not reach here
+        delete this;
+        break;
+    }
+  }
+
+ private:
+  void Recycle() {
+    // Reset state and re-register for next RPC
+    ctx_.~ServerContext();
+    new (&ctx_) grpc::ServerContext();
+    stream_.~ServerAsyncReaderWriter();
+    new (&stream_) grpc::ServerAsyncReaderWriter<ProcessingResponse, ProcessingRequest>(&ctx_);
+    request_.Clear();
+    response_.Clear();
+    status_ = INIT;
+    service_->RequestProcess(&ctx_, &stream_, cq_, cq_, this);
+  }
+
+  ExternalProcessor::AsyncService* service_;
+  grpc::ServerCompletionQueue* cq_;
+  grpc::ServerContext ctx_;
+  grpc::ServerAsyncReaderWriter<ProcessingResponse, ProcessingRequest> stream_;
+
+  ProcessingRequest request_;
+  ProcessingResponse response_;
+  std::unique_ptr<ProcessorType> processor_;
+
+  CallStatus status_;
+};
+
+/**
+ * @class CalloutServerRunner
+ * @brief Async gRPC server using CompletionQueue
+ *
+ * This class manages the async gRPC server lifecycle with:
+ * - Multiple CompletionQueues for better throughput
+ * - Multi-threaded handler pool
+ * - Handler recycling model
+ */
+class CalloutServerRunner {
+ public:
+  struct ServerConfig {
+    std::string secure_address;
+    std::string plaintext_address;
+    std::string health_check_address;
+    std::string cert_path;
+    std::string key_path;
+    bool enable_plaintext;
+    bool enable_tls;
+    int num_threads;
+  };
+
+  static ServerConfig DefaultConfig() {
+    return {
+        .secure_address = "0.0.0.0:443",
+        .plaintext_address = "0.0.0.0:8080",
+        .health_check_address = "0.0.0.0:80",
+        .cert_path = "ssl_creds/chain.pem",
+        .key_path = "ssl_creds/privatekey.pem",
+        .enable_plaintext = true,
+        .enable_tls = false,
+        .num_threads = 0  // 0 means use hardware concurrency
+    };
+  }
+
+  /**
    * @brief Creates SSL credentials for secure server communication
    * @param key_path Path to private key file
    * @param cert_path Path to certificate file
@@ -206,180 +398,144 @@ class CalloutServer : public ExternalProcessor::Service {
     return grpc::SslServerCredentials(ssl_options);
   }
 
-  template <typename ServerType = CalloutServer>
-  static bool RunServers(const ServerConfig& config = ServerConfig{}) {
-    std::unique_lock<std::mutex> lock(server_mutex_);
-    bool server_started = false;
-  
-    // Start secure server only if TLS is enabled and credentials are available
+  template <typename ProcessorType>
+  static void RunServers(const ServerConfig& config = ServerConfig{}) {
+    int num_threads = config.num_threads > 0
+        ? config.num_threads
+        : std::thread::hardware_concurrency();
+
+    // Use multiple completion queues - one per thread
+    // This eliminates CQ contention and improves cache locality
+    const int num_cqs = num_threads;
+
+    LOG(INFO) << "Starting async gRPC server with " << num_threads
+              << " threads and " << num_cqs << " completion queues";
+
+    grpc::ServerBuilder builder;
+    ExternalProcessor::AsyncService service;
+
+    // Message sizes (4MB)
+    builder.SetMaxReceiveMessageSize(4 * 1024 * 1024);
+    builder.SetMaxSendMessageSize(4 * 1024 * 1024);
+
+    // High concurrency settings
+    builder.AddChannelArgument(GRPC_ARG_MAX_CONCURRENT_STREAMS, 2500);
+    builder.AddChannelArgument(GRPC_ARG_ALLOW_REUSEPORT, 1);
+
+    // HTTP/2 tuning
+    builder.AddChannelArgument(GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA, 0);
+    builder.AddChannelArgument(
+        GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS, 10000);
+
+    // Keepalive settings for connection health
+    builder.AddChannelArgument(GRPC_ARG_KEEPALIVE_TIME_MS, 30000);
+    builder.AddChannelArgument(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, 60000);
+    builder.AddChannelArgument(GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS, 1);
+
+    // Resource quota allows headroom above thread count
+    grpc::ResourceQuota quota("server_quota");
+    quota.SetMaxThreads(num_threads * 2);
+    builder.SetResourceQuota(quota);
+
+    // Add listening ports
+    if (config.enable_plaintext && !config.plaintext_address.empty()) {
+      builder.AddListeningPort(config.plaintext_address,
+                               grpc::InsecureServerCredentials());
+      LOG(INFO) << "Plaintext server will listen on " << config.plaintext_address;
+    }
+
     if (config.enable_tls && !config.secure_address.empty()) {
-      auto creds = CreateSecureServerCredentials(config.key_path, config.cert_path);
+      auto creds = CreateSecureServerCredentials(config.key_path,
+                                                  config.cert_path);
       if (creds) {
-        secure_thread_ = std::thread([config, creds]() {
-          std::unique_ptr<grpc::Server> local_server;
-          auto service = std::make_unique<ServerType>();
-          {
-            grpc::ServerBuilder builder;
-            builder.AddListeningPort(config.secure_address, *creds);
-            builder.RegisterService(service.get());
-            local_server = builder.BuildAndStart();
-          }
-  
-          {
-            std::lock_guard<std::mutex> lock(server_mutex_);
-            secure_server_.reset(local_server.release());
-            server_ready_ = true;
-          }
-          server_cv_.notify_one();
-  
-          if (secure_server_) {
-            LOG(INFO) << "Secure server listening on " << config.secure_address;
-            secure_server_->Wait();
-          }
-  
-          {
-            std::lock_guard<std::mutex> lock(server_mutex_);
-            if (shutdown_requested_) {
-              secure_server_.reset();
-            }
-          }
-        });
-        server_started = true;
+        builder.AddListeningPort(config.secure_address, *creds);
+        LOG(INFO) << "Secure server will listen on " << config.secure_address;
       }
     }
-  
-    // Start plaintext server if enabled
-    if (config.enable_plaintext && !plaintext_server_) {
-      plaintext_thread_ = std::thread([config]() {
-        std::unique_ptr<grpc::Server> local_server;
-        auto service = std::make_unique<ServerType>();
-        {
-          grpc::ServerBuilder builder;
-          builder.AddListeningPort(config.plaintext_address,
-                                  grpc::InsecureServerCredentials());
-          builder.RegisterService(service.get());
-          local_server = builder.BuildAndStart();
-        }
-  
-        {
-          std::lock_guard<std::mutex> lock(server_mutex_);
-          plaintext_server_.reset(local_server.release());
-          server_ready_ = true;
-        }
-        server_cv_.notify_one();
-  
-        if (plaintext_server_) {
-          LOG(INFO) << "Plaintext server listening on " << config.plaintext_address;
-          plaintext_server_->Wait();
-        }
-  
-        {
-          std::lock_guard<std::mutex> lock(server_mutex_);
-          if (shutdown_requested_) {
-            plaintext_server_.reset();
-          }
-        }
+
+    builder.RegisterService(&service);
+
+    // Create completion queues
+    std::vector<std::unique_ptr<grpc::ServerCompletionQueue>> cqs;
+    for (int i = 0; i < num_cqs; ++i) {
+      cqs.push_back(builder.AddCompletionQueue());
+    }
+
+    server_ = builder.BuildAndStart();
+    if (!server_) {
+      LOG(ERROR) << "Failed to start server";
+      return;
+    }
+
+    LOG(INFO) << "Async server started";
+
+    // Pre-allocate handlers per CQ.
+    // Each handler manages one concurrent RPC stream via the recycling model.
+    const int initial_handlers_per_cq = 64;
+    LOG(INFO) << "Pre-allocating " << initial_handlers_per_cq << " handlers per CQ ("
+              << (initial_handlers_per_cq * num_cqs) << " total)";
+    for (int i = 0; i < num_cqs; ++i) {
+      for (int j = 0; j < initial_handlers_per_cq; ++j) {
+        new CallData<ProcessorType>(&service, cqs[i].get());
+      }
+    }
+
+    // Start worker threads - multiple threads can poll the same CQ
+    std::vector<std::thread> threads;
+    for (int i = 0; i < num_threads; ++i) {
+      // Round-robin assign threads to completion queues
+      threads.emplace_back([cq = cqs[i % num_cqs].get()]() {
+        HandleRpcs<ProcessorType>(cq);
       });
-      server_started = true;
     }
-  
-    if (server_started) {
-      server_cv_.wait(lock, [] { return server_ready_.load(); });
+
+    server_ready_ = true;
+
+    // Wait for shutdown signal
+    while (!shutdown_requested_) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
-    return server_started;
+
+    // Shutdown
+    server_->Shutdown();
+    for (auto& cq : cqs) {
+      cq->Shutdown();
+    }
+
+    // Join all threads
+    for (auto& t : threads) {
+      if (t.joinable()) {
+        t.join();
+      }
+    }
+
+    // Drain completion queues
+    for (auto& cq : cqs) {
+      void* tag;
+      bool ok;
+      while (cq->Next(&tag, &ok)) {
+        // Drain remaining events
+      }
+    }
   }
 
   static void Shutdown() {
-    std::unique_lock<std::mutex> lock(server_mutex_);
     shutdown_requested_ = true;
-    if (plaintext_server_) {
-      plaintext_server_->Shutdown();
-    }
-    if (secure_server_) {
-      secure_server_->Shutdown();
-    }
-  }
-  
-  static void WaitForCompletion() {
-    if (plaintext_thread_.joinable()) {
-      plaintext_thread_.join();
-    }
-    if (secure_thread_.joinable()) {
-      secure_thread_.join();
-    }
-    std::lock_guard<std::mutex> lock(server_mutex_);
-    plaintext_server_.reset();
-    secure_server_.reset();
   }
 
-  /**
-   * @brief Main processing loop for handling gRPC streams
-   * @param context Server context
-   * @param stream Bidirectional gRPC stream
-   * @return gRPC status
-   */
-  grpc::Status Process(
-      grpc::ServerContext* context,
-      grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream)
-      override {
-    ProcessingRequest request;
-    while (stream->Read(&request)) {
-      ProcessingResponse response;
-      ProcessRequest(&request, &response);
-      stream->Write(response);
-    }
-    return grpc::Status::OK;
-  }
-
-  /**
-   * @brief Handle HTTP request headers (to be overridden)
-   * @param request Incoming processing request
-   * @param response Output response to populate
-   */
-  virtual void OnRequestHeader(ProcessingRequest* request,
-                               ProcessingResponse* response) {
-    LOG(INFO) << "OnRequestHeader called.";
-  }
-
-  /**
-   * @brief Handle HTTP response headers (to be overridden)
-   * @param request Incoming processing request
-   * @param response Output response to populate
-   */
-  virtual void OnResponseHeader(ProcessingRequest* request,
-                                ProcessingResponse* response) {
-    LOG(INFO) << "OnResponseHeader called.";
-  }
-
-  /**
-   * @brief Handle HTTP request body (to be overridden)
-   * @param request Incoming processing request
-   * @param response Output response to populate
-   */
-  virtual void OnRequestBody(ProcessingRequest* request,
-                             ProcessingResponse* response) {
-    LOG(INFO) << "OnRequestBody called.";
-  }
-
-  /**
-   * @brief Handle HTTP response body (to be overridden)
-   * @param request Incoming processing request
-   * @param response Output response to populate
-   */
-  virtual void OnResponseBody(ProcessingRequest* request,
-                              ProcessingResponse* response) {
-    LOG(INFO) << "OnResponseBody called.";
+  static bool IsReady() {
+    return server_ready_.load();
   }
 
  private:
-  static inline std::shared_ptr<grpc::Server> plaintext_server_ = nullptr;
-  static inline std::shared_ptr<grpc::Server> secure_server_ = nullptr;
-  static inline std::thread secure_thread_;
-  static inline std::thread plaintext_thread_;
-  static inline std::mutex server_mutex_;
-  static inline std::condition_variable server_cv_;
-  static inline std::atomic<bool> server_ready_{false};
-  static inline std::atomic<bool> shutdown_requested_{false};
+  template <typename ProcessorType>
+  static void HandleRpcs(grpc::ServerCompletionQueue* cq) {
+    void* tag;
+    bool ok;
+    while (cq->Next(&tag, &ok)) {
+      static_cast<CallData<ProcessorType>*>(tag)->Proceed(ok);
+    }
+  }
 
   static absl::StatusOr<std::string> ReadDataFile(std::string_view path) {
     std::ifstream file(std::string{path}, std::ios::binary);
@@ -392,25 +548,9 @@ class CalloutServer : public ExternalProcessor::Service {
     return file_string_stream.str();
   }
 
-  void ProcessRequest(ProcessingRequest* request, ProcessingResponse* response) {
-    switch (request->request_case()) {
-      case ProcessingRequest::kRequestHeaders:
-        OnRequestHeader(request, response);
-        break;
-      case ProcessingRequest::kResponseHeaders:
-        OnResponseHeader(request, response);
-        break;
-      case ProcessingRequest::kRequestBody:
-        OnRequestBody(request, response);
-        break;
-      case ProcessingRequest::kResponseBody:
-        OnResponseBody(request, response);
-        break;
-      default:
-        LOG(WARNING) << "Received a ProcessingRequest with no request data.";
-        break;
-    }
-  }
+  static inline std::unique_ptr<grpc::Server> server_;
+  static inline std::atomic<bool> server_ready_{false};
+  static inline std::atomic<bool> shutdown_requested_{false};
 };
 
-#endif  // CALLOUT_SERVER_H_
+#endif  // SERVICE_CALLOUT_SERVER_H_

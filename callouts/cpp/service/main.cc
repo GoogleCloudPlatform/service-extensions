@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <grpcpp/grpcpp.h>
-
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
+#include <grpcpp/grpcpp.h>
 
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
@@ -37,6 +36,8 @@ ABSL_FLAG(std::string, cert_path, "ssl_creds/chain.pem",
           "The SSL certificate file path");
 ABSL_FLAG(bool, enable_tls, false,
           "Whether to enable secure TLS gRPC server");
+ABSL_FLAG(int, num_threads, 0,
+          "Number of worker threads (0 = auto-detect based on hardware)");
 
 void StartHttpHealthCheckServer(uint16_t port) {
   namespace beast = boost::beast;
@@ -90,7 +91,7 @@ void StartHttpHealthCheckServer(uint16_t port) {
 int main(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
 
-  auto config = CalloutServer::DefaultConfig();
+  auto config = CalloutServerRunner::DefaultConfig();
   config.secure_address = absl::GetFlag(FLAGS_server_address);
   config.key_path = absl::GetFlag(FLAGS_key_path);
   config.cert_path = absl::GetFlag(FLAGS_cert_path);
@@ -102,6 +103,9 @@ int main(int argc, char** argv) {
   // Set TLS configuration
   config.enable_tls = absl::GetFlag(FLAGS_enable_tls);
 
+  // Set number of threads
+  config.num_threads = absl::GetFlag(FLAGS_num_threads);
+
   if (!config.enable_plaintext && !config.enable_tls) {
     LOG(ERROR) << "No valid configuration: at least one of --enable_plaintext "
                   "or --enable_tls must be true";
@@ -111,19 +115,24 @@ int main(int argc, char** argv) {
   std::thread health_check_thread(StartHttpHealthCheckServer,
                                   absl::GetFlag(FLAGS_health_check_port));
 
-  CalloutServer::RunServers<CustomCalloutServer>(config);
+  // Run the async server in a separate thread
+  std::thread server_thread([config]() {
+    CalloutServerRunner::RunServers<CustomCalloutServer>(config);
+  });
 
   boost::asio::io_context io_context;
   boost::asio::signal_set signals(io_context, SIGINT, SIGTERM);
   signals.async_wait([&](auto, auto) {
-    CalloutServer::Shutdown();
+    CalloutServerRunner::Shutdown();
     io_context.stop();
   });
 
   io_context.run();
 
-  CalloutServer::WaitForCompletion();
-  health_check_thread.join();
+  if (server_thread.joinable()) {
+    server_thread.join();
+  }
+  // Note: health_check_thread runs forever; in production, add graceful shutdown
 
   return 0;
 }

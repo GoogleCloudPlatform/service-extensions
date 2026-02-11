@@ -30,29 +30,30 @@ using google::protobuf::util::MessageDifferencer;
 class BasicServerTest : public testing::Test {
  protected:
   void SetUp() override {
-    config_ = CalloutServer::DefaultConfig();
+    config_ = CalloutServerRunner::DefaultConfig();
     config_.enable_plaintext = true;
     config_.plaintext_address = "0.0.0.0:8181";
     config_.health_check_address = "0.0.0.0:8081";
     config_.key_path = "";
     config_.cert_path = "";
+    config_.num_threads = 1;
 
     server_thread_ = std::thread([this]() {
-      CalloutServer::RunServers(config_);
+      CalloutServerRunner::RunServers<CustomCalloutServer>(config_);
     });
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    while (!CalloutServerRunner::IsReady()) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
   }
 
   void TearDown() override {
-    CalloutServer::Shutdown();
-    CalloutServer::WaitForCompletion();
-    
+    CalloutServerRunner::Shutdown();
     if (server_thread_.joinable()) {
       server_thread_.join();
     }
   }
 
-  CalloutServer::ServerConfig config_;
+  CalloutServerRunner::ServerConfig config_;
   std::thread server_thread_;
 };
 
@@ -61,20 +62,18 @@ TEST_F(BasicServerTest, OnRequestHeader) {
   request.mutable_request_headers();
   ProcessingResponse response;
   CustomCalloutServer service;
-  
+
   service.OnRequestHeader(&request, &response);
 
   ProcessingResponse expected_response;
   auto* headers_mutation = expected_response.mutable_request_headers()
-                              ->mutable_response()
-                              ->mutable_header_mutation();
-  
-  // Add header
+                               ->mutable_response()
+                               ->mutable_header_mutation();
+
   auto* new_header = headers_mutation->add_set_headers()->mutable_header();
   new_header->set_key("add-header-request");
   new_header->set_value("Value-request");
-  
-  // Replace header
+
   auto* replace_header = headers_mutation->add_set_headers();
   replace_header->set_append_action(
       HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
@@ -93,20 +92,18 @@ TEST_F(BasicServerTest, OnResponseHeader) {
   request.mutable_response_headers();
   ProcessingResponse response;
   CustomCalloutServer service;
-  
+
   service.OnResponseHeader(&request, &response);
 
   ProcessingResponse expected_response;
   auto* headers_mutation = expected_response.mutable_response_headers()
                                ->mutable_response()
                                ->mutable_header_mutation();
-  
-  // Add header
+
   auto* new_header = headers_mutation->add_set_headers()->mutable_header();
   new_header->set_key("add-header-response");
   new_header->set_value("Value-response");
-  
-  // Replace header
+
   auto* replace_header = headers_mutation->add_set_headers();
   replace_header->set_append_action(
       HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
@@ -125,7 +122,7 @@ TEST_F(BasicServerTest, OnRequestBody) {
   request.mutable_request_body();
   ProcessingResponse response;
   CustomCalloutServer service;
-  
+
   service.OnRequestBody(&request, &response);
 
   ProcessingResponse expected_response;
@@ -146,7 +143,7 @@ TEST_F(BasicServerTest, OnResponseBody) {
   request.mutable_response_body();
   ProcessingResponse response;
   CustomCalloutServer service;
-  
+
   service.OnResponseBody(&request, &response);
 
   ProcessingResponse expected_response;
