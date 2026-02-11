@@ -151,8 +151,18 @@ Configure the server using these command line flags:
   --enable_tls=false \                # Whether to enable secure TLS gRPC server (default: false)
   --health_check_port=80 \            # Health check port (default: 80)
   --key_path=/path/to/key.pem \       # SSL private key (default: ssl_creds/privatekey.pem)
-  --cert_path=/path/to/cert.pem       # SSL certificate (default: ssl_creds/chain.pem)
+  --cert_path=/path/to/cert.pem \     # SSL certificate (default: ssl_creds/chain.pem)
+  --num_threads=0                     # Worker threads (default: 0 = auto-detect)
 ```
+
+### Threading Configuration
+
+The `--num_threads` flag controls the number of worker threads:
+- `0` (default): Auto-detect based on hardware concurrency
+- `N`: Use exactly N worker threads
+
+Each thread gets its own CompletionQueue for optimal performance. For most deployments,
+the auto-detect setting provides good performance.
 
 > **Note**: TLS is disabled by default. To enable TLS, set `--enable_tls=true`.
 > For production environments, it is strongly recommended to enable TLS to ensure secure communication.
@@ -170,15 +180,18 @@ docker run -p 443:443 -p 8080:8080 \
 
 This repository provides the following files to be extended to fit the needs of the user:
 
-[CalloutServer](./service/callout_server.h): Baseline service callout server with dual endpoints (secure/insecure) and health check service.
+[CalloutServer](./service/callout_server.h): Base class for implementing custom request/response processing logic with async gRPC support.
 
 ### Making a New Server
 
-The provided `CalloutServer` class implements the `ExternalProcessor::Service` interface with:
-- Insecure (plaintext) endpoint on port 8080 (enabled by default)
-- Secure (TLS) endpoint on port 443 (disabled by default, enable with `--enable_tls=true`)
-- HTTP health check on port 80
-- Configurable via command line flags
+The SDK provides two main classes:
+
+1. **`CalloutServer`** - Base class for your custom processing logic. Override the virtual methods to implement your business logic.
+
+2. **`CalloutServerRunner`** - Manages the async gRPC server lifecycle with:
+   - Multiple CompletionQueues for better throughput
+   - Multi-threaded handler pool (64 handlers per CQ)
+   - Handler recycling model for efficient memory use
 
 ### Extend the CalloutServer
 
@@ -220,14 +233,14 @@ void OnRequestHeader(ProcessingRequest* request,
 ### Run the Server
 
 The server automatically handles:
-- Dual gRPC endpoints (secure/insecure)
+- Async gRPC processing with multiple completion queues
 - Health check service
 - Command line configuration
 
 Example minimal setup:
 ```c++
-auto config = CalloutServer::DefaultConfig();
-CalloutServer::RunServers(config);
+auto config = CalloutServerRunner::DefaultConfig();
+CalloutServerRunner::RunServers<CustomCalloutServer>(config);
 ```
 
 An example of how this file can be used together with your custom service
