@@ -116,21 +116,6 @@ Running from the [./config](./config)
 EXAMPLE_TYPE=basic docker-compose up
 ```
 
-## Running the without Docker
-
-### Set Example Type:
-
-```
-export EXAMPLE_TYPE=basic  # Options: basic, jwt_auth, redirect
-```
-
-### Build and Run:
-
-```
-bazel build --config=clang //examples/${EXAMPLE_TYPE}:custom_callout_server_cpp
-./bazel-bin/examples/${EXAMPLE_TYPE}/custom_callout_server_cpp
-```
-
 ## Running Tests
 
 To run the unit tests, use the following command from the project root:
