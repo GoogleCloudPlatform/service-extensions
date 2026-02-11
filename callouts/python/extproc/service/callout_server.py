@@ -68,18 +68,15 @@ class CalloutServer:
   """Server wrapper for managing callout servers and processing callouts.
 
   Attributes:
-    address: Address that the main secure server will attempt to connect to,
-      defaults to default_ip:443.
-    port: If specified, overrides the port of address.
+    secure_address: Address that the main secure (TLS) server will attempt to connect to,
+      defaults to default_ip:443. Only used if disable_tls is False.
     health_check_address: The health check serving address,
       defaults to default_ip:80.
-    health_check_port: If set, overrides the port of health_check_address.
     combined_health_check: If True, does not create a separate health check server.
     secure_health_check: If True, will use HTTPS as the protocol of the health check server.
       Requires cert_chain_path and private_key_path to be set.
     plaintext_address: The non-authenticated address to listen to,
       defaults to default_ip:8080.
-    plaintext_port: If set, overrides the port of plaintext_address.
     disable_plaintext: If true, disables the plaintext address of the server.
     default_ip: If left None, defaults to '0.0.0.0'.
     cert_chain: PEM Certificate chain used to authenticate secure connections,
@@ -88,24 +85,24 @@ class CalloutServer:
     private_key: PEM private key of the server.
     private_key_path: Relative file path pointing to a file containing private_key data.
     server_thread_count: Threads allocated to the main grpc service.
+    disable_tls: If True, disables the secure (TLS) server. Defaults to True (TLS disabled).
   """
+
   def __init__(
-      self,
-      address: tuple[str, int] | None = None,
-      port: int | None = None,
-      health_check_address: tuple[str, int] | None = None,
-      health_check_port: int | None = None,
-      combined_health_check: bool = False,
-      secure_health_check: bool = False,
-      plaintext_address: tuple[str, int] | None = None,
-      plaintext_port: int | None = None,
-      disable_plaintext: bool = False,
-      default_ip: str | None = None,
-      cert_chain: bytes | None = None,
-      cert_chain_path: str | None = './extproc/ssl_creds/chain.pem',
-      private_key: bytes | None = None,
-      private_key_path: str = './extproc/ssl_creds/privatekey.pem',
-      server_thread_count: int = 2,
+    self,
+    secure_address: tuple[str, int] | None = None,
+    health_check_address: tuple[str, int] | None = None,
+    combined_health_check: bool = False,
+    secure_health_check: bool = False,
+    plaintext_address: tuple[str, int] | None = None,
+    disable_plaintext: bool = False,
+    disable_tls: bool = True,
+    default_ip: str | None = None,
+    cert_chain: bytes | None = None,
+    cert_chain_path: str | None = './extproc/ssl_creds/chain.pem',
+    private_key: bytes | None = None,
+    private_key_path: str = './extproc/ssl_creds/privatekey.pem',
+    server_thread_count: int = 2,
   ):
     self._setup = False
     self._shutdown = False
@@ -113,22 +110,21 @@ class CalloutServer:
     self._health_check_server: HTTPServer | None = None
     default_ip = default_ip or '0.0.0.0'
 
-    self.address: tuple[str, int] = address or (default_ip, 443)
-    if port:
-      self.address = (self.address[0], port)
+    self.secure_address: tuple[str, int] = secure_address or (default_ip, 443)
 
     self.plaintext_address: tuple[str, int] | None = None
     if not disable_plaintext:
       self.plaintext_address = plaintext_address or (default_ip, 8080)
-      if plaintext_port:
-        self.plaintext_address = (self.plaintext_address[0], plaintext_port)
 
     self.health_check_address: tuple[str, int] | None = None
     if not combined_health_check:
       self.health_check_address = health_check_address or (default_ip, 80)
-      if health_check_port:
-        self.health_check_address = (self.health_check_address[0],
-                                     health_check_port)
+
+    self.disable_tls = disable_tls
+
+    if self.disable_tls and self.plaintext_address is None:
+      raise ValueError(
+          'At least one of secure (TLS) or plaintext listeners must be enabled.')
 
     def _read_cert_file(path: str | None) -> bytes | None:
       if path:
@@ -141,6 +137,16 @@ class CalloutServer:
     # Read cert data.
     self.private_key = private_key or _read_cert_file(private_key_path)
     self.cert_chain = cert_chain or _read_cert_file(cert_chain_path)
+
+    if not self.disable_tls:
+      if not self.private_key:
+        raise ValueError(
+            'TLS is enabled but private key is not provided. '
+            'Please provide private_key or private_key_path.')
+      if not self.cert_chain:
+        raise ValueError(
+            'TLS is enabled but certificate chain is not provided. '
+            'Please provide cert_chain or cert_chain_path.')
 
     if secure_health_check:
       if not private_key_path:
@@ -325,16 +331,18 @@ class _GRPCCalloutService(ExternalProcessorServicer):
     self._server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=processor.server_thread_count))
     add_ExternalProcessorServicer_to_server(self, self._server)
-    server_credentials = grpc.ssl_server_credentials(
+    self._start_msg = 'GRPC callout server started'
+    if not processor.disable_tls:
+      server_credentials = grpc.ssl_server_credentials(
         private_key_certificate_chain_pairs=[(processor.private_key,
                                               processor.cert_chain)])
-    address_str = _addr_to_str(processor.address)
-    self._server.add_secure_port(address_str, server_credentials)
-    self._start_msg = f'GRPC callout server started, listening on {address_str}.'
+      address_str = _addr_to_str(processor.secure_address)
+      self._server.add_secure_port(address_str, server_credentials)
+      self._start_msg += f', listening on {address_str} (secure)'
     if processor.plaintext_address:
       plaintext_address_str = _addr_to_str(processor.plaintext_address)
       self._server.add_insecure_port(plaintext_address_str)
-      self._start_msg += f' (secure) and {plaintext_address_str} (plaintext)'
+      self._start_msg += f', listening on {plaintext_address_str} (plaintext)'
 
   def stop(self) -> None:
     self._server.stop(grace=10)
