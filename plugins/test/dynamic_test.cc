@@ -527,13 +527,13 @@ void DynamicTest::BenchStreamLifecycle(benchmark::State& state) {
     auto stream = TestHttpContext(handle, &cfg_);
     benchmark::DoNotOptimize(stream);
     BM_RETURN_IF_FAILED(handle);
+    peak_rss_kib_ = std::max(peak_rss_kib_, getVmRSS());
     stream.TearDown();
 
     if (first) {
       first = false;
       EmitStats(state, *handle, stream);
     }
-    peak_rss_kib_ = std::max(peak_rss_kib_, getVmRSS());
   }
 
   // Emit peak RSS again, since the stats were only emitted at the first run earlier.
@@ -685,7 +685,6 @@ void DynamicTest::BenchLoadPlugin(benchmark::State& state) {
     benchmark::DoNotOptimize(wasm->isFailed());
     peak_rss_kib_ = std::max(peak_rss_kib_, getVmRSS());
   }
-  // TODO(rachgreen): Why not just call EmitStats here?
   state.counters["PeakVmRSS_KiB"] = peak_rss_kib_;
 }
 

@@ -8,7 +8,7 @@ common --noenable_bzlmod
 # Default engine to execute when running bazel build/test. This engine can
 # be overridden by specifying a different engine on the command line:
 # `bazel test //... --define engine=wasmtime` for example.
-build --define engine=wasmtime
+build --define engine=wamr-jit
 
 # For unit testing, remove randomness from BoringSSL.
 # This doesn't capture 'bazel run' test invocations. Oh well.
