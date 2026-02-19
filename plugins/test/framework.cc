@@ -77,25 +77,19 @@ bool TestWasm::load(std::string_view bytecode, bool allow_precompiled) {
     const uint32_t elf_magic = 0x464c457f; // Little-endian for: \x7fELF
 
     if (magic == elf_magic) {
-      // FAST PATH: If we detect the Wasmtime AOT/ELF format, 
-      // we bypass the WasmBase's slow/failing validation logic entirely.
-      // wasm_vm_->integration()->trace("TestWasm::load detected ELF magic. Bypassing base Wasm validation.");
-     
-      // Directly call the underlying WasmVm::load (which is Wasmtime::load).
-      // Wasmtime::load knows to call wasm_module_deserialize based on the ELF magic bytes.
-      // We pass the AOT bytes as the first parameter (bytecode), and an empty string 
-      // for the second parameter (precompiled data).
-      // function_names_ is a protected member available in WasmBase.
+      // If we detect the ELF format, this means we have inputted an
+      // AOT-compiled Wasmtime file, so we bypass the WasmBase's validation logic
+      // and instead directly call WasmVm::load.
+
+      // Set AOT bytes as the first parameter.
       return wasm_vm_->load(bytecode, 
                             /*precompiled_data=*/std::string_view{}, 
                             function_names_);
     }
   }
 
-  // SLOW/STANDARD PATH: If it's not ELF (i.e., it's raw Wasm or an unknown format), 
-  // we rely on the base class implementation, which performs ABI checks, 
-  // function name indexing, stripping, and finally calls WasmVm::load.
-  // The base class implementation is needed for standard Wasm modules.
+  // If it's not ELF we rely on the base class implementation, which performs 
+  // validation then calls WasmVm::load.
   return proxy_wasm::WasmBase::load(std::string(bytecode), allow_precompiled);
 }
 
