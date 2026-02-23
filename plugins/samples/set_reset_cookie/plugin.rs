@@ -39,7 +39,6 @@ impl RootContext for CookieManagerRootContext {
         // Handle empty configuration
         if _plugin_configuration_size == 0 {
             log::warn!("Empty configuration provided, no cookies will be managed");
-            self.cookie_configs.clear();
             return true; // Empty config is valid, just does nothing
         }
 
@@ -59,9 +58,6 @@ impl RootContext for CookieManagerRootContext {
             }
         };
 
-        // Parse the protobuf configuration using prost-reflect or manual parsing
-        // Note: For text protobuf parsing, you might need to use a text format parser
-        // This is a simplified version - you may need to adjust based on your protobuf setup
         let config: CookieManagerConfig = match parse_text_proto(&config_string) {
             Ok(c) => c,
             Err(e) => {
@@ -78,7 +74,6 @@ impl RootContext for CookieManagerRootContext {
         // Validate parsed configuration
         if config.cookies.is_empty() {
             log::warn!("Configuration parsed successfully but contains no cookie definitions");
-            self.cookie_configs.clear();
             return true;
         }
 
@@ -293,18 +288,7 @@ impl CookieManagerHttpContext {
     }
 }
 
-// Helper function to parse text protobuf format
-// Note: This is a placeholder - you'll need to implement or use a library for text proto parsing
 fn parse_text_proto(text: &str) -> Result<CookieManagerConfig, String> {
-    // This is a simplified parser. In production, you should use a proper text format parser
-    // or consider using JSON/binary protobuf instead
-    
-    // For now, returning an error to indicate this needs proper implementation
-    Err("Text protobuf parsing not fully implemented. Please use binary protobuf or implement a text parser.".to_string())
-    
-    // You could use prost-reflect or implement a custom parser here
-    // Example with hypothetical parser:
-    // prost_reflect::text_format::parse::<CookieManagerConfig>(text)
-    //     .map_err(|e| e.to_string())
+    protobuf::text_format::parse_from_str(text).map_err(|e| e.to_string())
 }
 // [END serviceextensions_plugin_set_reset_cookie]
