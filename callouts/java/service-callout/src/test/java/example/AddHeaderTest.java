@@ -40,7 +40,7 @@ public class AddHeaderTest {
     @Before
     public void setUp() throws IOException {
         server = new AddHeader.Builder()
-                .setPort(8443)
+                .setSecurePort(8443)
                 .setHealthCheckPort(8000)
                 .build();
 
