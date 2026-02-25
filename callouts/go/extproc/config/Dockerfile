@@ -16,7 +16,7 @@
 FROM marketplace.gcr.io/google/debian12 AS builder
 
 # Set the Go version
-ENV GO_VERSION 1.23.0
+ENV GO_VERSION 1.26.0
 
 # Install Go
 RUN apt-get update && apt-get install -y wget \
