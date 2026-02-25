@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"io"
 	"log"
@@ -49,7 +50,7 @@ func (s *server) Process(stream extproc.ExternalProcessor_ProcessServer) error {
 	for {
 		req, err := stream.Recv()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return nil
 			}
 			return err
@@ -91,9 +92,9 @@ func makeChannel(addr string, useTLS bool, certFile string) (*grpc.ClientConn, e
 		if err != nil {
 			return nil, err
 		}
-		return grpc.Dial(addr, grpc.WithTransportCredentials(creds))
+		return grpc.NewClient(addr, grpc.WithTransportCredentials(creds))
 	}
-	return grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	return grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 }
 
 // makeJSONRequest sends ProcessingRequest objects read from a JSON string and receives ProcessingResponse objects.
@@ -149,7 +150,7 @@ func makeJSONRequest(address string, useTLS bool, certFile, jsonData string) ([]
 	var responses []*extproc.ProcessingResponse
 	for {
 		resp, err := stream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

@@ -20,8 +20,8 @@ import (
 	base "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	httpstatus "github.com/envoyproxy/go-control-plane/envoy/type/v3"
+	"google.golang.org/protobuf/proto"
         structpb "google.golang.org/protobuf/types/known/structpb"
-	"github.com/golang/protobuf/proto"
 )
 
 const DYNAMIC_FORWARDING_METADATA_NAMESPACE string = "com.google.envoy.dynamic_forwarding.selected_endpoints"

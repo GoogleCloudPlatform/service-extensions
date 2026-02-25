@@ -15,6 +15,7 @@
 package main
 
 import (
+	"errors"
 	"io"
 	"log"
 	"net"
@@ -42,7 +43,7 @@ func (s *testServer) Process(stream extproc.ExternalProcessor_ProcessServer) err
 	for {
 		req, err := stream.Recv()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return nil
 			}
 			return err
