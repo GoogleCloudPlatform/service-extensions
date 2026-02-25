@@ -16,13 +16,13 @@ package jwt_auth
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/internal/server"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/pkg/utils"
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -49,7 +49,7 @@ func NewExampleCalloutService() *ExampleCalloutService {
 
 // LoadPublicKey loads the public key from the specified file path.
 func (s *ExampleCalloutService) LoadPublicKey(path string) {
-	key, err := ioutil.ReadFile(path)
+	key, err := os.ReadFile(path)
 	if err != nil {
 		log.Fatalf("failed to load public key: %v", err)
 	}
@@ -59,26 +59,31 @@ func (s *ExampleCalloutService) LoadPublicKey(path string) {
 // extractJWTToken extracts the JWT token from the request headers.
 func extractJWTToken(headers *extproc.HttpHeaders) (string, error) {
 	for _, header := range headers.Headers.Headers {
-		if header.Key == "Authorization" {
-			return string(header.RawValue), nil
+		// Use case-insensitive comparison since gRPC/HTTP2 normalizes headers to lowercase
+		if strings.EqualFold(header.Key, "authorization") {
+			// Try RawValue first, fall back to Value
+			if len(header.RawValue) > 0 {
+				return string(header.RawValue), nil
+			}
+			return header.Value, nil
 		}
 	}
 	return "", fmt.Errorf("no Authorization header found")
 }
 
 // validateJWTToken validates the JWT token using the public key.
-func validateJWTToken(key []byte, headers *extproc.HttpHeaders) (map[string]interface{}, error) {
+func validateJWTToken(key []byte, headers *extproc.HttpHeaders) (map[string]any, error) {
 	tokenString, err := extractJWTToken(headers)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if strings.HasPrefix(tokenString, "Bearer ") {
-		tokenString = strings.TrimPrefix(tokenString, "Bearer ")
+	if t, ok := strings.CutPrefix(tokenString, "Bearer "); ok {
+		tokenString = t
 	}
 
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
