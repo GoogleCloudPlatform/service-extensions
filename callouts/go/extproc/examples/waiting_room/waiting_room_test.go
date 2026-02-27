@@ -16,6 +16,7 @@ package waiting_room
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -28,10 +29,9 @@ import (
 
 // TestHandleRequestHeadersFirstVisit tests the HandleRequestHeaders method when a user visits for the first time (no cookie).
 func TestHandleRequestHeadersFirstVisit(t *testing.T) {
-	// Create an instance of WaitingRoomCalloutService
 	service := NewWaitingRoomCalloutService()
 
-	// Create a sample HttpHeaders request with no cookie
+	// No cookie header - first visit
 	headers := &extproc.HttpHeaders{
 		Headers: &core.HeaderMap{
 			Headers: []*core.HeaderValue{
@@ -43,57 +43,67 @@ func TestHandleRequestHeadersFirstVisit(t *testing.T) {
 		},
 	}
 
-	// Call the HandleRequestHeaders method
 	response, err := service.HandleRequestHeaders(headers)
-
-	// Check if any error occurred
 	if err != nil {
 		t.Errorf("HandleRequestHeaders got err: %v", err)
 	}
-
-	// Check if the response is not nil
 	if response == nil {
 		t.Fatalf("HandleRequestHeaders(): got nil resp, want non-nil")
 	}
 
+	immediateResp := response.GetImmediateResponse()
+	if immediateResp == nil {
+		t.Fatalf("HandleRequestHeaders(): got nil ImmediateResponse for first visit, want non-nil")
+	}
+
+	// Verify the HTTP status is 503 Service Unavailable
+	if immediateResp.GetStatus().GetCode().Number() != 503 {
+		t.Errorf("Expected status 503, got: %d", immediateResp.GetStatus().GetCode().Number())
+	}
+
 	// Verify that a Set-Cookie header was added
-	requestHeaders := response.GetRequestHeaders()
-	if requestHeaders == nil {
-		t.Fatalf("HandleRequestHeaders(): got nil RequestHeaders, want non-nil")
-	}
-
-	headerMutation := requestHeaders.GetResponse().GetHeaderMutation()
-	if headerMutation == nil {
-		t.Fatalf("HandleRequestHeaders(): got nil HeaderMutation, want non-nil")
-	}
-
-	// Check that Set-Cookie header exists
 	found := false
-	for _, header := range headerMutation.GetSetHeaders() {
-		if header.GetHeader().GetKey() == "Set-Cookie" {
+	var retryAfterValue string
+	for _, header := range immediateResp.GetHeaders().GetSetHeaders() {
+		key := header.GetHeader().GetKey()
+		val := string(header.GetHeader().GetRawValue())
+		switch key {
+		case "Set-Cookie":
 			found = true
-			cookieValue := string(header.GetHeader().GetRawValue())
-			
 			// Verify cookie contains the waiting room token name
-			if !strings.Contains(cookieValue, WaitingRoomCookieName) {
-				t.Errorf("Set-Cookie header missing waiting_room_token, got: %s", cookieValue)
+			if !strings.Contains(val, WaitingRoomCookieName) {
+				t.Errorf("Set-Cookie header missing %s, got: %s", WaitingRoomCookieName, val)
 			}
-			
 			// Verify cookie has security attributes
-			if !strings.Contains(cookieValue, "HttpOnly") {
-				t.Errorf("Set-Cookie header missing HttpOnly attribute, got: %s", cookieValue)
+			if !strings.Contains(val, "HttpOnly") {
+				t.Errorf("Set-Cookie header missing HttpOnly attribute, got: %s", val)
 			}
-			if !strings.Contains(cookieValue, "SameSite=Strict") {
-				t.Errorf("Set-Cookie header missing SameSite=Strict attribute, got: %s", cookieValue)
+			if !strings.Contains(val, "SameSite=Strict") {
+				t.Errorf("Set-Cookie header missing SameSite=Strict attribute, got: %s", val)
 			}
+		case "Retry-After":
+			retryAfterValue = val
 		}
 	}
 
 	if !found {
-		t.Errorf("HandleRequestHeaders(): Set-Cookie header not found in response")
+		t.Errorf("HandleRequestHeaders(): Set-Cookie header not found in ImmediateResponse")
+	}
+	if retryAfterValue == "" {
+		t.Errorf("HandleRequestHeaders(): Retry-After header not found in ImmediateResponse")
+	} else {
+		ra, err := strconv.ParseInt(retryAfterValue, 10, 64)
+		if err != nil || ra <= 0 {
+			t.Errorf("Expected positive Retry-After value, got: %s", retryAfterValue)
+		}
 	}
 
-	// Verify that dynamic metadata indicates redirect
+	// Verify response body contains waiting room HTML
+	if !strings.Contains(immediateResp.GetBody(), "waiting room") {
+		t.Errorf("Expected ImmediateResponse body to contain waiting room HTML, got: %s", immediateResp.GetBody())
+	}
+
+	// Verify dynamic metadata indicates redirect
 	if response.GetDynamicMetadata() != nil {
 		fields := response.GetDynamicMetadata().GetFields()
 		if waitingRoom, ok := fields["waiting_room"]; ok {
@@ -102,21 +112,23 @@ func TestHandleRequestHeadersFirstVisit(t *testing.T) {
 				if !redirect.GetBoolValue() {
 					t.Errorf("Expected redirect to be true for first visit")
 				}
+			} else {
+				t.Errorf("Expected 'redirect' field in waiting_room metadata")
 			}
+		} else {
+			t.Errorf("Expected 'waiting_room' field in dynamic metadata")
 		}
 	}
 }
 
 // TestHandleRequestHeadersWithinWaitPeriod tests the HandleRequestHeaders method when a user has a cookie but hasn't waited long enough.
 func TestHandleRequestHeadersWithinWaitPeriod(t *testing.T) {
-	// Create an instance of WaitingRoomCalloutService
 	service := NewWaitingRoomCalloutService()
 
-	// Create a cookie with a timestamp from 2 minutes ago (less than the 5-minute wait time)
+	// Cookie with a timestamp from 2 minutes ago (less than the 5-minute wait time)
 	recentTimestamp := time.Now().Unix() - 120 // 2 minutes ago
 	cookieValue := fmt.Sprintf("%s=test-token-123:%d", WaitingRoomCookieName, recentTimestamp)
 
-	// Create a sample HttpHeaders request with the cookie
 	headers := &extproc.HttpHeaders{
 		Headers: &core.HeaderMap{
 			Headers: []*core.HeaderValue{
@@ -132,41 +144,63 @@ func TestHandleRequestHeadersWithinWaitPeriod(t *testing.T) {
 		},
 	}
 
-	// Call the HandleRequestHeaders method
 	response, err := service.HandleRequestHeaders(headers)
-
-	// Check if any error occurred
 	if err != nil {
 		t.Errorf("HandleRequestHeaders got err: %v", err)
 	}
-
-	// Check if the response is not nil
 	if response == nil {
 		t.Fatalf("HandleRequestHeaders(): got nil resp, want non-nil")
 	}
 
-	// Verify that a new Set-Cookie header was added (user still waiting)
-	requestHeaders := response.GetRequestHeaders()
-	if requestHeaders == nil {
-		t.Fatalf("HandleRequestHeaders(): got nil RequestHeaders, want non-nil")
+	immediateResp := response.GetImmediateResponse()
+	if immediateResp == nil {
+		t.Fatalf("HandleRequestHeaders(): got nil ImmediateResponse for within-wait-period, want non-nil")
 	}
 
-	headerMutation := requestHeaders.GetResponse().GetHeaderMutation()
-	if headerMutation == nil {
-		t.Fatalf("HandleRequestHeaders(): got nil HeaderMutation, want non-nil")
+	// Verify 503 status
+	if immediateResp.GetStatus().GetCode().Number() != 503 {
+		t.Errorf("Expected status 503, got: %d", immediateResp.GetStatus().GetCode().Number())
 	}
 
-	// Verify dynamic metadata shows remaining wait time
+	// (not reset the clock with a new token/timestamp).
+	for _, header := range immediateResp.GetHeaders().GetSetHeaders() {
+		if header.GetHeader().GetKey() == "Set-Cookie" {
+			val := string(header.GetHeader().GetRawValue())
+			// The cookie value should contain the original token and timestamp
+			if !strings.Contains(val, "test-token-123") {
+				t.Errorf("Expected Set-Cookie to preserve original token 'test-token-123', got: %s", val)
+			}
+			expectedTS := fmt.Sprintf("%d", recentTimestamp)
+			if !strings.Contains(val, expectedTS) {
+				t.Errorf("Expected Set-Cookie to preserve original timestamp %s, got: %s", expectedTS, val)
+			}
+		}
+	}
+
+	// Verify dynamic metadata shows correct remaining wait time (~3 minutes remaining)
 	if response.GetDynamicMetadata() != nil {
 		fields := response.GetDynamicMetadata().GetFields()
 		if waitingRoom, ok := fields["waiting_room"]; ok {
 			wrFields := waitingRoom.GetStructValue().GetFields()
 			if retryAfter, ok := wrFields["retry_after"]; ok {
 				remaining := retryAfter.GetNumberValue()
-				// Should be less than full wait time but greater than 0
+				// Should be less than full wait time (300) but greater than 0
+				// With a 2-min-old cookie, ~180 seconds remain.
 				if remaining <= 0 || remaining >= WaitingRoomWaitTime {
 					t.Errorf("Expected retry_after between 0 and %d, got: %f", WaitingRoomWaitTime, remaining)
 				}
+			} else {
+				t.Errorf("Expected 'retry_after' field in waiting_room metadata")
+			}
+		}
+	}
+
+	// Verify Retry-After header is also set correctly
+	for _, header := range immediateResp.GetHeaders().GetSetHeaders() {
+		if header.GetHeader().GetKey() == "Retry-After" {
+			ra, err := strconv.ParseInt(string(header.GetHeader().GetRawValue()), 10, 64)
+			if err != nil || ra <= 0 || ra >= WaitingRoomWaitTime {
+				t.Errorf("Expected Retry-After between 0 and %d, got: %s", WaitingRoomWaitTime, string(header.GetHeader().GetRawValue()))
 			}
 		}
 	}
@@ -174,14 +208,12 @@ func TestHandleRequestHeadersWithinWaitPeriod(t *testing.T) {
 
 // TestHandleRequestHeadersAfterWaitPeriod tests the HandleRequestHeaders method when a user has waited long enough.
 func TestHandleRequestHeadersAfterWaitPeriod(t *testing.T) {
-	// Create an instance of WaitingRoomCalloutService
 	service := NewWaitingRoomCalloutService()
 
-	// Create a cookie with a timestamp from 6 minutes ago (more than the 5-minute wait time)
+	// Cookie with a timestamp from 6 minutes ago (more than the 5-minute wait time)
 	oldTimestamp := time.Now().Unix() - (WaitingRoomWaitTime + 60) // 6 minutes ago
 	cookieValue := fmt.Sprintf("%s=test-token-456:%d", WaitingRoomCookieName, oldTimestamp)
 
-	// Create a sample HttpHeaders request with the cookie
 	headers := &extproc.HttpHeaders{
 		Headers: &core.HeaderMap{
 			Headers: []*core.HeaderValue{
@@ -197,20 +229,15 @@ func TestHandleRequestHeadersAfterWaitPeriod(t *testing.T) {
 		},
 	}
 
-	// Call the HandleRequestHeaders method
 	response, err := service.HandleRequestHeaders(headers)
-
-	// Check if any error occurred
 	if err != nil {
 		t.Errorf("HandleRequestHeaders got err: %v", err)
 	}
-
-	// Check if the response is not nil
 	if response == nil {
 		t.Fatalf("HandleRequestHeaders(): got nil resp, want non-nil")
 	}
 
-	// Define the expected response - user should be allowed through
+	// After the wait period the response is still RequestHeaders (allow-through path is unchanged).
 	wantResponse := &extproc.ProcessingResponse{
 		Response: &extproc.ProcessingResponse_RequestHeaders{
 			RequestHeaders: &extproc.HeadersResponse{
@@ -230,20 +257,18 @@ func TestHandleRequestHeadersAfterWaitPeriod(t *testing.T) {
 		},
 	}
 
-	// Compare the entire proto messages
 	if diff := cmp.Diff(response, wantResponse, protocmp.Transform()); diff != "" {
 		t.Errorf("HandleRequestHeaders() mismatch (-want +got):\n%s", diff)
 	}
 
-	// Verify that X-Waiting-Room-Status header is set to "allowed"
+	// Also verify via direct accessor
 	requestHeaders := response.GetRequestHeaders()
 	if requestHeaders == nil {
-		t.Fatalf("HandleRequestHeaders(): got nil RequestHeaders, want non-nil")
+		t.Fatalf("HandleRequestHeaders(): got nil RequestHeaders for allowed user, want non-nil")
 	}
-
 	headerMutation := requestHeaders.GetResponse().GetHeaderMutation()
 	if headerMutation == nil {
-		t.Fatalf("HandleRequestHeaders(): got nil HeaderMutation, want non-nil")
+		t.Fatalf("HandleRequestHeaders(): got nil HeaderMutation for allowed user, want non-nil")
 	}
 
 	found := false
@@ -256,7 +281,6 @@ func TestHandleRequestHeadersAfterWaitPeriod(t *testing.T) {
 			}
 		}
 	}
-
 	if !found {
 		t.Errorf("HandleRequestHeaders(): X-Waiting-Room-Status header not found in response")
 	}
@@ -264,26 +288,19 @@ func TestHandleRequestHeadersAfterWaitPeriod(t *testing.T) {
 
 // TestHandleResponseHeaders tests the HandleResponseHeaders method of WaitingRoomCalloutService.
 func TestHandleResponseHeaders(t *testing.T) {
-	// Create an instance of WaitingRoomCalloutService
 	service := NewWaitingRoomCalloutService()
 
-	// Create a sample HttpHeaders response
 	headers := &extproc.HttpHeaders{}
 
-	// Call the HandleResponseHeaders method
 	response, err := service.HandleResponseHeaders(headers)
-
-	// Check if any error occurred
 	if err != nil {
 		t.Errorf("HandleResponseHeaders got err: %v", err)
 	}
-
-	// Check if the response is not nil
 	if response == nil {
 		t.Fatalf("HandleResponseHeaders(): got nil resp, want non-nil")
 	}
 
-	// Define the expected response
+	// This path is unchanged - still uses ResponseHeaders mutation.
 	wantResponse := &extproc.ProcessingResponse{
 		Response: &extproc.ProcessingResponse_ResponseHeaders{
 			ResponseHeaders: &extproc.HeadersResponse{
@@ -303,7 +320,6 @@ func TestHandleResponseHeaders(t *testing.T) {
 		},
 	}
 
-	// Compare the entire proto messages
 	if diff := cmp.Diff(response, wantResponse, protocmp.Transform()); diff != "" {
 		t.Errorf("HandleResponseHeaders() mismatch (-want +got):\n%s", diff)
 	}

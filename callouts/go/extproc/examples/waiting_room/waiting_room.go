@@ -22,17 +22,19 @@ import (
 	"strings"
 	"time"
 
+	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
+	envoy_type "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/internal/server"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/pkg/utils"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const (
-
 	WaitingRoomCookieName = "waiting_room_token"
-	
+
 	WaitingRoomWaitTime = 300 // 5 minutes
-	
+
 	WaitingRoomPath = "/waiting-room"
 )
 
@@ -51,13 +53,15 @@ func NewWaitingRoomCalloutService() *WaitingRoomCalloutService {
 
 // HandleRequestHeaders processes incoming requests and implements waiting room logic.
 func (s *WaitingRoomCalloutService) HandleRequestHeaders(headers *extproc.HttpHeaders) (*extproc.ProcessingResponse, error) {
-	// Extract headers for processing
-	headerMap := utils.GetHeaderMap(headers)
-	
+	headerMap := make(map[string]string)
+	for _, hv := range headers.GetHeaders().GetHeaders() {
+		headerMap[strings.ToLower(hv.GetKey())] = string(hv.GetRawValue())
+	}
+
 	// Check if user has a waiting room cookie
 	cookieHeader := headerMap["cookie"]
 	token, timestamp := extractWaitingRoomCookie(cookieHeader)
-	
+
 	// Determine if user should be allowed through
 	if shouldAllowAccess(token, timestamp) {
 		// User has valid token and has waited long enough - allow through
@@ -74,44 +78,91 @@ func (s *WaitingRoomCalloutService) HandleRequestHeaders(headers *extproc.HttpHe
 			},
 		}, nil
 	}
-	
-	// User needs to wait - redirect to waiting room
-	newToken := generateToken()
+
 	currentTime := time.Now().Unix()
+
+	// Only generate a fresh token for true first-time visitors so the timer doesn't reset.
+	var cookieToken string
+	var cookieTimestamp int64
+	if token != "" && timestamp != 0 {
+		// Returning visitor - reuse their existing token and original timestamp
+		cookieToken = token
+		cookieTimestamp = timestamp
+	} else {
+		// First visit - issue a new token with the current time
+		cookieToken = generateToken()
+		cookieTimestamp = currentTime
+	}
+
 	cookieValue := fmt.Sprintf("%s=%s:%d; Path=/; Max-Age=%d; HttpOnly; SameSite=Strict",
-		WaitingRoomCookieName, newToken, currentTime, WaitingRoomWaitTime*2)
-	
-	retryAfter := WaitingRoomWaitTime
-	if timestamp > 0 {
-		elapsed := currentTime - timestamp
-		remaining := WaitingRoomWaitTime - elapsed
+		WaitingRoomCookieName, cookieToken, cookieTimestamp, WaitingRoomWaitTime*2)
+
+	retryAfter := int64(WaitingRoomWaitTime)
+	if cookieTimestamp > 0 {
+		elapsed := currentTime - cookieTimestamp
+		remaining := int64(WaitingRoomWaitTime) - elapsed
 		if remaining > 0 {
 			retryAfter = remaining
+		} else {
+			retryAfter = 0
 		}
 	}
-	
+
+	metaStruct, err := structpb.NewStruct(map[string]interface{}{
+		"waiting_room": map[string]interface{}{
+			"redirect":    true,
+			"retry_after": retryAfter,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to build dynamic metadata: %w", err)
+	}
+
+	waitingRoomHTML := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Waiting Room</title>
+<meta http-equiv="refresh" content="%d;url=/">
+</head>
+<body>
+<h1>You are in the waiting room</h1>
+<p>Please wait approximately <strong>%d seconds</strong> before you will be admitted.</p>
+<p>This page will automatically retry in %d seconds.</p>
+</body>
+</html>`, retryAfter, retryAfter, retryAfter)
+
 	return &extproc.ProcessingResponse{
-		Response: &extproc.ProcessingResponse_RequestHeaders{
-			RequestHeaders: &extproc.HeaderMutation{
-				SetHeaders: []*extproc.HeaderValueOption{
-					{
-						Header: &extproc.HeaderValue{
-							Key:   "Set-Cookie",
-							Value: cookieValue,
+		Response: &extproc.ProcessingResponse_ImmediateResponse{
+			ImmediateResponse: &extproc.ImmediateResponse{
+				Status: &envoy_type.HttpStatus{
+					Code: envoy_type.StatusCode_ServiceUnavailable, // 503
+				},
+				Headers: &extproc.HeaderMutation{
+					SetHeaders: []*extproc.HeaderValueOption{
+						{
+							Header: &core.HeaderValue{
+								Key:      "Set-Cookie",
+								RawValue: []byte(cookieValue),
+							},
+						},
+						{
+							Header: &core.HeaderValue{
+								Key:      "Retry-After",
+								RawValue: []byte(strconv.FormatInt(retryAfter, 10)),
+							},
+						},
+						{
+							Header: &core.HeaderValue{
+								Key:      "Content-Type",
+								RawValue: []byte("text/html; charset=utf-8"),
+							},
 						},
 					},
 				},
+				Body:    waitingRoomHTML,
+				Details: "waiting_room",
 			},
 		},
-		ModeOverride: &extproc.ProcessingMode{
-			ResponseHeaderMode: extproc.ProcessingMode_SEND,
-		},
-		DynamicMetadata: utils.NewStruct(map[string]interface{}{
-			"waiting_room": map[string]interface{}{
-				"redirect":    true,
-				"retry_after": retryAfter,
-			},
-		}),
+		DynamicMetadata: metaStruct,
 	}, nil
 }
 
@@ -136,7 +187,7 @@ func extractWaitingRoomCookie(cookieHeader string) (token string, timestamp int6
 	if cookieHeader == "" {
 		return "", 0
 	}
-	
+
 	cookies := strings.Split(cookieHeader, ";")
 	for _, cookie := range cookies {
 		cookie = strings.TrimSpace(cookie)
@@ -152,7 +203,7 @@ func extractWaitingRoomCookie(cookieHeader string) (token string, timestamp int6
 			break
 		}
 	}
-	
+
 	return token, timestamp
 }
 
@@ -162,11 +213,11 @@ func shouldAllowAccess(token string, timestamp int64) bool {
 	if token == "" || timestamp == 0 {
 		return false
 	}
-	
+
 	// Check if enough time has elapsed
 	currentTime := time.Now().Unix()
 	elapsed := currentTime - timestamp
-	
+
 	return elapsed >= WaitingRoomWaitTime
 }
 
