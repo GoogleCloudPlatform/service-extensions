@@ -30,21 +30,21 @@ All callbacks return `Continue` or `true` to allow normal request processing.
 
 | Callback | C++ | Rust | When Called |
 |----------|-----|------|-------------|
-| `onCreate` | ✅ | ✅ | When root context is created |
-| `onStart` / `on_vm_start` | ✅ | ✅ | When WASM VM starts |
-| `onConfigure` / `on_configure` | ✅ | ✅ | When configuration is loaded |
-| `onDone` / `on_done` | ✅ | ✅ | Before root context is destroyed |
-| `onDelete` / `Drop` | ✅ | ✅ | When root context is destroyed |
+| `onCreate` | Yes | Yes | When root context is created |
+| `onStart` / `on_vm_start` | Yes | Yes | When WASM VM starts |
+| `onConfigure` / `on_configure` | Yes | Yes | When configuration is loaded |
+| `onDone` / `on_done` | Yes | Yes | Before root context is destroyed |
+| `onDelete` / `Drop` | Yes | Yes | When root context is destroyed |
 
 ### HTTP Context Callbacks
 
 | Callback | C++ | Rust | When Called |
 |----------|-----|------|-------------|
-| `onCreate` / `create_http_context` | ✅ | ✅ | When HTTP context is created |
-| `onRequestHeaders` / `on_http_request_headers` | ✅ | ✅ | When request headers are received |
-| `onResponseHeaders` / `on_http_response_headers` | ✅ | ✅ | When response headers are received |
-| `onDone` / `on_done` | ✅ | ✅ | Before HTTP context is destroyed |
-| `onDelete` / `Drop` | ✅ | ✅ | When HTTP context is destroyed |
+| `onCreate` / `create_http_context` | Yes | Yes | When HTTP context is created |
+| `onRequestHeaders` / `on_http_request_headers` | Yes | Yes | When request headers are received |
+| `onResponseHeaders` / `on_http_response_headers` | Yes | Yes | When response headers are received |
+| `onDone` / `on_done` | Yes | Yes | Before HTTP context is destroyed |
+| `onDelete` / `Drop` | Yes | Yes | When HTTP context is destroyed |
 
 ## Key Code Walkthrough
 

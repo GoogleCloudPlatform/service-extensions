@@ -58,11 +58,11 @@ The core logic is conceptually identical across all three language implementatio
   response_code / 100 == 5
   ```
   This efficiently checks if the status code is between 500-599:
-  - 500 / 100 = 5 ✓
-  - 502 / 100 = 5 ✓
-  - 599 / 100 = 5 ✓
-  - 404 / 100 = 4 ✗
-  - 200 / 100 = 2 ✗
+  - 500 / 100 = 5 (matches)
+  - 502 / 100 = 5 (matches)
+  - 599 / 100 = 5 (matches)
+  - 404 / 100 = 4 (does not match)
+  - 200 / 100 = 2 (does not match)
 
 - **Status code remapping** — The mapping logic:
   - **C++/Go**: Separate `mapResponseCode()` function for flexibility:
@@ -177,8 +177,4 @@ Derived from [`tests.textpb`](tests.textpb):
 - **Debugging difficulty**: Makes troubleshooting harder since the original error is lost
 - **Client confusion**: Clients may misinterpret 404 when the actual problem is server-side
 
-**Best practices**:
-- Consider logging the original status code before remapping
-- Use this pattern selectively (e.g., only for public-facing APIs)
-- Preserve original status codes in internal headers for debugging
-- Monitor backend errors separately from client-facing status codes
+**Note**: When using this pattern, logging the original status code before remapping, using it selectively, preserving original codes in internal headers, and monitoring backend errors separately can help mitigate these issues.
