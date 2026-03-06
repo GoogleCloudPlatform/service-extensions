@@ -34,8 +34,6 @@ const (
 	WaitingRoomCookieName = "waiting_room_token"
 
 	WaitingRoomWaitTime = 300 // 5 minutes
-
-	WaitingRoomPath = "/waiting-room"
 )
 
 // WaitingRoomCalloutService is a gRPC service that handles waiting room logic.
@@ -137,7 +135,7 @@ func (s *WaitingRoomCalloutService) HandleRequestHeaders(headers *extproc.HttpHe
 					Code: envoy_type.StatusCode_ServiceUnavailable, // 503
 				},
 				Headers: &extproc.HeaderMutation{
-					SetHeaders: []*extproc.HeaderValueOption{
+					SetHeaders: []*core.HeaderValueOption{
 						{
 							Header: &core.HeaderValue{
 								Key:      "Set-Cookie",

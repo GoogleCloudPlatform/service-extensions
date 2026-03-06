@@ -257,7 +257,7 @@ func TestHandleRequestHeadersAfterWaitPeriod(t *testing.T) {
 		},
 	}
 
-	if diff := cmp.Diff(response, wantResponse, protocmp.Transform()); diff != "" {
+	if diff := cmp.Diff(wantResponse, response, protocmp.Transform()); diff != "" {
 		t.Errorf("HandleRequestHeaders() mismatch (-want +got):\n%s", diff)
 	}
 
@@ -320,7 +320,7 @@ func TestHandleResponseHeaders(t *testing.T) {
 		},
 	}
 
-	if diff := cmp.Diff(response, wantResponse, protocmp.Transform()); diff != "" {
+	if diff := cmp.Diff(wantResponse, response, protocmp.Transform()); diff != "" {
 		t.Errorf("HandleResponseHeaders() mismatch (-want +got):\n%s", diff)
 	}
 }
