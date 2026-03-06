@@ -1,40 +1,38 @@
 # Set Cookie Plugin
 
-This plugin implements automatic session management by detecting if a session ID cookie exists in incoming requests and creating one if it doesn't. When a request arrives without a session cookie, the plugin generates a random session ID and sets it via a `Set-Cookie` response header. Use this plugin when you need to implement session tracking, ensure all users have session identifiers, or add stateful behavior to stateless backends. It operates during both the **request headers** and **response headers** processing phases.
+This plugin implements automatic session management by detecting if a session ID cookie exists in incoming requests and creating one if it doesn't. When a request arrives without a valid session cookie, the plugin generates a random session ID and sets it via a `Set-Cookie` response header. Use this plugin when you need to implement session tracking, ensure all users have session identifiers, or add stateful behavior to stateless backends. It operates during both the **request headers** and **response headers** processing phases.
 
 ## How It Works
 
-### Request Phase (Session Detection)
-
 1. The proxy receives an HTTP request from a client and invokes the plugin's `on_http_request_headers` callback.
-
-2. The plugin reads the `Cookie` header and parses it to look for the session cookie (named `my_cookie` by default).
-
-3. **Cookie parsing**: The plugin splits the `Cookie` header by `; ` (semicolon-space) to separate individual cookies, then splits each cookie by `=` to extract name-value pairs.
-
-4. **Session ID extraction**: If `my_cookie` is found, its value is stored for later use. Otherwise, the plugin records that no session ID exists.
-
-### Response Phase (Session Creation)
-
-1. The proxy receives a response from the upstream server and invokes the plugin's `on_http_response_headers` callback.
-
-2. **If session ID exists** (detected in request phase):
+2. The plugin reads the `Cookie` header and performs security validations:
+   - Checks if the header exists (returns nullopt if missing)
+   - Validates header size (max 4KB) to prevent DoS attacks
+   - Validates cookie format and structure
+3. **Cookie parsing**: If valid, the plugin splits the `Cookie` header by `; ` (semicolon-space) to separate individual cookies, then splits each cookie by `=` to extract name-value pairs. Malformed cookies (without `=`) are skipped.
+4. **Session ID extraction**: If `my_cookie` is found, its value is validated:
+   - Must not be empty
+   - Maximum length of 128 characters
+   - Must contain only alphanumeric characters
+   
+   If valid, the session ID is stored for later use. Otherwise, the plugin records that no valid session ID exists.
+5. When the upstream response arrives, the proxy invokes the plugin's `on_http_response_headers` callback.
+6. **If valid session ID exists** (detected in request phase):
    - The plugin logs: `"This current request is for the existing session ID: {id}"`
-   - No `Set-Cookie` header is added (client already has a session)
-
-3. **If no session ID** (not found in request):
+   - No `Set-Cookie` header is added (client already has a valid session)
+7. **If no valid session ID** (not found or invalid in request):
    - The plugin generates a new random session ID using a cryptographically secure random number generator
-   - Adds a `Set-Cookie` response header: `my_cookie={new_id}; Path=/; HttpOnly`
+   - Attempts to add a `Set-Cookie` response header: `my_cookie={new_id}; Path=/; HttpOnly`
+   - Verifies the operation success (logs error if header addition fails)
    - Logs: `"New session ID created for the current request: {new_id}"`
-
-4. The response is forwarded to the client with the new session cookie (if created).
+8. The response is forwarded to the client with the new session cookie (if successfully created).
 
 ## Proxy-Wasm Callbacks Used
 
 | Callback | Purpose |
 |---|---|
-| `on_http_request_headers` | Parses `Cookie` header to detect existing session ID |
-| `on_http_response_headers` | Adds `Set-Cookie` header if no session ID was found in request |
+| `on_http_request_headers` | Parses and validates the `Cookie` header to detect an existing session ID |
+| `on_http_response_headers` | Adds a `Set-Cookie` header if no valid session ID was found in the request |
 
 ## Key Code Walkthrough
 
