@@ -154,7 +154,9 @@ for your own plugin. Extend them to fit your particular use case.
     Enable reCAPTCHA challenge on response body by injecting script into head
     tag.
     Warning: This is not a replacement for [official reCAPTCHA documentation](https://developers.google.com/recaptcha).
-
+*   [CDN Token Generator](samples/cdn_token_generator/): Creates signed URLs with 
+    time-limited tokens for Media CDN to protect premium content. Takes an original URL 
+    from a request header and adds cryptographic signatures using HMAC-SHA256.
 
 # Feature set / ABI
 
