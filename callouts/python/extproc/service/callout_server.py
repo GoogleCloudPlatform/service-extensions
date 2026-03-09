@@ -19,14 +19,12 @@ Bundled with an optional health check server.
 Can be set up to use ssl certificates.
 """
 
-from concurrent import futures
-from http.server import BaseHTTPRequestHandler
-from http.server import HTTPServer
+import asyncio
 import logging
 import ssl
-from typing import Iterator, Union
-from typing import Iterable
+from typing import AsyncIterator, Union
 
+from aiohttp import web
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpBody
 from envoy.service.ext_proc.v3.external_processor_pb2 import HttpHeaders
 from envoy.service.ext_proc.v3.external_processor_pb2 import BodyResponse
@@ -35,12 +33,20 @@ from envoy.service.ext_proc.v3.external_processor_pb2 import ImmediateResponse
 from envoy.service.ext_proc.v3.external_processor_pb2 import ProcessingRequest
 from envoy.service.ext_proc.v3.external_processor_pb2 import ProcessingResponse
 from envoy.service.ext_proc.v3.external_processor_pb2_grpc import (
-    add_ExternalProcessorServicer_to_server,)
+  add_ExternalProcessorServicer_to_server,)
 from envoy.service.ext_proc.v3.external_processor_pb2_grpc import (
-    ExternalProcessorServicer,)
-import grpc
-from google.protobuf.struct_pb2 import Struct
+  ExternalProcessorServicer,)
+import grpc.aio
 from grpc import ServicerContext
+
+# Use uvloop for better async performance (Linux/macOS only).
+# On Windows, uvloop is not supported and the default asyncio event loop is used.
+try:
+  import uvloop
+  asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+  logging.info("Using uvloop for improved async performance")
+except ImportError:
+  logging.info("uvloop not available, using default event loop")
 
 
 def _addr_to_str(address: tuple[str, int]) -> str:
@@ -55,17 +61,8 @@ def _addr_to_str(address: tuple[str, int]) -> str:
   return f'{address[0]}:{address[1]}'
 
 
-class HealthCheckService(BaseHTTPRequestHandler):
-  """Server for responding to health check pings."""
-
-  def do_GET(self) -> None:
-    """Returns an empty page with 200 status code."""
-    self.send_response(200)
-    self.end_headers()
-
-
 class CalloutServer:
-  """Server wrapper for managing callout servers and processing callouts.
+  """Async server wrapper for managing callout servers and processing callouts.
 
   Attributes:
     secure_address: Address that the main secure (TLS) server will attempt to connect to,
@@ -84,7 +81,7 @@ class CalloutServer:
     cert_chain_path: Relative file path to the cert_chain.
     private_key: PEM private key of the server.
     private_key_path: Relative file path pointing to a file containing private_key data.
-    server_thread_count: Threads allocated to the main grpc service.
+    server_thread_count: Kept for compatibility but not used in async server.
     disable_tls: If True, disables the secure (TLS) server. Defaults to True (TLS disabled).
   """
 
@@ -104,10 +101,9 @@ class CalloutServer:
     private_key_path: str = './extproc/ssl_creds/privatekey.pem',
     server_thread_count: int = 2,
   ):
-    self._setup = False
+    self._server: grpc.aio.Server | None = None
+    self._health_check_runner: web.AppRunner | None = None
     self._shutdown = False
-    self._closed = False
-    self._health_check_server: HTTPServer | None = None
     default_ip = default_ip or '0.0.0.0'
 
     self.secure_address: tuple[str, int] = secure_address or (default_ip, 443)
@@ -124,16 +120,21 @@ class CalloutServer:
 
     if self.disable_tls and self.plaintext_address is None:
       raise ValueError(
-          'At least one of secure (TLS) or plaintext listeners must be enabled.')
+        'At least one of secure (TLS) or plaintext listeners must be enabled.')
 
     def _read_cert_file(path: str | None) -> bytes | None:
       if path:
-        with open(path, 'rb') as file:
-          return file.read()
+        try:
+          with open(path, 'rb') as file:
+            return file.read()
+        except FileNotFoundError:
+          return None
       return None
 
     self.server_thread_count = server_thread_count
     self.secure_health_check = secure_health_check
+    self.cert_chain_path = cert_chain_path
+    self.private_key_path = private_key_path
     # Read cert data.
     self.private_key = private_key or _read_cert_file(private_key_path)
     self.cert_chain = cert_chain or _read_cert_file(cert_chain_path)
@@ -141,12 +142,12 @@ class CalloutServer:
     if not self.disable_tls:
       if not self.private_key:
         raise ValueError(
-            'TLS is enabled but private key is not provided. '
-            'Please provide private_key or private_key_path.')
+          'TLS is enabled but private key is not provided. '
+          'Please provide private_key or private_key_path.')
       if not self.cert_chain:
         raise ValueError(
-            'TLS is enabled but certificate chain is not provided. '
-            'Please provide cert_chain or cert_chain_path.')
+          'TLS is enabled but certificate chain is not provided. '
+          'Please provide cert_chain or cert_chain_path.')
 
     if secure_health_check:
       if not private_key_path:
@@ -159,81 +160,123 @@ class CalloutServer:
       self.health_check_ssl_context.load_cert_chain(certfile=cert_chain_path,
                                                     keyfile=private_key_path)
 
-    self._callout_server = _GRPCCalloutService(self)
-
   def run(self) -> None:
     """Start all requested servers and listen for new connections; blocking."""
-    self._start_servers()
-    self._setup = True
+    asyncio.run(self._run_async())
+
+  async def _run_async(self) -> None:
+    """Async entry point for running the server."""
+    # gRPC tuning for high concurrency
+    self._server = grpc.aio.server(
+      options=[
+        # Allow many concurrent streams for high load
+        ('grpc.max_concurrent_streams', 2500),
+        # Enable SO_REUSEPORT for better connection distribution
+        ('grpc.so_reuseport', 1),
+        # Reasonable message size limits
+        ('grpc.max_receive_message_length', 4 * 1024 * 1024),
+        ('grpc.max_send_message_length', 4 * 1024 * 1024),
+        # HTTP2 tuning for high concurrency
+        ('grpc.http2.max_pings_without_data', 0),
+        ('grpc.http2.min_ping_interval_without_data_ms', 10000),
+        ('grpc.http2.min_recv_ping_interval_without_data_ms', 10000),
+        # Keepalive settings
+        ('grpc.keepalive_time_ms', 30000),
+        ('grpc.keepalive_timeout_ms', 60000),
+        ('grpc.keepalive_permit_without_calls', 1),
+      ]
+    )
+
+    # Add servicer
+    add_ExternalProcessorServicer_to_server(
+      _AsyncGRPCCalloutService(self),
+      self._server
+    )
+
+    start_msg = 'Async gRPC callout server started'
+
+    # Add secure port if TLS is enabled
+    if not self.disable_tls:
+      server_credentials = grpc.ssl_server_credentials(
+        private_key_certificate_chain_pairs=[(self.private_key, self.cert_chain)]
+      )
+      self._server.add_secure_port(_addr_to_str(self.secure_address), server_credentials)
+      start_msg += f', listening on {_addr_to_str(self.secure_address)} (secure)'
+
+    # Add plaintext port
+    if self.plaintext_address:
+      self._server.add_insecure_port(_addr_to_str(self.plaintext_address))
+      start_msg += f', listening on {_addr_to_str(self.plaintext_address)} (plaintext)'
+
+    await self._server.start()
+    logging.info(start_msg)
+
+    # Start health check HTTP server
+    if self.health_check_address:
+      await self._start_health_check_server()
+
     try:
-      self._loop_server()
+      await self._server.wait_for_termination()
     except KeyboardInterrupt:
       logging.info('Server interrupted')
     finally:
-      self._stop_servers()
-      self._closed = True
+      if self._health_check_runner:
+        await self._health_check_runner.cleanup()
+      await self._server.stop(grace=5)
+      logging.info('Server stopped.')
 
-  def _start_servers(self) -> None:
-    """Start the requested servers."""
-    if self.health_check_address:
-      self._health_check_server = HTTPServer(self.health_check_address,
-                                             HealthCheckService)
-      protocol = 'HTTP'
-      if self.secure_health_check:
-        protocol = 'HTTPS'
-        self._health_check_server.socket = (
-          self.health_check_ssl_context.wrap_socket(
-            sock=self._health_check_server.socket,))
+  async def _health_check_handler(self, request: web.Request) -> web.Response:
+    """Handle health check HTTP requests."""
+    return web.Response(text="OK", status=200)
 
-      logging.info('%s health check server bound to %s.', protocol,
-                   _addr_to_str(self.health_check_address))
-    self._callout_server.start()
+  async def _start_health_check_server(self) -> None:
+    """Start the async HTTP health check server."""
+    app = web.Application()
+    app.router.add_get('/', self._health_check_handler)
+    app.router.add_get('/health', self._health_check_handler)
 
-  def _stop_servers(self) -> None:
-    """Close the sockets of all servers, and trigger shutdowns."""
-    if self._health_check_server:
-      self._health_check_server.server_close()
-      self._health_check_server.shutdown()
-      logging.info('Health check server stopped.')
+    self._health_check_runner = web.AppRunner(app)
+    await self._health_check_runner.setup()
 
-    if self._callout_server:
-      self._callout_server.stop()
+    ssl_context = None
+    protocol = 'HTTP'
+    if self.secure_health_check:
+      protocol = 'HTTPS'
+      ssl_context = self.health_check_ssl_context
 
-  def _loop_server(self) -> None:
-    """Loop server forever, calling shutdown will cause the server to stop."""
-
-    # We chose the main serving thread based on what server configuration
-    # was requested. Defaults to the health check thread.
-    if self._health_check_server:
-      logging.info("Health check server started.")
-      self._health_check_server.serve_forever()
-    else:
-      # If the only server requested is a grpc callout server, we wait on the grpc server.
-      self._callout_server.loop()
+    site = web.TCPSite(
+      self._health_check_runner,
+      self.health_check_address[0],
+      self.health_check_address[1],
+      ssl_context=ssl_context
+    )
+    await site.start()
+    logging.info('%s health check server listening on %s.', protocol,
+                 _addr_to_str(self.health_check_address))
 
   def shutdown(self) -> None:
     """Tell the server to shutdown, ending all serving threads."""
-    if self._health_check_server:
-      self._health_check_server.shutdown()
-    if self._callout_server:
-      self._callout_server.stop()
+    self._shutdown = True
+    if self._server:
+      asyncio.create_task(self._server.stop(grace=5))
 
-  def process(
-      self,
-      callout: ProcessingRequest,
-      context: ServicerContext,
+  async def process_async(
+    self,
+    callout: ProcessingRequest,
+    context: ServicerContext,
   ) -> ProcessingResponse:
-    """Process incomming callouts.
+    """Process incoming callouts asynchronously.
 
     Args:
-        callout: The incomming callout.
+        callout: The incoming callout.
         context: Stream context on the callout.
 
-    Yields:
+    Returns:
         ProcessingResponse: A response for the incoming callout.
     """
     if callout.HasField('request_headers'):
-      match self.on_request_headers(callout.request_headers, context):
+      result = await self.on_request_headers_async(callout.request_headers, context)
+      match result:
         case ProcessingResponse() as processing_response:
           return processing_response
         case ImmediateResponse() as immediate_headers:
@@ -241,27 +284,97 @@ class CalloutServer:
         case HeadersResponse() | None as header_response:
           return ProcessingResponse(request_headers=header_response)
         case _:
-          logging.warn("MALFORMED CALLOUT %s", callout)
+          logging.warning("MALFORMED CALLOUT %s", callout)
     elif callout.HasField('response_headers'):
-      return ProcessingResponse(response_headers=self.on_response_headers(
-          callout.response_headers, context))
+      result = await self.on_response_headers_async(callout.response_headers, context)
+      return ProcessingResponse(response_headers=result)
     elif callout.HasField('request_body'):
-      match self.on_request_body(callout.request_body, context):
+      result = await self.on_request_body_async(callout.request_body, context)
+      match result:
         case ImmediateResponse() as immediate_body:
           return ProcessingResponse(immediate_response=immediate_body)
         case BodyResponse() | None as body_response:
           return ProcessingResponse(request_body=body_response)
         case _:
-          logging.warn("MALFORMED CALLOUT %s", callout)
+          logging.warning("MALFORMED CALLOUT %s", callout)
     elif callout.HasField('response_body'):
-      return ProcessingResponse(
-          response_body=self.on_response_body(callout.response_body, context))
+      result = await self.on_response_body_async(callout.response_body, context)
+      return ProcessingResponse(response_body=result)
     return ProcessingResponse()
 
+  # Async handler methods - override these in subclasses for async processing
+  async def on_request_headers_async(
+    self,
+    headers: HttpHeaders,
+    context: ServicerContext
+  ) -> Union[None, HeadersResponse, ImmediateResponse, ProcessingResponse]:
+    """Process incoming request headers asynchronously.
+
+    Override this method for custom async header processing.
+    Default implementation delegates to sync version.
+
+    Args:
+      headers: Request headers to process.
+      context: RPC context of the incoming callout.
+
+    Returns:
+      Optional header modification object or a complete response.
+    """
+    return self.on_request_headers(headers, context)
+
+  async def on_response_headers_async(
+    self,
+    headers: HttpHeaders,
+    context: ServicerContext
+  ) -> Union[None, HeadersResponse]:
+    """Process incoming response headers asynchronously.
+
+    Args:
+      headers: Response headers to process.
+      context: RPC context of the incoming callout.
+
+    Returns:
+      Optional header modification object.
+    """
+    return self.on_response_headers(headers, context)
+
+  async def on_request_body_async(
+    self,
+    body: HttpBody,
+    context: ServicerContext
+  ) -> Union[None, BodyResponse, ImmediateResponse]:
+    """Process an incoming request body asynchronously.
+
+    Args:
+      body: Request body to process.
+      context: RPC context of the incoming callout.
+
+    Returns:
+      Optional body modification object.
+    """
+    return self.on_request_body(body, context)
+
+  async def on_response_body_async(
+    self,
+    body: HttpBody,
+    context: ServicerContext
+  ) -> Union[None, BodyResponse]:
+    """Process an incoming response body asynchronously.
+
+    Args:
+      body: Response body to process.
+      context: RPC context of the incoming callout.
+
+    Returns:
+      Optional body modification object.
+    """
+    return self.on_response_body(body, context)
+
+  # Sync handler methods for backward compatibility - override these for simple cases
   def on_request_headers(
-      self,
-      headers: HttpHeaders,  # pylint: disable=unused-argument
-      context: ServicerContext  # pylint: disable=unused-argument
+    self,
+    headers: HttpHeaders,  # pylint: disable=unused-argument
+    context: ServicerContext  # pylint: disable=unused-argument
   ) -> Union[None, HeadersResponse, ImmediateResponse, ProcessingResponse]:
     """Process incoming request headers.
 
@@ -275,9 +388,9 @@ class CalloutServer:
     return None
 
   def on_response_headers(
-      self,
-      headers: HttpHeaders,  # pylint: disable=unused-argument
-      context: ServicerContext  # pylint: disable=unused-argument
+    self,
+    headers: HttpHeaders,  # pylint: disable=unused-argument
+    context: ServicerContext  # pylint: disable=unused-argument
   ) -> Union[None, HeadersResponse]:
     """Process incoming response headers.
 
@@ -291,14 +404,14 @@ class CalloutServer:
     return None
 
   def on_request_body(
-      self,
-      body: HttpBody,  # pylint: disable=unused-argument
-      context: ServicerContext  # pylint: disable=unused-argument
+    self,
+    body: HttpBody,  # pylint: disable=unused-argument
+    context: ServicerContext  # pylint: disable=unused-argument
   ) -> Union[None, BodyResponse, ImmediateResponse]:
     """Process an incoming request body.
 
     Args:
-      headers: Request body to process.
+      body: Request body to process.
       context: RPC context of the incoming callout.
 
     Returns:
@@ -307,14 +420,14 @@ class CalloutServer:
     return None
 
   def on_response_body(
-      self,
-      body: HttpBody,  # pylint: disable=unused-argument
-      context: ServicerContext  # pylint: disable=unused-argument
+    self,
+    body: HttpBody,  # pylint: disable=unused-argument
+    context: ServicerContext  # pylint: disable=unused-argument
   ) -> Union[None, BodyResponse]:
     """Process an incoming response body.
 
     Args:
-      headers: Response body to process.
+      body: Response body to process.
       context: RPC context of the incoming callout.
 
     Returns:
@@ -323,44 +436,18 @@ class CalloutServer:
     return None
 
 
-class _GRPCCalloutService(ExternalProcessorServicer):
-  """GRPC based Callout server implementation."""
+class _AsyncGRPCCalloutService(ExternalProcessorServicer):
+  """Async gRPC Callout server implementation using grpc.aio."""
 
-  def __init__(self, processor, *args, **kwargs):
+  def __init__(self, processor: CalloutServer):
     self._processor = processor
-    self._server = grpc.server(
-        futures.ThreadPoolExecutor(max_workers=processor.server_thread_count))
-    add_ExternalProcessorServicer_to_server(self, self._server)
-    self._start_msg = 'GRPC callout server started'
-    if not processor.disable_tls:
-      server_credentials = grpc.ssl_server_credentials(
-        private_key_certificate_chain_pairs=[(processor.private_key,
-                                              processor.cert_chain)])
-      address_str = _addr_to_str(processor.secure_address)
-      self._server.add_secure_port(address_str, server_credentials)
-      self._start_msg += f', listening on {address_str} (secure)'
-    if processor.plaintext_address:
-      plaintext_address_str = _addr_to_str(processor.plaintext_address)
-      self._server.add_insecure_port(plaintext_address_str)
-      self._start_msg += f', listening on {plaintext_address_str} (plaintext)'
 
-  def stop(self) -> None:
-    self._server.stop(grace=10)
-    self._server.wait_for_termination(timeout=10)
-    logging.info('GRPC server stopped.')
-
-  def loop(self) -> None:
-    self._server.wait_for_termination()
-
-  def start(self) -> None:
-    self._server.start()
-    logging.info(self._start_msg)
-
-  def Process(
-      self,
-      callout_iterator: Iterable[ProcessingRequest],
-      context: ServicerContext,
-  ) -> Iterator[ProcessingResponse]:
-    """Process the client callout."""
-    for callout in callout_iterator:
-      yield self._processor.process(callout, context)
+  async def Process(
+    self,
+    request_iterator: AsyncIterator[ProcessingRequest],
+    context: grpc.aio.ServicerContext,
+  ) -> AsyncIterator[ProcessingResponse]:
+    """Process the client callout asynchronously."""
+    async for callout in request_iterator:
+      response = await self._processor.process_async(callout, context)
+      yield response
