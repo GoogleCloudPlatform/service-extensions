@@ -115,7 +115,7 @@ def test_secure_request(server: CalloutServerTest) -> None:
   responses = list(
     make_json_request(
       ['{"requestBody": {}}', '{"responseBody": {}}'],
-      server.address,
+      server.secure_address,
       key='./extproc/ssl_creds/chain.pem',
     )
   )
