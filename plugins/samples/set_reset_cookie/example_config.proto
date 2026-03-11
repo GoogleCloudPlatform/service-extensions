@@ -1,0 +1,41 @@
+# Example Cookie Manager Configuration
+# Text protobuf format
+
+cookies {
+  name: "session_id"
+  value: "abc123"
+  path: "/"
+  max_age: -1  # Session cookie
+  http_only: true
+  secure: true
+  same_site_strict: false
+  operation: SET
+}
+
+cookies {
+  name: "user_prefs"
+  value: "theme=dark"
+  path: "/"
+  domain: ".example.com"
+  max_age: 2592000  # 30 days
+  http_only: true
+  secure: true
+  same_site_strict: true
+  operation: SET
+}
+
+cookies {
+  name: "tracking_cookie"
+  operation: DELETE
+}
+
+cookies {
+  name: "auth_token"
+  value: "new_token_value"
+  path: "/"
+  domain: ".example.com"
+  max_age: 3600
+  http_only: true
+  secure: true
+  operation: OVERWRITE
+}
