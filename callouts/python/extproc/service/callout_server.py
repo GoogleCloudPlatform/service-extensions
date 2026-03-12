@@ -128,8 +128,19 @@ class CalloutServer:
 
     def _read_cert_file(path: str | None) -> bytes | None:
       if path:
-        with open(path, 'rb') as file:
-          return file.read()
+        logging.info(f"Attempting to read cert/key file at: '{path}'")
+        try:
+          with open(path, 'rb') as file:
+            content = file.read()
+            if content:
+              logging.info(f"Successfully read '{path}'.")
+            else:
+              logging.warning(f"File at '{path}' is empty.")
+            return content
+        except FileNotFoundError:
+          logging.error(f"File not found at '{path}'.")
+        except Exception as e:
+          logging.error(f"Failed to read '{path}': {e}", exc_info=True)
       return None
 
     self.server_thread_count = server_thread_count
