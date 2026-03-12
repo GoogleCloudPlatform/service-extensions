@@ -10,7 +10,7 @@ Files using Copyright 2024 Google LLC & Apache License Version 2.0:
 
 ## Requirements
 
-* Go 1.23+
+* Go 1.26+
 * Docker
 * Docker Compose
 

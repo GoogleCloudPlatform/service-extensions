@@ -15,11 +15,11 @@
 package jwt_auth
 
 import (
-	"io/ioutil"
+	"os"
 	"strconv"
 	"testing"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 	base "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	"github.com/google/go-cmp/cmp"
@@ -42,7 +42,7 @@ func generateTestJWTToken(privateKey []byte, claims jwt.MapClaims) (string, erro
 // TestHandleRequestHeaders_ValidToken tests the handling of request headers with a valid JWT token.
 func TestHandleRequestHeaders_ValidToken(t *testing.T) {
 	// Load the test private key
-	privateKey, err := ioutil.ReadFile("../../ssl_creds/localhost.key")
+	privateKey, err := os.ReadFile("../../ssl_creds/localhost.key")
 	if err != nil {
 		t.Fatalf("failed to load private key: %v", err)
 	}
