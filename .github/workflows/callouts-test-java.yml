@@ -1,6 +1,7 @@
 name: Callouts test Java
 
 on:
+  workflow_dispatch:  # allow manual runs
   push:
     branches: [ "main" ]
     paths:
