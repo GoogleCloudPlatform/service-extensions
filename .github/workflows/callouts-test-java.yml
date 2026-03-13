@@ -1,6 +1,4 @@
-# This workflow will install Java dependencies, run tests and lint with a single version of Java
-
-name: Callouts test Java SDK
+name: Callouts test Java
 
 on:
   push:

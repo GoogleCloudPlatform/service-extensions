@@ -1,8 +1,8 @@
-name: Callouts Go SDK
+name: Callouts test Go
 
 on:
   push:
-    branches: [ "main"]
+    branches: [ "main" ]
     paths:
       - callouts/go/**
   pull_request:
