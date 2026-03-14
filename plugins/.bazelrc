@@ -8,7 +8,7 @@ common --noenable_bzlmod
 # Default engine to execute when running bazel build/test. This engine can
 # be overridden by specifying a different engine on the command line:
 # `bazel test //... --define engine=wasmtime` for example.
-build --define engine=v8
+build --define engine=wamr-jit
 
 # For unit testing, remove randomness from BoringSSL.
 # This doesn't capture 'bazel run' test invocations. Oh well.
@@ -67,11 +67,33 @@ build:clang-tsan --linkopt -fsanitize=thread
 # Set per-platform flags (used below).
 build --enable_platform_specific_config
 
-# Use C++17.
-build:linux --cxxopt=-std=c++17
-build:macos --cxxopt=-std=c++17
-build:windows --cxxopt="/std:c++17"
+# Use C++20.
+build:linux --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
+build:macos --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
+build:windows --cxxopt="/std:c++20" --host_cxxopt="/std:c++20"
+
+
+build:hermetic --incompatible_enable_cc_toolchain_resolution
+build:hermetic --action_env BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+build:hermetic --extra_toolchains @emsdk//emscripten_toolchain:cc-toolchain-wasm
+
+# Use vendored LLVM C/C++ compiler.
+build:hermetic-llvm --config=hermetic
+build:hermetic-llvm --extra_toolchains @llvm_toolchain//:cc-toolchain-x86_64-linux
+
+build:hermetic-llvm-macos-x86_64 --config=hermetic
+build:hermetic-llvm-macos-x86_64 --extra_toolchains @llvm_toolchain//:cc-toolchain-x86_64-darwin
+# Below flags mitigate https://github.com/bazel-contrib/toolchains_llvm/pull/229.
+build:hermetic-llvm-macos-x86_64 --features=-libtool
+
+build:hermetic-llvm --incompatible_enable_cc_toolchain_resolution
+build:hermetic-llvm --action_env BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+build:hermetic-llvm --extra_toolchains @llvm_toolchain//:cc-toolchain-x86_64-linux
+build:hermetic-llvm --extra_toolchains @llvm_aarch64//:cc-toolchain-aarch64-linux
+build:hermetic-llvm --extra_toolchains @emsdk//emscripten_toolchain:cc-toolchain-wasm
 
 # Enable symlinks and runfiles on Windows (enabled by default on other platforms).
 startup --windows_enable_symlinks
 build:windows --enable_runfiles
+
+build --override_repository=proxy_wasm_cpp_host=../../../proxy-wasm-cpp-host

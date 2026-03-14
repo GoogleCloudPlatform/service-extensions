@@ -274,6 +274,8 @@ class TestWasm : public proxy_wasm::WasmBase {
 
   ContextOptions& options() { return options_; }
 
+  bool load(std::string_view bytecode, bool allow_precompiled);
+
  private:
   ContextOptions options_;
 };
@@ -283,6 +285,9 @@ absl::StatusOr<std::string> ReadDataFile(const std::string& path);
 
 // Helper to scan for .wasm files next to the executing binary.
 std::vector<std::string> FindPlugins();
+
+// Helper to create a VM.
+absl::StatusOr<std::shared_ptr<TestWasm>> CreateVm(const std::string& engine, ContextOptions options);
 
 // Helper to create a VM and load wasm.
 absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>> CreatePluginVm(
