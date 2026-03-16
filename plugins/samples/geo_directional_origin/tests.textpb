@@ -1,0 +1,167 @@
+test {
+  name: "SetHeaderForUS"
+  benchmark: false
+  properties {
+    path: "request.client_region"
+    value: "US"
+  }
+  request_headers {
+    input { 
+      header { key: ":path" value: "/test" }
+      header { key: ":method" value: "GET" }
+      header { key: ":authority" value: "example.com" }
+    }
+    result { 
+      has_header { key: "x-country-code" value: "US" }
+    }
+  }
+}
+
+test {
+  name: "SetHeaderForGermany"
+  benchmark: false
+  properties {
+    path: "request.client_region"
+    value: "DE"
+  }
+  request_headers {
+    input { 
+      header { key: ":path" value: "/api/data" }
+      header { key: ":method" value: "GET" }
+      header { key: ":authority" value: "example.com" }
+    }
+    result { 
+      has_header { key: "x-country-code" value: "DE" }
+    }
+  }
+}
+
+test {
+  name: "SetHeaderForJapan"
+  benchmark: false
+  properties {
+    path: "request.client_region"
+    value: "JP"
+  }
+  request_headers {
+    input { 
+      header { key: ":path" value: "/test" }
+      header { key: ":method" value: "POST" }
+      header { key: ":authority" value: "example.com" }
+    }
+    result { 
+      has_header { key: "x-country-code" value: "JP" }
+    }
+  }
+}
+
+test {
+  name: "SetHeaderForBrazil"
+  benchmark: false
+  properties {
+    path: "request.client_region"
+    value: "BR"
+  }
+  request_headers {
+    input { 
+      header { key: ":path" value: "/test" }
+      header { key: ":method" value: "GET" }
+      header { key: ":authority" value: "example.com" }
+    }
+    result { 
+      has_header { key: "x-country-code" value: "BR" }
+    }
+  }
+}
+
+test {
+  name: "NoGeoInformationAvailable"
+  benchmark: false
+  request_headers {
+    input { 
+      header { key: ":path" value: "/test" }
+      header { key: ":method" value: "GET" }
+      header { key: ":authority" value: "example.com" }
+    }
+    result { 
+      no_header { key: "x-country-code" }
+    }
+  }
+}
+
+test {
+  name: "EmptyCountryCode"
+  benchmark: false
+  properties {
+    path: "request.client_region"
+    value: ""
+  }
+  request_headers {
+    input { 
+      header { key: ":path" value: "/test" }
+      header { key: ":method" value: "GET" }
+      header { key: ":authority" value: "example.com" }
+    }
+    result { 
+      no_header { key: "x-country-code" }
+    }
+  }
+}
+
+test {
+  name: "SetHeaderForSouthAfrica"
+  benchmark: false
+  properties {
+    path: "request.client_region"
+    value: "ZA"
+  }
+  request_headers {
+    input { 
+      header { key: ":path" value: "/test" }
+      header { key: ":method" value: "GET" }
+      header { key: ":authority" value: "example.com" }
+    }
+    result { 
+      has_header { key: "x-country-code" value: "ZA" }
+    }
+  }
+}
+
+test {
+  name: "SecuritySpoofedHeaderRemoved"
+  benchmark: false
+  properties {
+    path: "request.client_region"
+    value: "GB"
+  }
+  request_headers {
+    input { 
+      header { key: ":path" value: "/test" }
+      header { key: ":method" value: "GET" }
+      header { key: ":authority" value: "example.com" }
+      header { key: "x-country-code" value: "XX" }
+    }
+    result { 
+      has_header { key: "x-country-code" value: "GB" }
+    }
+  }
+}
+
+test {
+  name: "BenchmarkGeoRouting"
+  benchmark: true
+  properties {
+    path: "request.client_region"
+    value: "GB"
+  }
+  request_headers {
+    input { 
+      header { key: ":path" value: "/test" }
+      header { key: ":method" value: "GET" }
+      header { key: ":authority" value: "example.com" }
+    }
+    result { 
+      has_header { key: "x-country-code" value: "GB" }
+    }
+  }
+}
