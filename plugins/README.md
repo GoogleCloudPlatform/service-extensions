@@ -54,12 +54,12 @@ C++ builds may require a specific toolchain: `--config=clang` or `--config=gcc`.
 
 # Testing and benchmarking
 
-1.  Write a plugin test file (text proto) to specify the plugin's functional
-    expectations ([example](samples/testing/tests.textpb)). Consult the plugin
-    tester [proto API](test/runner.proto) as needed.
-1.  Add `benchmark: true` to tests that exemplify common wasm operations
+1. Write a plugin test file to specify the plugin's functional expectations. 
+   This file can either be in text proto format ([example](samples/testing/tests.textpb)) or YAML ([example](samples/testing/tests.yaml)). 
+   Consult the plugin tester [proto API](test/runner.proto) as needed.
+2. Add `benchmark: true` to tests that exemplify common wasm operations
     ([example](samples/add_header/tests.textpb)).
-1.  Run + Test + Benchmark your wasm plugin as follows!
+3. Run + Test + Benchmark your wasm plugin as follows!
 
 ```bash
 docker run -it -v $(pwd):/mnt \
@@ -101,9 +101,10 @@ for your own plugin. Extend them to fit your particular use case.
     callbacks.
 *   [Hello World](samples/local_reply): Immediately response with "Hello World"
     upon request.
-*   [Add HTTP request & response headers](samples/add_header): Add a header on
-    both the client request and server response paths. Also check for existing
-    headers.
+*   [Add HTTP request headers](samples/add_request_header): Add a header on the
+    client request path.
+*   [Add HTTP response headers](samples/add_response_header): Add a header on
+    the server response path. Also check for existing headers.
 *   [Plugin config with a list of tokens to deny](samples/config_denylist): Deny
     a request whenever it contains a known bad token. Bad tokens are loaded at
     plugin initialization time from plugin configuration.

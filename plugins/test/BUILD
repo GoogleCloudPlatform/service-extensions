@@ -8,6 +8,7 @@ cc_library(
     srcs = ["framework.cc"],
     hdrs = ["framework.h"],
     deps = [
+        ":runner_cc_proto",
         "@boost//:algorithm",
         "@boost//:dll",
         "@boost//:filesystem",
@@ -45,11 +46,25 @@ cc_library(
         ":dynamic_test",
         ":framework",
         ":runner_cc_proto",
+        ":yaml_proto_converter",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/flags:parse",
         "@com_google_benchmark//:benchmark",
         "@com_google_googletest//:gtest",
         "@com_google_protobuf//:protobuf",
+    ],
+)
+
+cc_library(
+    name = "yaml_proto_converter",
+    srcs = ["yaml_proto_converter.cpp"],
+    hdrs = ["yaml_proto_converter.h"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@yaml_cpp//:yaml-cpp",
+        "//test:runner_cc_proto",
     ],
 )
 

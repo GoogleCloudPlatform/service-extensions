@@ -63,12 +63,20 @@ def proxy_wasm_tests(
         tests,
         plugins = [],
         data = [],
-        config = None):
+        config = None,
+        **kwargs):
+    # Determine the appropriate flag based on file extension
+    if tests.endswith((".yaml", ".yml")):
+        test_flag = "--yaml=$(rootpath %s)" % tests
+    elif tests.endswith((".txtpb", ".textpb", ".textproto", ".pbtxt")):
+        test_flag = "--proto=$(rootpath %s)" % tests
+    else:
+        fail("Unsupported test file format: %s. Supported formats: .yaml, .yml, .txtpb, .textpb, .textproto, .pbtxt" % tests)
     """Generates cc_test targets for each provided wasm plugin.
 
     Args:
       name: Base name for the test targets.
-      tests: TestSuite textproto config file that contains the tests to run.
+      tests: TestSuite textproto and/or yaml config file that contains the tests to run.
       plugins: List of plugins (wasm build targets) to run tests on.
       data: Supplementary inputs, such as test data payloads.
       config: Optional path to plugin config file.
@@ -77,10 +85,11 @@ def proxy_wasm_tests(
         cc_test(
             name = "%s_%s" % (plugin.removeprefix(":").removesuffix(".wasm"), name),
             args = [
-                "--proto=$(rootpath %s)" % tests,
+                test_flag,
                 "--plugin=$(rootpath %s)" % plugin,
                 "--config=$(rootpath %s)" % config if config else "",
             ],
             data = [tests, plugin] + ([config] if config else []) + data,
             deps = ["//test:runner_lib"],
+            **kwargs
         )

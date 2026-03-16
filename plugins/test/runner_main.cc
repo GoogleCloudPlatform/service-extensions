@@ -36,8 +36,10 @@
 #include "test/dynamic_test.h"
 #include "test/framework.h"
 #include "test/runner.pb.h"
+#include "test/yaml_proto_converter.h"
 
 ABSL_FLAG(std::string, proto, "", "Path to test config. Required.");
+ABSL_FLAG(std::string, yaml, "", "Path to test config (.yaml format).");
 ABSL_FLAG(std::string, plugin, "", "Override path to plugin wasm.");
 ABSL_FLAG(std::string, config, "", "Override path to plugin config.");
 ABSL_FLAG(std::string, logfile, "", "Emit plugin logs to disk or stdio.");
@@ -50,6 +52,7 @@ ABSL_FLAG(uint64_t, num_additional_streams, 0,
           "Number of additional streams to run in benchmarks.");
 ABSL_FLAG(uint64_t, additional_stream_advance_rate, 0,
           "Number of additional streams to advance per benchmark iteration.");
+
 
 namespace service_extensions_samples {
 
@@ -64,23 +67,67 @@ std::string AbslUnparseFlag(pb::Env::LogLevel ll) {
 }
 }  // namespace pb
 
+// Determines input format based on file extension
+enum class InputFormat {
+  TEXTPROTO,
+  YAML,
+  UNKNOWN
+};
+
 absl::StatusOr<pb::TestSuite> ParseInputs(int argc, char** argv) {
   auto params = absl::ParseCommandLine(argc, argv);
 
-  // Parse test config.
-  std::string cfg_path = absl::GetFlag(FLAGS_proto);
-  if (cfg_path.empty()) {
-    return absl::InvalidArgumentError("Flag --proto is required.");
+  // Determine input file and format
+  std::string cfg_path;
+  InputFormat format = InputFormat::UNKNOWN;
+
+  if (std::string proto_path = absl::GetFlag(FLAGS_proto); !proto_path.empty()) {
+    cfg_path = proto_path;
+    format = InputFormat::TEXTPROTO;
   }
 
+  if (std::string yaml_path = absl::GetFlag(FLAGS_yaml); !yaml_path.empty()) {
+    if (format != InputFormat::UNKNOWN) {
+      return absl::InvalidArgumentError(
+          "Cannot specify both --proto and --yaml flags");
+    }
+    cfg_path = yaml_path;
+    format = InputFormat::YAML;
+  }
+
+  if (format == InputFormat::UNKNOWN) {
+    return absl::InvalidArgumentError(
+        "Either --proto or --yaml flag is required.");
+  }
+
+  // Read input file
   auto cfg_bytes = ReadDataFile(cfg_path);
   if (!cfg_bytes.ok()) {
     return cfg_bytes.status();
   }
+
+  // Parse based on format
   pb::TestSuite tests;
-  if (!google::protobuf::TextFormat::ParseFromString(*cfg_bytes, &tests)) {
-    return absl::InvalidArgumentError("Failed to parse input proto");
+  switch (format) {
+    case InputFormat::TEXTPROTO: {
+      if (!google::protobuf::TextFormat::ParseFromString(*cfg_bytes, &tests)) {
+        return absl::InvalidArgumentError("Failed to parse input textproto");
+      }
+      break;
+    }
+    case InputFormat::YAML: {
+      auto yaml_result = pb::ConvertYamlToTestSuite(*cfg_bytes);
+      if (!yaml_result.ok()) {
+        return absl::InvalidArgumentError(
+            absl::StrCat("Failed to parse input YAML: ", yaml_result.status().message()));
+      }
+      tests = std::move(*yaml_result);
+      break;
+    }
+    default:
+      return absl::InvalidArgumentError("Unsupported input format");
   }
+
   tests.mutable_env()->set_test_path(cfg_path);
 
   // Apply flag overrides.

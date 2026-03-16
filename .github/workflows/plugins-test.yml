@@ -15,14 +15,13 @@
 name: Plugins test
 
 on:
+  workflow_dispatch:  # allow manual runs
   pull_request:
-    branches:
-    - main
+    branches: [ "main" ]
     paths:
     - plugins/**
   push:
-    branches:
-    - main
+    branches: [ "main" ]
     paths:
     - plugins/**
   schedule:
