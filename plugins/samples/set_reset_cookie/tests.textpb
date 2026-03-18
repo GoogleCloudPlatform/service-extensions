@@ -1,131 +1,66 @@
 test {
-  name: "SetNewSessionCookie"
-  
-  config: """
-    cookies {
-      name: "session_id"
-      value: "12345"
-      path: "/"
-      http_only: true
-      operation: SET
-    }
-  """
-  
-  request_headers {
-    input { header { key: "Cookie" value: "other_cookie=some_value" } }
+  name: "LoadsConfig"
+  plugin_init {
+    log { regex: ".*Successfully loaded 3 cookie configuration.*" }
   }
-  
+}
+test {
+  name: "SetsCookieOnResponse"
   response_headers {
-    result { 
-      header { key: "Set-Cookie" value: "session_id=12345; Path=/; HttpOnly" }
-      log { regex: ".+Setting session cookie: session_id=12345" }
+    result {
+      # The host combines multiple Set-Cookie headers into one comma-separated value.
+      headers { regex: "Set-Cookie: .*session_id=abc123; Path=/; HttpOnly.*" }
+      headers { regex: "Set-Cookie: .*tracking_id=new_value; Path=/; Domain=\\.example\\.com; Max-Age=3600; HttpOnly; Secure.*" }
+      log { regex: ".*Setting session cookie: session_id" }
     }
   }
 }
-
 test {
-  name: "SetPersistentDomainCookie"
-  
-  config: """
-    cookies {
-      name: "user_pref"
-      value: "dark_mode"
-      path: "/"
-      domain: "example.com"
-      max_age: 86400
-      http_only: true
-      secure: true
-      operation: SET
-    }
-  """
-  
+  name: "DeletesCookieFromRequest"
   request_headers {
-    input { header { key: "Cookie" value: "" } }
-  }
-  
-  response_headers {
-    result { 
-      header { key: "Set-Cookie" value: "user_pref=dark_mode; Path=/; Domain=example.com; Max-Age=86400; HttpOnly; Secure" }
-      log { regex: ".+Setting persistent cookie: user_pref=dark_mode" }
-    }
-  }
-}
-
-test {
-  name: "DeleteCookieBeforeCDNCache"
-  
-  config: """
-    cookies {
-      name: "old_cookie"
-      operation: DELETE
-    }
-  """
-  
-  request_headers {
-    input { 
+    input {
       header { key: "Cookie" value: "session_id=abc123; old_cookie=expired; user_pref=value" }
     }
     result {
+      has_header { key: "Cookie" value: "session_id=abc123; user_pref=value" }
+      log { regex: ".*Marking cookie for deletion before CDN cache: old_cookie" }
+    }
+  }
+}
+test {
+  name: "NoDeleteWhenCookieAbsent"
+  request_headers {
+    input {
       header { key: "Cookie" value: "session_id=abc123; user_pref=value" }
-      log { regex: ".+Marking cookie for deletion before CDN cache: old_cookie" }
     }
-  }
-  
-  response_headers {
-    result { 
-      no_header { key: "Set-Cookie" }
+    result {
+      has_header { key: "Cookie" value: "session_id=abc123; user_pref=value" }
     }
   }
 }
-
 test {
-  name: "OverwriteExistingCookieWithNewValue"
-  
-  config: """
-    cookies {
-      name: "tracking_id"
-      value: "new_value"
-      path: "/"
-      domain: ".example.com"
-      max_age: 3600
-      http_only: true
-      secure: true
-      operation: OVERWRITE
-    }
-  """
-  
-  request_headers {
-    input { header { key: "Cookie" value: "tracking_id=old_value" } }
-  }
-  
+  name: "OverwritesExistingCookie"
   response_headers {
-    result { 
-      header { key: "Set-Cookie" value: "tracking_id=new_value; Path=/; Domain=.example.com; Max-Age=3600; HttpOnly; Secure" }
-      log { regex: ".+Overwriting existing cookie: tracking_id" }
+    input {
+      header { key: "Set-Cookie" value: "tracking_id=old_value; Path=/old" }
+      header { key: "Set-Cookie" value: "other_cookie=keep_me" }
+    }
+    result {
+      headers { regex: "Set-Cookie: .*other_cookie=keep_me.*" }
+      headers { regex: "Set-Cookie: .*session_id=abc123; Path=/; HttpOnly.*" }
+      headers { regex: "Set-Cookie: .*tracking_id=new_value; Path=/; Domain=\\.example\\.com; Max-Age=3600; HttpOnly; Secure.*" }
     }
   }
 }
-
 test {
-  name: "RemoveSetCookieDirectiveCompletely"
-  
-  config: """
-    cookies {
-      name: "remove_me"
-      value: ""
-      path: "/"
-      operation: OVERWRITE
-    }
-  """
-  
+  name: "DeleteAllRequestCookies"
   request_headers {
-    input { header { key: "Cookie" value: "remove_me=value" } }
-  }
-  
-  response_headers {
-    result { 
-      header { key: "Set-Cookie" value: "remove_me=; Path=/; Max-Age=0" }
-      log { regex: ".+Removing Set-Cookie directive for: remove_me" }
+    input {
+      header { key: "Cookie" value: "old_cookie=only_one" }
+    }
+    result {
+      no_header { key: "Cookie" }
+      log { regex: ".*Marking cookie for deletion before CDN cache: old_cookie" }
     }
   }
 }
