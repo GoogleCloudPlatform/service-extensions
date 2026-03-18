@@ -60,4 +60,19 @@ def add_command_line_args() -> argparse.ArgumentParser:
       action="store_true",
       help='Disables the plaintext address of the callout server.',
   )
+  parser.add_argument(
+      '--disable_tls',
+      action="store_true",
+      help='Disables the secure address of the callout server.',
+  )
+  parser.add_argument(
+      '--cert_chain_path',
+      type=str,
+      help='File path to the cert chain to use for TLS.',
+  )
+  parser.add_argument(
+      '--private_key_path',
+      type=str,
+      help='File path to the private key to use for TLS.',
+  )
   return parser
