@@ -1,34 +1,36 @@
-load("//:plugins.bzl", "proxy_wasm_plugin_cpp", "proxy_wasm_tests")
-load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
-load("@rules_proto//proto:defs.bzl", "proto_library")
+load("//:plugins.bzl", "proxy_wasm_plugin_cpp", "proxy_wasm_plugin_go", "proxy_wasm_plugin_rust", "proxy_wasm_tests")
 
-licenses(["notice"])
-
-proto_library(
-    name = "cookie_config_proto",
-    srcs = ["cookie_config.proto"],
-)
-
-cc_proto_library(
-    name = "cookie_config_cc_proto",
-    deps = [":cookie_config_proto"],
-)
+licenses(["notice"])  # Apache 2
 
 proxy_wasm_plugin_cpp(
-    name = "cookie_manager.wasm",
+    name = "plugin_cpp.wasm",
     srcs = ["plugin.cc"],
     deps = [
-        ":cookie_config_cc_proto",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
-        "@com_google_protobuf//:protobuf",
     ],
 )
 
+proxy_wasm_plugin_rust(
+    name = "plugin_rust.wasm",
+    srcs = ["plugin.rs"],
+    deps = [
+        "//bazel/cargo/remote:log",
+        "//bazel/cargo/remote:proxy-wasm",
+    ],
+)
+
+proxy_wasm_plugin_go(
+    name = "plugin_go.wasm",
+    srcs = ["plugin.go"],
+)
+
 proxy_wasm_tests(
-    name = "cookie_manager_tests",
+    name = "tests",
+    config = ":tests.config",
     plugins = [
-        ":cookie_manager.wasm",
+        ":plugin_cpp.wasm",
+        ":plugin_rust.wasm",
+        ":plugin_go.wasm",
     ],
     tests = ":tests.textpb",
 )
