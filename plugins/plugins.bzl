@@ -63,7 +63,8 @@ def proxy_wasm_tests(
         tests,
         plugins = [],
         data = [],
-        config = None):
+        config = None,
+        **kwargs):
     # Determine the appropriate flag based on file extension
     if tests.endswith((".yaml", ".yml")):
         test_flag = "--yaml=$(rootpath %s)" % tests
@@ -90,4 +91,5 @@ def proxy_wasm_tests(
             ],
             data = [tests, plugin] + ([config] if config else []) + data,
             deps = ["//test:runner_lib"],
+            **kwargs
         )
