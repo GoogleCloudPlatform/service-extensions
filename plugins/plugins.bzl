@@ -25,7 +25,6 @@ def proxy_wasm_plugin_rust(**kwargs):
         rustc_flags = [
             "-Copt-level=3",  # Optimize for binary speed
             "-Cstrip=debuginfo",  # Strip debug info, but leave symbols
-            "-Clto=yes",  # Link time optimization of the whole binary
         ],
         **kwargs
     )

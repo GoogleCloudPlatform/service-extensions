@@ -51,6 +51,12 @@ class DynamicTest : public DynamicFixture {
   void TestBody() override;
 
   // Benchmark functions.
+  // Create a vm.
+  void BenchCreateVm(benchmark::State& state);
+  // Load the plugin into the vm.
+  void BenchLoadPlugin(benchmark::State& state);
+  // Plugin: onStart and onConfigure.
+  void BenchStartPlugin(benchmark::State& state);
   // Plugin lifecycle: onStart, onConfigure, onDone.
   void BenchPluginLifecycle(benchmark::State& state);
   // Stream lifecycle: onCreate, onDone.
@@ -102,6 +108,9 @@ class DynamicTest : public DynamicFixture {
   pb::Env env_;
   pb::Test cfg_;
   absl::BitGen bitgen_;
+
+  long peak_rss_kib_ = 0;
+
 };
 
 }  // namespace service_extensions_samples

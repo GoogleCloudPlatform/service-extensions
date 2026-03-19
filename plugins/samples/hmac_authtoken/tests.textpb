@@ -1,7 +1,7 @@
 # With a valid token, request allowed and token removed from :path.
 test {
   name: "WithValidHMACToken"
-  benchmark: false
+  benchmark: true
   request_headers {
     input { header { key: ":path" value: "/somepage/otherpage?param1=value1&param2=value2&token=48277f04685e364e0e3f3c4bfa78cb91293d304bbf196829334cb1c4a741d6b0" } }
     result {
@@ -12,6 +12,7 @@ test {
 # No token set, forbidden request.
 test {
   name: "NoToken"
+  benchmark: true
   request_headers {
     input {
       header { key: ":path" value: "/admin" }
@@ -26,6 +27,7 @@ test {
 # invalid token, forbidden request.
 test {
   name: "InvalidToken"
+  benchmark: true
   request_headers {
     input {
       header { key: ":path" value: "/admin?token=ddssdsdsddfdffddsssd" }
@@ -40,6 +42,7 @@ test {
 # invalid :path header, return bad request
 test {
   name: "InvalidPathHeader"
+  benchmark: true
   request_headers {
     input {
       header { key: ":path" value: "foo:bar" }
