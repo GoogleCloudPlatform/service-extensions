@@ -18,6 +18,7 @@ from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 from envoy.service.ext_proc.v3.external_processor_pb2 import ProcessingRequest, ProcessingResponse
 from extproc.service import callout_server
 from extproc.service import callout_tools
+from extproc.service import command_line_tools
 from google.protobuf.wrappers_pb2 import StringValue
 from google.protobuf import any_pb2
 
@@ -97,7 +98,7 @@ class CalloutServerExample(callout_server.CalloutServer):
 
 if __name__ == '__main__':
   # Setup command line args.
-  args = callout_tools.add_command_line_args().parse_args()
+  args = command_line_tools.add_command_line_args().parse_args()
   # Set the debug level.
   logging.basicConfig(level=logging.DEBUG)
   logging.info('Starting e2e_test server v7.')
