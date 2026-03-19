@@ -13,12 +13,15 @@
 // limitations under the License.
 
 // [START serviceextensions_plugin_ad_insertion]
+#include <algorithm>
 #include <map>
-#include <string>
 #include <sstream>
+#include <string>
 #include <string_view>
 #include <vector>
-#include <algorithm>
+
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_split.h"
 #include "proxy_wasm_intrinsics.h"
 
 class MyRootContext : public RootContext {
@@ -26,19 +29,68 @@ class MyRootContext : public RootContext {
   explicit MyRootContext(uint32_t id, std::string_view root_id)
       : RootContext(id, root_id) {}
 
-  bool onConfigure(size_t configuration_size) override {
-    // Ad configuration - set this to be loaded from plugin config
-    // Format: {position_name, {gam_slot, ad_size, html_marker, insert_before}}
+  bool onConfigure(size_t config_len) override {
+    // 1. Set default configurations for fallback and testing purposes.
+    gpt_library_url_ = "https://securepubads.g.doubleclick.net/tag/js/gpt.js";
+    inject_gpt_library_ = true;
     ad_configs_ = {
         {"header", {"/1234/header_ad", "728x90", "<body>", false}},
         {"content", {"/1234/content_ad", "300x250", "<article>", false}},
         {"sidebar", {"/1234/sidebar_ad", "160x600", "</article>", true}}
     };
+
+    // 2. If no configuration is provided, use defaults.
+    if (config_len == 0) {
+      LOG_INFO("No configuration provided. Using default ad insertion config.");
+      return true;
+    }
+
+    // 3. Read the configuration buffer.
+    auto config_data = getBufferBytes(WasmBufferType::PluginConfiguration, 0, config_len);
+    if (!config_data || config_data->size() == 0) {
+      return true;
+    }
+
+    // Clear default ad configs since we are loading custom ones.
+    ad_configs_.clear();
+    absl::string_view config_str = config_data->view();
+
+    // 4. Parse the CSV-like configuration format.
+    // Expected format per line (comma-separated):
+    // gpt_url, <url>
+    // inject_gpt, <true|false>
+    // ad, <position>, <gam_slot>, <size>, <insert_before_bool>, <marker>
+    for (absl::string_view line : absl::StrSplit(config_str, '\n')) {
+      absl::string_view stripped = absl::StripAsciiWhitespace(line);
+      // Skip empty lines or comments
+      if (stripped.empty() || stripped[0] == '#') continue;
+
+      std::vector<absl::string_view> parts = absl::StrSplit(stripped, ',');
+      
+      // Trim whitespace from extracted parts
+      for (auto& part : parts) {
+        part = absl::StripAsciiWhitespace(part);
+      }
+
+      if (parts[0] == "gpt_url" && parts.size() >= 2) {
+        gpt_library_url_ = std::string(parts[1]);
+      } else if (parts[0] == "inject_gpt" && parts.size() >= 2) {
+        inject_gpt_library_ = (parts[1] == "true");
+      } else if (parts[0] == "ad" && parts.size() >= 6) {
+        std::string position = std::string(parts[1]);
+        AdConfig config;
+        config.slot = std::string(parts[2]);
+        config.size = std::string(parts[3]);
+        config.insert_before = (parts[4] == "true");
+        config.marker = std::string(parts[5]);
+        
+        ad_configs_[position] = config;
+      } else {
+        LOG_WARN("Invalid configuration line: " + std::string(stripped));
+      }
+    }
     
-    // GPT library configuration
-    gpt_library_url_ = "https://securepubads.g.doubleclick.net/tag/js/gpt.js";
-    inject_gpt_library_ = true;
-    
+    LOG_INFO("Ad Insertion plugin configured successfully from custom payload.");
     return true;
   }
 
@@ -78,7 +130,7 @@ class MyHttpContext : public Context {
                                        bool end_of_stream) override {
     // Skip ad insertion for ad requests to avoid infinite loops
     auto path = getRequestHeader(":path");
-    if (path && path->view().find("/ads/") != std::string::npos) {
+    if (path && path->view().find("/ads/") != std::string_view::npos) {
       is_ad_request_ = true;
     }
     return FilterHeadersStatus::Continue;
@@ -87,7 +139,7 @@ class MyHttpContext : public Context {
   FilterHeadersStatus onResponseHeaders(uint32_t headers,
                                         bool end_of_stream) override {
     auto content_type = getResponseHeader("Content-Type");
-    if (content_type && content_type->view().find("text/html") != std::string::npos) {
+    if (content_type && content_type->view().find("text/html") != std::string_view::npos) {
       should_insert_ads_ = true;
       removeResponseHeader("Content-Length");
     }
@@ -99,8 +151,17 @@ class MyHttpContext : public Context {
       return FilterDataStatus::Continue;
     }
 
-    // Process HTML body and inject GAM ads
+    // Buffer the body until the end of the stream to ensure we process the complete HTML.
+    // Processing chunks individually might split HTML tags and break marker matching.
+    if (!end_of_stream) {
+      return FilterDataStatus::StopIterationAndBuffer;
+    }
+
     auto body = getBufferBytes(WasmBufferType::HttpResponseBody, 0, body_size);
+    if (!body) {
+      return FilterDataStatus::Continue;
+    }
+
     std::string body_str = std::string(body->view());
     processBodyWithGAM(body_str);
 
@@ -108,10 +169,10 @@ class MyHttpContext : public Context {
   }
 
  private:
-  bool isGptAlreadyLoaded(const std::string& body) const {
-    return body.find("googletag") != std::string::npos ||
-           body.find("gpt.js") != std::string::npos ||
-           body.find("doubleclick.net/tag/js/gpt") != std::string::npos;
+  bool isGptAlreadyLoaded(std::string_view body) const {
+    return body.find("googletag") != std::string_view::npos ||
+           body.find("gpt.js") != std::string_view::npos ||
+           body.find("doubleclick.net/tag/js/gpt") != std::string_view::npos;
   }
 
   void processBodyWithGAM(std::string& body) {
@@ -129,7 +190,7 @@ class MyHttpContext : public Context {
       prepareAdInsertion(body, position, config, insertions);
     }
     
-    // 3. Apply all insertions in reverse order (to maintain correct indices)
+    // 3. Apply insertions from bottom to top to maintain accurate position values for early insertions.
     if (!insertions.empty()) {
       applyAllInsertions(body, insertions);
     }
@@ -137,8 +198,8 @@ class MyHttpContext : public Context {
     setBuffer(WasmBufferType::HttpResponseBody, 0, body.size(), body);
   }
 
-  void prepareGptLibraryInjection(std::string& body, 
-                                std::vector<std::pair<size_t, std::string>>& insertions) {
+  void prepareGptLibraryInjection(const std::string& body, 
+                                  std::vector<std::pair<size_t, std::string>>& insertions) const {
     size_t head_pos = body.find("<head>");
     if (head_pos != std::string::npos) {
       insertions.emplace_back(head_pos + 6, 
@@ -153,9 +214,9 @@ class MyHttpContext : public Context {
     }
   }
 
-  void prepareAdInsertion(std::string& body, std::string_view position,
-                         const MyRootContext::AdConfig& config,
-                         std::vector<std::pair<size_t, std::string>>& insertions) {
+  void prepareAdInsertion(const std::string& body, std::string_view position,
+                          const MyRootContext::AdConfig& config,
+                          std::vector<std::pair<size_t, std::string>>& insertions) const {
     size_t marker_pos = body.find(config.marker);
     if (marker_pos == std::string::npos) return;
 
@@ -166,15 +227,12 @@ class MyHttpContext : public Context {
   }
 
   void applyAllInsertions(std::string& body, 
-                         std::vector<std::pair<size_t, std::string>>& insertions) {
-    // Sort insertions by position in DESCENDING order
-    // This ensures that later insertions don't affect positions of earlier ones
+                          std::vector<std::pair<size_t, std::string>>& insertions) const {
     std::sort(insertions.begin(), insertions.end(),
               [](const auto& a, const auto& b) {
                 return a.first > b.first;
               });
     
-    // Apply all insertions
     for (const auto& [pos, content] : insertions) {
       body.insert(pos, content);
     }
@@ -184,9 +242,8 @@ class MyHttpContext : public Context {
                                 const MyRootContext::AdConfig& config) const {
     std::ostringstream html;
     
-    // GAM Ad HTML Template
     html << "<div id=\"ad-container-" << position << "\" class=\"ad-unit\">\n"
-         << "  <!-- GAM Ad Slot: " << config.slot << " -->\n"
+         << "  \n"
          << "  <script>\n"
          << "    (function() {\n"
          << "      // Same-domain GAM integration\n"
