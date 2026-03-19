@@ -28,9 +28,9 @@ using serviceextensions::cookie_manager::CookieConfig;
 using serviceextensions::cookie_manager::CookieManagerConfig;
 using serviceextensions::cookie_manager::CookieOperation;
 
-class CookieManagerRootContext : public RootContext {
+class MyRootContext : public RootContext {
  public:
-  explicit CookieManagerRootContext(uint32_t id, std::string_view root_id)
+  explicit MyRootContext(uint32_t id, std::string_view root_id)
       : RootContext(id, root_id) {}
 
   bool onConfigure(size_t config_size) override {
@@ -87,11 +87,11 @@ class CookieManagerRootContext : public RootContext {
 };
 
 // HTTP context for cookie management operations.
-class CookieManagerHttpContext : public Context {
+class MyHttpContext : public Context {
  public:
-  explicit CookieManagerHttpContext(uint32_t id, RootContext* root)
+  explicit MyHttpContext(uint32_t id, RootContext* root)
       : Context(id, root),
-        root_(static_cast<CookieManagerRootContext*>(root)) {}
+        root_(static_cast<MyRootContext*>(root)) {}
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
@@ -107,7 +107,7 @@ class CookieManagerHttpContext : public Context {
   }
 
  private:
-  CookieManagerRootContext* root_;
+  MyRootContext* root_;
   // Preserve original cookie order using a vector of pairs.
   std::vector<std::pair<std::string, std::string>> request_cookies_;
 
@@ -234,7 +234,7 @@ class CookieManagerHttpContext : public Context {
   }
 };
 
-static RegisterContextFactory register_CookieManagerContext(
-    CONTEXT_FACTORY(CookieManagerHttpContext),
-    ROOT_FACTORY(CookieManagerRootContext));
+static RegisterContextFactory register_StaticContext(
+    CONTEXT_FACTORY(MyHttpContext),
+    ROOT_FACTORY(MyRootContext));
 // [END serviceextensions_plugin_set_reset_cookie]
