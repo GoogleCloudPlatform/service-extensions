@@ -17,27 +17,16 @@
 #include <utility>
 #include <vector>
 
-#include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
+#include "samples/set_reset_cookie/cookie_config.pb.h"
+#include "google/protobuf/text_format.h"
 #include "proxy_wasm_intrinsics.h"
 
-// Cookie operation types.
-enum class CookieOp { SET, DELETE, OVERWRITE };
-
-// Parsed cookie configuration.
-struct CookieConfig {
-  CookieOp operation = CookieOp::SET;
-  std::string name;
-  std::string value;
-  std::string path = "/";
-  std::string domain;
-  int max_age = -1;  // -1 for session cookie, >0 for persistent
-  bool http_only = false;
-  bool secure = false;
-  bool same_site_strict = false;
-};
+using serviceextensions::cookie_manager::CookieConfig;
+using serviceextensions::cookie_manager::CookieManagerConfig;
+using serviceextensions::cookie_manager::CookieOperation;
 
 class CookieManagerRootContext : public RootContext {
  public:
@@ -57,58 +46,30 @@ class CookieManagerRootContext : public RootContext {
       return false;
     }
 
-    // Parse pipe-delimited config lines:
-    // OPERATION|name|value|path|domain|max_age|http_only|secure|same_site_strict
-    std::string config_str = config_data->toString();
-    for (absl::string_view line : absl::StrSplit(config_str, '\n')) {
-      // Skip empty lines and comments.
-      if (line.empty() || line[0] == '#') continue;
+    CookieManagerConfig config;
+    if (!google::protobuf::TextFormat::ParseFromString(
+            config_data->toString(), &config)) {
+      LOG_ERROR(
+          "Failed to parse cookie manager configuration. "
+          "Example: cookies { name: \"session\" value: \"abc\" operation: SET }");
+      return false;
+    }
 
-      std::vector<std::string> fields = absl::StrSplit(line, '|');
-      if (fields.size() < 2) {
-        LOG_ERROR(absl::StrCat("Invalid config line: ", line));
+    if (config.cookies_size() == 0) {
+      LOG_WARN("No cookie configurations found, no cookies will be managed");
+      return true;
+    }
+
+    for (const auto& cookie : config.cookies()) {
+      if (cookie.name().empty()) {
+        LOG_ERROR("Cookie configuration missing required 'name' field");
         continue;
       }
-
-      CookieConfig cookie;
-
-      // Parse operation.
-      if (fields[0] == "SET") {
-        cookie.operation = CookieOp::SET;
-      } else if (fields[0] == "DELETE") {
-        cookie.operation = CookieOp::DELETE;
-      } else if (fields[0] == "OVERWRITE") {
-        cookie.operation = CookieOp::OVERWRITE;
-      } else {
-        LOG_ERROR("Unknown operation: " + fields[0]);
-        continue;
-      }
-
-      cookie.name = fields[1];
-      if (cookie.name.empty()) {
-        LOG_ERROR("Cookie name cannot be empty");
-        continue;
-      }
-
-      // Parse optional fields.
-      if (fields.size() > 2) cookie.value = fields[2];
-      if (fields.size() > 3 && !fields[3].empty()) cookie.path = fields[3];
-      if (fields.size() > 4) cookie.domain = fields[4];
-      if (fields.size() > 5 && !fields[5].empty()) {
-        if (!absl::SimpleAtoi(fields[5], &cookie.max_age)) {
-          LOG_ERROR(absl::StrCat("Invalid max_age value: ", fields[5]));
-          continue;
-        }
-      }
-      if (fields.size() > 6) cookie.http_only = (fields[6] == "true");
-      if (fields.size() > 7) cookie.secure = (fields[7] == "true");
-      if (fields.size() > 8) cookie.same_site_strict = (fields[8] == "true");
-
       cookie_configs_.push_back(cookie);
     }
 
     if (cookie_configs_.empty()) {
-      LOG_WARN("No valid cookie configurations found, no cookies will be managed");
+      LOG_WARN("No valid cookie configurations found");
       return true;
     }
 
@@ -168,14 +129,14 @@ class CookieManagerHttpContext : public Context {
   void processCookieDeletions() {
     bool modified = false;
     for (const auto& config : root_->getCookieConfigs()) {
-      if (config.operation != CookieOp::DELETE) continue;
+      if (config.operation() != CookieOperation::DELETE) continue;
       for (auto it = request_cookies_.begin(); it != request_cookies_.end();
            ++it) {
-        if (it->first == config.name) {
+        if (it->first == config.name()) {
           request_cookies_.erase(it);
           modified = true;
           LOG_INFO("Marking cookie for deletion before CDN cache: " +
-                   config.name);
+                   config.name());
           break;
         }
       }
@@ -197,9 +158,10 @@ class CookieManagerHttpContext : public Context {
   // Process SET and OVERWRITE operations on response headers.
   void processCookieOperations() {
     for (const auto& config : root_->getCookieConfigs()) {
-      if (config.operation == CookieOp::SET) {
+      if (config.operation() == CookieOperation::SET ||
+          config.operation() == CookieOperation::COOKIE_OPERATION_UNSPECIFIED) {
         addSetCookieHeader(config);
-      } else if (config.operation == CookieOp::OVERWRITE) {
+      } else if (config.operation() == CookieOperation::OVERWRITE) {
         overwriteCookie(config);
       }
     }
@@ -207,21 +169,22 @@ class CookieManagerHttpContext : public Context {
 
   // Build a Set-Cookie header value string from config attributes.
   std::string buildSetCookieValue(const CookieConfig& config) {
-    std::string val = absl::StrCat(config.name, "=", config.value);
-    absl::StrAppend(&val, "; Path=", config.path);
-    if (!config.domain.empty()) {
-      absl::StrAppend(&val, "; Domain=", config.domain);
+    std::string val = absl::StrCat(config.name(), "=", config.value());
+    std::string path = config.path().empty() ? "/" : config.path();
+    absl::StrAppend(&val, "; Path=", path);
+    if (!config.domain().empty()) {
+      absl::StrAppend(&val, "; Domain=", config.domain());
     }
-    if (config.max_age > 0) {
-      absl::StrAppend(&val, "; Max-Age=", config.max_age);
+    if (config.max_age() > 0) {
+      absl::StrAppend(&val, "; Max-Age=", config.max_age());
     }
-    if (config.http_only) {
+    if (config.http_only()) {
       absl::StrAppend(&val, "; HttpOnly");
     }
-    if (config.secure) {
+    if (config.secure()) {
       absl::StrAppend(&val, "; Secure");
     }
-    if (config.same_site_strict) {
+    if (config.same_site_strict()) {
       absl::StrAppend(&val, "; SameSite=Strict");
     }
     return val;
@@ -230,8 +193,8 @@ class CookieManagerHttpContext : public Context {
   // Add a new Set-Cookie response header.
   void addSetCookieHeader(const CookieConfig& config) {
     addResponseHeader("Set-Cookie", buildSetCookieValue(config));
-    std::string log_type = (config.max_age == -1) ? "session" : "persistent";
-    LOG_INFO("Setting " + log_type + " cookie: " + config.name);
+    std::string log_type = (config.max_age() <= 0) ? "session" : "persistent";
+    LOG_INFO("Setting " + log_type + " cookie: " + config.name());
   }
 
   // Overwrite an existing Set-Cookie header for the target cookie name,
@@ -246,7 +209,7 @@ class CookieManagerHttpContext : public Context {
 
     // Preserve non-matching Set-Cookie values from the combined header.
     if (existing && existing->size() > 0) {
-      std::string prefix = absl::StrCat(config.name, "=");
+      std::string prefix = absl::StrCat(config.name(), "=");
       for (absl::string_view cookie :
            absl::StrSplit(existing->view(), ", ")) {
         if (cookie.substr(0, prefix.size()) != prefix) {
@@ -256,16 +219,17 @@ class CookieManagerHttpContext : public Context {
     }
 
     // Set the new value or expire the cookie.
-    if (!config.value.empty()) {
+    if (!config.value().empty()) {
       addSetCookieHeader(config);
     } else {
-      std::string expire = absl::StrCat(config.name, "=; Path=", config.path,
+      std::string path = config.path().empty() ? "/" : config.path();
+      std::string expire = absl::StrCat(config.name(), "=; Path=", path,
                                          "; Max-Age=0");
-      if (!config.domain.empty()) {
-        absl::StrAppend(&expire, "; Domain=", config.domain);
+      if (!config.domain().empty()) {
+        absl::StrAppend(&expire, "; Domain=", config.domain());
       }
       addResponseHeader("Set-Cookie", expire);
-      LOG_INFO("Removing Set-Cookie directive for: " + config.name);
+      LOG_INFO("Removing Set-Cookie directive for: " + config.name());
     }
   }
 };
