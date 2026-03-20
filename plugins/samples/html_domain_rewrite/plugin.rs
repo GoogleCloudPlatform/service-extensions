@@ -111,6 +111,7 @@ impl<'a> HttpContext for MyHttpContext<'a> {
     fn on_http_response_body(&mut self, body_size: usize, _: bool) -> Action {
         if let Some(body_bytes) = self.get_http_response_body(0, body_size) {
             if let Err(e) = self.parse_chunk(body_bytes) {
+                // Prefer sending immediate response instead of panicking to avoid plugin crashes.
                 self.send_http_response(
                     500,
                     vec![],
@@ -119,6 +120,7 @@ impl<'a> HttpContext for MyHttpContext<'a> {
                             .into_bytes(),
                     ),
                 );
+                return Action::Pause;
             }
         }
         // Replace the entire chunk (0 to body_size) with the latest data emitted by the rewriter

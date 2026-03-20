@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "absl/random/random.h"
 #include "benchmark/benchmark.h"
 #include "gtest/gtest.h"
 #include "test/framework.h"
@@ -100,6 +101,7 @@ class DynamicTest : public DynamicFixture {
   std::string engine_;
   pb::Env env_;
   pb::Test cfg_;
+  absl::BitGen bitgen_;
 };
 
 }  // namespace service_extensions_samples

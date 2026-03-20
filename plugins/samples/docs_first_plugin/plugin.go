@@ -57,7 +57,7 @@ func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) t
 	proxywasm.LogInfof("onRequestHeaders: hello from wasm")
 
 	// Route Extension example: host rewrite
-	err := proxywasm.ReplaceHttpRequestHeader(":host", "service-extensions.com")
+	err := proxywasm.ReplaceHttpRequestHeader(":authority", "service-extensions.com")
 	if err != nil {
 		panic(err)
 	}
