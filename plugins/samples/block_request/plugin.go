@@ -26,38 +26,21 @@ import (
 
 func main() {}
 func init() {
-	proxywasm.SetVMContext(&vmContext{})
-}
-
-type vmContext struct {
-	types.DefaultVMContext
-}
-
-type pluginContext struct {
-	types.DefaultPluginContext
+	uuid.EnableRandPool()
+	proxywasm.SetHttpContext(newHttpContext)
 }
 
 type httpContext struct {
 	types.DefaultHttpContext
-	pluginContext *pluginContext
 }
 
-func (*vmContext) NewPluginContext(contextID uint32) types.PluginContext {
-	return &pluginContext{}
+func newHttpContext(contextID uint32) types.HttpContext {
+	return &httpContext{}
 }
 
-func (*pluginContext) OnPluginStart(pluginConfigurationSize int) types.OnPluginStartStatus {
-	uuid.EnableRandPool()
-	return types.OnPluginStartStatusOK
-}
-
-func (*pluginContext) GenerateRequestId() string {
-	uuid := uuid.NewString()
-	return strings.Replace(uuid, "-", "", -1)
-}
-
-func (pluginContext *pluginContext) NewHttpContext(uint32) types.HttpContext {
-	return &httpContext{pluginContext: pluginContext}
+func generateRequestId() string {
+	id := uuid.NewString()
+	return strings.Replace(id, "-", "", -1)
 }
 
 const (
@@ -67,21 +50,16 @@ const (
 // Checks whether the client's Referer header matches an expected domain. If
 // not, generate a 403 Forbidden response.
 func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) types.Action {
-	defer func() {
-		err := recover()
-		if err != nil {
-			proxywasm.SendHttpResponse(500, [][2]string{}, []byte(fmt.Sprintf("%v", err)), 0)
-		}
-	}()
 	referer, err := proxywasm.GetHttpRequestHeader("Referer")
 	// Check if referer match with the expected domain.
 	if err == types.ErrorStatusNotFound || !strings.Contains(referer, allowedReferer) {
-		requestId := ctx.pluginContext.GenerateRequestId()
+		requestId := generateRequestId()
 		proxywasm.LogInfof("Forbidden - Request ID: %v", requestId)
 		proxywasm.SendHttpResponse(403, [][2]string{}, []byte(fmt.Sprintf("Forbidden - Request ID: %v", requestId)), 0)
-		return types.ActionPause
+		return types.ActionContinue
 	} else if err != nil {
-		panic(err)
+		proxywasm.SendHttpResponse(500, [][2]string{}, []byte(fmt.Sprintf("%v", err)), 0)
+		return types.ActionContinue
 	}
 
 	// Change it to a meaningful name according to your needs.
