@@ -13,12 +13,13 @@
 // limitations under the License.
 
 // [START serviceextensions_plugin_set_cookie]
+use cookie::Cookie;
 use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 // Define the cookie name as a constant
 const COOKIE_NAME: &str = "my_cookie";
@@ -89,10 +90,11 @@ impl HttpContext for MyHttpContext {
             );
 
             // Set the Set-Cookie header with the new session ID
-            self.add_http_response_header(
-                "Set-Cookie",
-                &format!("{}={}; Path=/; HttpOnly", COOKIE_NAME, new_session_id),
-            );
+            let cookie = Cookie::build(COOKIE_NAME, &new_session_id)
+                .path("/")
+                .http_only(true)
+                .finish();
+            self.add_http_response_header("Set-Cookie", &cookie.to_string());
         }
 
         Action::Continue
@@ -102,19 +104,15 @@ impl HttpContext for MyHttpContext {
 impl MyHttpContext {
     /// Extracts the session ID from the Cookie header if present.
     fn get_session_id_from_cookie(&self) -> Option<String> {
-        match self.get_http_request_header("Cookie") {
-            Some(cookies) => {
-                // Split the Cookie header into individual cookies
-                for cookie in cookies.split("; ") {
-                    let parts: Vec<&str> = cookie.splitn(2, '=').collect();
-                    if parts.len() == 2 && parts[0] == COOKIE_NAME {
-                        return Some(parts[1].to_string());
-                    }
+        let header = self.get_http_request_header("Cookie")?;
+        for pair in header.split("; ") {
+            if let Ok(c) = Cookie::parse(pair) {
+                if c.name() == COOKIE_NAME {
+                    return Some(c.value().to_string());
                 }
-                None
             }
-            None => None,
         }
+        None
     }
 
     /// Generates a random `u32` session ID.

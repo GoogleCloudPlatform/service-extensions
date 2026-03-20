@@ -6,6 +6,7 @@ proxy_wasm_plugin_rust(
     name = "plugin_rust.wasm",
     srcs = ["plugin.rs"],
     deps = [
+        "//bazel/cargo/remote:cookie",
         "//bazel/cargo/remote:log",
         "//bazel/cargo/remote:proxy-wasm",
         "//bazel/cargo/remote:rand",
