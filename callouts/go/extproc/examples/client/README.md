@@ -84,4 +84,4 @@ go test -v ./callouts/go/extproc/samples/grpc_client_server/...
 
 ## Available Languages
 
-- [x] [Go](add_header.go)
+- [x] [Go](client.go)
