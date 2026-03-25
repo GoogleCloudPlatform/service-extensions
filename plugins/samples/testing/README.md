@@ -32,179 +32,11 @@ The plugin's test suite (`tests.textpb`) demonstrates:
    - External file content (file references)
 6. **HTTP/1.1 parsing**: Origin form, absolute form, request/response formats
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_http_request_headers` | Logs context ID for debugging |
-| `on_http_response_headers` | Emits timestamps and conditionally sends error response |
-
-## Key Code Walkthrough
-
-### C++ Implementation
-
-- **Debug logging**:
-  ```cpp
-  LOG_DEBUG(std::string("request headers ") + std::to_string(id()));
-  ```
-  Logs the context ID for each request (helpful for debugging concurrent requests).
-
-- **Header debugging (commented)**:
-  ```cpp
-  auto result = getRequestHeaderPairs();
-  auto pairs = result->pairs();
-  for (auto& p : pairs) {
-      LOG_INFO(std::string(p.first) + " -> " + std::string(p.second));
-  }
-  ```
-  Can be uncommented to dump all headers to logs for troubleshooting.
-
-- **Timestamp emission**:
-  ```cpp
-  for (int i = 1; i <= 3; ++i) {
-      using namespace std::chrono_literals;
-      const auto ts = std::chrono::high_resolution_clock::now();
-      const auto ns = ts.time_since_epoch() / 1ns;
-      LOG_INFO("time " + std::to_string(i) + ": " + std::to_string(ns));
-  }
-  ```
-  Emits three timestamps in nanoseconds. In tests with `time_secs: 123456789`, these timestamps are frozen for deterministic testing.
-
-- **Conditional error response**:
-  ```cpp
-  if (getResponseHeader("reply-with-error")->data()) {
-      sendLocalResponse(500, "extra", "fake error", {{"error", "goaway"}});
-      return FilterHeadersStatus::StopAllIterationAndWatermark;
-  }
-  ```
-  Sends a 500 error if the special header is present.
-
-### Rust Implementation
-
-- **Timestamp emission**:
-  ```rust
-  for i in 1..4 {
-      let ns = SystemTime::now()
-          .duration_since(SystemTime::UNIX_EPOCH)
-          .unwrap()
-          .as_nanos();
-      info!("time {}: {}", i, ns);
-  }
-  ```
-  Equivalent timestamp logic using Rust's `SystemTime`.
-
-- **Conditional error response**:
-  ```rust
-  if self.get_http_response_header("reply-with-error").is_some() {
-      self.send_http_response(500, vec![("error", "goaway")], Some(b"fake error"));
-      return Action::Pause;
-  }
-  ```
-
-## Test Configuration
-
-The test file demonstrates advanced testing features:
-
-### Environment Configuration
-
-```protobuf
-env {
-  log_level: DEBUG          # Set log level for verbose output
-  log_path: "/dev/stdout"   # Direct logs to stdout
-  time_secs: 123456789      # Freeze time for deterministic tests
-}
-```
-
-**Time control**: Setting `time_secs` freezes the system clock, making all timestamp-based operations deterministic. Perfect for testing time-dependent behavior.
-
-### Test 1: Headers_Proto (Structured Headers)
-
-Demonstrates proto-based header input:
-
-```protobuf
-request_headers {
-  input {
-    header { key: ":path" value: "/" }
-    header { key: ":method" value: "GET" }
-  }
-  result {
-    has_header { key: ":method" value: "GET" }      # Positive match
-    no_header { key: ":scheme" }                     # Negative match
-    log { regex: ".*request headers.*" }             # Log presence
-    log { regex: ".*response headers.*" invert: true }  # Log absence
-  }
-}
-```
-
-**Response testing**:
-```protobuf
-response_headers {
-  input {
-    header { key: "reply-with-error" value: "yes" }
-  }
-  result {
-    immediate { http_status: 500 }              # Check status
-    body { exact: "fake error" }                # Check body
-    has_header { key: "error" value: "goaway" } # Check added header
-    no_header { key: "server-message" }         # Original header removed
-    log { regex: ".*time 1: 123456789000000000" }  # Frozen time
-  }
-}
-```
-
-### Test 2: Headers_Content (Inline HTTP/1.1)
-
-Demonstrates inline HTTP/1.1 content:
-
-```protobuf
-request_headers {
-  input {
-    content:
-      "GET /my/path?foo=bar HTTP/1.1\n"
-      "Host: myhost.com\n"
-      "MyHeader: MyVal1\n"
-      "MyHeader: MyVal2\n"
-  }
-  result {
-    has_header { key: ":method" value: "GET" }
-    has_header { key: ":path" value: "/my/path?foo=bar" }
-    has_header { key: ":authority" value: "myhost.com" }
-    no_header { key: "Host" }  # Host converted to :authority
-    has_header { key: "MyHeader" value: "MyVal1, MyVal2" }  # Duplicate headers combined
-  }
-}
-```
-
-**HTTP/1.1 → HTTP/2 conversion**:
-- `Host:` header becomes `:authority` pseudo-header
-- Duplicate headers are combined with `, ` separator
-- Request line is parsed into `:method`, `:path`, and optionally `:scheme`
-
-### Test 3: Headers_File (External File)
-
-Demonstrates file-based input:
-
-```protobuf
-request_headers {
-  input {
-    file: "request_headers.data"
-  }
-  result {
-    has_header { key: ":scheme" value: "https" }
-    has_header { key: ":authority" value: "example.com:8080" }
-  }
-}
-```
-
-**File content** (`request_headers.data`):
-```http
-GET https://example.com:8080/my/path?foo=bar HTTP/1.1
-Host: myhost.com
-MyHeader: MyVal1
-MyHeader: MyVal2
-```
-
-**Absolute form parsing**: The absolute URI in the request line is parsed into `:scheme` and `:authority`.
+- **Console debugging**: Implements intentional logging logic strictly to record and output context IDs and operational timestamps. 
+- **Time precision**: Intentionally forces absolute timestamp execution in rust using `SystemTime` and C++ via `<chrono>` to enable locked tests.
+- **Fault injection**: Monitors the specified error request header and deliberately disrupts processing by transmitting a hardcoded 500 error HTTP response locally.
 
 ## Configuration
 
@@ -243,11 +75,11 @@ bazelisk test --test_output=all //samples/testing:tests
 
 The test suite validates:
 
-| Test | Purpose | Key Validations |
-|------|---------|----------------|
-| **Headers_Proto** | Structured header input | Header matching, log verification, frozen time, immediate response |
-| **Headers_Content** | Inline HTTP/1.1 input | Request parsing, header conversion, duplicate header handling |
-| **Headers_File** | External file input | Absolute form parsing, file loading |
+| Scenario | Description |
+|---|---|
+| **Headers_Proto** | Verifies execution behaviors like header matching, frozen logs, and immediate response outputs using structured input properties. |
+| **Headers_Content** | Verifies advanced request parsing capabilities handling duplicate headers directly from inline HTTP/1.1 input formats. |
+| **Headers_File** | Verifies logic surrounding external file loading functionality and interpreting raw HTTP absolute URI components. |
 
 ## Available Languages
 

@@ -24,69 +24,11 @@ This plugin demonstrates how to parse URL query parameters from HTTP requests an
 
 6. The plugin returns `Continue` / `ActionContinue`, allowing the request to proceed normally to the upstream server.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_http_request_headers` | Parses the `:path` header, extracts the `token` query parameter, and logs its value |
-
-## Key Code Walkthrough
-
-The core logic is conceptually identical across all three language implementations:
-
-- **Path retrieval** — The plugin reads the `:path` header:
-  - **C++**: `WasmDataPtr path = getRequestHeader(":path");`
-  - **Go**: `path, err := proxywasm.GetHttpRequestHeader(":path")`
-  - **Rust**: `self.get_http_request_header(":path")`
-
-- **URL parsing** — Each language uses its standard URL parsing library:
-  - **C++**:
-    ```cpp
-    boost::system::result<boost::urls::url_view> url =
-        boost::urls::parse_uri_reference(path->view());
-    auto it = url->params().find("token");
-    if (it != url->params().end()) {
-        token = (*it).value;
-    }
-    ```
-    Boost.URL automatically handles URL decoding of parameter values.
-
-  - **Go**:
-    ```go
-    u, err := url.Parse(path)
-    token := u.Query().Get("token")
-    if token == "" {
-        token = "<missing>"
-    }
-    ```
-    The `Query().Get()` method automatically handles URL decoding.
-
-  - **Rust**:
-    ```rust
-    let base = Url::parse("http://example.com").ok();
-    let options = Url::options().base_url(base.as_ref());
-    let token: Option<String> = match options.parse(&path) {
-        Ok(url) => url.query_pairs().find_map(|(k, v)| {
-            if k == "token" {
-                Some(v.to_string())
-            } else {
-                None
-            }
-        }),
-        Err(_) => None,
-    };
-    ```
-    Rust requires a base URL to parse relative paths. The `query_pairs()` iterator automatically handles URL decoding.
-
-- **Error handling** — Each language handles parsing errors differently:
-  - **C++**: Returns `"<missing>"` if URL parsing fails or parameter is not found.
-  - **Go**: Uses `defer recover()` to catch panics from parsing errors and sends a 500 response.
-  - **Rust**: Returns `None` if URL parsing fails, which is converted to `"<missing>"` by `unwrap_or()`.
-
-- **Logging** — The token value is logged:
-  - **C++**: `LOG_INFO("token: " + token);`
-  - **Go**: `proxywasm.LogInfof("token: %s", token);`
-  - **Rust**: `info!("token: {}", token.unwrap_or("<missing>".to_string()));`
+- **Path retrieval**: Extracts the raw HTTP path string via the `:path` pseudo-header.
+- **URL parsing**: Leverages standard URL libraries across languages (`Boost.URL` in C++, `net/url` in Go, `url` crate in Rust) to safely decode and parse query parameters.
+- **Fallback behaviors**: Gracefully handles missing token parameters by emitting a `<missing>` string rather than triggering errors.
 
 ## Configuration
 
@@ -126,11 +68,11 @@ bazelisk test --test_output=all //samples/log_query:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **NoPath** | No `:path` header | No log output (path is missing) |
-| **NoToken** | `:path: /foo?bar=baz&a=b` (no `token` parameter) | Log: `token: <missing>` |
-| **LogToken** | `:path: /foo?bar=baz&token=so%20special&a=b` (URL-encoded token) | Log: `token: so special` (URL-decoded value) |
+| Scenario | Description |
+|---|---|
+| **NoPath** | Does not log anything when the `:path` pseudo-header is completely missing. |
+| **NoToken** | Logs a missing status when the expected `token` parameter is not present in the URL. |
+| **LogToken** | Correctly parses, URL-decodes, and logs the value of the provided `token`. |
 
 ## Available Languages
 

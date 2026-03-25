@@ -39,16 +39,14 @@ This plugin implements bulk domain redirects by reading domain mappings from a c
 
 6. **If no mapping exists**: The request continues normally to the upstream server.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_configure` (C++/Rust) / `OnPluginStart` (Go) | Reads and parses the domain mappings configuration file |
-| `on_http_request_headers` | Checks if the request domain should be redirected and sends 301 if matched |
+- **Configuration parsing**: Loads a text-based configuration at module initialization, stripping whitespace, ignoring comments, and storing key-value pairs in a hash map.
+- **Host extraction**: Pulls the client's target hostname from the `:authority` pseudo-header, safely stripping any trailing port numbers if present.
+- **State sharing**: Maintains a shared memory reference (e.g., `Rc<HashMap>` in Rust or pointers in C++/Go) to allow efficient lookup of domains across multiple request contexts without reparsing data.
+- **Case manipulation**: Normalizes the incoming authority strings to lowercase before hashmap lookup to ensure case-insensitive matching.
 
-## Key Code Walkthrough
-
-### Configuration Parsing
+## Configuration Parsing
 
 All implementations parse a simple text format:
 
@@ -231,12 +229,12 @@ bazelisk test --test_output=all //samples/redirect_bulk:tests
 
 Derived from [`tests.textpb`](tests.textpb) with configuration `abc.com → xyz.com`:
 
-| Scenario | Input | Output |
-|---|---|---|
-| **NoRedirect** | `:authority: example.com`, `:path: /main/somepage/otherpage`, `:scheme: https` (domain not in mappings) | Request continues unchanged; no `Location` header |
-| **DomainRedirect** | `:authority: abc.com`, `:path: /images/picture.png`, `:scheme: https` | 301 redirect with `Location: https://xyz.com/images/picture.png` |
-| **DomainWithPortRedirect** | `:authority: abc.com:8080`, `:path: /api/v1/data`, `:scheme: http` (port stripped) | 301 redirect with `Location: http://xyz.com/api/v1/data` |
-| **CaseInsensitiveDomainMatch** | `:authority: ABC.com` (uppercase), `:path: /case-test`, `:scheme: https` | 301 redirect with `Location: https://xyz.com/case-test` (case-insensitive match works) |
+| Scenario | Description |
+|---|---|
+| **NoRedirect** | Continues the request when the requested domain is not present in the configuration mapping. |
+| **DomainRedirect** | Matches the incoming domain and issues a 301 redirect substituting only the domain portion of the URL. |
+| **DomainWithPortRedirect** | Safely ignores incoming port numbers and correctly maps the base domain to its new destination. |
+| **CaseInsensitiveDomainMatch** | Normalizes an uppercase incoming domain and successfully maps it to its target destination. |
 
 ## Available Languages
 

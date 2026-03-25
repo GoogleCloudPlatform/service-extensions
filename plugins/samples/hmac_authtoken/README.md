@@ -21,73 +21,11 @@ This plugin implements URL-based authentication using HMAC (Hash-based Message A
 
 6. **Success**: If all validations pass, the plugin allows the request to proceed to the upstream server with the cleaned URL.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_http_request_headers` | Parses the `:path` header, validates the HMAC token, and removes it from the URL before forwarding |
-
-## Key Code Walkthrough
-
-This plugin is only available in C++:
-
-- **Secret key** — The plugin uses a hardcoded secret key for HMAC computation:
-  ```cpp
-  const std::string kSecretKey = "your_secret_key";
-  ```
-  **Important**: Replace this with a strong, randomly generated secret key in production. The secret must be kept confidential and must match the key used to generate the tokens.
-
-- **URL parsing** — The plugin parses the `:path` header using Boost.URL:
-  ```cpp
-  boost::system::result<boost::urls::url> url =
-      boost::urls::parse_relative_ref(getRequestHeader(":path")->toString());
-  if (!url) {
-      sendLocalResponse(400, "", "Error parsing the :path HTTP header.\n", {});
-      return FilterHeadersStatus::ContinueAndEndStream;
-  }
-  ```
-  The `parse_relative_ref` function handles relative URLs (e.g., `/path?query`) and absolute URLs. If parsing fails, a 400 error is returned.
-
-- **Token extraction and removal** — The plugin searches for the `token` query parameter:
-  ```cpp
-  auto it = url->params().find("token");
-  if (it == url->params().end()) {
-      sendLocalResponse(403, "", "Access forbidden - missing token.\n", {});
-      return FilterHeadersStatus::ContinueAndEndStream;
-  }
-  
-  const std::string token = (*it).value;
-  url->params().erase(it);  // Remove token from URL
-  const std::string path = url->buffer();
-  ```
-  The `params()` method provides access to query parameters. After extracting the token value, it's removed from the URL using `erase()`. The `buffer()` method returns the complete URL string without the token.
-
-- **HMAC computation** — The plugin computes HMAC-SHA256 using OpenSSL:
-  ```cpp
-  std::string computeHmacSignature(std::string_view data) {
-    unsigned char result[EVP_MAX_MD_SIZE];
-    unsigned int len;
-    HMAC(EVP_sha256(), kSecretKey.c_str(), kSecretKey.length(),
-         reinterpret_cast<const unsigned char*>(std::string{data}.c_str()),
-         data.length(), result, &len);
-    return absl::BytesToHexString(std::string(result, result + len));
-  }
-  ```
-  The HMAC is computed over the URL path (without the token parameter) and returned as a hex string.
-
-- **Signature verification** — The plugin compares the computed signature to the token:
-  ```cpp
-  if (computeHmacSignature(path) != token) {
-      sendLocalResponse(403, "", "Access forbidden - invalid token.\n", {});
-      return FilterHeadersStatus::ContinueAndEndStream;
-  }
-  ```
-
-- **Path rewriting** — After validation, the plugin updates the `:path` header:
-  ```cpp
-  replaceRequestHeader(":path", path);
-  ```
-  This ensures the upstream server receives the clean URL without the token parameter.
+- **URL parsing**: The `Boost.URL` library is used to parse the URL and handle query parameters directly via `url->params()`.
+- **HMAC computation**: Calculates an HMAC-SHA256 signature natively using OpenSSL on the target URL path without the attached `token`.
+- **Token removal**: After verifying the signature is valid, the token query parameter is stripped from the `:path` pseudo-header so it doesn't leak upstream.
 
 ## Configuration
 
@@ -166,12 +104,12 @@ bazelisk test --test_output=all //samples/hmac_authtoken:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **WithValidHMACToken** | `:path: /somepage/otherpage?param1=value1&param2=value2&token=48277f04685e364e0e3f3c4bfa78cb91293d304bbf196829334cb1c4a741d6b0` | `:path: /somepage/otherpage?param1=value1&param2=value2` (valid token removed, request allowed) |
-| **NoToken** | `:path: /admin` (no token parameter) | 403 with `"Access forbidden - missing token.\n"` (token required) |
-| **InvalidToken** | `:path: /admin?token=ddssdsdsddfdffddsssd` (invalid token) | 403 with `"Access forbidden - invalid token.\n"` (signature verification failed) |
-| **InvalidPathHeader** | `:path: foo:bar` (malformed URL) | 400 with `"Error parsing the :path HTTP header.\n"` (URL parsing failed) |
+| Scenario | Description |
+|---|---|
+| **WithValidHMACToken** | Validates the token, strips it from the path, and forwards the cleaned request upstream. |
+| **NoToken** | Rejects the request when the required token parameter is absent. |
+| **InvalidToken** | Rejects the request when the provided string fails HMAC verification. |
+| **InvalidPathHeader** | Returns a 400 Bad Request if the incoming URL is malformed and cannot be parsed. |
 
 ## Available Languages
 

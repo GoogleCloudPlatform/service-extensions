@@ -18,32 +18,11 @@ This plugin demonstrates how to process HTTP request and response bodies in chun
    - **Multiple chunks**: When a 10-byte body (`"1234567890"`) is split into 5 chunks of 2 bytes each (`"12"`, `"34"`, `"56"`, `"78"`, `"90"`), the plugin appends `"foo"` to each chunk, resulting in `"12foo34foo56foo78foo90foo"`.
    - **Single chunk**: When the entire body is processed as a single chunk, the plugin appends `"foo"` once.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_http_request_body` | Appends `"foo"` to each chunk of the request body |
-| `on_http_response_body` | Appends `"bar"` to each chunk of the response body |
-
-## Key Code Walkthrough
-
-The core logic is identical between the C++ and Rust implementations:
-
-- **Request body modification** — The plugin appends `"foo"` to each request body chunk:
-  - **C++** uses `setBuffer(WasmBufferType::HttpRequestBody, chunk_len, 0, "foo")`. The parameters specify:
-    - Buffer type: `HttpRequestBody`
-    - Offset: `chunk_len` (append after existing content)
-    - Length to replace: `0` (insert without replacing)
-    - New content: `"foo"`
-
-- **Response body modification** — The plugin appends `"bar"` to each response body chunk:
-  - **C++** uses `setBuffer(WasmBufferType::HttpResponseBody, chunk_len, 0, "bar")` with the same offset/length semantics.
-
-- **Chunking semantics** — The `chunk_len` parameter indicates the size of the current chunk. By using `chunk_len` as the offset and `0` as the replacement length, the plugin appends content without removing any existing data. This works regardless of whether the body is transmitted as a single chunk or multiple chunks.
-
-- **End-of-stream flag** — Both callbacks receive an `end_of_stream` parameter that indicates whether this is the final chunk. The plugin ignores this flag and processes all chunks identically.
-
-**Important**: This plugin modifies body content without updating the `Content-Length` header. In production, you would need to either remove the `Content-Length` header to force chunked transfer encoding, or calculate and update the header to reflect the new body size.
+- **Chunked body modification**: The plugin appends a fixed string to both request and response body chunks as they stream through the proxy.
+- **Buffer editing offsets**: The chunk length is used as the offset for appending data, ensuring existing content is not replaced.
+- **Content-Length considerations**: Modifying body content length without updating the `Content-Length` header requires the proxy to handle chunked transfer encoding (not natively handled by this sample).
 
 ## Configuration
 
@@ -85,14 +64,14 @@ bazelisk test --test_output=all //samples/body_chunking:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **NumChunkWithFileInput** | Request body from `request_body.data` (`1234567890`) split into 5 chunks; Response body from `response_body.data` (`0987654321`) split into 5 chunks | Request: `12foo34foo56foo78foo90foo` (each 2-byte chunk gets `"foo"` appended); Response: `09bar87bar65bar43bar21bar` (each 2-byte chunk gets `"bar"` appended) |
-| **NumChunkWithFileInputFileOutput** | Request body from `request_body.data` split into 5 chunks | Request body matches `expected_request_body.data` (`12foo34foo56foo78foo90foo`) |
-| **NumChunkWithContentInput** | Request body `1234567890` (inline content) split into 5 chunks | Request: `12foo34foo56foo78foo90foo` (same as file input) |
-| **ChunkSizeWithFileInput** | Request body from `request_body.data`, chunked by size (2 bytes) | Request: `12foo34foo56foo78foo90foo` (chunk size produces same result as num_chunks) |
-| **ChunkSizeWithContentInput** | Request body `1234567890` (inline content), chunked by size (2 bytes) | Request: `12foo34foo56foo78foo90foo` (chunk size produces same result) |
-| **NoChunking** | Three separate request bodies: `"12"`, `"34"`, `"56"` (each processed as a single chunk) | Request bodies: `"12foo"`, `"34foo"`, `"56foo"` (each gets `"foo"` appended once) |
+| Scenario | Description |
+|---|---|
+| **NumChunkWithFileInput** | Successfully appends the corresponding strings to each chunk of the request and response bodies. |
+| **NumChunkWithFileInputFileOutput** | Verifies that a request body split into multiple chunks matches the expected concatenated output. |
+| **NumChunkWithContentInput** | Verifies inline content matches file input behavior. |
+| **ChunkSizeWithFileInput** | Verifies that chunking by explicit sizes produces the same results as chunking by number of chunks. |
+| **ChunkSizeWithContentInput** | Verifies chunk size behavior with inline string content. |
+| **NoChunking** | Correctly appends the configured string when the body is sent as a single continuous chunk. |
 
 ## Available Languages
 

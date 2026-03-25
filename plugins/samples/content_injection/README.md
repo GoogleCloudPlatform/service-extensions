@@ -23,53 +23,12 @@ This plugin demonstrates advanced HTML rewriting by injecting a JavaScript scrip
 5. **Chunked processing**:
    - The plugin processes the response body in 500-byte chunks (controlled by `chunk_size`) to balance memory usage and processing efficiency, even when the underlying proxy delivers larger or smaller chunks.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_http_response_body` | Parses and rewrites HTML chunks, injecting the script tag when the `<head>` element is encountered |
-
-## Key Code Walkthrough
-
-This plugin is only available in Rust and demonstrates advanced patterns:
-
-- **HtmlRewriter initialization** — The rewriter is created in `MyHttpContext::new()` with:
-  - **Element content handler**: `element!("head", move |el| { ... })` registers a handler that matches `<head>` tags. When matched, it prepends the script tag using `el.prepend("<script src=\"https://www.foo.com/api.js\"></script>", ContentType::Html)`.
-  - **Output sink**: `SharedRewriterOutputSink` wraps a shared `Rc<RefCell<Vec<u8>>>` buffer that collects the rewritten HTML as the parser processes it.
-
-- **Shared state management** — The plugin uses `Rc<RefCell<T>>` to share mutable state between the HTTP context and the rewriter's closures:
-  - **`output: Rc<RefCell<Vec<u8>>>`** — Stores the modified HTML as the rewriter produces it. The `Rc` (reference-counted pointer) allows multiple references (HTTP context and output sink), while `RefCell` enables runtime-checked mutable borrowing.
-  - **`completed: Rc<RefCell<bool>>`** — Tracks whether the script has been injected. This flag is set inside the element handler closure and checked in the HTTP context to optimize processing.
-
-- **Chunked parsing** — In `on_http_response_body`, the plugin iterates through the response body in 500-byte chunks:
-  ```rust
-  for start_index in (0..body_size).step_by(chunk_size) {
-      if let Some(body_bytes) = self.get_http_response_body(start_index, chunk_size) {
-          self.parse_chunk(body_bytes)?;
-          if *self.completed.borrow() == true {
-              self.end_rewriter()?;
-              // Replace section [0, start_index + chunk_size) with modified HTML
-              self.set_http_response_body(0, start_index + chunk_size, self.output.borrow().as_slice());
-              self.output.borrow_mut().clear();
-              return Action::Continue;
-          }
-      }
-  }
-  ```
-  This approach allows the plugin to process large responses incrementally without buffering the entire body.
-
-- **Rewriter lifecycle** — The `HtmlRewriter` persists across multiple `on_http_response_body` calls:
-  - **`rewriter.write(&body_bytes)`** — Processes a chunk of HTML, invoking registered handlers and writing output to the sink.
-  - **`rewriter.end()`** — Flushes any buffered incomplete HTML elements to the output sink as plain text. This is called after the `<head>` tag is processed to ensure all pending output is written.
-  - The rewriter is stored as `Option<HtmlRewriter>` and is consumed (taken) when `end()` is called to finalize processing.
-
-- **Error handling** — The plugin avoids panicking by sending a 500 Internal Server Error response if the rewriter encounters an error:
-  ```rust
-  if let Err(e) = self.parse_chunk(body_bytes) {
-      self.send_http_response(500, vec![], Some(&format!("Error while writing to HtmlRewriter: {}", e).into_bytes()));
-      return Action::Pause;
-  }
-  ```
+- **Streaming HTML parser**: Utilizes the `lol_html` crate's `HtmlRewriter` to process HTML structure across potentially split response chunks.
+- **Shared state capabilities**: Rust leverages `Rc<RefCell<T>>` to manage the modified HTML buffer and completion flags across callback executions.
+- **Chunked processing strategy**: Reads the response body in configurable chunk sizes to maintain steady memory overhead.
+- **Early termination**: Flushes buffers and stops executing further HTML rewrites as soon as the intended injection completes successfully.
 
 ## Configuration
 
@@ -114,13 +73,13 @@ bazelisk test --test_output=all //samples/content_injection:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **ContentInjection** | HTML response with `<head><title>Page Title</title></head>`, split into 10 chunks | `<head><script src="https://www.foo.com/api.js"></script><title>Page Title</title></head>` (script injected at the beginning of `<head>`) |
-| **LargeBody1Chunk** | 1.1 KB HTML from `response_body.data` as a single chunk | HTML matching `expected_response_body.data` with script injected (benchmark test) |
-| **LargeBody10Chunks** | Same HTML split into 10 chunks | Same output (demonstrates correct handling of chunked HTML, benchmark test) |
-| **LargeBody50Chunks** | Same HTML split into 50 chunks | Same output (benchmark test showing marginal CPU increase with more chunks) |
-| **LargeBody100Chunks** | Same HTML split into 100 chunks | Same output (benchmark test showing CPU usage remains low) |
+| Scenario | Description |
+|---|---|
+| **ContentInjection** | Successfully injects the script element exactly into the `<head>` block of an HTML response. |
+| **LargeBody1Chunk** | Verifies performance and correctness over a large body processed as a single chunk. |
+| **LargeBody10Chunks** | Verifies performance and correctness over a large body dynamically split into 10 chunks. |
+| **LargeBody50Chunks** | Verifies system stability when a large response is excessively chunked. |
+| **LargeBody100Chunks** | Analyzes CPU constraints under heavy response chunking loads. |
 
 ## Available Languages
 

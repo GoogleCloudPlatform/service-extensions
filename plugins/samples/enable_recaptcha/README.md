@@ -23,61 +23,12 @@ This plugin demonstrates how to enable Google reCAPTCHA Enterprise on HTML pages
 
 4. **Error handling**: If the rewriter encounters an error, the plugin logs the error and returns `Action::Continue` instead of panicking, avoiding plugin crashes.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_configure` | Reads the JSON configuration file, validates the reCAPTCHA key type, and stores the configuration |
-| `on_http_response_body` | Parses and rewrites HTML chunks, injecting the reCAPTCHA script when the `<head>` element is encountered |
-
-## Key Code Walkthrough
-
-This plugin is only available in Rust and builds upon the `content_injection` sample with configuration-driven script injection:
-
-- **Configuration parsing** — The plugin reads and validates a JSON config file:
-  ```rust
-  #[derive(Deserialize, Debug, Default)]
-  struct RecaptchaConfig {
-      recaptcha_key_type: String,   // "SESSION" or "ACTION"
-      recaptcha_key_value: String,  // reCAPTCHA site key
-  }
-  ```
-  In `on_configure()`, the plugin uses `serde_json::from_str()` to parse the JSON config. Invalid JSON or missing fields cause a panic. The plugin explicitly validates that `recaptcha_key_type` is either `"SESSION"` or `"ACTION"`.
-
-- **Dynamic script generation** — The plugin generates different script tags based on the key type:
-  - **SESSION tokens** (for WAF integration):
-    ```html
-    <script src="https://www.google.com/recaptcha/enterprise.js?render=&waf={key}" async defer></script>
-    ```
-  - **ACTION tokens** (for score-based assessment):
-    ```html
-    <script src="https://www.google.com/recaptcha/enterprise.js?render={key}"></script>
-    ```
-  
-  The script URL is constructed dynamically in `create_element_content_handler()` using `format!()`.
-
-- **Element content handler** — The plugin registers a handler that matches `<head>` tags:
-  ```rust
-  vec![element!("head", move |el| {
-      el.prepend(
-          format!("<script src=\"...\"></script>").as_str(),
-          ContentType::Html,
-      );
-      *completed_script_injection.borrow_mut() = true;
-      Ok(())
-  })]
-  ```
-  The handler prepends the script tag to the beginning of the `<head>` element.
-
-- **Streaming HTML rewriting** — The plugin uses the same streaming approach as the `content_injection` sample:
-  - The `HtmlRewriter` persists across multiple `on_http_response_body` calls, maintaining parse state.
-  - The plugin processes the body in 500-byte chunks to balance memory usage and performance.
-  - After script injection, the plugin calls `rewriter.end()` and stops processing.
-
-- **Shared state management** — The plugin uses `Rc<RefCell<T>>` to share mutable state:
-  - `recaptcha_config: Rc<RefCell<RecaptchaConfig>>` — Shared between root context and HTTP contexts.
-  - `completed_script_injection: Rc<RefCell<bool>>` — Shared between HTTP context and element handler closure.
-  - `output: Rc<RefCell<Vec<u8>>>` — Shared between HTTP context and output sink.
+- **Configuration parsing**: Parses a JSON configuration at initialization to determine the reCAPTCHA key type and value.
+- **Dynamic handler generation**: Dynamically constructs the script tag injection string based on whether the token is a `SESSION` or `ACTION` type.
+- **Streaming integration**: Uses the `lol_html` crate to parse HTML chunks incrementally and injects the script into the `<head>` element.
+- **Early termination**: Halts the `HtmlRewriter` early as soon as the target tag is successfully modified.
 
 ## Configuration
 
@@ -161,10 +112,10 @@ bazelisk test --test_output=all //samples/enable_recaptcha:tests
 
 Derived from test files:
 
-| Scenario | Input | Output |
-|---|---|---|
-| **Enable reCAPTCHA session** (`session_tests.textpb`) | HTML from `response_body.data` split into 10 chunks; config: `SESSION` token with key `1234-abcd` | HTML matching `session_key_expected_response_body.data` with `<script src="https://www.google.com/recaptcha/enterprise.js?render=&waf=1234-abcd" async defer></script>` injected into `<head>` |
-| **Enable reCAPTCHA action** (`action_tests.textpb`) | HTML from `response_body.data` split into 10 chunks; config: `ACTION` token with key `1234-abcd` | HTML matching `action_key_expected_response_body.data` with `<script src="https://www.google.com/recaptcha/enterprise.js?render=1234-abcd"></script>` injected into `<head>` |
+| Scenario | Description |
+|---|---|
+| **Enable reCAPTCHA session** (`session_tests.textpb`) | Injects a session-based reCAPTCHA script tag into a chunked HTML response body. |
+| **Enable reCAPTCHA action** (`action_tests.textpb`) | Injects an action-based reCAPTCHA script tag into a chunked HTML response body. |
 
 ## Available Languages
 

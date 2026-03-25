@@ -34,90 +34,12 @@ This plugin implements request authentication using HMAC (Hash-based Message Aut
 
 10. **Success**: If all validations pass, the plugin allows the request to proceed to the upstream server.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_configure` | Plugin initialization (currently no-op but can be used for config loading) |
-| `on_http_request_headers` | Validates the HMAC token in the `Authorization` header |
-
-## Key Code Walkthrough
-
-This plugin is only available in C++:
-
-- **Secret key and token validity** — Configured in the root context:
-  ```cpp
-  std::string secret_key_ = "your-secret-key";
-  const int64_t token_validity_seconds_ = 300;  // 5 minutes
-  ```
-  **Important**: Replace `secret_key_` with a strong, randomly generated secret in production. The token validity period can be adjusted based on security requirements.
-
-- **Authorization header validation** — The plugin checks for the header and scheme:
-  ```cpp
-  auto auth_header = getRequestHeader("authorization");
-  if (!auth_header || auth_header->view().empty()) {
-      sendLocalResponse(401, 
-                       "WWW-Authenticate: HMAC realm=\"api\"",
-                       "Missing Authorization header", 
-                       {});
-      return FilterHeadersStatus::StopIteration;
-  }
-  
-  if (!absl::StartsWithIgnoreCase(auth_value, "HMAC ")) {
-      sendLocalResponse(400, "", "Invalid Authorization scheme. Use 'HMAC'", {});
-      return FilterHeadersStatus::StopIteration;
-  }
-  ```
-  The scheme check is case-insensitive, so `"HMAC"`, `"hmac"`, or `"Hmac"` are all accepted.
-
-- **Token parsing** — The plugin splits the token on the `:` character:
-  ```cpp
-  std::string token = std::string(auth_value.substr(prefix.size()));
-  std::vector<std::string> token_parts(absl::StrSplit(token, absl::MaxSplits(':', 1)));
-  
-  if (token_parts.size() != 2) {
-      sendLocalResponse(400, "", "Invalid token format: expected 'timestamp:hmac'", {});
-      return FilterHeadersStatus::StopIteration;
-  }
-  ```
-  The `MaxSplits(':', 1)` ensures the string is split into exactly 2 parts, allowing the HMAC signature to contain `:` characters.
-
-- **Expiration check** — The plugin validates the token age:
-  ```cpp
-  const uint64_t current_time = static_cast<uint64_t>(absl::ToUnixSeconds(absl::Now()));
-  if ((current_time - token_timestamp) > root_->token_validity_seconds_) {
-      sendLocalResponse(403, "", "Token expired", {});
-      return FilterHeadersStatus::StopIteration;
-  }
-  ```
-
-- **HMAC computation** — The plugin computes HMAC-MD5 using OpenSSL:
-  ```cpp
-  std::string computeHmacMd5(const std::string& message, const std::string& key) {
-    unsigned char hash[EVP_MAX_MD_SIZE];
-    unsigned int hash_len = 0;
-    
-    unsigned char* hmac_result = HMAC(EVP_md5(), 
-                                     key.data(), key.size(),
-                                     reinterpret_cast<const unsigned char*>(message.data()), message.size(),
-                                     hash, &hash_len);
-    
-    if (hmac_result == nullptr || hash_len == 0) {
-      return "";
-    }
-    
-    return absl::BytesToHexString(absl::string_view(reinterpret_cast<const char*>(hash), hash_len));
-  }
-  ```
-  The message format is `METHOD:PATH:timestamp` (e.g., `GET:/api:1717000000`). The result is converted to a lowercase hex string.
-
-- **Signature comparison** — The plugin performs a constant-time string comparison:
-  ```cpp
-  if (expected_hmac != token_hmac) {
-      sendLocalResponse(403, "", "Invalid HMAC", {});
-      return FilterHeadersStatus::StopIteration;
-  }
-  ```
+- **Header validation**: Verifies the presence of the `Authorization` header and ensures it uses the `HMAC` scheme.
+- **Token decomposition**: Safely splits the token payload into timestamp and signature components.
+- **Cryptographic verification**: Constructs a message from the HTTP method, path, and timestamp, then verifies its HMAC-MD5 signature utilizing OpenSSL.
+- **Temporal constraints**: Uses `absl::Now()` to enforce a maximum token age of 5 minutes (300 seconds).
 
 ## Configuration
 
@@ -238,13 +160,13 @@ bazelisk test --test_output=all //samples/hmac_token_validation:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **Invalid_HMAC_Format** | `Authorization: HMAC invalid_timestamp` (missing `:` separator) | 400 Bad Request with `"Invalid token format: expected 'timestamp:hmac'"` |
-| **Missing_Authorization_Header** | No `Authorization` header | 401 Unauthorized with `"Missing Authorization header"` and `WWW-Authenticate: HMAC realm="api"` |
-| **Invalid_HMAC_Value** | `Authorization: HMAC 1717000000:invalid_hmac_value` (wrong signature) | 403 Forbidden with `"Invalid HMAC"` |
-| **Case_Insensitive_Scheme** | `Authorization: hmac 1717000000:valid_hmac` (lowercase scheme) | 403 Forbidden (scheme accepted, but HMAC validation fails with test data) |
-| **Expired_Token** | `Authorization: HMAC 1710000000:hmac_value` (timestamp > 300 seconds old) | 403 Forbidden with `"Token expired"` |
+| Scenario | Description |
+|---|---|
+| **Invalid_HMAC_Format** | Responds with 400 Bad Request when the token string is not formatted properly. |
+| **Missing_Authorization_Header** | Responds with 401 Unauthorized when the required authorization header is omitted. |
+| **Invalid_HMAC_Value** | Responds with 403 Forbidden when the token signature fails validation. |
+| **Case_Insensitive_Scheme** | Accepts differently cased `hmac` schemes but correctly enforces signature validity. |
+| **Expired_Token** | Responds with 403 Forbidden when the token's timestamp is older than the allowed expiration period. |
 
 ## Available Languages
 

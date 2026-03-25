@@ -24,73 +24,11 @@ The plugin logs messages at every stage of its lifecycle:
 
 All callbacks return `Continue` or `true` to allow normal request processing.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-### Root Context Callbacks
-
-| Callback | C++ | Rust | When Called |
-|----------|-----|------|-------------|
-| `onCreate` | Yes | Yes | When root context is created |
-| `onStart` / `on_vm_start` | Yes | Yes | When WASM VM starts |
-| `onConfigure` / `on_configure` | Yes | Yes | When configuration is loaded |
-| `onDone` / `on_done` | Yes | Yes | Before root context is destroyed |
-| `onDelete` / `Drop` | Yes | Yes | When root context is destroyed |
-
-### HTTP Context Callbacks
-
-| Callback | C++ | Rust | When Called |
-|----------|-----|------|-------------|
-| `onCreate` / `create_http_context` | Yes | Yes | When HTTP context is created |
-| `onRequestHeaders` / `on_http_request_headers` | Yes | Yes | When request headers are received |
-| `onResponseHeaders` / `on_http_response_headers` | Yes | Yes | When response headers are received |
-| `onDone` / `on_done` | Yes | Yes | Before HTTP context is destroyed |
-| `onDelete` / `Drop` | Yes | Yes | When HTTP context is destroyed |
-
-## Key Code Walkthrough
-
-The plugin implementations differ slightly in how they handle object lifecycle:
-
-- **C++ logging** — Uses `LOG_INFO` macro for all log messages:
-  ```cpp
-  void onCreate() override { LOG_INFO("root onCreate called"); }
-  bool onStart(size_t) override {
-      LOG_INFO("root onStart called");
-      return true;
-  }
-  ```
-
-- **Rust logging** — Uses the `log` crate's `info!` macro:
-  ```rust
-  fn on_vm_start(&mut self, _: usize) -> bool {
-      info!("root onStart called");
-      return true;
-  }
-  ```
-  
-  Rust also uses the `Drop` trait for cleanup logging:
-  ```rust
-  impl Drop for MyRootContext {
-      fn drop(&mut self) {
-          info!("root onDelete called");
-      }
-  }
-  ```
-
-- **Context creation in Rust** — The root context is created in the `set_root_context` closure:
-  ```rust
-  proxy_wasm::set_root_context(|_| -> Box<dyn RootContext> {
-      info!("root onCreate called");
-      Box::new(MyRootContext)
-  });
-  ```
-  
-  HTTP contexts are created in `create_http_context`:
-  ```rust
-  fn create_http_context(&self, _: u32) -> Option<Box<dyn HttpContext>> {
-      info!("http onCreate called");
-      Some(Box::new(MyHttpContext))
-  }
-  ```
+- **Lifecycle logging**: Traces plugin execution by emitting logs inside both root context methods (e.g. `onStart`, `onConfigure`) and HTTP context methods (e.g. `onRequestHeaders`).
+- **Memory safety boundaries**: Rust utilizes the `Drop` trait to explicitly track and log the deletion of contexts.
+- **Logging APIs**: Demonstrates framework-specific logging commands: C++ `LOG_INFO`, Go `proxywasm.LogInfof`, and Rust `info!`.
 
 ## Configuration
 

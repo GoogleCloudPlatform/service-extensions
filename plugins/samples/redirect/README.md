@@ -24,90 +24,11 @@ This plugin demonstrates HTTP redirection by intercepting requests to specific p
 
 6. **Non-matching paths**: If the prefix doesn't match, the request continues normally to the upstream server.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_http_request_headers` | Checks path prefix, sends 301 redirect if matched, or allows request to continue |
-
-## Key Code Walkthrough
-
-The core logic is identical across all three language implementations:
-
-- **Path prefix constants** — The old and new prefixes are defined as constants:
-  - **C++**: `constexpr std::string_view old_path_prefix = "/foo/";`
-  - **Go**: `const oldPathPrefix = "/foo/"`
-  - **Rust**: `const OLD_PATH_PREFIX: &str = "/foo/";`
-
-- **Path retrieval** — The plugin reads the `:path` header:
-  - **C++**: `auto path = getRequestHeader(":path")->toString();`
-  - **Go**: `path, err := proxywasm.GetHttpRequestHeader(":path")`
-  - **Rust**: `if let Some(path) = self.get_http_request_header(":path")`
-
-- **Prefix matching** — Each language uses its standard string function:
-  - **C++**:
-    ```cpp
-    if (absl::StartsWith(path, old_path_prefix)) {
-        std::string new_path = absl::StrCat(
-            new_path_prefix, 
-            path.substr(old_path_prefix.length())
-        );
-    ```
-    Uses Abseil's `StartsWith` for efficient prefix checking and `StrCat` for string concatenation.
-
-  - **Go**:
-    ```go
-    if strings.HasPrefix(path, oldPathPrefix) {
-        newPath := newPathPrefix + strings.TrimPrefix(path, oldPathPrefix)
-    ```
-    Uses standard library `HasPrefix` and `TrimPrefix` for clean prefix replacement.
-
-  - **Rust**:
-    ```rust
-    if path.starts_with(OLD_PATH_PREFIX) {
-        let new_path = format!(
-            "{}{}",
-            NEW_PATH_PREFIX,
-            &path[OLD_PATH_PREFIX.len()..]
-        );
-    ```
-    Uses string slicing to extract the suffix after the prefix.
-
-- **Redirect response** — All implementations send a 301 with Location header:
-  - **C++**:
-    ```cpp
-    sendLocalResponse(
-        301,                                      // Status code
-        "",                                        // Details
-        absl::StrCat("Content moved to ", new_path),  // Body
-        {{"Location", new_path}}                  // Headers
-    );
-    return FilterHeadersStatus::ContinueAndEndStream;
-    ```
-
-  - **Go**:
-    ```go
-    headers := [][2]string{{"Location", newPath}}
-    body := []byte("Content moved to " + newPath)
-    proxywasm.SendHttpResponse(301, headers, body, -1)
-    return types.ActionPause
-    ```
-
-  - **Rust**:
-    ```rust
-    self.send_http_response(
-        301,
-        vec![("Location", new_path.as_str())],
-        Some(format!("Content moved to {}", new_path).as_bytes()),
-    );
-    return Action::Pause;
-    ```
-
-- **HTTP 301 vs 302**: The plugin uses 301 (Moved Permanently) which:
-  - Tells clients and search engines the resource has permanently moved
-  - Browsers cache the redirect
-  - SEO authority transfers to the new URL
-  - Use 302 (Found) for temporary redirects or 307/308 for method-preserving redirects
+- **Prefix matching**: Uses native string prefix functions (`absl::StartsWith` in C++, `strings.HasPrefix` in Go, `starts_with` in Rust) to identify matching paths.
+- **Path rewriting**: Constructs the new destination URL path by splicing the new prefix with the leftover suffix from the original path.
+- **Immediate response**: Triggers an HTTP 301 response immediately, bypassing the upstream destination by returning `ContinueAndEndStream` / `ActionPause`.
 
 ## Configuration
 
@@ -180,11 +101,11 @@ bazelisk test --test_output=all //samples/redirect:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **NoRedirect** | `:path: /main/somepage/otherpage` (prefix not matched) | Request continues with original path; no `Location` header |
-| **DoRedirect** | `:path: /foo/images/picture.png` (prefix matched) | 301 redirect with `Location: /bar/images/picture.png`; body: `"Content moved to /bar/images/picture.png"` |
-| **DoRedirect** (duplicate name in test) | `:path: /main/foo/images/picture.png` (prefix not at beginning) | Request continues with original path; no `Location` header (only matches prefix at start) |
+| Scenario | Description |
+|---|---|
+| **NoRedirect** | Allows the request to continue unchanged since the target prefix isn't matched. |
+| **DoRedirect** | Matches the configured prefix and halts the request with a 301 redirect to the derived new path. |
+| **DoRedirect** (duplicate name in test) | Allows the request to continue unchanged since the prefix only exists mid-path, not at the start. |
 
 **Note**: The third test has a duplicate name "DoRedirect" which should be renamed (e.g., "NoRedirectWhenPrefixNotAtStart").
 

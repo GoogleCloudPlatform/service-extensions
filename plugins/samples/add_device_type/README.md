@@ -14,39 +14,12 @@ This plugin analyzes the `User-Agent` header of incoming HTTP requests and adds 
 4. The plugin sets the `x-device-type` header to the detected category (`bot`, `tablet`, `phone`, `desktop`, or `other` if no match).
 5. The plugin returns `Action::Continue`, forwarding the request with the new header to the upstream server.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_http_request_headers` | Reads the `User-Agent` header, detects device type, and adds the `x-device-type` header |
-
-## Key Code Walkthrough
-
-The core logic is conceptually identical across all three language implementations:
-
-- **User-Agent extraction** — The plugin reads the `user-agent` header:
-  - **C++** uses `getRequestHeader("user-agent")` and `absl::AsciiStrToLower()` to normalize the string.
-  - **Go** uses `proxywasm.GetHttpRequestHeader(userAgentHeader)` and `strings.ToLower()`. If the header is missing, it defaults to `"unknown"`.
-  - **Rust** uses `self.get_http_request_header("user-agent")` with `unwrap_or_default()` and `.to_lowercase()`.
-
-- **Device type detection** — The plugin evaluates the user agent in priority order using helper functions:
-  - **`IsBot()`/`isBot()`/`is_bot()`** — Checks for bot/crawler keywords. Bots are detected first to prevent misclassification (e.g., a bot pretending to be a mobile device).
-  - **`IsTablet()`/`isTablet()`/`is_tablet()`** — Checks for tablet keywords. For Android devices, requires additional indicators (`tablet`, `tab`, `pad`) because Android user agents can represent both phones and tablets.
-  - **`IsMobile()`/`isMobile()`/`is_mobile()`** — Checks for mobile phone keywords like `iphone`, `android`, `mobile`.
-  - **`IsDesktop()`/`isDesktop()`/`is_desktop()`** — Checks for desktop browser keywords like `chrome`, `firefox`, `safari`.
-  - If no category matches, the device type is set to `other`.
-
-- **Keyword matching** — All implementations use a `ContainsAny()` / `containsAny()` / `contains_any()` helper that checks if the user agent contains any keyword from a given list. Keywords are stored as static/package-level constants for efficiency:
-  - **C++**: Static methods on `MyRootContext` return references to static vectors.
-  - **Go**: Package-level `[]string` slices (`botKeywords`, `tabletKeywords`, etc.).
-  - **Rust**: Static slices (`&[&str]`) defined inline in each detection function.
-
-- **Header modification** — The plugin sets the `x-device-type` header:
-  - **`replaceRequestHeader("x-device-type", device_type)`** (C++)
-  - **`proxywasm.ReplaceHttpRequestHeader(deviceTypeHeader, deviceType)`** (Go)
-  - **`self.set_http_request_header("x-device-type", Some(&device_type))`** (Rust)
-
-The detection priority ensures that bots are never misclassified, and Android tablets are distinguished from Android phones.
+- **Normalization**: The user agent string is converted to lowercase for case-insensitive processing. C++ leverages `absl::AsciiStrToLower()`.
+- **Detection Order**: Bot detection is executed first so bots aren't incorrectly categorized as device types.
+- **Android distinction**: Differentiating an Android tablet from a phone requires matching additional indicators (like `tablet` or `pad`).
+- **Data structures**: Keyword lists are stored efficiently as static/module-level variables or slices.
 
 ## Configuration
 
@@ -90,17 +63,17 @@ bazelisk test --test_output=all //samples/device_type:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **DetectDesktopUserAgent** | `User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36` | `x-device-type: desktop` (Chrome on Windows detected as desktop) |
-| **DetectIPhoneUserAgent** | `User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1` | `x-device-type: phone` (iPhone detected as phone) |
-| **DetectIPadUserAgent** | `User-Agent: Mozilla/5.0 (iPad; CPU OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1` | `x-device-type: tablet` (iPad detected as tablet) |
-| **DetectAndroidPhoneUserAgent** | `User-Agent: Mozilla/5.0 (Linux; Android 10; SM-G960U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36` | `x-device-type: phone` (Android phone detected via `mobile` keyword) |
-| **DetectAndroidTabletUserAgent** | `User-Agent: Mozilla/5.0 (Linux; Android 10; SM-T510) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Safari/537.36` | `x-device-type: tablet` (Android tablet detected via `SM-T` model identifier) |
-| **DetectBotUserAgent** | `User-Agent: Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)` | `x-device-type: bot` (Googlebot detected as bot) |
-| **MissingUserAgent** | No `User-Agent` header present | `x-device-type: other` (missing user agent defaults to `other`) |
-| **CaseInsensitivity** | `User-Agent: MOZILLA/5.0 (IPHONE; CPU iPhone OS)` (uppercase) | `x-device-type: phone` (case-insensitive matching detects iPhone) |
-| **BenchmarkDetection** | `User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36` | `x-device-type: desktop` (performance benchmark test) |
+| Scenario | Description |
+|---|---|
+| **DetectDesktopUserAgent** | Correctly identifies a Chrome on Windows browser as a desktop device. |
+| **DetectIPhoneUserAgent** | Correctly identifies an iPhone as a mobile phone. |
+| **DetectIPadUserAgent** | Correctly identifies an iPad as a tablet device. |
+| **DetectAndroidPhoneUserAgent** | Correctly identifies an Android phone via the `mobile` keyword. |
+| **DetectAndroidTabletUserAgent** | Correctly identifies an Android tablet via a specific model identifier keyword. |
+| **DetectBotUserAgent** | Correctly identifies Googlebot as a bot. |
+| **MissingUserAgent** | Defaults to the `other` category when the header is missing. |
+| **CaseInsensitivity** | Successfully handles uppercase user agent strings. |
+| **BenchmarkDetection** | Validates performance during normal desktop parsing. |
 
 ## Available Languages
 

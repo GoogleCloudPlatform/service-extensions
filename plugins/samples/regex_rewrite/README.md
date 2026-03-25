@@ -44,89 +44,11 @@ This plugin demonstrates advanced URL path manipulation using regular expression
 
 6. The plugin returns `Continue` / `ActionContinue`, forwarding the (potentially modified) request.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_configure` (C++/Rust) / `OnPluginStart` (Go) | Compiles the regex pattern at plugin initialization for efficient reuse |
-| `on_http_request_headers` | Applies regex replacement to `:path` header if pattern matches |
-
-## Key Code Walkthrough
-
-### Regex Compilation (Initialization)
-
-- **C++**:
-  ```cpp
-  bool onConfigure(size_t) override {
-      // Compile the regex expression at plugin setup time.
-      path_match.emplace("/foo-([^/]+)/");
-      return path_match->ok();
-  }
-  ```
-  Uses RE2 library's `emplace()` to construct the regex in-place. Returns `false` if compilation fails.
-
-- **Go**:
-  ```go
-  func (ctx *pluginContext) OnPluginStart(int) types.OnPluginStartStatus {
-      var err error
-      ctx.pathMatch, err = regexp.Compile("/foo-([^/]+)/")
-      if err != nil {
-          proxywasm.LogErrorf("Error compiling the path regular expression: %v", err)
-          return types.OnPluginStartStatusFailed
-      }
-      return types.OnPluginStartStatusOK
-  }
-  ```
-  Uses standard library `regexp.Compile()` and returns status based on success.
-
-- **Rust**:
-  ```rust
-  fn on_configure(&mut self, _: usize) -> bool {
-      self.path_match = Some(Rc::new(Regex::new(r"/foo-([^/]+)/").unwrap()));
-      return true;
-  }
-  ```
-  Uses the `regex` crate and stores the compiled regex in an `Rc` for shared ownership. Uses `unwrap()` which will panic on compilation failure (acceptable since the pattern is hardcoded and known to be valid).
-
-### Regex Replacement (Request Processing)
-
-- **C++**:
-  ```cpp
-  std::string edit = path->toString();  // mutable copy
-  if (re2::RE2::Replace(&edit, *root_->path_match, "/\\1/")) {
-      replaceRequestHeader(":path", edit);
-  }
-  ```
-  - `RE2::Replace()` modifies the string in-place and returns `true` if a replacement was made
-  - Replacement pattern `"/\\1/"` uses `\1` for the first capture group (backslash escaped in C++ string)
-
-- **Go**:
-  ```go
-  edit := ctx.pluginContext.pathMatch.ReplaceAllString(path, "/$1/")
-  if len(edit) != len(path) {
-      proxywasm.ReplaceHttpRequestHeader(":path", edit)
-  }
-  ```
-  - `ReplaceAllString()` returns a new string with all matches replaced
-  - Replacement pattern `"/$1/"` uses `$1` for the first capture group
-  - Length comparison detects if replacement occurred (efficient check)
-
-- **Rust**:
-  ```rust
-  let edit = self.path_match.replace(&path, "/$1/");
-  if path.len() != edit.len() {
-      self.set_http_request_header(":path", Some(&edit));
-  }
-  ```
-  - `replace()` returns a `Cow<str>` (clone-on-write string) with the first match replaced
-  - Replacement pattern `"/$1/"` uses `$1` for the first capture group
-  - Length comparison avoids unnecessary header updates
-
-### Shared Regex State
-
-- **C++**: Uses pointer to root context to access shared regex
-- **Go**: Stores pointer to plugin context in HTTP context
-- **Rust**: Uses `Rc<Regex>` (reference counted smart pointer) for efficient shared ownership without copying the compiled regex
+- **Pre-compiled efficiency**: Compiles the regular expression exactly once during `on_configure` / `OnPluginStart` to avoid per-request processing overhead.
+- **Regex engine usage**: Specifically utilizes `RE2` in C++, `regexp` in Go, and the `regex` crate in Rust to perform matching and capture-group replacement.
+- **Selective replacement**: Triggers a rewrite of the `:path` pseudo-header only if the compiled regex effectively matches and modifies the string.
 
 ## Configuration
 
@@ -197,10 +119,10 @@ bazelisk test --test_output=all //samples/regex_rewrite:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Input | Output | Explanation |
-|---|---|---|---|
-| **NoMatch** | `:path: /one/two?three=four` | `:path: /one/two?three=four` | Pattern `/foo-([^/]+)/` doesn't match; path unchanged |
-| **MatchAndReplace** | `:path: /pre/foo-one/foo-two/post?a=b` | `:path: /pre/one/foo-two/post?a=b` | First match `/foo-one/` replaced with `/one/`; second match `/foo-two/` unchanged (first match only) |
+| Scenario | Description |
+|---|---|
+| **NoMatch** | Leaves the path unmodified when the regex pattern does not match. |
+| **MatchAndReplace** | Successfully catches the pattern, extracts the capture group, and manipulates the path using the extracted substring. |
 
 **Note**: Both tests include `benchmark: true` for performance testing.
 

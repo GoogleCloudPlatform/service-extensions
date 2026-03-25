@@ -17,39 +17,12 @@ This plugin detects and masks credit card numbers in HTTP response headers and b
 
 **Important limitation**: For simplicity, this plugin does not handle credit card numbers that are split across multiple `on_http_response_body` calls (chunk boundaries). In production, you would need to implement buffering or stateful pattern matching to handle this edge case.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_configure` | Compiles the credit card regex pattern once at plugin initialization (C++ only; Go compiles in `NewPluginContext`) |
-| `on_http_response_headers` | Checks the `google-run-pii-check` header and masks credit card numbers in all response headers |
-| `on_http_response_body` | Masks credit card numbers in the response body if PII checking is enabled |
-
-## Key Code Walkthrough
-
-The core logic is conceptually identical between the C++ and Go implementations:
-
-- **Regex compilation** — The credit card pattern is compiled once to avoid repeated expensive operations:
-  - **C++** compiles the regex in `onConfigure()` (root context) using `re2::RE2("\\d{4}-\\d{4}-\\d{4}-(\\d{4})")` and stores it in the root context (`card_match`). The HTTP context accesses it via `root_->card_match`.
-  - **Go** compiles the regex in `NewPluginContext()` using `regexp.MustCompile("\\d{4}-\\d{4}-\\d{4}-(\\d{4})")` and stores it in the plugin context. The HTTP context receives a reference to the compiled regex.
-
-  The pattern `\d{4}-\d{4}-\d{4}-(\d{4})` matches 19-character hyphenated credit card numbers and captures the last 4 digits in a group.
-
-- **Conditional activation** — The plugin only processes responses with `google-run-pii-check: true`:
-  - **C++** uses `getResponseHeader("google-run-pii-check")` and checks if `pii_header->view() == "true"`.
-  - **Go** uses `proxywasm.GetHttpResponseHeader("google-run-pii-check")` and checks if `value != "true"` (inverted logic, returns early if not `"true"`).
-
-- **Header scanning** — The plugin iterates through all response headers:
-  - **C++** uses `getResponseHeaderPairs()->pairs()` to retrieve all headers, applies `maskCardNumbers()` to each value, and calls `replaceResponseHeader()` if a match is found.
-  - **Go** uses `proxywasm.GetHttpResponseHeaders()` to retrieve all headers, applies `creditCardRegex.ReplaceAllString()` to each value, and calls `proxywasm.ReplaceHttpResponseHeader()` if the value changed.
-
-- **Body scanning** — The plugin scans the response body if PII checking is enabled:
-  - **C++** uses `getBufferBytes(WasmBufferType::HttpResponseBody, 0, body_buffer_length)` to read the entire body, applies `maskCardNumbers()`, and calls `setBuffer()` to replace the body if matches are found.
-  - **Go** uses `proxywasm.GetHttpResponseBody(0, numBytes)` to read the body, applies `creditCardRegex.ReplaceAll()`, and calls `proxywasm.ReplaceHttpResponseBody()` to replace the body.
-
-- **Masking pattern** — Both implementations replace matched credit card numbers with `XXXX-XXXX-XXXX-[last 4 digits]`:
-  - **C++** uses `re2::RE2::GlobalReplace(&value, *root_->card_match, "XXXX-XXXX-XXXX-\\1")` where `\\1` references the captured last 4 digits.
-  - **Go** uses `creditCardRegex.ReplaceAllString(value, "XXXX-XXXX-XXXX-${1}")` where `${1}` references the captured last 4 digits.
+- **Regular expression compilation**: The regex is compiled once during plugin initialization (`onConfigure` or `NewPluginContext`) for optimal performance.
+- **Conditional execution**: Processing is bypassed entirely unless the specific `google-run-pii-check` header is present and set to true.
+- **Header sweeping**: The plugin iterates through all response headers, matching and masking credit card numbers in-place.
+- **Body scanning**: The response body is fully read into a buffer, scanned against the regex pattern, and replaced if matches occur.
 
 ## Configuration
 
@@ -89,12 +62,12 @@ bazelisk test --test_output=all //samples/check_pii:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **WithRunCheckHeaderOverwriteCardNumberOnResponseHeader** | Response headers: `x-card-number: 1234-5678-9123-4567`, `google-run-pii-check: true` | `x-card-number: XXXX-XXXX-XXXX-4567` (credit card number masked in header) |
-| **WithoutRunCheckHeaderKeepTheOriginalHeaders** | Response headers: `x-card-number: 1234-5678-9123-4567`, `google-run-pii-check: false` | `x-card-number: 1234-5678-9123-4567` (no masking, PII check disabled) |
-| **WithRunCheckHeaderOverwriteCardNumberOnBody** | Response header: `google-run-pii-check: true`; Response body contains `1234-5678-9123-4567` and `1234-4567-9123-8886` | Body with credit card numbers masked: `XXXX-XXXX-XXXX-4567` and `XXXX-XXXX-XXXX-8886` |
-| **WithoutRunCheckHeaderKeepTheOriginalBody** | Response header: `google-run-pii-check: false`; Response body contains `1234-5678-9123-4567` and `1234-4567-9123-8886` | Body unchanged (no masking, PII check disabled) |
+| Scenario | Description |
+|---|---|
+| **WithRunCheckHeaderOverwriteCardNumberOnResponseHeader** | Correctly masks credit card numbers in response headers when the check is enabled. |
+| **WithoutRunCheckHeaderKeepTheOriginalHeaders** | Leaves response headers untouched when the PII check is disabled. |
+| **WithRunCheckHeaderOverwriteCardNumberOnBody** | Correctly masks multiple credit card numbers within the response body when enabled. |
+| **WithoutRunCheckHeaderKeepTheOriginalBody** | Leaves the response body untouched when the PII check is disabled. |
 
 ## Available Languages
 

@@ -30,104 +30,11 @@ This plugin implements JWT (JSON Web Token) authentication by validating tokens 
 
 7. **Success**: If all validations pass, the plugin allows the request to proceed to the upstream server with the cleaned URL.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_configure` (C++) / `OnPluginStart` (Go) | Loads and parses the RSA public key from the configuration file |
-| `on_http_request_headers` | Extracts JWT from URL, validates signature, and removes token from path |
-
-## Key Code Walkthrough
-
-The core logic is conceptually identical between C++ and Go implementations:
-
-- **RSA public key loading** — The plugin loads the public key during initialization:
-  - **C++**:
-    ```cpp
-    const std::string rsa_key = config_->toString();
-    jwks_ = google::jwt_verify::Jwks::createFrom(
-        rsa_key, google::jwt_verify::Jwks::Type::PEM);
-    ```
-    The `jwt_verify_lib` library handles PEM decoding and key parsing.
-
-  - **Go**:
-    ```go
-    block, _ := pem.Decode(config)
-    pub, err := x509.ParsePKIXPublicKey(block.Bytes)
-    if err != nil {
-        pub, err = x509.ParsePKCS1PublicKey(block.Bytes)
-    }
-    rsaPub, ok := pub.(*rsa.PublicKey)
-    ```
-    Go tries both PKIX (standard) and PKCS1 (legacy) formats to support different PEM encodings.
-
-- **URL parsing and token extraction** — The plugin parses the `:path` header:
-  - **C++**:
-    ```cpp
-    boost::system::result<boost::urls::url> url =
-        boost::urls::parse_uri_reference(path->view());
-    auto it = url->params().find("jwt");
-    ```
-  - **Go**:
-    ```go
-    u, err := url.ParseRequestURI(path)
-    query := u.Query()
-    jwtToken := query.Get("jwt")
-    ```
-
-- **JWT parsing** — The plugin validates token structure:
-  - **C++**:
-    ```cpp
-    google::jwt_verify::Jwt jwt;
-    if (jwt.parseFromString((*it).value) != google::jwt_verify::Status::Ok) {
-        sendLocalResponse(403, "", "Access forbidden - invalid token.\n", {});
-    }
-    ```
-  - **Go**:
-    ```go
-    parser := jwt.NewParser(jwt.WithoutClaimsValidation())
-    _, _, err = parser.ParseUnverified(jwtToken, jwt.MapClaims{})
-    if err != nil {
-        ctx.sendResponse(403, "Access forbidden - invalid token.\n")
-    }
-    ```
-
-- **Signature verification** — The plugin verifies the JWT signature:
-  - **C++**:
-    ```cpp
-    const auto status = google::jwt_verify::verifyJwt(jwt, *root_->jwks());
-    if (status != google::jwt_verify::Status::Ok) {
-        sendLocalResponse(403, "", "Access forbidden.\n", {});
-    }
-    ```
-    The `verifyJwt` function checks the signature and validates standard claims (exp, nbf, etc.).
-
-  - **Go**:
-    ```go
-    token, err := jwt.Parse(jwtToken, func(token *jwt.Token) (interface{}, error) {
-        if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-            return nil, fmt.Errorf("unexpected signing method")
-        }
-        return ctx.publicKey, nil
-    })
-    if err != nil || !token.Valid {
-        ctx.sendResponse(403, "Access forbidden.\n")
-    }
-    ```
-    The key function validates that the token uses RSA signing and returns the public key for verification.
-
-- **Token removal** — After validation, the plugin removes the `jwt` parameter:
-  - **C++**:
-    ```cpp
-    url->params().erase(it);
-    replaceRequestHeader(":path", url->buffer());
-    ```
-  - **Go**:
-    ```go
-    query.Del("jwt")
-    u.RawQuery = query.Encode()
-    proxywasm.ReplaceHttpRequestHeader(":path", u.String())
-    ```
+- **Key parsing**: Decodes RSA public keys from PEM formats directly at plugin initialization to reduce request-time overhead.
+- **Token processing**: C++ leverages `jwt_verify_lib` for JWT structure and signature operations, while Go uses standard `jwt` modules and crypto packages.
+- **Routing clean-up**: Once verified, the JWT parameter is cleanly deleted from the URL path forwarded to the upstream servers.
 
 ## Configuration
 
@@ -214,12 +121,12 @@ bazelisk test --test_output=all //samples/jwt_auth:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **WithValidJwt** | `:path: /admin?jwt=<valid_token>&param=value` | `:path: /admin?param=value` (valid JWT removed, request allowed) |
-| **NoJwt** | `:path: /admin` (no jwt parameter) | 403 with `"Access forbidden - missing token.\n"` |
-| **InvalidJwt** | `:path: /admin?jwt=ddssdsds.ddfdffd.dsssd` (malformed JWT) | 403 with `"Access forbidden - invalid token.\n"` (parsing failed) |
-| **NotAllowedJwt** | `:path: /admin?jwt=<token_with_invalid_signature>` | 403 with `"Access forbidden.\n"` (signature verification failed) |
+| Scenario | Description |
+|---|---|
+| **WithValidJwt** | Removes the token from the query parameters prior to happily forwarding the request. |
+| **NoJwt** | Blocks the request with a 403 Forbidden when the JWT query parameter is entirely missing. |
+| **InvalidJwt** | Blocks the request with a 403 Forbidden if the string is inherently malformed. |
+| **NotAllowedJwt** | Blocks the request with a 403 Forbidden if the structural token fails cryptographic validation against the public key. |
 
 ## Available Languages
 

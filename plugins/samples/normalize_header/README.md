@@ -22,81 +22,11 @@ This plugin detects the client's device type by analyzing request headers and ad
 
 3. The plugin always adds exactly one `client-device-type` header and returns `Continue` / `ActionContinue`, allowing the request to proceed to the upstream server.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_http_request_headers` | Detects device type from headers and adds normalized `client-device-type` header |
-
-## Key Code Walkthrough
-
-The core logic is identical across all three language implementations:
-
-- **Client Hints detection** — The plugin checks the standardized mobile hint:
-  - **C++**:
-    ```cpp
-    const auto mobile_header = getRequestHeader("Sec-CH-UA-Mobile");
-    if (mobile_header && mobile_header->view() == "?1") {
-        addRequestHeader("client-device-type", "mobile");
-        return FilterHeadersStatus::Continue;
-    }
-    ```
-  
-  - **Go**:
-    ```go
-    mobileHeader, err := proxywasm.GetHttpRequestHeader("Sec-CH-UA-Mobile")
-    if err == nil && mobileHeader == "?1" {
-        proxywasm.AddHttpRequestHeader("client-device-type", "mobile")
-        return types.ActionContinue
-    }
-    ```
-  
-  - **Rust**:
-    ```rust
-    let mobile_header = self.get_http_request_header("Sec-CH-UA-Mobile");
-    if mobile_header.unwrap_or_default() == "?1" {
-        self.add_http_request_header(DEVICE_TYPE_KEY, DEVICE_TYPE_VALUE);
-        return Action::Continue;
-    }
-    ```
-
-  The value `"?1"` is the standard boolean-true representation in structured headers (RFC 8941).
-
-- **User-Agent fallback** — The plugin performs case-insensitive substring matching:
-  - **C++**:
-    ```cpp
-    const auto user_agent = getRequestHeader("User-Agent");
-    if (user_agent && absl::StrContainsIgnoreCase(user_agent->view(), "mobile")) {
-        addRequestHeader("client-device-type", "mobile");
-        return FilterHeadersStatus::Continue;
-    }
-    ```
-    Uses Abseil's `StrContainsIgnoreCase` for efficient case-insensitive search.
-
-  - **Go**:
-    ```go
-    userAgentHeader, err := proxywasm.GetHttpRequestHeader("User-Agent")
-    if err == nil && strings.Contains(strings.ToLower(userAgentHeader), "mobile") {
-        proxywasm.AddHttpRequestHeader("client-device-type", "mobile")
-        return types.ActionContinue
-    }
-    ```
-    Converts to lowercase before checking for substring.
-
-  - **Rust**:
-    ```rust
-    let user_agent = self.get_http_request_header("User-Agent");
-    if user_agent.map_or(false, |s| s.to_lowercase().contains(DEVICE_TYPE_VALUE)) {
-        self.add_http_request_header(DEVICE_TYPE_KEY, DEVICE_TYPE_VALUE);
-        return Action::Continue;
-    }
-    ```
-    Uses `map_or` to handle `Option` and converts to lowercase.
-
-- **Default value** — If no mobile indicators are found:
-  - All implementations add `client-device-type: unknown` as the fallback value.
-
-- **Early return pattern** — All implementations use early returns after each detection method succeeds, ensuring only one header is added and avoiding unnecessary checks.
+- **Client Hints prioritization**: Prefers the modern, standardized `Sec-CH-UA-Mobile` header to accurately identify mobile devices over fragile user-agent heuristics.
+- **User-Agent fallback**: Falls back to case-insensitive `User-Agent` substring searching if client hints are unavailable.
+- **Early termination**: Emits the normalized header and returns `Continue` immediately after the first successful strategy matches, skipping redundant checks.
 
 ## Configuration
 
@@ -141,12 +71,12 @@ bazelisk test --test_output=all //samples/normalize_header:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **NoHeaderSet** | No `Sec-CH-UA-Mobile` or `User-Agent` headers | `client-device-type: unknown` (default value) |
-| **WithMobileHeaderHintEqTrue** | `Sec-CH-UA-Mobile: ?1`, `User-Agent: Chrome...` | `client-device-type: mobile` (Client Hints has priority) |
-| **WithMobileHeaderHintEqFalse** | `Sec-CH-UA-Mobile: ?0`, `User-Agent: Chrome...` | `client-device-type: unknown` (Client Hints explicitly says not mobile; User-Agent doesn't contain "mobile") |
-| **WithMobileUserAgent** | `User-Agent: Chrome/... Mobile/...` | `client-device-type: mobile` (User-Agent contains "mobile" substring) |
+| Scenario | Description |
+|---|---|
+| **NoHeaderSet** | Assigns the device type as `unknown` when no indicators are present. |
+| **WithMobileHeaderHintEqTrue** | Accurately identifies a mobile device via the `Sec-CH-UA-Mobile` indicator, bypassing the user agent check. |
+| **WithMobileHeaderHintEqFalse** | Correctly identifies a non-mobile device when the hint explicitly denies it, despite lack of user agent substrings. |
+| **WithMobileUserAgent** | Accurately identifies a mobile device by correctly parsing the user agent fallback. |
 
 ## Available Languages
 

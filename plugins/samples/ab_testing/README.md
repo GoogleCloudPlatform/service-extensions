@@ -10,34 +10,12 @@ This plugin implements A/B testing by routing a percentage of users to a v2 endp
 4. If the hash value is less than or equal to the configured percentile (50), the plugin rewrites the path by replacing `/v1/` with `/v2/`, preserving the rest of the path and all query parameters.
 5. The plugin returns `Action::Continue`, forwarding the (potentially modified) request to the upstream server.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_http_request_headers` | Inspects the `:path` header and rewrites it from `/v1/` to `/v2/` for eligible users |
-
-## Key Code Walkthrough
-
-The core logic is conceptually identical across all three language implementations, though implementation details vary:
-
-- **Path extraction and validation** — The plugin reads the `:path` pseudo-header and checks if it starts with `/v1/` (case-insensitive in C++ and Go, case-sensitive after lowercasing in Rust).
-
-- **User extraction** — The plugin parses the query string to extract the `user` parameter:
-  - **C++** uses `boost::urls::parse_relative_ref` to parse the path and `url->params().find("user")` to retrieve the value.
-  - **Go** uses `url.Parse` and `u.Query().Get("user")` from the standard library.
-  - **Rust** constructs a full URL (`http://example.com{path}`) and uses the `url` crate's `query_pairs()` iterator to find the `user` key.
-
-- **Hash-based routing** — The plugin computes a deterministic hash of the user ID and checks if it falls within the percentile:
-  - **C++** uses `std::hash<std::string_view>{}(user) % 100` to produce a value between 0 and 99.
-  - **Go** uses FNV-1a 64-bit hashing (`fnv.New64a()`) and reduces the result modulo 100.
-  - **Rust** implements a custom hash function that sums the ASCII values of the user string and adds `3 × user.len()` before taking modulo 100. This custom implementation was chosen to match the C++ test expectations for specific inputs like `"userAAA"`.
-
-- **Path rewriting** — If the hash is ≤ 50, the plugin replaces `/v1/` with `/v2/`:
-  - **`replaceRequestHeader(":path", new_path)`** (C++)
-  - **`proxywasm.ReplaceHttpRequestHeader(":path", newPath)`** (Go)
-  - **`self.set_http_request_header(":path", Some(&new_path))`** (Rust)
-
-The percentile threshold is hardcoded to 50, meaning approximately 50% of users (with distinct user IDs) will be routed to v2.
+- **Path extraction**: The plugin reads the `:path` header and handles query parameters.
+- **Specific libraries used for URLs**: C++ uses `boost::urls`, Go relies on the standard `net/url`, and Rust builds a full URL and uses the `url` crate.
+- **Hashing**: Device type detection / user identity routing depends on a deterministic hash of the extracted user ID. Rust implements a custom hash function to match C++ test expectations.
+- **Threshold**: The 50% threshold for routing to the v2 endpoint is hardcoded as a constant.
 
 ## Configuration
 
@@ -80,13 +58,13 @@ bazelisk test --test_output=all //samples/ab_testing:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **WithHashBelowThresholdRedirectsToV2File** | `:path: /v1/file.png?user=user1` | `:path: /v2/file.png?user=user1` (hash of `user1` ≤ 50, path rewritten) |
-| **WithHashBelowThresholdRedirectsToV2FileIgnoringQueryParam** | `:path: /v1/file.png?user=user1&param=value` | `:path: /v2/file.png?user=user1&param=value` (hash of `user1` ≤ 50, all query params preserved) |
-| **WithHashAboveThresholdKeepTheSame** | `:path: /v1/file.png?user=userAAA` | `:path: /v1/file.png?user=userAAA` (hash of `userAAA` > 50, no rewrite) |
-| **WithAnotherPathKeepTheSame** | `:path: /v1alpha/file.png?user=user1` | `:path: /v1alpha/file.png?user=user1` (path does not start with `/v1/`, no rewrite) |
-| **WithoutUserKeepTheSame** | `:path: /v1/file.png` | `:path: /v1/file.png` (no `user` query parameter, no rewrite) |
+| Scenario | Description |
+|---|---|
+| **WithHashBelowThresholdRedirectsToV2File** | Redirects to the v2 path when the user's hash is below the configured threshold. |
+| **WithHashBelowThresholdRedirectsToV2FileIgnoringQueryParam** | Preserves additional query parameters while rewriting the path for users below the threshold. |
+| **WithHashAboveThresholdKeepTheSame** | Makes no changes when the user's hash is above the configured threshold. |
+| **WithAnotherPathKeepTheSame** | Makes no changes when the request path does not match the configured v1 path. |
+| **WithoutUserKeepTheSame** | Makes no changes because the required user query parameter is missing. |
 
 ## Available Languages
 

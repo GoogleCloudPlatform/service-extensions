@@ -12,33 +12,12 @@ This plugin intercepts 5xx server error responses and replaces them with a 302 r
    - `Origin-Status` header containing the original 5xx status code for logging/debugging
 5. The plugin returns `Action::Continue`, and the proxy sends the redirect response to the client instead of the original 5xx error.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_http_response_headers` | Inspects the `:status` header and sends a 302 redirect for 5xx responses |
-
-## Key Code Walkthrough
-
-The core logic is identical across all three language implementations:
-
-- **Status code extraction and parsing** — The plugin reads the `:status` pseudo-header:
-  - **C++** uses `getResponseHeader(":status")` and `absl::SimpleAtoi()` to parse the value.
-  - **Go** uses `proxywasm.GetHttpResponseHeader(":status")` and `strconv.Atoi()`.
-  - **Rust** uses `self.get_http_response_header(":status")` and `status.parse::<u16>()`.
-
-- **5xx detection** — The plugin checks if `response_code / 100 == 5` (integer division), which matches any status code from 500 to 599.
-
-- **Custom redirect response** — If a 5xx is detected, the plugin generates a 302 redirect:
-  - **`sendLocalResponse(302, "", "", {{"Origin-Status", ...}, {"Location", ...}})`** (C++)
-  - **`proxywasm.SendHttpResponse(302, [][2]string{{"Origin-Status", ...}, {"Location", ...}}, nil, 0)`** (Go)
-  - **`self.send_http_response(302, vec![("Origin-Status", ...), ("Location", ...)], None)`** (Rust)
-  
-  The `Origin-Status` header preserves the original error code (e.g., `501`, `503`) for diagnostic purposes, while `Location` directs the client to the custom error page.
-
-- **Return value** — C++ returns `FilterHeadersStatus::ContinueAndEndStream` after sending the redirect to signal the proxy should not forward the original response body. Go and Rust return `Action::Continue`, as the redirect response replaces the original response entirely.
-
-The redirect page URL is hardcoded as a constant: `https://storage.googleapis.com/www.example.com/server-error.html`.
+- **Status parsing**: The plugin extracts the `:status` pseudo-header; C++ uses `absl::SimpleAtoi()`.
+- **Redirect generation**: A 302 redirect is sent directly from the plugin instead of returning the upstream response. C++ requires returning `FilterHeadersStatus::ContinueAndEndStream` after sending the local response to halt the original response body.
+- **Diagnostic headers**: The original status code is preserved in the custom `Origin-Status` header.
+- **Redirection URL**: The destination error page is hardcoded as a constant string.
 
 ## Configuration
 
@@ -81,10 +60,10 @@ bazelisk test --test_output=all //samples/add_custom_response:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **NoRedirect** | Response with `:status: 200` | `:status: 200` unchanged, no `Location` header (non-5xx response passes through) |
-| **DoRedirect** | Response with `:status: 501` | 302 redirect with `Location: https://storage.googleapis.com/www.example.com/server-error.html` and `Origin-Status: 501` (original 5xx replaced with redirect) |
+| Scenario | Description |
+|---|---|
+| **NoRedirect** | Does nothing for successful responses. |
+| **DoRedirect** | Intercepts a 5xx response and redirects the client to the custom error page while preserving the original status code. |
 
 ## Available Languages
 

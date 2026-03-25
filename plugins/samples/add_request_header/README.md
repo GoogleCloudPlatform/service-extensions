@@ -19,30 +19,9 @@ routing hints, or default values into upstream requests. It operates during the
 4. The plugin returns `Action::Continue`, allowing the (now modified) request to
    proceed to the upstream server.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_http_request_headers` | Adds the `Message` header and sets the `Welcome` header on every incoming request |
-
-## Key Code Walkthrough
-
-The core logic is identical across all three language implementations:
-
-- **`add_http_request_header("Message", "hello")`** — Appends the value `hello`
-  to the `Message` header. If the header doesn't exist, it is created. If it
-  already exists, the value is appended with a comma separator (e.g.,
-  `hey, hello`). This is the **add** semantic.
-
-- **`set_http_request_header("Welcome", "warm")`** (Rust) /
-  **`replaceRequestHeader("Welcome", "warm")`** (C++) /
-  **`ReplaceHttpRequestHeader("Welcome", "warm")`** (Go) — Overwrites the
-  `Welcome` header with `warm`, regardless of any existing value. This is the
-  **set/replace** semantic.
-
-The distinction between add and set/replace is a fundamental concept in header
-manipulation. This sample is a good starting point for understanding how each
-operation behaves, especially with pre-existing headers.
+- **Appending vs replacing headers**: This plugin demonstrates the distinction between "adding" a header (appending with a comma to existing values if present) and "setting" or "replacing" a header (completely overwriting it).
 
 ## Configuration
 
@@ -82,12 +61,12 @@ bazelisk test --test_output=all //samples/add_request_header:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **AddsRequestHeader** | Request with no `Message` or `Welcome` headers | `Message: hello`, `Welcome: warm` added |
-| **UpdatesRequestHeader** | Request with `Message: hey` and `Welcome: cold` | `Message: hey, hello` (appended), `Welcome: warm` (replaced) |
-| **RequestAndResponse** | Request with no `Message` header | `Message: hello` added (response path is unaffected) |
-| **CaseInsensitiveUpdates** | Request with `message: hey` and `welcome: cold` (lowercase) | `message: hey, hello` (appended), `welcome: warm` (replaced) — header names are case-insensitive |
+| Scenario | Description |
+|---|---|
+| **AddsRequestHeader** | Injects the new headers when they do not previously exist on the request. |
+| **UpdatesRequestHeader** | Appends to the existing `Message` header and overwrites the existing `Welcome` header. |
+| **RequestAndResponse** | Verifies that the modifications occur only on the request phase. |
+| **CaseInsensitiveUpdates** | Properly updates existing headers regardless of their original case. |
 
 ## Available Languages
 

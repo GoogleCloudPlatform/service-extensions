@@ -19,35 +19,11 @@ This plugin demonstrates two common Service Extensions use cases:
 - **Route Extension**: Rewriting the destination host and path (`:authority` and `:path` headers) to route requests to different backends.
 - **Traffic Extension**: Adding custom headers to responses for debugging, tracing, or client identification.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_http_request_headers` | Logs a message and rewrites the `:authority` and `:path` headers to route requests to `service-extensions.com/` |
-| `on_http_response_headers` | Logs a message and adds the `hello: service-extensions` header to the response |
-
-## Key Code Walkthrough
-
-The core logic is identical across all three language implementations:
-
-- **Request header rewriting** — The plugin modifies routing headers:
-  - **C++** uses `replaceRequestHeader(":authority", "service-extensions.com")` and `replaceRequestHeader(":path", "/")` to overwrite the pseudo-headers.
-  - **Go** uses `proxywasm.ReplaceHttpRequestHeader(":authority", "service-extensions.com")` and `proxywasm.ReplaceHttpRequestHeader(":path", "/")`. Errors trigger a panic, which is caught by the `defer recover()` block and results in a 500 error response.
-  - **Rust** uses `self.set_http_request_header(":authority", Some("service-extensions.com"))` and `self.set_http_request_header(":path", Some("/"))`.
-
-  The **`:authority`** pseudo-header is the HTTP/2 equivalent of the HTTP/1.1 `Host` header and controls which upstream server receives the request. The **`:path`** pseudo-header specifies the request URI path.
-
-- **Response header addition** — The plugin adds a custom header to responses:
-  - **C++** uses `addResponseHeader("hello", "service-extensions")` to add the header. If the header already exists, the value is appended (comma-separated).
-  - **Go** uses `proxywasm.AddHttpResponseHeader("hello", "service-extensions")` with the same append semantics.
-  - **Rust** uses `self.add_http_response_header("hello", "service-extensions")` with the same append semantics.
-
-- **Logging** — Both callbacks log messages:
-  - **C++** uses `LOG_INFO("onRequestHeaders: hello from wasm")` and `LOG_INFO("onResponseHeaders: hello from wasm")`.
-  - **Go** uses `proxywasm.LogInfof("onRequestHeaders: hello from wasm")` and `proxywasm.LogInfof("onResponseHeaders: hello from wasm")`.
-  - **Rust** uses `info!("onRequestHeaders: hello from wasm")` and `info!("onResponseHeaders: hello from wasm")`.
-
-  These log messages appear in the proxy's logs and are useful for debugging and tracing plugin execution.
+- **Header rewriting**: The plugin overwrites the `:authority` and `:path` pseudo-headers to redirect the request. Go handles errors with `defer recover()`.
+- **Response modification**: Appends a custom `hello` header to the outgoing response.
+- **Observability**: Logs a custom message during both the request and response phases.
 
 ## Configuration
 
@@ -87,10 +63,10 @@ bazelisk test --test_output=all //samples/first_plugin:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **Basics** (request) | Any HTTP request | Log message matching `onRequestHeaders: hello from wasm`; `:authority: service-extensions.com`; `:path: /` (request routed to `service-extensions.com/` regardless of original destination) |
-| **Basics** (response) | Any HTTP response | Log message matching `onResponseHeaders: hello from wasm`; `hello: service-extensions` header added |
+| Scenario | Description |
+|---|---|
+| **Basics** (request) | Modifies an incoming request by rewriting the host and path headers while logging the action. |
+| **Basics** (response) | Modifies an outgoing response by injecting a custom header while logging the action. |
 
 ## Available Languages
 

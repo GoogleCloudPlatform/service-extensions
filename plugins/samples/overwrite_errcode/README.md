@@ -20,74 +20,11 @@ This plugin demonstrates response status code manipulation by remapping server e
 
 6. The plugin returns `Continue` / `ActionContinue`, forwarding the (potentially modified) response to the client.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_http_response_headers` | Reads response status code, remaps 5xx to 404, and updates the `:status` header |
-
-## Key Code Walkthrough
-
-The core logic is conceptually identical across all three language implementations:
-
-- **Status code extraction** — The plugin reads and parses the `:status` header:
-  - **C++**:
-    ```cpp
-    const auto response_status = getResponseHeader(":status");
-    int response_code;
-    if (response_status && absl::SimpleAtoi(response_status->view(), &response_code))
-    ```
-    Uses Abseil's `SimpleAtoi` for safe string-to-int conversion.
-
-  - **Go**:
-    ```go
-    statusVal, err := proxywasm.GetHttpResponseHeader(":status")
-    responseCode, err := strconv.Atoi(statusVal)
-    ```
-    Uses standard library `strconv.Atoi` for conversion.
-
-  - **Rust**:
-    ```rust
-    if let Some(status_val) = self.get_http_response_header(":status") {
-        if let Ok(response_code) = status_val.parse::<i32>() {
-    ```
-    Uses Rust's `parse()` method with pattern matching for error handling.
-
-- **5xx range detection** — All implementations use integer division:
-  ```
-  response_code / 100 == 5
-  ```
-  This efficiently checks if the status code is between 500-599:
-  - 500 / 100 = 5 (matches)
-  - 502 / 100 = 5 (matches)
-  - 599 / 100 = 5 (matches)
-  - 404 / 100 = 4 (does not match)
-  - 200 / 100 = 2 (does not match)
-
-- **Status code remapping** — The mapping logic:
-  - **C++/Go**: Separate `mapResponseCode()` function for flexibility:
-    ```cpp
-    static int mapResponseCode(int response_code) {
-        return (response_code / 100 == 5) ? 404 : response_code;
-    }
-    ```
-    This allows easy customization of the mapping logic.
-
-  - **Rust**: Directly sets `"404"` as a string:
-    ```rust
-    self.set_http_response_header(":status", Some("404"));
-    ```
-    Simpler approach for the specific 5xx → 404 mapping.
-
-- **Header replacement** — The plugin updates the status code:
-  - **C++**: `replaceResponseHeader(":status", absl::StrCat(mapResponseCode(response_code)))`
-  - **Go**: `proxywasm.ReplaceHttpResponseHeader(":status", strconv.Itoa(newStatus))`
-  - **Rust**: `self.set_http_response_header(":status", Some("404"))`
-
-- **Error handling** — Different approaches:
-  - **C++**: Returns early if parsing fails (implicit error handling)
-  - **Go**: Logs errors and returns `ActionContinue` to avoid breaking the request
-  - **Rust**: Uses pattern matching (`if let`) to gracefully handle `None` and parse errors
+- **Status code parsing**: Safely extracts and parses the `:status` pseudo-header into a workable integer representation.
+- **Range detecting logic**: Uses integer division (`code / 100 == 5`) to efficiently classify all 5xx errors rather than comparing against bounds.
+- **Status overriding**: Modifies the `:status` header to 404 whenever the aforementioned 5xx range test evaluates to true.
 
 ## Configuration
 
@@ -158,11 +95,11 @@ bazelisk test --test_output=all //samples/overwrite_errcode:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **With500StatusCodeChangeTo404** | `:status: 500` (Internal Server Error) | `:status: 404` (Not Found) |
-| **With502StatusCodeChangeTo404** | `:status: 502` (Bad Gateway) | `:status: 404` (Not Found) |
-| **With200StatusCodeNothingChanges** | `:status: 200` (OK) | `:status: 200` (unchanged; only 5xx codes are remapped) |
+| Scenario | Description |
+|---|---|
+| **With500StatusCodeChangeTo404** | Modifies a 500 error code to 404 Not Found before responding to the client. |
+| **With502StatusCodeChangeTo404** | Modifies a 502 error code to 404 Not Found before responding to the client. |
+| **With200StatusCodeNothingChanges** | Permits successful 200 OK responses to pass unmodified. |
 
 ## Available Languages
 

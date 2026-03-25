@@ -29,84 +29,12 @@ This plugin demonstrates advanced URL query parameter manipulation by adding or 
 
 7. The plugin returns `Continue` / `Action::Continue`, forwarding the modified request.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_http_request_headers` | Parses `:path`, removes existing `key` parameter (if present), adds `key=new+val`, and updates `:path` |
-
-## Key Code Walkthrough
-
-The core logic demonstrates advanced URL manipulation:
-
-### C++ Implementation
-
-- **URL parsing with Boost.URL**:
-  ```cpp
-  boost::system::result<boost::urls::url> url =
-      boost::urls::parse_uri_reference(path->view());
-  ```
-  Parses relative URL references (e.g., `/path?query#fragment`).
-
-- **Encoding options**:
-  ```cpp
-  boost::urls::encoding_opts opt;
-  opt.space_as_plus = true;  // Encode spaces as "+" not "%20"
-  ```
-  This follows HTML form encoding conventions (application/x-www-form-urlencoded).
-
-- **Value encoding**:
-  ```cpp
-  std::string val = boost::urls::encode("new val", boost::urls::pchars, opt);
-  ```
-  Encodes the value using percent-encoding with specified character set.
-
-- **Parameter manipulation**:
-  ```cpp
-  url->params(opt).erase("key");      // Remove existing parameter
-  url->params(opt).set("key", val);    // Add parameter at end
-  ```
-  Erasing first ensures the parameter appears at the end of the query string.
-
-- **Path update**:
-  ```cpp
-  replaceRequestHeader(":path", url->encoded_resource());
-  ```
-  `encoded_resource()` returns the path + query + fragment (excludes scheme/host).
-
-### Rust Implementation
-
-- **URL parsing with dummy base**:
-  ```rust
-  let base = Url::parse("http://example.com").ok();
-  let options = Url::options().base_url(base.as_ref());
-  if let Ok(url) = options.parse(&path) {
-  ```
-  Rust's `url` crate requires a base URL for parsing relative paths.
-
-- **Filter existing parameter**:
-  ```rust
-  let query = url.query_pairs().filter(|(k, _)| k != "key");
-  ```
-  Creates an iterator of query parameters excluding `key`.
-
-- **Parameter manipulation**:
-  ```rust
-  let mut edit = url.clone();
-  edit.query_pairs_mut()
-      .clear()                      // Remove all parameters
-      .extend_pairs(query)          // Add back filtered parameters
-      .append_pair("key", "new val"); // Add new parameter at end
-  ```
-  This ensures `key` appears last in the query string.
-
-- **Path extraction**:
-  ```rust
-  self.set_http_request_header(":path", Some(&edit[Position::BeforePath..]));
-  ```
-  `Position::BeforePath..` extracts everything from the path onward (excludes scheme/host).
-
-- **Automatic URL encoding**: The `url` crate automatically encodes special characters, including spaces as `+` in query strings.
+- **URL structuring**: Accurately processes requested path layouts including complex relative URIs or disparate query strings utilizing parsing libraries like `Boost.URL` (C++) or `url` (Rust).
+- **String replacement**: Erases prior configurations for the targeting parameter ensuring no conflicting states exist.
+- **URL encoding**: Securely implements HTML form style URL-encoding explicitly dictating that spaces emit as `+`.
+- **Parameter serialization**: Rewrites the final `key` string value accurately at the tail end of the query without accidentally dropping URL fragments.
 
 ## Configuration
 
@@ -185,12 +113,12 @@ bazelisk test --test_output=all //samples/set_query:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Input | Output | Explanation |
-|---|---|---|---|
-| **NoPath** | No `:path` header | (unchanged) | No URL to modify |
-| **AddToken** | `:path: /foo?a=b` | `:path: /foo?a=b&key=new+val` | Parameter added at end; space encoded as `+` |
-| **ReplaceToken** | `:path: /foo?key=val&a=b` | `:path: /foo?a=b&key=new+val` | Existing `key` removed, new one added at end |
-| **PreserveFragment** | `:path: /foo?a=b&c=d#e` | `:path: /foo?a=b&c=d&key=new+val#e` | Fragment `#e` preserved after query parameters |
+| Scenario | Description |
+|---|---|
+| **NoPath** | Avoids parameter injection entirely when no `:path` header is present. |
+| **AddToken** | Appends the URL-encoded query parameter correctly onto standard paths. |
+| **ReplaceToken** | Removes an existing key value completely before successfully overriding it at the end of the query. |
+| **PreserveFragment** | Safely manages appending the new query parameter in front of any encoded URL fragments (like `#e`). |
 
 ## Available Languages
 

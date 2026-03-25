@@ -28,93 +28,11 @@ This pattern is useful when you want to normalize existing headers without addin
 
 This pattern is useful when you want to ensure a header is always present with a specific value.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_http_request_headers` | Conditionally replaces `RequestHeader` only if it already exists |
-| `on_http_response_headers` | Unconditionally sets `ResponseHeader` (creates or replaces) |
-
-## Key Code Walkthrough
-
-The plugin demonstrates different header manipulation patterns:
-
-### Request Headers (Conditional)
-
-- **C++**:
-  ```cpp
-  const auto header_key = "RequestHeader";
-  const auto header = getRequestHeader(header_key);
-  // It will only replace the header if it already exists.
-  if (header->size() > 0) {
-      replaceRequestHeader(header_key, "changed");
-  }
-  ```
-  Checks if the header exists and has content before replacing.
-
-- **Go**:
-  ```go
-  headerKey := "RequestHeader"
-  header, err := proxywasm.GetHttpRequestHeader(headerKey)
-  if err != nil && err != types.ErrorStatusNotFound {
-      panic(err)
-  }
-  if len(header) > 0 {
-      err := proxywasm.ReplaceHttpRequestHeader(headerKey, "changed")
-      if err != nil {
-          panic(err)
-      }
-  }
-  ```
-  Explicitly checks for `ErrorStatusNotFound` to distinguish "header doesn't exist" from other errors.
-
-- **Rust**:
-  ```rust
-  let header_key = "RequestHeader";
-  if let Some(_header) = self.get_http_request_header(header_key) {
-      self.set_http_request_header(header_key, Some("changed"));
-  }
-  ```
-  Uses pattern matching (`if let Some`) to conditionally replace only if the header exists.
-
-### Response Headers (Unconditional)
-
-- **C++**:
-  ```cpp
-  // Unlike the previous example, the header will be added if it doesn't exist
-  // or updated if it already does.
-  replaceResponseHeader("ResponseHeader", "changed");
-  ```
-  No existence check — always sets the header.
-
-- **Go**:
-  ```go
-  err := proxywasm.ReplaceHttpResponseHeader("ResponseHeader", "changed")
-  if err != nil {
-      panic(err)
-  }
-  ```
-  Direct replacement without checking if the header exists.
-
-- **Rust**:
-  ```rust
-  self.set_http_response_header("ResponseHeader", Some("changed"));
-  ```
-  Always sets the header (upsert behavior).
-
-### API Behavior Differences
-
-**`replaceHeader` / `ReplaceHttpHeader` / `set_http_header`**:
-- **Behavior**: Creates the header if it doesn't exist, replaces if it does (upsert)
-- **Use case**: Ensuring a header always has a specific value
-
-**`addHeader` / `AddHttpHeader` / `add_http_header`**:
-- **Behavior**: Appends to existing headers (can create multiple values)
-- **Use case**: Adding additional values to multi-valued headers (e.g., `Set-Cookie`)
-
-**Conditional replacement pattern**:
-- **Behavior**: Only modifies existing headers
-- **Use case**: Normalizing headers without adding new ones
+- **Conditional logic**: Demonstrates checking for header existence before mutation using `getRequestHeader()->size()` (C++) or equivalent patterns in other languages.
+- **API distinction**: Contrasts the difference between appending values (`addHeader`) versus upserting values (`replaceHeader`).
+- **Phase-specific behavior**: Runs in both request and response phases, doing a conditional overwrite for requests and an unconditional upsert for responses.
 
 ## Configuration
 
@@ -167,12 +85,12 @@ bazelisk test --test_output=all //samples/overwrite_header:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **DoNotAddRequestHeader** | Request with `OtherHeader: OtherValue` (no `RequestHeader`) | `OtherHeader: OtherValue` (unchanged); `RequestHeader` not added (conditional replacement skipped) |
-| **DoAddResponseHeader** | Response with `OtherHeader: OtherValue` (no `ResponseHeader`) | `OtherHeader: OtherValue` (unchanged); `ResponseHeader: changed` added (unconditional upsert) |
-| **OverwriteRequestHeader** | Request with `RequestHeader: SomeHeaderValue`, `OtherHeader: OtherValue` | `RequestHeader: changed` (value replaced); `OtherHeader: OtherValue` (unchanged) |
-| **OverwriteResponseHeader** | Response with `ResponseHeader: SomeHeaderValue`, `OtherHeader: OtherValue` | `ResponseHeader: changed` (value replaced); `OtherHeader: OtherValue` (unchanged) |
+| Scenario | Description |
+|---|---|
+| **DoNotAddRequestHeader** | Skips modifying the request header since the target header is completely missing. |
+| **DoAddResponseHeader** | Unconditionally adds the response header even though it was originally absent. |
+| **OverwriteRequestHeader** | Conditionally overwrites the value of the existing request header. |
+| **OverwriteResponseHeader** | Unconditionally overwrites the value of the existing response header. |
 
 ## Available Languages
 

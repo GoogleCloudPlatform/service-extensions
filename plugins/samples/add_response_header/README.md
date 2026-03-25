@@ -10,32 +10,11 @@ This plugin modifies HTTP response headers as they pass through the proxy. It co
 4. The plugin unconditionally removes the `Welcome` header from the response, regardless of its value.
 5. The plugin returns `Action::Continue`, forwarding the modified response headers to the client.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_http_response_headers` | Conditionally appends to the `Message` header and removes the `Welcome` header |
-
-## Key Code Walkthrough
-
-The core logic is identical across all three language implementations:
-
-- **Conditional header modification** — The plugin reads the `Message` header and conditionally adds a value:
-  - **C++** uses `getResponseHeader("Message")` to retrieve the header, checks if `msg->view() == "foo"`, and calls `addResponseHeader("Message", "bar")` to append `"bar"`.
-  - **Go** uses `proxywasm.GetHttpResponseHeader("Message")` to retrieve the header, checks if `msgValue == "foo"`, and calls `proxywasm.AddHttpResponseHeader("Message", "bar")` to append `"bar"`. If the header is missing, the error is logged as critical but does not stop processing.
-  - **Rust** uses `self.get_http_response_header("Message")` with `unwrap_or_default()` to retrieve the header (defaulting to an empty string if missing), checks if it equals `"foo"`, and calls `self.add_http_response_header("Message", "bar")` to append `"bar"`.
-
-  The **add** operation appends the new value with a comma separator (e.g., `"foo"` becomes `"foo, bar"`), following standard HTTP header semantics for multi-valued headers.
-
-- **Unconditional header removal** — The plugin removes the `Welcome` header:
-  - **C++** uses `removeResponseHeader("Welcome")`.
-  - **Go** uses `proxywasm.RemoveHttpResponseHeader("Welcome")`. If the removal fails (e.g., header doesn't exist), it triggers a panic.
-  - **Rust** uses `self.set_http_response_header("Welcome", None)` (setting a header to `None` removes it).
-
-- **Error handling** — Error handling differs slightly between implementations:
-  - **C++** performs no explicit error handling (relies on the host context).
-  - **Go** includes a `defer recover()` block that catches panics and sends a 500 error response. Missing `Message` headers are logged but do not interrupt processing.
-  - **Rust** handles missing headers gracefully with `unwrap_or_default()`.
+- **Appending headers**: The `Message` header is modified using the "add" operation, which appropriately appends values automatically separated by commas.
+- **Removing headers**: The `Welcome` header is removed unconditionally. In Rust, this is achieved by trying to set the header to `None`.
+- **Error handling considerations**: Missing headers need to be handled carefully depending on the target language. The Go implementation uses `defer recover()` to respond with a 500 error if panics occur during header manipulation, while Rust handles them gracefully via `unwrap_or_default()`.
 
 ## Configuration
 
@@ -75,15 +54,15 @@ bazelisk test --test_output=all //samples/add_response_header:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **NoDefaultResponseHeader** | Response with no `Message` header | No `Message` header added (conditional logic does not trigger) |
-| **LeavesResponseHeader** | Response with `Message: non-matching` | `Message: non-matching` unchanged (value does not equal `"foo"`) |
-| **ExtendsResponseHeader** | Response with `Message: foo` | `Message: foo, bar` (value appended because original equals `"foo"`) |
-| **RemovesResponseHeader** | Response with `Welcome: any` | `Welcome` header removed (unconditional removal) |
-| **RequestAndResponse** | Response with `Message: foo` | `Message: foo, bar` (behavior consistent across request/response phases) |
-| **CaseInsensitiveLookup** | Response with `message: foo` (lowercase) | `message: foo, bar` (header names are case-insensitive) |
-| **CaseInsensitiveRemoval** | Response with `welcome: any` (lowercase) | `welcome` header removed (case-insensitive removal) |
+| Scenario | Description |
+|---|---|
+| **NoDefaultResponseHeader** | Applies no changes if the required header is missing. |
+| **LeavesResponseHeader** | Makes no modifications if the header value does not match the expected string. |
+| **ExtendsResponseHeader** | Appends a value to the header when the original value matches. |
+| **RemovesResponseHeader** | Unconditionally removes the specified header. |
+| **RequestAndResponse** | Confirms behavior correctly matches the response phase. |
+| **CaseInsensitiveLookup** | Successfully detects and appends to the header regardless of its casing. |
+| **CaseInsensitiveRemoval** | Successfully removes the specified header even when casing differs. |
 
 ## Available Languages
 

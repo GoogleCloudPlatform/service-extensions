@@ -30,86 +30,12 @@ This plugin implements secure cookie-based authentication using HMAC (Hash-based
 
 7. **Success**: If all validations pass, the plugin allows the request to proceed to the upstream server.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_configure` | Compiles the IPv4 regex pattern at plugin initialization for efficient IP validation |
-| `on_http_request_headers` | Validates the HMAC cookie by checking IP, expiration, and signature |
-
-## Key Code Walkthrough
-
-This plugin is only available in C++:
-
-- **Secret key** — The plugin uses a hardcoded secret key for HMAC computation:
-  ```cpp
-  const std::string kSecretKey = "your_secret_key";
-  ```
-  **Important**: Replace this with a strong, randomly generated secret key in production. The secret must be kept confidential and should match the key used to generate the cookies.
-
-- **IPv4 regex compilation** — In `on_configure()`, the plugin compiles a regex to validate IPv4 addresses:
-  ```cpp
-  ip_match.emplace("^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$");
-  ```
-  This matches addresses like `127.0.0.1` or `192.168.1.1`.
-
-- **Client IP extraction** — The plugin parses the `X-Forwarded-For` header:
-  ```cpp
-  const std::string ips = getRequestHeader("X-Forwarded-For")->toString();
-  for (absl::string_view ip : absl::StrSplit(ips, ',')) {
-    if (re2::RE2::FullMatch(ip, *root_->ip_match)) {
-      return std::string(ip);
-    }
-  }
-  ```
-  The header may contain multiple IPs (e.g., `<existing-values>,127.0.0.1,<load-balancer-ip>`). The plugin returns the first valid IPv4 address.
-
-- **Cookie extraction** — The plugin parses the `Cookie` header to find the `Authorization` cookie:
-  ```cpp
-  const std::string cookies = getRequestHeader("Cookie")->toString();
-  for (absl::string_view sp : absl::StrSplit(cookies, "; ")) {
-    const std::pair<std::string, std::string> cookie =
-        absl::StrSplit(sp, absl::MaxSplits('=', 1));
-    if (cookie.first == "Authorization") {
-      return cookie.second;
-    }
-  }
-  ```
-  The `Cookie` header contains multiple cookies separated by `; `. The plugin splits on `=` with a max of 1 split to handle cookie values that contain `=`.
-
-- **Cookie parsing** — The plugin parses the `Authorization` cookie format:
-  ```cpp
-  std::pair<std::string_view, std::string_view> payload_and_hash =
-      absl::StrSplit(cookie, ".");
-  std::string payload;
-  std::string hash;
-  if (absl::Base64Unescape(payload_and_hash.first, &payload) &&
-      absl::Base64Unescape(payload_and_hash.second, &hash)) {
-    return std::pair{payload, hash};
-  }
-  ```
-  Both the payload and hash are base64-decoded.
-
-- **HMAC computation** — The plugin computes HMAC-SHA256 using OpenSSL:
-  ```cpp
-  std::string computeHmacSignature(std::string_view data) {
-    unsigned char result[EVP_MAX_MD_SIZE];
-    unsigned int len;
-    HMAC(EVP_sha256(), kSecretKey.c_str(), kSecretKey.length(),
-         reinterpret_cast<const unsigned char*>(std::string{data}.c_str()),
-         data.length(), result, &len);
-    return absl::BytesToHexString(std::string(result, result + len));
-  }
-  ```
-  The result is converted to a hex string for comparison.
-
-- **Expiration validation** — The plugin compares the current time (in nanoseconds) to the expiration timestamp:
-  ```cpp
-  const int64_t unix_now = absl::ToUnixNanos(absl::Now());
-  int64_t parsed_expiration_timestamp;
-  return absl::SimpleAtoi(expiration_timestamp, &parsed_expiration_timestamp) &&
-         unix_now <= parsed_expiration_timestamp;
-  ```
+- **Regex compilation**: Compiles a regex matching IPv4 strings at initialization.
+- **Header parsing**: Extracts the client IP from the `X-Forwarded-For` header and an `Authorization` payload from the `Cookie` header.
+- **HMAC validation**: Computes an HMAC-SHA256 hash using OpenSSL on the extracted payload and compares it against the signed hash in the cookie.
+- **Security checks**: Validates both the IP claim in the payload against the request origin, and the expiration claim against the current Unix time.
 
 ## Configuration
 
@@ -166,16 +92,16 @@ bazelisk test --test_output=all //samples/hmac_authcookie:tests
 
 Derived from [`tests.textpb`](tests.textpb) (test environment time: Tue Dec 31 2024 03:00:00 GMT+0000):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **NoXForwardedForHeader** | No `X-Forwarded-For` header; `Authorization` cookie present | 403 with `"Access forbidden - missing client IP.\n"` (IP extraction failed) |
-| **NoClientIP** | `X-Forwarded-For: <existing-values>,<not-an-ip>,<not-an-ip-also>` (no valid IP); `Authorization` cookie present | 403 with `"Access forbidden - missing client IP.\n"` (no valid IPv4 found) |
-| **WithValidHMACHash** | `X-Forwarded-For: <existing-values>,127.0.0.1,<load-balancer-ip>`; Valid `Authorization` cookie for IP `127.0.0.1` expiring Jan 01 2025 | Request allowed (all validations pass) |
-| **WithExpiredHMACHash** | `X-Forwarded-For: <existing-values>,127.0.0.1,<load-balancer-ip>`; `Authorization` cookie for IP `127.0.0.1` expired Dec 30 2024 | 403 with `"Access forbidden - hash expired.\n"` (cookie expired) |
-| **WithInvalidClientIp** | `X-Forwarded-For: <existing-values>,127.0.0.2,<load-balancer-ip>`; `Authorization` cookie for IP `127.0.0.1` | 403 with `"Access forbidden - invalid client IP.\n"` (IP mismatch) |
-| **WithInvalidHMACHash** | `X-Forwarded-For: <existing-values>,127.0.0.1,<load-balancer-ip>`; `Authorization` cookie with invalid HMAC signature | 403 with `"Access forbidden - invalid HMAC hash.\n"` (signature verification failed) |
-| **NoCookie** | `X-Forwarded-For: <existing-values>,127.0.0.1,<load-balancer-ip>`; No `Authorization` cookie | 403 with `"Access forbidden - missing HMAC cookie.\n"` (cookie missing) |
-| **InvalidCookie** | `X-Forwarded-For: <existing-values>,127.0.0.1,<load-balancer-ip>`; `Authorization` cookie with invalid format | 403 with `"Access forbidden - invalid HMAC cookie.\n"` (parsing failed) |
+| Scenario | Description |
+|---|---|
+| **NoXForwardedForHeader** | Rejects the request when the origin IP header is completely missing. |
+| **NoClientIP** | Rejects the request when no valid IPv4 address can be parsed from the origin header. |
+| **WithValidHMACHash** | Allows the request when the token signature, IP claim, and timestamp claim are all valid. |
+| **WithExpiredHMACHash** | Rejects the request when the cookie expiration time is in the past. |
+| **WithInvalidClientIp** | Rejects the request when the IP from the cookie payload does not match the actual client IP. |
+| **WithInvalidHMACHash** | Rejects the request when the cryptographic signature of the token is incorrect. |
+| **NoCookie** | Rejects the request when the expected cookie header is missing. |
+| **InvalidCookie** | Rejects the request when the cookie format cannot be successfully parsed. |
 
 ## Available Languages
 

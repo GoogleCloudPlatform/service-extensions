@@ -17,35 +17,11 @@ This plugin implements token-based access control using a configurable denylist.
 
 3. **No-config fallback**: If no configuration file is provided, the plugin loads an empty denylist (size 0) and allows all tokens.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_configure` | Reads the configuration file, parses the denylist tokens, and stores them in a hash set |
-| `on_http_request_headers` | Checks the `User-Token` header against the denylist and blocks matching tokens with a 403 response |
-| `on_http_response_headers` | No-op (returns `Continue`); included for completeness |
-
-## Key Code Walkthrough
-
-The core logic is conceptually identical between the C++ and Rust implementations:
-
-- **Configuration parsing** — The plugin reads and parses the denylist at startup:
-  - **C++** uses `getBufferBytes(WasmBufferType::PluginConfiguration, 0, config_len)` to read the config as a single buffer, stores it in `config_` to maintain ownership, and parses it as a string view using `find_first_of(" \f\n\r\t\v", idx)` to split on whitespace. Each token is stored as a `string_view` in `tokens_` (`unordered_set<string_view>`), avoiding string copies.
-  - **Rust** uses `self.get_plugin_configuration()` to read the config as bytes, converts it to a UTF-8 string, and splits it using `config_lines.lines()` followed by `.trim()` to remove whitespace. Each non-empty token is stored as a `String` in `tokens` (`Rc<HashSet<String>>`). The `Rc` (reference-counted pointer) allows shallow copying the hash set to HTTP contexts without duplicating the data.
-
-  Both implementations log the number of tokens loaded using `LOG_INFO` (C++) or `info!` (Rust).
-
-- **Token validation** — The plugin checks the `User-Token` header against the denylist:
-  - **C++** uses `getRequestHeader("User-Token")` to retrieve the header. If missing or empty, it sends a 403 with `"Access forbidden - token missing.\n"`. If present, it checks `tokens_.count(token->view()) > 0` to determine if the token is in the denylist.
-  - **Rust** uses `self.get_http_request_header("User-Token")` with pattern matching. If `None`, it sends a 403 with `"Access forbidden - token missing.\n"`. If `Some(auth_header)`, it checks `self.tokens.contains(&auth_header)` to determine if the token is in the denylist.
-
-- **Blocking response** — When a token is denied, the plugin sends a 403 Forbidden response:
-  - **C++** uses `sendLocalResponse(403, "", "Access forbidden.\n", {})` and returns `FilterHeadersStatus::StopAllIterationAndWatermark` to stop processing.
-  - **Rust** uses `self.send_http_response(403, vec![], Some(b"Access forbidden.\n"))` and returns `Action::Pause` to stop processing.
-
-- **Performance optimization** — Both implementations use efficient data structures to avoid copying:
-  - **C++** stores the config buffer in the root context (`config_`) and uses `string_view` references to avoid string copies. The HTTP context holds a reference to the root context's token set.
-  - **Rust** uses `Rc<HashSet<String>>` to share the token set between the root context and HTTP contexts. Cloning an `Rc` is a shallow copy (only increments a reference count), avoiding expensive deep copies of the hash set on every request.
+- **Configuration parsing**: Parses a given text block at initialization and splits it by whitespace to build a denylist set.
+- **Optimization via shared references**: Rust utilizes an `Rc<HashSet<String>>` to shallow copy the configuration into HTTP contexts efficiently, and C++ shares `string_view` references from the root context.
+- **Token validation**: Reads the `User-Token` header and verifies its absence in the denylist; missing headers or matches result in an immediate 403 Forbidden response.
 
 ## Configuration
 
@@ -100,19 +76,25 @@ bazelisk test --test_output=all //samples/config_denylist:tests
 
 Derived from [`tests.textpb`](tests.textpb) (with config file):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **LoadsConfig** | Plugin initialization with `tests.config` | Log message `Config keys size 3` (3 tokens loaded: `no-user`, `bad-user`, `evil-user`) |
-| **AllowsGoodToken** | Request with `User-Token: good-user` | Request passes through with `User-Token: good-user` header (token not in denylist) |
-| **DeniesBadToken** | Request with `User-Token: bad-user` | 403 Forbidden response with body `"Access forbidden.\n"` (token is in denylist) |
-| **DeniesMissingToken** | Request with no `User-Token` header | 403 Forbidden response with body `"Access forbidden - token missing.\n"` (header required) |
+| Scenario | Description |
+|---|---|
+| **LoadsConfig** | Successfully parses tokens from the configuration file at startup. |
+| **AllowsGoodToken** | Permits requests that provide a valid token not found in the denylist. |
+| **DeniesBadToken** | Rejects requests providing a token present in the denylist. |
+| **DeniesMissingToken** | Rejects requests entirely lacking the required token header. |
+| **LoadsNoConfig** | Successfully initializes with an empty denylist when no configuration file is present. |
+| **AllowsBadToken** | Allows historically bad tokens through when no configuration denylist is loaded. |
 
 Derived from [`tests_noconfig.textpb`](tests_noconfig.textpb) (without config file):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **LoadsNoConfig** | Plugin initialization without config | Log message `Config keys size 0` (empty denylist) |
-| **AllowsBadToken** | Request with `User-Token: bad-user` | Request passes through with `User-Token: bad-user` header (empty denylist allows all tokens) |
+| Scenario | Description |
+|---|---|
+| **LoadsConfig** | Successfully parses tokens from the configuration file at startup. |
+| **AllowsGoodToken** | Permits requests that provide a valid token not found in the denylist. |
+| **DeniesBadToken** | Rejects requests providing a token present in the denylist. |
+| **DeniesMissingToken** | Rejects requests entirely lacking the required token header. |
+| **LoadsNoConfig** | Successfully initializes with an empty denylist when no configuration file is present. |
+| **AllowsBadToken** | Allows historically bad tokens through when no configuration denylist is loaded. |
 
 ## Available Languages
 

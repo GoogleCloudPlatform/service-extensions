@@ -19,56 +19,10 @@ This plugin removes all `Set-Cookie` headers from HTTP responses, effectively pr
 
 6. The plugin returns `Continue` / `ActionContinue`, forwarding the modified response to the client.
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_http_response_headers` | Removes all `Set-Cookie` headers from the response |
-
-## Key Code Walkthrough
-
-The implementation is remarkably simple across all three languages:
-
-- **C++**:
-  ```cpp
-  FilterHeadersStatus onResponseHeaders(uint32_t headers, bool end_of_stream) override {
-      // Remove all Set-Cookie headers from the response
-      removeResponseHeader("Set-Cookie");
-      return FilterHeadersStatus::Continue;
-  }
-  ```
-  Single function call removes all instances of the header.
-
-- **Go**:
-  ```go
-  func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) types.Action {
-      // Remove all Set-Cookie headers from the response
-      if err := proxywasm.RemoveHttpResponseHeader("Set-Cookie"); err != nil {
-          proxywasm.LogErrorf("failed to remove Set-Cookie header: %v", err)
-      }
-      return types.ActionContinue
-  }
-  ```
-  Includes error logging for debugging, though removal typically doesn't fail.
-
-- **Rust**:
-  ```rust
-  fn on_http_response_headers(&mut self, _: usize, _: bool) -> Action {
-      // Remove all Set-Cookie headers from the response
-      self.set_http_response_header("Set-Cookie", None);
-      return Action::Continue;
-  }
-  ```
-  Uses `set_http_response_header()` with `None` value to remove the header. This API is consistent with setting headers (using `Some(value)`) vs. removing them (using `None`).
-
-### API Differences
-
-**Header Removal APIs**:
-- **C++**: `removeResponseHeader(name)` - Explicit removal function
-- **Go**: `RemoveHttpResponseHeader(name)` - Explicit removal function  
-- **Rust**: `set_http_response_header(name, None)` - Uses set API with `None` value
-
-**Behavior consistency**: All implementations remove **all** instances of the specified header name, not just the first one.
+- **Header removal block**: Eradicates HTTP headers by strictly passing the header key to the `removeResponseHeader` API or equivalent null-setter (`set_http_response_header("Set-Cookie", None)` in Rust).
+- **Multiple instance stripping**: Demonstrates that calling the native deletion function eliminates all instances of the case-insensitive header string simultaneously.
 
 ## Configuration
 
@@ -142,15 +96,15 @@ bazelisk test --test_output=all //samples/remove_setcookie:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Input | Output |
-|---|---|---|
-| **RemovesSingleSetCookie** | `Set-Cookie: sessionid=1234` | No `Set-Cookie` header (removed) |
-| **RemovesMultipleSetCookies** | `Set-Cookie: sessionid=1234`, `Set-Cookie: user=john` (two instances) | No `Set-Cookie` headers (both removed) |
-| **LeavesOtherHeaders** | `Content-Type: text/html`, `Set-Cookie: sessionid=abcd` | `Content-Type: text/html` (preserved); `Set-Cookie` removed |
-| **NoSetCookieInResponse** | No `Set-Cookie` header | No `Set-Cookie` header (no-op, no error) |
-| **CaseInsensitiveRemoval** | `set-cookie: sessionid=5678` (lowercase) | No `set-cookie` header (case-insensitive removal works) |
-| **MixedCaseRemoval** | `SeT-CoOkIe: test=value` (mixed case) | No `SeT-CoOkIe` header (case-insensitive removal works) |
-| **CombinedHeaderOperations** | `Set-Cookie: to-be-removed`, `Cache-Control: max-age=3600` | `Cache-Control: max-age=3600` (preserved); `Set-Cookie` removed |
+| Scenario | Description |
+|---|---|
+| **RemovesSingleSetCookie** | Erases a single instance of the `Set-Cookie` header. |
+| **RemovesMultipleSetCookies** | Erases multiple duplicate instances of the `Set-Cookie` header simultaneously. |
+| **LeavesOtherHeaders** | Confirms that entirely unrelated headers remain untouched during cookie deletion. |
+| **NoSetCookieInResponse** | Operates safely as a no-op when no cookies exist to be deleted. |
+| **CaseInsensitiveRemoval** | Confirms that standard lowercase headers are successfully erased. |
+| **MixedCaseRemoval** | Confirms that chaotically cased headers are successfully erased. |
+| **CombinedHeaderOperations** | Removes the specified header safely amidst other varied response headers. |
 
 ## Available Languages
 

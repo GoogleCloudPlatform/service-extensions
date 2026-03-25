@@ -27,77 +27,12 @@ This plugin implements automatic session management by detecting if a session ID
    - Logs: `"New session ID created for the current request: {new_id}"`
 8. The response is forwarded to the client with the new session cookie (if successfully created).
 
-## Proxy-Wasm Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_http_request_headers` | Parses and validates the `Cookie` header to detect an existing session ID |
-| `on_http_response_headers` | Adds a `Set-Cookie` header if no valid session ID was found in the request |
-
-## Key Code Walkthrough
-
-This plugin is only available in C++:
-
-- **Random number generation** — Uses Abseil's secure random generator:
-  ```cpp
-  class MyRootContext : public RootContext {
-   private:
-    absl::BitGen bitgen_;
-   public:
-    uint64_t generateRandom() { return absl::Uniform<uint64_t>(bitgen_); }
-  };
-  ```
-  - `absl::BitGen` provides cryptographically strong random numbers
-  - `absl::Uniform<uint64_t>` generates a random 64-bit unsigned integer
-  - The generator is stored in the root context for reuse across requests
-
-- **Cookie parsing** — Extracts session ID from `Cookie` header:
-  ```cpp
-  static std::optional<std::string> getSessionIdFromCookie() {
-    const auto cookies = getRequestHeader("Cookie")->toString();
-    for (absl::string_view sp : absl::StrSplit(cookies, "; ")) {
-      const std::pair<std::string, std::string> cookie =
-          absl::StrSplit(sp, absl::MaxSplits('=', 1));
-      if (cookie.first == kCookieName) {
-        return cookie.second;
-      }
-    }
-    return std::nullopt;
-  }
-  ```
-  - Splits on `"; "` to separate multiple cookies
-  - Splits each cookie on `=` with max splits of 1 (handles values containing `=`)
-  - Returns `std::nullopt` if cookie not found
-
-- **Session detection** — Stores session ID for use in response phase:
-  ```cpp
-  FilterHeadersStatus onRequestHeaders(...) override {
-    session_id_ = getSessionIdFromCookie();
-    return FilterHeadersStatus::Continue;
-  }
-  ```
-  - Member variable `session_id_` persists across callbacks
-
-- **Conditional cookie setting** — Only sets cookie if session ID doesn't exist:
-  ```cpp
-  FilterHeadersStatus onResponseHeaders(...) override {
-    if (session_id_.has_value()) {
-      LOG_INFO("This current request is for the existing session ID: " + *session_id_);
-    } else {
-      const std::string new_session_id = std::to_string(root_->generateRandom());
-      LOG_INFO("New session ID created for the current request: " + new_session_id);
-      addResponseHeader("Set-Cookie",
-          absl::StrCat(kCookieName, "=", new_session_id, "; Path=/; HttpOnly"));
-    }
-    return FilterHeadersStatus::Continue;
-  }
-  ```
-  - Checks if `session_id_` has a value (was found in request)
-  - If not, generates new ID and adds `Set-Cookie` header
-
-- **Cookie attributes** — The generated cookie includes security attributes:
-  - `Path=/` — Cookie is sent for all paths on the domain
-  - `HttpOnly` — Cookie cannot be accessed by JavaScript (prevents XSS attacks)
+- **Random values**: Cryptographically secures a randomly generated session ID safely leveraging Abseil's `absl::BitGen`.
+- **Cookie parsing**: Safely delineates the string output of the `Cookie` header into key-value pairs while respecting potential formatting oddities like embedded equal signs.
+- **State propagation**: Propagates the parsed or generated session ID into the C++ class state, guaranteeing visibility between request and response phases.
+- **Header insertion**: Securely drops the generated session cookie via `addResponseHeader` bound with HTTP-only and root path attributes.
 
 ## Configuration
 
@@ -167,10 +102,10 @@ bazelisk test --test_output=all //samples/set_cookie:tests
 
 Derived from [`tests.textpb`](tests.textpb):
 
-| Scenario | Request Input | Response Output |
-|---|---|---|
-| **WihSessionIdSetKeepTheSameAndLog** | `Cookie: some-cookie=some-value; my_cookie=999999999` (session cookie present) | No `Set-Cookie` header; Log: `"This current request is for the existing session ID: 999999999"` |
-| **WihNoSessionIdCreateOneAndLog** | `Cookie: some-cookie=some-value; other-cookie=other-value` (no session cookie) | `Set-Cookie: my_cookie={random_number}; Path=/; HttpOnly`; Log: `"New session ID created for the current request: {random_number}"` |
+| Scenario | Description |
+|---|---|
+| **WihSessionIdSetKeepTheSameAndLog** | Detects an established session cookie and skips generation. |
+| **WihNoSessionIdCreateOneAndLog** | Automatically injects a new HTTP-only session cookie when an existing one isn't detected. |
 
 **Note**: Test names have typos (`Wih` should be `With`). The functionality is correct despite the typos.
 
