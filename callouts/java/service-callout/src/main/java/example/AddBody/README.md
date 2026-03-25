@@ -11,31 +11,19 @@ This plugin demonstrates HTTP body manipulation at the proxy layer by intercepti
 5. The handler discards the original response body and replaces it entirely with the static string `"body replaced"`.
 6. The modified response is returned to the client.
 
-## Ext_Proc Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `onRequestBody` | Reads the existing request body and appends `"-added-body"` to it |
-| `onResponseBody` | Replaces the outgoing response body entirely with `"body replaced"` |
-
-## Key Code Walkthrough
-
-- **Class structure** — `AddBody` extends `ServiceCallout` and follows the Builder pattern. The inner `Builder` class extends `ServiceCallout.Builder<AddBody.Builder>`, implementing `build()` to return a new `AddBody` instance and `self()` to return the concrete builder type. This pattern allows fluent configuration chaining inherited from the base builder.
-
-- **Request body mutation** — `onRequestBody` receives the `ProcessingResponse.Builder` and the original `HttpBody`. It calls `addBodyMutations` on `processingResponseBuilder.getRequestBodyBuilder()`, passing `body.getBody().toStringUtf8() + "-added-body"` as the new body content. The second and third arguments are `null`, indicating no `clearBody` action and no additional mutation options, so the original body is overwritten with the appended string rather than being cleared first.
-
-- **Response body mutation** — `onResponseBody` follows the same pattern but passes the static string `"body replaced"` as the new body content, discarding the original response body entirely. Both `null` arguments again indicate no additional options.
-
-- **`addBodyMutations` utility** — Both callbacks delegate to `ServiceCalloutTools.addBodyMutations`, a shared static helper that constructs the appropriate body mutation on the provided response builder, abstracting away the protobuf boilerplate.
-
-- **Server startup** — The `main` method constructs an `AddBody` instance using its `Builder` with default configuration, then calls `server.start()` followed by `server.blockUntilShutdown()` to keep the process alive until manually terminated.
+- **Class structure**: `AddBody` extends `ServiceCallout` and follows the Builder pattern. The inner `Builder` class extends `ServiceCallout.Builder<AddBody.Builder>`, implementing `build()` to return a new `AddBody` instance and `self()` to return the concrete builder type. This pattern allows fluent configuration chaining inherited from the base builder.
+- **Request body mutation**: `onRequestBody` receives the `ProcessingResponse.Builder` and the original `HttpBody`. It calls `addBodyMutations` on `processingResponseBuilder.getRequestBodyBuilder()`, passing `body.getBody().toStringUtf8() + "-added-body"` as the new body content. The second and third arguments are `null`, indicating no `clearBody` action and no additional mutation options, so the original body is overwritten with the appended string rather than being cleared first.
+- **Response body mutation**: `onResponseBody` follows the same pattern but passes the static string `"body replaced"` as the new body content, discarding the original response body entirely. Both `null` arguments again indicate no additional options.
+- **`addBodyMutations` utility**: Both callbacks delegate to `ServiceCalloutTools.addBodyMutations`, a shared static helper that constructs the appropriate body mutation on the provided response builder, abstracting away the protobuf boilerplate.
+- **Server startup**: The `main` method constructs an `AddBody` instance using its `Builder` with default configuration, then calls `server.start()` followed by `server.blockUntilShutdown()` to keep the process alive until manually terminated.
 
 ## Configuration
 
 Server behaviour can be customised through the `Builder` at construction time. No configuration is required for the default setup — the body strings are hardcoded in the handlers:
-
-- Request body suffix: `"-added-body"` (appended to existing content)
-- Response body replacement: `"body replaced"` (replaces existing content entirely)
+- `request body suffix`: `"-added-body"` (appended to existing content)
+- `response body replacement`: `"body replaced"` (replaces existing content entirely)
 
 Optional builder parameters inherited from `ServiceCallout.Builder`:
 
@@ -48,7 +36,7 @@ Optional builder parameters inherited from `ServiceCallout.Builder`:
 
 ## Build
 
-Build the plugin from the project root using Maven or Gradle (adjust for your build tool):
+Build the plugin from the project root using Maven or Gradle:
 ```bash
 # Maven
 mvn compile
@@ -84,13 +72,13 @@ gradle test --tests "example.AddBodyTest"
 
 ## Expected Behavior
 
-| Scenario | Input | Output |
-|---|---|---|
-| **Request body is appended** | Request body `"hello"` | Modified body `"hello-added-body"` forwarded to upstream |
-| **Empty request body is appended** | Request body `""` | Modified body `"-added-body"` forwarded to upstream |
-| **Response body is replaced** | Any response body from upstream | Response body replaced with `"body replaced"` |
-| **No clear action on request** | Any request body | Original bytes overwritten with appended string; no explicit clear issued |
-| **No clear action on response** | Any response body | Original bytes overwritten with static string; no explicit clear issued |
+| Scenario | Description |
+|---|---|
+| **Request body is appended** | A request body of `"hello"` is modified to `"hello-added-body"` before being forwarded to the upstream. |
+| **Empty request body is appended** | An empty request body `""` is modified to `"-added-body"` before being forwarded to the upstream. |
+| **Response body is replaced** | Any response body from the upstream is replaced with `"body replaced"`. |
+| **No clear action on request** | The original request bytes are overwritten with the appended string; no explicit clear is issued. |
+| **No clear action on response** | The original response bytes are overwritten with the static string; no explicit clear is issued. |
 
 ## Available Languages
 

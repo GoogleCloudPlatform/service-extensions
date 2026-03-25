@@ -11,33 +11,22 @@ This plugin implements device-type detection at the proxy layer by inspecting th
 5. If no `:authority` header is found, an empty `HeadersResponse` is returned and no mutation is applied.
 6. The modified request is forwarded to the upstream service.
 
-## Ext_Proc Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_request_headers` | Inspects the `:authority` header, classifies the device type, and injects `client-device-type` with the resolved value |
-
-## Key Code Walkthrough
-
-- **Class structure** — `CalloutServerExample` extends `callout_server.CalloutServer` and overrides only the request headers callback. The core logic is extracted into the `add_device_type_header` helper method, keeping the callback itself a single-line delegation. No other phases are registered, so all other HTTP lifecycle phases pass through unmodified.
-
-- **Device type classification** — `get_device_type(host_value)` is a module-level function that applies substring matching in priority order: `"m.example.com"` is checked first for mobile, then `"t.example.com"` for tablet, with `"desktop"` as the unconditional fallback. The function operates on the full host string, so subdomains like `"m.example.com/path"` are matched correctly.
-
-- **Authority header extraction** — `add_device_type_header` uses a generator expression with `next(..., None)` to find the first header whose `key == ':authority'` and decode its `raw_value` as UTF-8. The `None` default means a missing `:authority` header is handled gracefully — the method returns an empty `service_pb2.HeadersResponse()` without applying any mutation.
-
-- **Header mutation** — When a host value is found, `callout_tools.add_header_mutation` is called with `add=[('client-device-type', device_type)]` and `clear_route_cache=True`. Clearing the route cache ensures Envoy re-evaluates any routing rules that may depend on the newly injected `client-device-type` header.
-
-- **Server startup** — The `__main__` block sets the log level to `DEBUG` and calls `CalloutServerExample().run()` to start the gRPC server with default configuration.
+- **Class structure**: `CalloutServerExample` extends `callout_server.CalloutServer` and overrides only the request headers callback. The core logic is extracted into the `add_device_type_header` helper method, keeping the callback itself a single-line delegation. No other phases are registered, so all other HTTP lifecycle phases pass through unmodified.
+- **Device type classification**: `get_device_type(host_value)` is a module-level function that applies substring matching in priority order: `"m.example.com"` is checked first for mobile, then `"t.example.com"` for tablet, with `"desktop"` as the unconditional fallback. The function operates on the full host string, so subdomains like `"m.example.com/path"` are matched correctly.
+- **Authority header extraction**: `add_device_type_header` uses a generator expression with `next(..., None)` to find the first header whose `key == ':authority'` and decode its `raw_value` as UTF-8. The `None` default means a missing `:authority` header is handled gracefully — the method returns an empty `service_pb2.HeadersResponse()` without applying any mutation.
+- **Header mutation**: When a host value is found, `callout_tools.add_header_mutation` is called with `add=[('client-device-type', device_type)]` and `clear_route_cache=True`. Clearing the route cache ensures Envoy re-evaluates any routing rules that may depend on the newly injected `client-device-type` header.
+- **Server startup**: The `__main__` block sets the log level to `DEBUG` and calls `CalloutServerExample().run()` to start the gRPC server with default configuration.
 
 ## Configuration
 
 No configuration is required for the default setup. The host substrings used for device classification and the injected header name are hardcoded in the plugin:
-
-- Mobile host pattern: `"m.example.com"`
-- Tablet host pattern: `"t.example.com"`
-- Default device type: `"desktop"`
-- Injected header: `client-device-type`
-- Request phase route cache: cleared (`True`)
+- `mobile host pattern`: `"m.example.com"`
+- `tablet host pattern`: `"t.example.com"`
+- `default device type`: `"desktop"`
+- `injected header`: `client-device-type`
+- `request phase route cache`: cleared (`True`)
 
 ## Build
 
@@ -71,13 +60,13 @@ python -m pytest -v tests/normalize_header_test.py
 
 ## Expected Behavior
 
-| Scenario | Input | Output |
-|---|---|---|
-| **Mobile host detected** | `:authority: m.example.com` | `client-device-type: mobile` injected; route cache cleared |
-| **Tablet host detected** | `:authority: t.example.com` | `client-device-type: tablet` injected; route cache cleared |
-| **Desktop host (default)** | `:authority: www.example.com` | `client-device-type: desktop` injected; route cache cleared |
-| **No `:authority` header** | Request without `:authority` pseudo-header | Empty `HeadersResponse` returned; no mutation applied |
-| **Response phases** | Any HTTP response | All response phases pass through unmodified; no response callbacks registered |
+| Scenario | Description |
+|---|---|
+| **Mobile host detected** | A request with `:authority: m.example.com` gets `client-device-type: mobile` injected and the route cache cleared. |
+| **Tablet host detected** | A request with `:authority: t.example.com` gets `client-device-type: tablet` injected and the route cache cleared. |
+| **Desktop host (default)** | A request with any other `:authority` value (e.g. `www.example.com`) gets `client-device-type: desktop` injected and the route cache cleared. |
+| **No `:authority` header** | A request without the `:authority` pseudo-header returns an empty `HeadersResponse` with no mutation applied. |
+| **Response phases** | All response phases pass through unmodified; no response callbacks are registered. |
 
 ## Available Languages
 

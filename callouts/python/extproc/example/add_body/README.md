@@ -11,31 +11,19 @@ This plugin demonstrates HTTP body manipulation at the proxy layer by intercepti
 5. The handler discards the original response body and replaces it entirely with the static string `"new-body"`.
 6. The modified response is returned to the client.
 
-## Ext_Proc Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_request_body` | Reads the existing request body and appends `"-added-request-body"` to it |
-| `on_response_body` | Replaces the outgoing response body entirely with `"new-body"` |
-
-## Key Code Walkthrough
-
-- **Class structure** — `CalloutServerExample` extends `callout_server.CalloutServer` and overrides only the two body phase callbacks. No constructor override is needed; the base class handles all server lifecycle concerns. The server is started by calling `.run()` directly on an instance.
-
-- **Request body mutation** — `on_request_body` decodes the raw body bytes with `body.body.decode('utf-8')`, appends the static suffix `"-added-request-body"`, and passes the concatenated string to `callout_tools.add_body_mutation`. This overwrites the request body with the appended content before forwarding to the upstream.
-
-- **Response body mutation** — `on_response_body` passes the static string `"new-body"` directly to `callout_tools.add_body_mutation`, discarding the original response body entirely and substituting the fixed replacement.
-
-- **`add_body_mutation` utility** — Both callbacks delegate to `callout_tools.add_body_mutation`, a shared helper from the `extproc.service` package that constructs the appropriate `BodyResponse` protobuf message, abstracting away the boilerplate of building the mutation directly.
-
-- **Server startup** — The `__main__` block sets the log level to `DEBUG` and calls `CalloutServerExample().run()` to start the gRPC server with default configuration.
+- **Class structure**: `CalloutServerExample` extends `callout_server.CalloutServer` and overrides only the two body phase callbacks. No constructor override is needed; the base class handles all server lifecycle concerns. The server is started by calling `.run()` directly on an instance.
+- **Request body mutation**: `on_request_body` decodes the raw body bytes with `body.body.decode('utf-8')`, appends the static suffix `"-added-request-body"`, and passes the concatenated string to `callout_tools.add_body_mutation`. This overwrites the request body with the appended content before forwarding to the upstream.
+- **Response body mutation**: `on_response_body` passes the static string `"new-body"` directly to `callout_tools.add_body_mutation`, discarding the original response body entirely and substituting the fixed replacement.
+- **`add_body_mutation` utility**: Both callbacks delegate to `callout_tools.add_body_mutation`, a shared helper from the `extproc.service` package that constructs the appropriate `BodyResponse` protobuf message, abstracting away the boilerplate of building the mutation directly.
+- **Server startup**: The `__main__` block sets the log level to `DEBUG` and calls `CalloutServerExample().run()` to start the gRPC server with default configuration.
 
 ## Configuration
 
 No configuration is required for the default setup. The body strings are hardcoded directly in each callback:
-
-- Request body suffix: `"-added-request-body"` (appended to existing UTF-8 content)
-- Response body replacement: `"new-body"` (replaces existing content entirely)
+- `request body suffix`: `"-added-request-body"` (appended to existing UTF-8 content)
+- `response body replacement`: `"new-body"` (replaces existing content entirely)
 
 ## Build
 
@@ -69,15 +57,16 @@ python -m pytest -v tests/add_body_test.py
 
 ## Expected Behavior
 
-| Scenario | Input | Output |
-|---|---|---|
-| **Request body is appended** | Request body `"hello"` | Modified body `"hello-added-request-body"` forwarded to upstream |
-| **Empty request body is appended** | Request body `""` | Modified body `"-added-request-body"` forwarded to upstream |
-| **Response body is replaced** | Any response body from upstream | Response body replaced with `"new-body"` |
-| **Non-UTF-8 request body** | Request body with non-UTF-8 bytes | `decode('utf-8')` raises `UnicodeDecodeError`; no mutation applied |
+| Scenario | Description |
+|---|---|
+| **Request body is appended** | A request body of `"hello"` is modified to `"hello-added-request-body"` before being forwarded to the upstream. |
+| **Empty request body is appended** | An empty request body `""` is modified to `"-added-request-body"` before being forwarded to the upstream. |
+| **Response body is replaced** | Any response body from the upstream is replaced with `"new-body"`. |
+| **Non-UTF-8 request body** | A request body with non-UTF-8 bytes causes `decode('utf-8')` to raise a `UnicodeDecodeError`; no mutation is applied. |
 
 ## Available Languages
 
 - [x] [Go](add_body.go)
 - [x] [Java](AddBody.java)
 - [x] [Python](service_callout_example.py)
+ss

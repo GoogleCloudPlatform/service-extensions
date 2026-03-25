@@ -17,48 +17,31 @@ This plugin demonstrates a complete ext_proc callout service by handling all fou
 11. The same deny and mock checks are applied. Otherwise, the body is cleared (no explicit replacement value passed).
 12. The fully modified response is returned to the client.
 
-## Ext_Proc Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_request_headers` | Denies on `bad-header`, mocks on `mock`, otherwise adds `header-request: request`, removes `foo`, clears route cache |
-| `on_response_headers` | Denies on `bad-header`, mocks on `mock`, otherwise adds `header-response: response` |
-| `on_request_body` | Denies on `bad-body`, mocks on `mock`, otherwise replaces body with `"replaced-body"` |
-| `on_response_body` | Denies on `bad-body`, mocks on `mock`, otherwise clears the response body |
-
-## Key Code Walkthrough
-
-- **Class structure** — `CalloutServerExample` extends `callout_server.CalloutServer` and overrides all four processing callbacks. No constructor override is needed; the base class handles server lifecycle. The server is started by calling `.run()` directly on an instance.
-
-- **Deny logic** — All four callbacks call `callout_tools.deny_callout(context)` as the first check, using `callout_tools.headers_contain` or `callout_tools.body_contains` to inspect the incoming data. Denial closes the gRPC connection immediately, preventing any further processing or upstream forwarding.
-
-- **Mock responses** — `generate_mock_header_response` returns `callout_tools.add_header_mutation([("Mock-Response", "Mocked-Value")])` and `generate_mock_body_response` returns `callout_tools.add_body_mutation("Mocked-Body")`. These are returned early when the `mock` signal is detected, bypassing the standard mutation path entirely.
-
-- **Request header mutation** — The standard path calls `callout_tools.add_header_mutation` with `add=[('header-request', 'request')]`, `remove=['foo']`, and `clear_route_cache=True`, injecting a new header, stripping `foo`, and forcing Envoy to recompute its routing decision.
-
-- **Response header mutation** — The standard path calls `callout_tools.add_header_mutation` with only `add=[('header-response', 'response')]`, preserving all existing response headers and leaving the route cache intact.
-
-- **Request body mutation** — The standard path calls `callout_tools.add_body_mutation(body='replaced-body')`, replacing the incoming request body with the static string `"replaced-body"`.
-
-- **Response body mutation** — The standard path calls `callout_tools.add_body_mutation()` with no arguments, which clears the response body without substituting new content.
-
-- **Server startup** — The `__main__` block sets the log level to `DEBUG` and calls `CalloutServerExample().run()` to start the gRPC server with default configuration.
+- **Class structure**: `CalloutServerExample` extends `callout_server.CalloutServer` and overrides all four processing callbacks. No constructor override is needed; the base class handles server lifecycle. The server is started by calling `.run()` directly on an instance.
+- **Deny logic**: All four callbacks call `callout_tools.deny_callout(context)` as the first check, using `callout_tools.headers_contain` or `callout_tools.body_contains` to inspect the incoming data. Denial closes the gRPC connection immediately, preventing any further processing or upstream forwarding.
+- **Mock responses**: `generate_mock_header_response` returns `callout_tools.add_header_mutation([("Mock-Response", "Mocked-Value")])` and `generate_mock_body_response` returns `callout_tools.add_body_mutation("Mocked-Body")`. These are returned early when the `mock` signal is detected, bypassing the standard mutation path entirely.
+- **Request header mutation**: The standard path calls `callout_tools.add_header_mutation` with `add=[('header-request', 'request')]`, `remove=['foo']`, and `clear_route_cache=True`, injecting a new header, stripping `foo`, and forcing Envoy to recompute its routing decision.
+- **Response header mutation**: The standard path calls `callout_tools.add_header_mutation` with only `add=[('header-response', 'response')]`, preserving all existing response headers and leaving the route cache intact.
+- **Request body mutation**: The standard path calls `callout_tools.add_body_mutation(body='replaced-body')`, replacing the incoming request body with the static string `"replaced-body"`.
+- **Response body mutation**: The standard path calls `callout_tools.add_body_mutation()` with no arguments, which clears the response body without substituting new content.
+- **Server startup**: The `__main__` block sets the log level to `DEBUG` and calls `CalloutServerExample().run()` to start the gRPC server with default configuration.
 
 ## Configuration
 
 No configuration is required for the default setup. All signal strings, injected header names and values, and body replacement strings are hardcoded in the callbacks:
-
-- Deny signal (headers): `bad-header`
-- Deny signal (body): `bad-body`
-- Mock signal (headers and body): `mock`
-- Mock header added: `Mock-Response: Mocked-Value`
-- Mock body replacement: `"Mocked-Body"`
-- Request header added: `header-request: request`
-- Request header removed: `foo`
-- Request route cache: cleared (`True`)
-- Response header added: `header-response: response`
-- Request body replacement: `"replaced-body"`
-- Response body: cleared (no replacement)
+- `deny signal (headers)`: `bad-header`
+- `deny signal (body)`: `bad-body`
+- `mock signal (headers and body)`: `mock`
+- `mock header added`: `Mock-Response: Mocked-Value`
+- `mock body replacement`: `"Mocked-Body"`
+- `request header added`: `header-request: request`
+- `request header removed`: `foo`
+- `request route cache`: cleared (`True`)
+- `response header added`: `header-response: response`
+- `request body replacement`: `"replaced-body"`
+- `response body`: cleared (no replacement)
 
 ## Build
 
@@ -92,20 +75,20 @@ python -m pytest -v tests/basic_callout_server_test.py
 
 ## Expected Behavior
 
-| Scenario | Input | Output |
-|---|---|---|
-| **Request header injected** | Any request without `bad-header` or `mock` | `header-request: request` added; `foo` removed; route cache cleared |
-| **Request header denied** | Request containing `bad-header` | Connection denied and closed immediately |
-| **Request header mocked** | Request containing `mock` header | `Mock-Response: Mocked-Value` returned instead of standard mutation |
-| **Response header injected** | Any response without `bad-header` or `mock` | `header-response: response` added |
-| **Response header denied** | Response containing `bad-header` | Connection denied and closed immediately |
-| **Response header mocked** | Response containing `mock` header | `Mock-Response: Mocked-Value` returned instead of standard mutation |
-| **Request body replaced** | Body without `bad-body` or `mock` | Body replaced with `"replaced-body"` |
-| **Request body denied** | Body containing `bad-body` | Connection denied and closed immediately |
-| **Request body mocked** | Body containing `mock` | Body replaced with `"Mocked-Body"` |
-| **Response body cleared** | Body without `bad-body` or `mock` | Response body cleared with no replacement |
-| **Response body denied** | Body containing `bad-body` | Connection denied and closed immediately |
-| **Response body mocked** | Body containing `mock` | Body replaced with `"Mocked-Body"` |
+| Scenario | Description |
+|---|---|
+| **Request header injected** | Any request without `bad-header` or `mock` gets `header-request: request` added, `foo` removed, and the route cache cleared. |
+| **Request header denied** | A request containing `bad-header` has the connection denied and closed immediately. |
+| **Request header mocked** | A request containing `mock` returns `Mock-Response: Mocked-Value` instead of the standard mutation. |
+| **Response header injected** | Any response without `bad-header` or `mock` gets `header-response: response` added. |
+| **Response header denied** | A response containing `bad-header` has the connection denied and closed immediately. |
+| **Response header mocked** | A response containing `mock` returns `Mock-Response: Mocked-Value` instead of the standard mutation. |
+| **Request body replaced** | A body without `bad-body` or `mock` is replaced with `"replaced-body"`. |
+| **Request body denied** | A body containing `bad-body` has the connection denied and closed immediately. |
+| **Request body mocked** | A body containing `mock` is replaced with `"Mocked-Body"`. |
+| **Response body cleared** | A body without `bad-body` or `mock` is cleared with no replacement. |
+| **Response body denied** | A body containing `bad-body` has the connection denied and closed immediately. |
+| **Response body mocked** | A body containing `mock` is replaced with `"Mocked-Body"`. |
 
 ## Available Languages
 

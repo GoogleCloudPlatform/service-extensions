@@ -11,34 +11,22 @@ This plugin implements an unconditional HTTP redirect at the proxy layer by inte
 5. The `ProcessingResponse` is returned as an immediate response, instructing Envoy to short-circuit the request and send the redirect directly to the client.
 6. The upstream service is never contacted.
 
-## Ext_Proc Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `onRequestHeaders` | Intercepts every incoming HTTP request and returns an immediate `301` redirect response with a `Location` header |
-
-## Key Code Walkthrough
-
-- **Class structure** — `Redirect` extends `ServiceCallout` and follows the Builder pattern. The inner `Builder` extends `ServiceCallout.Builder<Redirect.Builder>`, implementing `build()` to return a new `Redirect` instance and `self()` to return the concrete builder type for fluent chaining. Only the request headers phase is handled, since the request is terminated before any other phase is reached.
-
-- **Status construction** — `HttpStatus` is built using `HttpStatus.newBuilder().setCode(StatusCode.forNumber(301)).build()`, wrapping the numeric status code `301` in the Envoy protobuf `HttpStatus` message expected by the `ImmediateResponse` builder.
-
-- **Redirect header** — The `Location` header is defined as an `ImmutableMap.of("Location", "http://service-extensions.com/redirect")` and passed directly to `buildImmediateResponse` as the headers-to-add map.
-
-- **Immediate response construction** — `ServiceCalloutTools.buildImmediateResponse` is called on `processingResponseBuilder.getImmediateResponseBuilder()` rather than on a headers or body builder. This populates the `ImmediateResponse` field of the `ProcessingResponse`, signalling Envoy to bypass the upstream entirely and reply to the client directly with the constructed status and headers.
-
-- **Unconditional behaviour** — Unlike routing or filtering plugins, this handler performs no inspection of the incoming request. Every request — regardless of path, method, or headers — receives the same redirect response.
-
-- **Server startup** — The `main` method constructs a `Redirect` instance using its `Builder` with default configuration, then calls `server.start()` followed by `server.blockUntilShutdown()` to keep the process alive until manually terminated.
+- **Class structure**: `Redirect` extends `ServiceCallout` and follows the Builder pattern. The inner `Builder` extends `ServiceCallout.Builder<Redirect.Builder>`, implementing `build()` to return a new `Redirect` instance and `self()` to return the concrete builder type for fluent chaining. Only the request headers phase is handled, since the request is terminated before any other phase is reached.
+- **Status construction**: `HttpStatus` is built using `HttpStatus.newBuilder().setCode(StatusCode.forNumber(301)).build()`, wrapping the numeric status code `301` in the Envoy protobuf `HttpStatus` message expected by the `ImmediateResponse` builder.
+- **Redirect header**: The `Location` header is defined as an `ImmutableMap.of("Location", "http://service-extensions.com/redirect")` and passed directly to `buildImmediateResponse` as the headers-to-add map.
+- **Immediate response construction**: `ServiceCalloutTools.buildImmediateResponse` is called on `processingResponseBuilder.getImmediateResponseBuilder()` rather than on a headers or body builder. This populates the `ImmediateResponse` field of the `ProcessingResponse`, signalling Envoy to bypass the upstream entirely and reply to the client directly with the constructed status and headers.
+- **Unconditional behaviour**: Unlike routing or filtering plugins, this handler performs no inspection of the incoming request. Every request — regardless of path, method, or headers — receives the same redirect response.
+- **Server startup**: The `main` method constructs a `Redirect` instance using its `Builder` with default configuration, then calls `server.start()` followed by `server.blockUntilShutdown()` to keep the process alive until manually terminated.
 
 ## Configuration
 
 No configuration is required for the default setup. The redirect target and status code are hardcoded directly in the handler:
-
-- HTTP status code: `301` (Moved Permanently)
-- Redirect target: `http://service-extensions.com/redirect`
-- Headers to remove: none
-- Response body: none
+- `HTTP status code`: `301` (Moved Permanently)
+- `redirect target`: `http://service-extensions.com/redirect`
+- `headers to remove`: none
+- `response body`: none
 
 Optional builder parameters inherited from `ServiceCallout.Builder`:
 
@@ -51,7 +39,7 @@ Optional builder parameters inherited from `ServiceCallout.Builder`:
 
 ## Build
 
-Build the plugin from the project root using Maven or Gradle (adjust for your build tool):
+Build the plugin from the project root using Maven or Gradle:
 ```bash
 # Maven
 mvn compile
@@ -87,12 +75,12 @@ gradle test --tests "example.RedirectTest"
 
 ## Expected Behavior
 
-| Scenario | Input | Output |
-|---|---|---|
-| **Any request is redirected** | Any HTTP request regardless of path or method | `301 Moved Permanently` with `Location: http://service-extensions.com/redirect` |
-| **Upstream is never reached** | Any HTTP request | Request short-circuited at the proxy; no upstream connection made |
-| **No body in response** | Any HTTP request | Immediate response returned with no body content |
-| **No headers removed** | Any HTTP request | No existing headers stripped from the response |
+| Scenario | Description |
+|---|---|
+| **Any request is redirected** | Every HTTP request, regardless of path or method, receives a `301 Moved Permanently` with `Location: http://service-extensions.com/redirect`. |
+| **Upstream is never reached** | The request is short-circuited at the proxy on every call; no upstream connection is made. |
+| **No body in response** | The immediate response is returned with no body content. |
+| **No headers removed** | No existing headers are stripped from the response. |
 
 ## Available Languages
 

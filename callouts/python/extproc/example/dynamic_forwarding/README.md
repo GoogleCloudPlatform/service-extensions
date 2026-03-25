@@ -12,34 +12,22 @@ This plugin implements dynamic backend routing by extracting a target IP address
 6. The selected IP and port `80` are passed to `callout_tools.build_dynamic_forwarding_metadata` to construct the appropriate protobuf metadata structure.
 7. The handler returns a `ProcessingResponse` with an empty `HeadersResponse` and the dynamic metadata attached, signalling Envoy to forward the request to the resolved backend.
 
-## Ext_Proc Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_request_headers` | Extracts `ip-to-return` header, validates against known addresses, and sets dynamic forwarding metadata to route the request to the resolved backend |
-
-## Key Code Walkthrough
-
-- **Class structure** — `CalloutServerExample` extends `callout_server.CalloutServer` and overrides only the request headers callback. No other phases are registered, so all other HTTP lifecycle phases pass through unmodified. The server is started by calling `.run()` directly on an instance.
-
-- **Header extraction** — The callback uses a generator expression with `next(..., None)` to iterate over `headers.headers.headers`, matching on `header.key == 'ip-to-return'` and decoding `header.raw_value` as UTF-8. The `None` default means a missing header is handled gracefully without raising an exception.
-
-- **Address validation** — The extracted IP is checked with `if ip_to_return not in known_addresses`, where `known_addresses = ['10.1.10.2', '10.1.10.3']`. Any value outside this list — including `None` from a missing header — causes the fallback IP `10.1.10.4` to be used instead. The selected IP is logged at `DEBUG` level.
-
-- **Dynamic metadata construction** — `callout_tools.build_dynamic_forwarding_metadata(ip_address=ip_to_return, port_number=80)` builds the protobuf `Struct` containing the target endpoint in the format expected by Envoy's dynamic forwarding filter.
-
-- **Response structure** — The handler returns a `service_pb2.ProcessingResponse` directly (rather than a `HeadersResponse`), populating both `request_headers=service_pb2.HeadersResponse()` (an empty pass-through) and `dynamic_metadata=selected_endpoints`. This keeps header processing transparent while still influencing upstream routing via the metadata field.
-
-- **Server startup** — The `__main__` block sets the log level to `DEBUG` and calls `CalloutServerExample().run()` to start the gRPC server with default configuration.
+- **Class structure**: `CalloutServerExample` extends `callout_server.CalloutServer` and overrides only the request headers callback. No other phases are registered, so all other HTTP lifecycle phases pass through unmodified. The server is started by calling `.run()` directly on an instance.
+- **Header extraction**: The callback uses a generator expression with `next(..., None)` to iterate over `headers.headers.headers`, matching on `header.key == 'ip-to-return'` and decoding `header.raw_value` as UTF-8. The `None` default means a missing header is handled gracefully without raising an exception.
+- **Address validation**: The extracted IP is checked with `if ip_to_return not in known_addresses`, where `known_addresses = ['10.1.10.2', '10.1.10.3']`. Any value outside this list — including `None` from a missing header — causes the fallback IP `10.1.10.4` to be used instead. The selected IP is logged at `DEBUG` level.
+- **Dynamic metadata construction**: `callout_tools.build_dynamic_forwarding_metadata(ip_address=ip_to_return, port_number=80)` builds the protobuf `Struct` containing the target endpoint in the format expected by Envoy's dynamic forwarding filter.
+- **Response structure**: The handler returns a `service_pb2.ProcessingResponse` directly (rather than a `HeadersResponse`), populating both `request_headers=service_pb2.HeadersResponse()` (an empty pass-through) and `dynamic_metadata=selected_endpoints`. This keeps header processing transparent while still influencing upstream routing via the metadata field.
+- **Server startup**: The `__main__` block sets the log level to `DEBUG` and calls `CalloutServerExample().run()` to start the gRPC server with default configuration.
 
 ## Configuration
 
 No configuration is required for the default setup. The known address list, fallback IP, and forwarding port are hardcoded in the callback:
-
-- Known addresses: `10.1.10.2`, `10.1.10.3`
-- Default (fallback) backend IP: `10.1.10.4`
-- Forwarding port: `80`
-- Routing header: `ip-to-return`
+- `known addresses`: `10.1.10.2`, `10.1.10.3`
+- `default (fallback) backend IP`: `10.1.10.4`
+- `forwarding port`: `80`
+- `routing header`: `ip-to-return`
 
 ## Build
 
@@ -73,14 +61,14 @@ python -m pytest -v tests/dynamic_forwarding_test.py
 
 ## Expected Behavior
 
-| Scenario | Input | Output |
-|---|---|---|
-| **First known address selected** | `ip-to-return: 10.1.10.2` | Dynamic metadata set to `10.1.10.2:80`; request forwarded to first known backend |
-| **Second known address selected** | `ip-to-return: 10.1.10.3` | Dynamic metadata set to `10.1.10.3:80`; request forwarded to second known backend |
-| **Unknown address falls back** | `ip-to-return: 192.168.1.5` | Dynamic metadata set to `10.1.10.4:80`; request forwarded to default backend |
-| **Missing header falls back** | Request without `ip-to-return` header | Dynamic metadata set to `10.1.10.4:80`; request forwarded to default backend |
-| **No header mutations** | Any request | Headers pass through unmodified; only `dynamic_metadata` is populated |
-| **Response phases** | Any HTTP response | All response phases pass through unmodified; no response callbacks registered |
+| Scenario | Description |
+|---|---|
+| **First known address selected** | A request with `ip-to-return: 10.1.10.2` sets dynamic metadata to `10.1.10.2:80` and forwards to the first known backend. |
+| **Second known address selected** | A request with `ip-to-return: 10.1.10.3` sets dynamic metadata to `10.1.10.3:80` and forwards to the second known backend. |
+| **Unknown address falls back** | A request with `ip-to-return: 192.168.1.5` sets dynamic metadata to `10.1.10.4:80` and forwards to the default backend. |
+| **Missing header falls back** | A request without the `ip-to-return` header sets dynamic metadata to `10.1.10.4:80` and forwards to the default backend. |
+| **No header mutations** | Headers pass through unmodified on any request; only `dynamic_metadata` is populated. |
+| **Response phases** | All response phases pass through unmodified; no response callbacks are registered. |
 
 ## Available Languages
 

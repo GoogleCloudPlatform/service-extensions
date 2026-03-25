@@ -11,31 +11,20 @@ This plugin implements dynamic backend routing by extracting a target IP address
 5. The resolved IP address and port `80` are passed to `utils.AddDynamicForwardingMetadata`, which constructs the appropriate protobuf metadata structure.
 6. The handler returns a `ProcessingResponse` with an empty `HeadersResponse` and the dynamic metadata attached, signalling Envoy to forward the request to the resolved backend.
 
-## gRPC Ext_Proc Handlers Used
+## Implementation Notes
 
-| Handler | Purpose |
-|---|---|
-| `HandleRequestHeaders` | Extracts the `ip-to-return` header and sets dynamic forwarding metadata to route the request to the resolved backend |
-
-## Key Code Walkthrough
-
-- **Service structure** — `ExampleCalloutService` embeds `server.GRPCCalloutService` and registers only the request headers handler in `NewExampleCalloutService()`, as dynamic forwarding decisions must be made before the request reaches the upstream.
-
-- **Header extraction** — `extractIpToReturnHeader` iterates over the raw header list in `headers.Headers.Headers`, matching on `header.Key == "ip-to-return"` and returning the value of `header.RawValue` as a string. It returns an error if the headers object is nil or if no matching header is found, allowing the caller to apply a fallback.
-
-- **Fallback routing** — If `extractIpToReturnHeader` returns an error (header missing or nil input), `HandleRequestHeaders` silently falls back to `"10.1.10.3"` as the default backend IP. This ensures the plugin never blocks a request due to a missing routing hint.
-
-- **Dynamic metadata construction** — `utils.AddDynamicForwardingMetadata(ipToReturn, 80)` builds a protobuf `Struct` containing the target IP and port in the format Envoy expects for dynamic forwarding. The result is attached to the `ProcessingResponse` via the `DynamicMetadata` field, not through header mutation.
-
-- **Response structure** — The returned `ProcessingResponse` carries an empty `HeadersResponse` (no header mutations are applied) alongside the populated `DynamicMetadata`, keeping header processing transparent while still influencing upstream routing.
+- **Service structure**: `ExampleCalloutService` embeds `server.GRPCCalloutService` and registers only the request headers handler in `NewExampleCalloutService()`, as dynamic forwarding decisions must be made before the request reaches the upstream.
+- **Header extraction**: `extractIpToReturnHeader` iterates over the raw header list in `headers.Headers.Headers`, matching on `header.Key == "ip-to-return"` and returning the value of `header.RawValue` as a string. It returns an error if the headers object is nil or if no matching header is found, allowing the caller to apply a fallback.
+- **Fallback routing**: If `extractIpToReturnHeader` returns an error (header missing or nil input), `HandleRequestHeaders` silently falls back to `"10.1.10.3"` as the default backend IP. This ensures the plugin never blocks a request due to a missing routing hint.
+- **Dynamic metadata construction**: `utils.AddDynamicForwardingMetadata(ipToReturn, 80)` builds a protobuf `Struct` containing the target IP and port in the format Envoy expects for dynamic forwarding. The result is attached to the `ProcessingResponse` via the `DynamicMetadata` field, not through header mutation.
+- **Response structure**: The returned `ProcessingResponse` carries an empty `HeadersResponse` (no header mutations are applied) alongside the populated `DynamicMetadata`, keeping header processing transparent while still influencing upstream routing.
 
 ## Configuration
 
 No configuration required. The fallback backend and forwarding port are hardcoded as constants in the handler:
-
-- Default backend IP: `10.1.10.3`
-- Forwarding port: `80`
-- Routing header: `ip-to-return`
+- `default backend IP`: `10.1.10.3`
+- `forwarding port`: `80`
+- `routing header`: `ip-to-return`
 
 ## Build
 
@@ -58,13 +47,13 @@ go test -v ./callouts/go/extproc/samples/dynamic_forwarding/...
 
 ## Expected Behavior
 
-| Scenario | Input | Output |
-|---|---|---|
-| **Custom backend is used** | Request with `ip-to-return: 192.168.1.5` | Dynamic metadata set to `192.168.1.5:80`; request forwarded to custom backend |
-| **Default backend is used** | Request without `ip-to-return` header | Dynamic metadata set to `10.1.10.3:80`; request forwarded to default backend |
-| **Nil headers fallback** | Nil or empty headers object | Dynamic metadata set to `10.1.10.3:80`; no error returned to proxy |
-| **Metadata build failure** | `AddDynamicForwardingMetadata` returns error | Handler returns `nil` response and propagates the error to the proxy |
-| **No header mutations** | Any request | Headers pass through unmodified; only `DynamicMetadata` is populated |
+| Scenario | Description |
+|---|---|
+| **Custom backend is used** | A request with `ip-to-return: 192.168.1.5` sets dynamic metadata to `192.168.1.5:80` and forwards to the custom backend. |
+| **Default backend is used** | A request without the `ip-to-return` header sets dynamic metadata to `10.1.10.3:80` and forwards to the default backend. |
+| **Nil headers fallback** | A nil or empty headers object sets dynamic metadata to `10.1.10.3:80` with no error returned to the proxy. |
+| **Metadata build failure** | If `AddDynamicForwardingMetadata` returns an error, the handler returns a `nil` response and propagates the error to the proxy. |
+| **No header mutations** | Headers pass through unmodified on any request; only `DynamicMetadata` is populated. |
 
 ## Available Languages
 

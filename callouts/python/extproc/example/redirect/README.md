@@ -9,32 +9,21 @@ This plugin implements an unconditional HTTP redirect at the proxy layer by inte
 3. An `ImmediateResponse` is returned, instructing Envoy to short-circuit the request and send the redirect directly to the client.
 4. The upstream service is never contacted.
 
-## Ext_Proc Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_request_headers` | Intercepts every incoming HTTP request and returns an immediate `301` redirect response with a `Location` header |
-
-## Key Code Walkthrough
-
-- **Class structure** — `CalloutServerExample` extends `callout_server.CalloutServer` and overrides only the request headers callback. No other phases are registered, so all other HTTP lifecycle phases would pass through unmodified — though in practice no request ever reaches them since every request is short-circuited at this phase.
-
-- **Immediate response** — `on_request_headers` returns the result of `callout_tools.header_immediate_response(code=301, headers=[('Location', 'http://service-extensions.com/redirect')])`. Unlike a normal header mutation response, an `ImmediateResponse` instructs Envoy to stop processing the request and reply to the client directly, bypassing the upstream entirely.
-
-- **Unconditional behaviour** — The handler performs no inspection of the incoming request. Every request — regardless of path, method, or headers — receives the same redirect response.
-
-- **`header_immediate_response` utility** — The callback delegates to `callout_tools.header_immediate_response`, a shared helper from the `extproc.service` package that constructs the appropriate `ImmediateResponse` protobuf message with the given status code and headers, abstracting away the boilerplate of building the response directly.
-
-- **Server startup** — The `__main__` block sets the log level to `DEBUG` and calls `CalloutServerExample().run()` to start the gRPC server with default configuration.
+- **Class structure**: `CalloutServerExample` extends `callout_server.CalloutServer` and overrides only the request headers callback. No other phases are registered, so all other HTTP lifecycle phases would pass through unmodified — though in practice no request ever reaches them since every request is short-circuited at this phase.
+- **Immediate response**: `on_request_headers` returns the result of `callout_tools.header_immediate_response(code=301, headers=[('Location', 'http://service-extensions.com/redirect')])`. Unlike a normal header mutation response, an `ImmediateResponse` instructs Envoy to stop processing the request and reply to the client directly, bypassing the upstream entirely.
+- **Unconditional behaviour**: The handler performs no inspection of the incoming request. Every request — regardless of path, method, or headers — receives the same redirect response.
+- **`header_immediate_response` utility**: The callback delegates to `callout_tools.header_immediate_response`, a shared helper from the `extproc.service` package that constructs the appropriate `ImmediateResponse` protobuf message with the given status code and headers, abstracting away the boilerplate of building the response directly.
+- **Server startup**: The `__main__` block sets the log level to `DEBUG` and calls `CalloutServerExample().run()` to start the gRPC server with default configuration.
 
 ## Configuration
 
 No configuration is required. The redirect target and status code are hardcoded directly in the callback:
-
-- HTTP status code: `301` (Moved Permanently)
-- Redirect target: `http://service-extensions.com/redirect`
-- Response body: none
-- Response trailers: none
+- `HTTP status code`: `301` (Moved Permanently)
+- `redirect target`: `http://service-extensions.com/redirect`
+- `response body`: none
+- `response trailers`: none
 
 ## Build
 
@@ -68,12 +57,12 @@ python -m pytest -v tests/redirect_test.py
 
 ## Expected Behavior
 
-| Scenario | Input | Output |
-|---|---|---|
-| **Any request is redirected** | Any HTTP request regardless of path or method | `301 Moved Permanently` with `Location: http://service-extensions.com/redirect` |
-| **Upstream is never reached** | Any HTTP request | Request short-circuited at the proxy; no upstream connection made |
-| **No body in response** | Any HTTP request | Immediate response returned with no body content |
-| **Response phases** | Any HTTP response | Never reached; all requests are terminated at the request headers phase |
+| Scenario | Description |
+|---|---|
+| **Any request is redirected** | Every HTTP request, regardless of path or method, receives a `301 Moved Permanently` with `Location: http://service-extensions.com/redirect`. |
+| **Upstream is never reached** | The request is short-circuited at the proxy on every call; no upstream connection is made. |
+| **No body in response** | The immediate response is returned with no body content. |
+| **Response phases** | Never reached; all requests are terminated at the request headers phase. |
 
 ## Available Languages
 

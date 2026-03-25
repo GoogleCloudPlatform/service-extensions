@@ -13,35 +13,23 @@ This plugin implements content-based request authorization at the proxy layer wi
 7. All authorization decisions — both approvals and denials — are logged to Google Cloud Logging via the configured client.
 8. The modified request is forwarded to the upstream service.
 
-## Ext_Proc Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_request_headers` | Denies requests missing `header-check`; otherwise adds `header-request: request` and clears the route cache |
-| `on_request_body` | Denies requests whose body does not contain `"body-check"`; otherwise replaces the body with `"replaced-body"` |
-
-## Key Code Walkthrough
-
-- **Class structure** — `CalloutServerExample` extends `callout_server.CalloutServer` and overrides only the two request-phase callbacks. No response-phase callbacks are registered, so response headers and body pass through unmodified. The server is started by calling `.run()` directly on an instance.
-
-- **Header authorization** — `on_request_headers` calls `callout_tools.header_contains(headers, 'header-check')` and, if it returns `False`, immediately calls `callout_tools.deny_callout(context, ...)` to close the connection with a descriptive denial message. If the check passes, `callout_tools.add_header_mutation` is called with `add=[('header-request', 'request')]` and `clear_route_cache=True`.
-
-- **Body authorization** — `on_request_body` calls `callout_tools.body_contains(body, 'body-check')` and, if it returns `False`, calls `callout_tools.deny_callout(context, ...)` with a corresponding message. If the check passes, `callout_tools.add_body_mutation(body='replaced-body')` replaces the request body.
-
-- **Google Cloud Logging setup** — The `__main__` block constructs a `google.cloud.logging.Client` using `compute_engine.Credentials()` targeting the project `"test-project"`, then calls `client.setup_logging()` to route the standard Python `logging` module output to Cloud Logging. This means all `logging.debug`, `logging.info`, and `logging.error` calls within the service — including denial messages — are captured in Cloud Logging automatically.
-
-- **Credentials** — `compute_engine.Credentials()` is used for local demonstration purposes. This assumes the code runs on a Google Compute Engine instance or an environment with Application Default Credentials. The inline comment notes this setup is not intended for production.
+- **Class structure**: `CalloutServerExample` extends `callout_server.CalloutServer` and overrides only the two request-phase callbacks. No response-phase callbacks are registered, so response headers and body pass through unmodified. The server is started by calling `.run()` directly on an instance.
+- **Header authorization**: `on_request_headers` calls `callout_tools.header_contains(headers, 'header-check')` and, if it returns `False`, immediately calls `callout_tools.deny_callout(context, ...)` to close the connection with a descriptive denial message. If the check passes, `callout_tools.add_header_mutation` is called with `add=[('header-request', 'request')]` and `clear_route_cache=True`.
+- **Body authorization**: `on_request_body` calls `callout_tools.body_contains(body, 'body-check')` and, if it returns `False`, calls `callout_tools.deny_callout(context, ...)` with a corresponding message. If the check passes, `callout_tools.add_body_mutation(body='replaced-body')` replaces the request body.
+- **Google Cloud Logging setup**: The `__main__` block constructs a `google.cloud.logging.Client` using `compute_engine.Credentials()` targeting the project `"test-project"`, then calls `client.setup_logging()` to route the standard Python `logging` module output to Cloud Logging. All `logging.debug`, `logging.info`, and `logging.error` calls within the service — including denial messages — are captured in Cloud Logging automatically.
+- **Credentials**: `compute_engine.Credentials()` is used for local demonstration purposes. This assumes the code runs on a Google Compute Engine instance or an environment with Application Default Credentials. The inline comment notes this setup is not intended for production.
 
 ## Configuration
 
 No configuration is required for the default authorization logic. All sentinel values and injected content are hardcoded in the callbacks:
-
-- Required header: `header-check` (must be present; value is not inspected)
-- Required body substring: `"body-check"` (must be present anywhere in the body)
-- Header added on approval: `header-request: request`
-- Request phase route cache: cleared (`True`)
-- Body replacement on approval: `"replaced-body"`
-- Cloud Logging project: `"test-project"` (update for your environment)
+- `required header`: `header-check` (must be present; value is not inspected)
+- `required body substring`: `"body-check"` (must be present anywhere in the body)
+- `header added on approval`: `header-request: request`
+- `request phase route cache`: cleared (`True`)
+- `body replacement on approval`: `"replaced-body"`
+- `Cloud Logging project`: `"test-project"` (update for your environment)
 
 ## Build
 
@@ -83,13 +71,13 @@ python -m pytest -v tests/cloud_log_test.py
 
 ## Expected Behavior
 
-| Scenario | Input | Output |
-|---|---|---|
-| **Request approved (headers)** | Request containing `header-check` header | `header-request: request` added; route cache cleared; decision logged |
-| **Request denied (headers)** | Request missing `header-check` header | Connection denied with `'"header-check" not found within the request headers'`; logged |
-| **Request approved (body)** | Body containing substring `"body-check"` | Body replaced with `"replaced-body"`; decision logged |
-| **Request denied (body)** | Body not containing `"body-check"` | Connection denied with `'"body-check" not found within the request body'`; logged |
-| **Response phases** | Any HTTP response | Headers and body pass through unmodified; no response callbacks registered |
+| Scenario | Description |
+|---|---|
+| **Request approved (headers)** | A request containing the `header-check` header gets `header-request: request` added and the route cache cleared; the decision is logged. |
+| **Request denied (headers)** | A request missing the `header-check` header is denied with `'"header-check" not found within the request headers'`; the decision is logged. |
+| **Request approved (body)** | A body containing the substring `"body-check"` is replaced with `"replaced-body"`; the decision is logged. |
+| **Request denied (body)** | A body not containing `"body-check"` is denied with `'"body-check" not found within the request body'`; the decision is logged. |
+| **Response phases** | Response headers and body pass through unmodified; no response callbacks are registered. |
 
 ## Available Languages
 

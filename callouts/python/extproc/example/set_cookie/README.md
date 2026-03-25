@@ -10,32 +10,21 @@ This plugin implements conditional cookie injection at the proxy layer by inspec
 4. If the `cookie-check` header is absent, `validate_header` returns `None`, no mutation is applied, and the response passes through unmodified.
 5. The modified response is returned to the client.
 
-## Ext_Proc Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_response_headers` | Checks for the `cookie-check` header and conditionally injects `Set-Cookie` into the response |
-
-## Key Code Walkthrough
-
-- **Class structure** — `CalloutServerExample` extends `callout_server.CalloutServer` and overrides only the response headers callback. No request-phase callbacks are registered, so all request phases pass through unmodified. The server is started by calling `.run()` directly on an instance.
-
-- **Header validation** — `validate_header` is a module-level function that uses a generator expression with `next(..., None)` to iterate over `http_headers.headers.headers`, matching on `header.key == 'cookie-check'` and returning `header.raw_value` (the raw bytes) if found. Returning the raw value rather than a boolean means the caller receives both the truthiness signal and the header value in a single call, though the value itself is not used in the current mutation logic.
-
-- **Cookie injection** — When `validate_header` returns a truthy result, `callout_tools.add_header_mutation` is called with `add=[('Set-Cookie', 'your_cookie_name=cookie_value; Max-Age=3600; Path=/')]`. No headers are removed and no `clear_route_cache` argument is passed, preserving all existing response headers and leaving the route cache intact.
-
-- **No-op on missing header** — If `validate_header` returns `None`, `on_response_headers` returns `None` implicitly. The base `CalloutServer` treats a `None` return as a no-op, allowing the response to pass through without any mutation.
-
-- **Server startup** — The `__main__` block sets the log level to `DEBUG` and calls `CalloutServerExample().run()` to start the gRPC server with default configuration.
+- **Class structure**: `CalloutServerExample` extends `callout_server.CalloutServer` and overrides only the response headers callback. No request-phase callbacks are registered, so all request phases pass through unmodified. The server is started by calling `.run()` directly on an instance.
+- **Header validation**: `validate_header` is a module-level function that uses a generator expression with `next(..., None)` to iterate over `http_headers.headers.headers`, matching on `header.key == 'cookie-check'` and returning `header.raw_value` (the raw bytes) if found. Returning the raw value rather than a boolean means the caller receives both the truthiness signal and the header value in a single call, though the value itself is not used in the current mutation logic.
+- **Cookie injection**: When `validate_header` returns a truthy result, `callout_tools.add_header_mutation` is called with `add=[('Set-Cookie', 'your_cookie_name=cookie_value; Max-Age=3600; Path=/')]`. No headers are removed and no `clear_route_cache` argument is passed, preserving all existing response headers and leaving the route cache intact.
+- **No-op on missing header**: If `validate_header` returns `None`, `on_response_headers` returns `None` implicitly. The base `CalloutServer` treats a `None` return as a no-op, allowing the response to pass through without any mutation.
+- **Server startup**: The `__main__` block sets the log level to `DEBUG` and calls `CalloutServerExample().run()` to start the gRPC server with default configuration.
 
 ## Configuration
 
 No configuration is required for the default setup. The trigger header name, cookie name, and cookie attributes are hardcoded in the plugin:
-
-- Trigger header: `cookie-check` (presence checked; value not inspected)
-- Cookie injected: `your_cookie_name=cookie_value`
-- Cookie `Max-Age`: `3600` seconds
-- Cookie `Path`: `/`
+- `trigger header`: `cookie-check` (presence checked; value not inspected)
+- `cookie injected`: `your_cookie_name=cookie_value`
+- `cookie Max-Age`: `3600` seconds
+- `cookie Path`: `/`
 
 ## Build
 
@@ -69,11 +58,11 @@ python -m pytest -v tests/set_cookie_test.py
 
 ## Expected Behavior
 
-| Scenario | Input | Output |
-|---|---|---|
-| **Cookie injected** | Response containing `cookie-check` header | `Set-Cookie: your_cookie_name=cookie_value; Max-Age=3600; Path=/` added to response |
-| **No mutation applied** | Response without `cookie-check` header | Response passes through unmodified; no headers added or removed |
-| **Request phases** | Any HTTP request | All request phases pass through unmodified; no request callbacks registered |
+| Scenario | Description |
+|---|---|
+| **Cookie injected** | A response containing the `cookie-check` header gets `Set-Cookie: your_cookie_name=cookie_value; Max-Age=3600; Path=/` added to its headers. |
+| **No mutation applied** | A response without the `cookie-check` header passes through unmodified; no headers are added or removed. |
+| **Request phases** | All request phases pass through unmodified; no request callbacks are registered. |
 
 ## Available Languages
 

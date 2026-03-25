@@ -12,7 +12,17 @@ This sample demonstrates a self-contained gRPC client-server setup for the Envoy
 6. The send side of the stream is closed to signal completion to the server.
 7. The program collects all `ProcessingResponse` messages from the server until the stream closes, logging each one in protobuf text format.
 
-## CLI Flags
+## Implementation Notes
+
+- **Server implementation**: The `server` struct embeds `extproc.UnimplementedExternalProcessorServer` and overrides the `Process` method. It reads requests from the bidirectional stream in a loop, logs each one, and replies with a hardcoded `ProcessingResponse` wrapping an empty `RequestHeaders` response. This stub is intentionally minimal and serves only to demonstrate the server side of the protocol.
+- **Server startup**: `startServer` binds a TCP listener, creates a bare `grpc.Server`, registers the `ExternalProcessor` implementation, and calls `Done` on a `sync.WaitGroup` before blocking on `Serve`. This allows the main goroutine to synchronize on server readiness before proceeding.
+- **Channel creation**: `makeChannel` wraps `grpc.Dial` and selects either TLS credentials (loaded from the provided cert file) or `insecure.NewCredentials()` based on the `--tls` flag. This separation keeps connection setup testable and reusable.
+- **JSON request dispatch**: `makeJSONRequest` unmarshals the raw JSON array into individual `json.RawMessage` entries, then uses `protojson.Unmarshal` to decode each one into a typed `*extproc.ProcessingRequest`. All requests are streamed to the server sequentially, the send side is closed with `stream.CloseSend()`, and responses are collected until `io.EOF`.
+- **Response logging**: Each received `ProcessingResponse` is formatted with `prototext.Format` and written to the standard logger, producing human-readable protobuf text output for inspection.
+
+## Configuration
+
+All configuration is provided via CLI flags at runtime. No config files or environment variables are required. The only mandatory flag is `--data`, which must be a valid JSON array of `ProcessingRequest` objects.
 
 | Flag | Default | Purpose |
 |---|---|---|
@@ -20,22 +30,6 @@ This sample demonstrates a self-contained gRPC client-server setup for the Envoy
 | `--cert_file` | `""` | Path to the CA root certificate file (required when `--tls` is `true`) |
 | `--addr` | `localhost:8181` | Server address in `host:port` format |
 | `--data` | *(required)* | JSON string containing an array of `ProcessingRequest` objects |
-
-## Key Code Walkthrough
-
-- **Server implementation** — The `server` struct embeds `extproc.UnimplementedExternalProcessorServer` and overrides the `Process` method. It reads requests from the bidirectional stream in a loop, logs each one, and replies with a hardcoded `ProcessingResponse` wrapping an empty `RequestHeaders` response. This stub is intentionally minimal and serves only to demonstrate the server side of the protocol.
-
-- **Server startup** — `startServer` binds a TCP listener, creates a bare `grpc.Server`, registers the `ExternalProcessor` implementation, and calls `Done` on a `sync.WaitGroup` before blocking on `Serve`. This allows the main goroutine to synchronize on server readiness before proceeding.
-
-- **Channel creation** — `makeChannel` wraps `grpc.Dial` and selects either TLS credentials (loaded from the provided cert file) or `insecure.NewCredentials()` based on the `--tls` flag. This separation keeps connection setup testable and reusable.
-
-- **JSON request dispatch** — `makeJSONRequest` unmarshals the raw JSON array into individual `json.RawMessage` entries, then uses `protojson.Unmarshal` to decode each one into a typed `*extproc.ProcessingRequest`. All requests are streamed to the server sequentially, the send side is closed with `stream.CloseSend()`, and responses are collected until `io.EOF`.
-
-- **Response logging** — Each received `ProcessingResponse` is formatted with `prototext.Format` and written to the standard logger, producing human-readable protobuf text output for inspection.
-
-## Configuration
-
-All configuration is provided via CLI flags at runtime. No config files or environment variables are required. The only mandatory flag is `--data`, which must be a valid JSON array of `ProcessingRequest` objects.
 
 ## Build
 
@@ -73,14 +67,14 @@ go test -v ./callouts/go/extproc/samples/grpc_client_server/...
 
 ## Expected Behavior
 
-| Scenario | Input | Output |
-|---|---|---|
-| **Single request is processed** | JSON array with one `ProcessingRequest` | One `ProcessingResponse` logged in protobuf text format |
-| **Multiple requests are processed** | JSON array with N `ProcessingRequest` entries | N `ProcessingResponse` messages logged in order |
-| **Stream closes cleanly** | All requests sent | `CloseSend` signals EOF; server loop exits on `io.EOF` |
-| **Missing `--data` flag** | No `--data` argument provided | Program exits with `log.Fatal("Data JSON is required")` |
-| **TLS disabled** | `--tls=false` (default) | Client connects with `insecure.NewCredentials()` over plain TCP |
-| **TLS enabled** | `--tls=true` with valid `--cert_file` | Client connects using CA certificate for transport security |
+| Scenario | Description |
+|---|---|
+| **Single request is processed** | A JSON array with one `ProcessingRequest` produces one `ProcessingResponse` logged in protobuf text format. |
+| **Multiple requests are processed** | A JSON array with N `ProcessingRequest` entries produces N `ProcessingResponse` messages logged in order. |
+| **Stream closes cleanly** | After all requests are sent, `CloseSend` signals EOF and the server loop exits on `io.EOF`. |
+| **Missing `--data` flag** | If no `--data` argument is provided, the program exits with `log.Fatal("Data JSON is required")`. |
+| **TLS disabled** | With `--tls=false` (default), the client connects with `insecure.NewCredentials()` over plain TCP. |
+| **TLS enabled** | With `--tls=true` and a valid `--cert_file`, the client connects using the CA certificate for transport security. |
 
 ## Available Languages
 

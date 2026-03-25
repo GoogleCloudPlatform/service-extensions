@@ -12,34 +12,22 @@ This plugin demonstrates deterministic header overwriting at the proxy layer by 
 6. The handler applies the same `OVERWRITE_IF_EXISTS_OR_ADD` action to set `header-response: response-new-value` on the outgoing response, without clearing the route cache.
 7. The modified response is returned to the client.
 
-## Ext_Proc Callbacks Used
+## Implementation Notes
 
-| Callback | Purpose |
-|---|---|
-| `on_request_headers` | Overwrites or adds `header-request: request-new-value`; clears the route cache |
-| `on_response_headers` | Overwrites or adds `header-response: response-new-value`; preserves the route cache |
-
-## Key Code Walkthrough
-
-- **Class structure** — `CalloutServerExample` extends `callout_server.CalloutServer` and overrides both header phase callbacks. No body-phase callbacks are registered, so request and response bodies pass through unmodified. The server is started by calling `.run()` directly on an instance.
-
-- **Append action** — `HeaderValueOption.HeaderAppendAction` is imported from `envoy.config.core.v3.base_pb2` and aliased as `actions` at module level. The specific action used is `actions.OVERWRITE_IF_EXISTS_OR_ADD`, which instructs Envoy to replace the header value if the key is already present, or create a new header entry if it is not. This is distinct from the default append behaviour, which would add a duplicate header alongside any existing one.
-
-- **Request header mutation** — `on_request_headers` calls `callout_tools.add_header_mutation` with `add=[('header-request', 'request-new-value')]`, `append_action=actions.OVERWRITE_IF_EXISTS_OR_ADD`, and `clear_route_cache=True`. Clearing the route cache ensures Envoy re-evaluates any routing rules that depend on the value of `header-request` after it has been overwritten.
-
-- **Response header mutation** — `on_response_headers` follows the identical pattern with `add=[('header-response', 'response-new-value')]` and the same append action, but omits `clear_route_cache` (defaulting to `False`) since routing decisions are already finalised at the response phase.
-
-- **Server startup** — The `__main__` block sets the log level to `DEBUG` and calls `CalloutServerExample().run()` to start the gRPC server with default configuration.
+- **Class structure**: `CalloutServerExample` extends `callout_server.CalloutServer` and overrides both header phase callbacks. No body-phase callbacks are registered, so request and response bodies pass through unmodified. The server is started by calling `.run()` directly on an instance.
+- **Append action**: `HeaderValueOption.HeaderAppendAction` is imported from `envoy.config.core.v3.base_pb2` and aliased as `actions` at module level. The specific action used is `actions.OVERWRITE_IF_EXISTS_OR_ADD`, which instructs Envoy to replace the header value if the key is already present, or create a new header entry if it is not. This is distinct from the default append behaviour, which would add a duplicate header alongside any existing one.
+- **Request header mutation**: `on_request_headers` calls `callout_tools.add_header_mutation` with `add=[('header-request', 'request-new-value')]`, `append_action=actions.OVERWRITE_IF_EXISTS_OR_ADD`, and `clear_route_cache=True`. Clearing the route cache ensures Envoy re-evaluates any routing rules that depend on the value of `header-request` after it has been overwritten.
+- **Response header mutation**: `on_response_headers` follows the identical pattern with `add=[('header-response', 'response-new-value')]` and the same append action, but omits `clear_route_cache` (defaulting to `False`) since routing decisions are already finalised at the response phase.
+- **Server startup**: The `__main__` block sets the log level to `DEBUG` and calls `CalloutServerExample().run()` to start the gRPC server with default configuration.
 
 ## Configuration
 
 No configuration is required for the default setup. The header names, values, and append action are hardcoded directly in each callback:
-
-- Request header overwritten or added: `header-request: request-new-value`
-- Request phase route cache: cleared (`True`)
-- Response header overwritten or added: `header-response: response-new-value`
-- Response phase route cache: preserved (default `False`)
-- Append action (both phases): `OVERWRITE_IF_EXISTS_OR_ADD`
+- `request header overwritten or added`: `header-request: request-new-value`
+- `request phase route cache`: cleared (`True`)
+- `response header overwritten or added`: `header-response: response-new-value`
+- `response phase route cache`: preserved (default `False`)
+- `append action (both phases)`: `OVERWRITE_IF_EXISTS_OR_ADD`
 
 ## Build
 
@@ -73,15 +61,15 @@ python -m pytest -v tests/update_header_test.py
 
 ## Expected Behavior
 
-| Scenario | Input | Output |
-|---|---|---|
-| **Request header overwritten** | Request containing `header-request` with any value | `header-request` value replaced with `"request-new-value"` |
-| **Request header added** | Request without `header-request` | `header-request: request-new-value` added to request headers |
-| **Request route cache cleared** | Any HTTP request | Envoy recomputes routing after request header mutation |
-| **Response header overwritten** | Response containing `header-response` with any value | `header-response` value replaced with `"response-new-value"` |
-| **Response header added** | Response without `header-response` | `header-response: response-new-value` added to response headers |
-| **Response route cache preserved** | Any HTTP response | Envoy routing decision unchanged after response header mutation |
-| **Body phases** | Any request or response body | Both body phases pass through unmodified; no body callbacks registered |
+| Scenario | Description |
+|---|---|
+| **Request header overwritten** | A request containing `header-request` with any value has it replaced with `"request-new-value"`. |
+| **Request header added** | A request without `header-request` gets `header-request: request-new-value` added to its headers. |
+| **Request route cache cleared** | Envoy recomputes its routing decision after the request header mutation. |
+| **Response header overwritten** | A response containing `header-response` with any value has it replaced with `"response-new-value"`. |
+| **Response header added** | A response without `header-response` gets `header-response: response-new-value` added to its headers. |
+| **Response route cache preserved** | Envoy's routing decision remains unchanged after the response header mutation. |
+| **Body phases** | Both request and response body phases pass through unmodified; no body callbacks are registered. |
 
 ## Available Languages
 
