@@ -19,7 +19,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"net/url"
 
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm"
@@ -28,50 +27,33 @@ import (
 
 func main() {}
 func init() {
-	proxywasm.SetVMContext(&vmContext{})
-}
-
-type vmContext struct {
-	types.DefaultVMContext
-}
-
-type pluginContext struct {
-	types.DefaultPluginContext
+	proxywasm.SetHttpContext(func(contextID uint32) types.HttpContext { return &httpContext{} })
 }
 
 type httpContext struct {
 	types.DefaultHttpContext
 }
 
-func (*vmContext) NewPluginContext(contextID uint32) types.PluginContext {
-	return &pluginContext{}
-}
-
-func (*pluginContext) NewHttpContext(uint32) types.HttpContext {
-	return &httpContext{}
-}
-
 const (
-	// Replace with your desired secret key.
+	// Replace with your desired secret key or read it from plugin configuration data.
 	secretKey = "your_secret_key"
 )
 
+func sendErrorResponse(err error) {
+	proxywasm.SendHttpResponse(500, [][2]string{}, []byte(err.Error()), 0)
+}
+
 func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) types.Action {
-	defer func() {
-		err := recover()
-		if err != nil {
-			proxywasm.SendHttpResponse(500, [][2]string{}, []byte(fmt.Sprintf("%v", err)), 0)
-		}
-	}()
 	path, err := proxywasm.GetHttpRequestHeader(":path")
 	if err != nil {
-		panic(err)
+		sendErrorResponse(err)
+		return types.ActionContinue
 	}
 	u, err := url.ParseRequestURI(path)
 	if err != nil {
 		proxywasm.LogErrorf("Error parsing the :path HTTP header: %v", err)
 		proxywasm.SendHttpResponse(400, [][2]string{}, []byte("Error parsing the :path HTTP header.\n"), 0)
-		return types.ActionPause
+		return types.ActionContinue
 	}
 
 	token := u.Query().Get("token")
@@ -79,7 +61,7 @@ func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) t
 	if token == "" {
 		proxywasm.LogErrorf("Access forbidden - missing token.")
 		proxywasm.SendHttpResponse(403, [][2]string{}, []byte("Access forbidden - missing token.\n"), 0)
-		return types.ActionPause
+		return types.ActionContinue
 	}
 
 	// Strip the token from the URL.
@@ -91,21 +73,22 @@ func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) t
 	}).String()
 	// Compare if the generated signature matches the token sent.
 	// In this sample the signature is generated using the request :path.
-	if !ctx.CheckHmacSignature(newPath, token) {
+	if !checkHmacSignature(newPath, token) {
 		proxywasm.LogErrorf("Access forbidden - invalid token.")
 		proxywasm.SendHttpResponse(403, [][2]string{}, []byte("Access forbidden - invalid token.\n"), 0)
-		return types.ActionPause
+		return types.ActionContinue
 	}
 
 	err = proxywasm.ReplaceHttpRequestHeader(":path", newPath)
 	if err != nil {
-		panic(err)
+		sendErrorResponse(err)
+		return types.ActionContinue
 	}
 	return types.ActionContinue
 
 }
 
-func (*httpContext) CheckHmacSignature(data string, token string) bool {
+func checkHmacSignature(data string, token string) bool {
 	mac := hmac.New(sha256.New, []byte(secretKey))
 	mac.Write([]byte(data))
 	expectedMAC := mac.Sum(nil)
