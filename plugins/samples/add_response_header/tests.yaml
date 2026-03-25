@@ -1,0 +1,73 @@
+test:
+- name: NoDefaultResponseHeader
+  response_headers:
+    result:
+      no_header:
+        key: Message
+- name: LeavesResponseHeader
+  response_headers:
+    input:
+      header:
+        key: Message
+        value: non-matching
+    result:
+      has_header:
+        key: Message
+        value: non-matching
+- name: ExtendsResponseHeader
+  benchmark: 'true'
+  response_headers:
+    input:
+      header:
+        key: Message
+        value: foo
+    result:
+      has_header:
+        key: Message
+        value: foo, bar
+- name: RemovesResponseHeader
+  benchmark: 'true'
+  response_headers:
+    input:
+      header:
+        key: Welcome
+        value: any
+    result:
+      no_header:
+        key: Welcome
+# Behavior is independent of stream.
+- name: RequestAndResponse
+  benchmark: 'true'
+  response_headers:
+    input:
+      header:
+        key: Message
+        value: foo
+    result:
+      has_header:
+        key: Message
+        value: foo, bar
+# Tests for header name case insensitivity.
+# NOTE: the test framework uses the same case-insensitive header map as the
+# wasm host context. This means a header key has the case used when it was
+# first created. It also means that we can't test casing in our expectations.
+# Here we are simply verifying that the wasm behavior is unaffected by case.
+- name: CaseInsensitiveLookup
+  response_headers:
+    input:
+      header:
+        key: message
+        value: foo
+    result:
+      has_header:
+        key: message
+        value: foo, bar
+- name: CaseInsensitiveRemoval
+  response_headers:
+    input:
+      header:
+        key: welcome
+        value: any
+    result:
+      no_header:
+        key: welcome
