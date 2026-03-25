@@ -1,0 +1,116 @@
+env:
+  log_level: DEBUG
+  log_path: /dev/stdout
+  time_secs: 123456789
+test:
+- name: Headers_Proto
+  request_headers:
+    input:
+      header:
+      - key: :path
+        value: /
+      - key: :method
+        value: GET
+    result:
+      has_header:
+        key: :method
+        value: GET
+      headers:
+      - exact: ':method: GET'
+      - regex: :scheme:.*
+        invert: 'true'
+      no_header:
+        key: :scheme
+      log:
+      - regex: .*request headers.*
+      - regex: .*response headers.*
+        invert: 'true'
+  response_headers:
+    input:
+      header:
+      - key: server-message
+        value: welcome
+      - key: reply-with-error
+        value: 'yes'
+    result:
+      immediate:
+        http_status: 500
+      body:
+        exact: fake error
+      has_header:
+        key: error
+        value: goaway
+      no_header:
+        key: server-message
+      log:
+      - regex: '.*time 1: 123456789000000000'
+      - regex: '.*time 2: 123456789000000000'
+      - regex: '.*time 3: 123456789000000000'
+- name: Headers_Content
+  request_headers:
+    input:
+      content: 'GET /my/path?foo=bar HTTP/1.1
+
+        Host: myhost.com
+
+        MyHeader: MyVal1
+
+        MyHeader: MyVal2
+
+        '
+    result:
+      has_header:
+      - key: :method
+        value: GET
+      - key: :path
+        value: /my/path?foo=bar
+      - key: :authority
+        value: myhost.com
+      - key: MyHeader
+        value: MyVal1, MyVal2
+      no_header:
+        key: Host
+  response_headers:
+    input:
+      content: 'HTTP/1.1 200 OK
+
+        Content-Type: image/jpeg; charset=utf-8
+
+        MyHeader: MyVal1
+
+        MyHeader: MyVal2
+
+        '
+    result:
+      has_header:
+      - key: :status
+        value: '200'
+      - key: MyHeader
+        value: MyVal1, MyVal2
+- name: Headers_File
+  request_headers:
+    input:
+      file: request_headers.data
+    result:
+      has_header:
+      - key: :method
+        value: GET
+      - key: :path
+        value: /my/path?foo=bar
+      - key: :scheme
+        value: https
+      - key: :authority
+        value: example.com:8080
+      - key: MyHeader
+        value: MyVal1, MyVal2
+      no_header:
+        key: Host
+  response_headers:
+    input:
+      file: response_headers.data
+    result:
+      has_header:
+      - key: :status
+        value: '403'
+      - key: MyHeader
+        value: MyVal1, MyVal2

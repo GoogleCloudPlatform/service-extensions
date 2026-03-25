@@ -6,8 +6,8 @@ proxy_wasm_plugin_rust(
     name = "plugin_rust.wasm",
     srcs = ["plugin.rs"],
     deps = [
-        "@crate_index//:log",
-        "@crate_index//:proxy-wasm",
+        "//bazel/cargo/remote:log",
+        "//bazel/cargo/remote:proxy-wasm",
     ],
 )
 
@@ -27,4 +27,17 @@ proxy_wasm_tests(
         ":plugin_rust.wasm",
     ],
     tests = ":tests.textpb",
+)
+
+proxy_wasm_tests(
+    name = "testsyaml",
+    data = [
+        ":request_headers.data",
+        ":response_headers.data",
+    ],
+    plugins = [
+        ":plugin_cpp.wasm",
+        ":plugin_rust.wasm",
+    ],
+    tests = ":tests.yaml",
 )

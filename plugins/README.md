@@ -15,6 +15,7 @@ We recommend the following process:
 
 1.  Write a wasm plugin using the [samples](#samples) and SDKs as a starting
     point: [C++](https://github.com/proxy-wasm/proxy-wasm-cpp-sdk),
+    [Go](https://github.com/proxy-wasm/proxy-wasm-go-sdk),
     [Rust](https://github.com/proxy-wasm/proxy-wasm-rust-sdk). See also the
     [best practices](https://cloud.google.com/service-extensions/docs/plugin-best-practices).
 1.  [Build](#build) the plugin.
@@ -53,12 +54,12 @@ C++ builds may require a specific toolchain: `--config=clang` or `--config=gcc`.
 
 # Testing and benchmarking
 
-1.  Write a plugin test file (text proto) to specify the plugin's functional
-    expectations ([example](samples/testing/tests.textpb)). Consult the plugin
-    tester [proto API](test/runner.proto) as needed.
-1.  Add `benchmark: true` to tests that exemplify common wasm operations
+1. Write a plugin test file to specify the plugin's functional expectations. 
+   This file can either be in text proto format ([example](samples/testing/tests.textpb)) or YAML ([example](samples/testing/tests.yaml)). 
+   Consult the plugin tester [proto API](test/runner.proto) as needed.
+2. Add `benchmark: true` to tests that exemplify common wasm operations
     ([example](samples/add_header/tests.textpb)).
-1.  Run + Test + Benchmark your wasm plugin as follows!
+3. Run + Test + Benchmark your wasm plugin as follows!
 
 ```bash
 docker run -it -v $(pwd):/mnt \
@@ -74,7 +75,9 @@ Tips:
 -   To see plugin-emitted logs on the console, add `--logfile=/dev/stdout`.
 -   To see a trace of logs and wasm ABI calls, add `--loglevel=TRACE`.
 -   To disable benchmarking for faster iteration, add `--nobench`.
+-   To disable unit testing for cleaner output, add `--notest`.
 -   To optionally specify plugin config data, add `--config=<path>`.
+-   To test memory with high concurrency, add `--num_additional_streams=500`.
 
 You can also run tests using Bazel. This is **much slower** the first time,
 because this builds both the tester and the V8 runtime from scratch. Use the
@@ -96,9 +99,12 @@ for your own plugin. Extend them to fit your particular use case.
 *   [Log each Wasm call](samples/log_calls): Don't change anything about the
     traffic (noop plugin). Log each wasm invocation, including lifecycle
     callbacks.
-*   [Add HTTP request & response headers](samples/add_header): Add a header on
-    both the client request and server response paths. Also check for existing
-    headers.
+*   [Hello World](samples/local_reply): Immediately response with "Hello World"
+    upon request.
+*   [Add HTTP request headers](samples/add_request_header): Add a header on the
+    client request path.
+*   [Add HTTP response headers](samples/add_response_header): Add a header on
+    the server response path. Also check for existing headers.
 *   [Plugin config with a list of tokens to deny](samples/config_denylist): Deny
     a request whenever it contains a known bad token. Bad tokens are loaded at
     plugin initialization time from plugin configuration.
@@ -127,7 +133,7 @@ for your own plugin. Extend them to fit your particular use case.
 *   [A/B decisioning based on query param](samples/ab_testing): Showcase A/B
     testing in action, 50% chance a user is served file A and 50% chance they
     are served file B.
-*   [Custom error page](samples/add_custom_response) For a certain class of
+*   [Custom error page](samples/add_custom_response): For a certain class of
     origin errors, redirect to a custom error page hosted on GCS.
 *   [Validate client JWT for authorization](samples/jwt_auth): Ensures user
     authentication by verifying an RS256-signed JWT token in the query string
@@ -135,6 +141,20 @@ for your own plugin. Extend them to fit your particular use case.
 *   [Check for PII on response](samples/check_pii): Checks the response HTTP
     headers and body for the presence of credit card numbers. If found, the
     initial numbers will be masked.
+*   [Validate client token on query string using HMAC](samples/hmac_authtoken):
+    Check the client request URL for a valid token signed using HMAC.
+*   [Validate client token using HMAC with cookie](samples/hmac_authcookie): Check
+    the client request for a valid token signed using HMAC provided via a cookie.
+*   [Rewrite domains in html response body](samples/html_domain_rewrite/): Parse
+    html in response body chunks and replace insances of "foo.com" with
+    "bar.com" in `<a href=***>`.
+*   [Add script in html response body](samples/content_injection/): Inject a
+    `<script>` at the start of `<head>` in response body.
+*   [Enable reCAPTCHA challenge on response body](samples/enable_recaptcha/):
+    Enable reCAPTCHA challenge on response body by injecting script into head
+    tag.
+    Warning: This is not a replacement for [official reCAPTCHA documentation](https://developers.google.com/recaptcha).
+
 
 # Feature set / ABI
 
@@ -156,7 +176,11 @@ Support will grow over time. The current feature set includes:
     *   on_delete
 *   Stream context HTTP callbacks (host -> wasm)
     *   on_request_headers
+    *   on_request_body
+    *   on_request_trailers
     *   on_response_headers
+    *   on_response_body
+    *   on_response_trailers
 *   Stream context HTTP hostcalls (wasm -> host)
     *   send_local_response
     *   get_header_map_value, add_header_map_value, replace_header_map_value,
@@ -176,7 +200,7 @@ Support will grow over time. The current feature set includes:
 
 In support of unit testing, this repo contains an `HttpTest` fixture with a
 `TestWasm` host implementation and `TestHttpContext` stream handler. These
-minimal implementations loosely match GCP Service Extension execution
+minimal implementations loosely match the GCP Service Extension execution
 environment. The contexts implement the ABI / feature set described above
 (mainly HTTP headers and logging), but often in a simple way (behaviors may not
 match GCP exactly).
