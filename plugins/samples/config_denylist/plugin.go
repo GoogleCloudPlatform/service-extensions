@@ -16,7 +16,6 @@
 package main
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm"
@@ -39,7 +38,7 @@ type pluginContext struct {
 
 type httpContext struct {
 	types.DefaultHttpContext
-	pluginContext *pluginContext
+	tokens map[string]struct{}
 }
 
 func (*vmContext) NewPluginContext(contextID uint32) types.PluginContext {
@@ -62,29 +61,18 @@ func (ctx *pluginContext) OnPluginStart(int) types.OnPluginStartStatus {
 }
 
 func (ctx *pluginContext) NewHttpContext(uint32) types.HttpContext {
-	return &httpContext{pluginContext: ctx}
-}
-
-func (ctx *pluginContext) IsDeniedUserToken(token string) bool {
-	_, found := ctx.tokens[token]
-	return found
+	return &httpContext{tokens: ctx.tokens}
 }
 
 func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) types.Action {
-	defer func() {
-		err := recover()
-		if err != nil {
-			proxywasm.SendHttpResponse(500, [][2]string{}, []byte(fmt.Sprintf("%v", err)), 0)
-		}
-	}()
 	userToken, err := proxywasm.GetHttpRequestHeader("User-Token")
 	if err != nil {
 		proxywasm.SendHttpResponse(403, [][2]string{}, []byte("Access forbidden - token missing.\n"), 0)
-		return types.ActionPause
+		return types.ActionContinue
 	}
-	if ctx.pluginContext.IsDeniedUserToken(userToken) {
+	if _, found := ctx.tokens[userToken]; found {
 		proxywasm.SendHttpResponse(403, [][2]string{}, []byte("Access forbidden.\n"), 0)
-		return types.ActionPause
+		return types.ActionContinue
 	}
 	return types.ActionContinue
 }
