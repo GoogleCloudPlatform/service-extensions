@@ -16,71 +16,49 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm"
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm/types"
 )
 
 func main() {}
 func init() {
-	proxywasm.SetVMContext(&vmContext{})
-}
-
-type vmContext struct {
-	types.DefaultVMContext
-}
-
-type pluginContext struct {
-	types.DefaultPluginContext
+	proxywasm.SetHttpContext(func(contextID uint32) types.HttpContext { return &httpContext{} })
 }
 
 type httpContext struct {
 	types.DefaultHttpContext
 }
 
-func (*vmContext) NewPluginContext(contextID uint32) types.PluginContext {
-	return &pluginContext{}
-}
-
-func (*pluginContext) NewHttpContext(uint32) types.HttpContext {
-	return &httpContext{}
+func sendErrorResponse(err error) {
+	proxywasm.SendHttpResponse(500, [][2]string{}, []byte(err.Error()), 0)
 }
 
 // Add foo onto the end of each request body chunk
 func (ctx *httpContext) OnHttpRequestBody(bodySize int, endOfStream bool) types.Action {
-	defer func() {
-		err := recover()
-		if err != nil {
-			proxywasm.SendHttpResponse(500, [][2]string{}, []byte(fmt.Sprintf("%v", err)), 0)
-		}
-	}()
 	chunk, err := proxywasm.GetHttpRequestBody(0, bodySize)
 	if err != nil {
-		panic(err)
+		sendErrorResponse(err)
+		return types.ActionContinue
 	}
 	err = proxywasm.ReplaceHttpRequestBody(append(chunk, "foo"...))
 	if err != nil {
-		panic(err)
+		sendErrorResponse(err)
+		return types.ActionContinue
 	}
 	return types.ActionContinue
 }
 
 // Add bar onto the end of each response body chunk
 func (ctx *httpContext) OnHttpResponseBody(bodySize int, endOfStream bool) types.Action {
-	defer func() {
-		err := recover()
-		if err != nil {
-			proxywasm.SendHttpResponse(500, [][2]string{}, []byte(fmt.Sprintf("%v", err)), 0)
-		}
-	}()
 	chunk, err := proxywasm.GetHttpResponseBody(0, bodySize)
 	if err != nil {
-		panic(err)
+		sendErrorResponse(err)
+		return types.ActionContinue
 	}
 	err = proxywasm.ReplaceHttpResponseBody(append(chunk, "bar"...))
 	if err != nil {
-		panic(err)
+		sendErrorResponse(err)
+		return types.ActionContinue
 	}
 	return types.ActionContinue
 }
