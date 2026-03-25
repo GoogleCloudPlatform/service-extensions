@@ -1,0 +1,40 @@
+test {
+  name: "DomainRewriteFooOutside<a>"
+  num_chunks:10
+  response_body {
+    input { content:  "<!DOCTYPE html>"
+                      "<html>"
+                      "<head>"
+                      "<title>Page Title</title>"
+                      "</head>"
+                      "<body>"
+
+                      "<h1>This is a Heading</h1>"
+                      "<p>This is a paragraph. Instances of \"foo.com\" here should not change</p>"
+                      "<div id=foo>"
+                      "<a href=https://foo.com>website</a>"
+                      "</div>"
+                      "<a href=https://foo.com>website</a>"
+                      "</body>"
+                      "</html>"
+    }
+    result {
+      body { exact: "<!DOCTYPE html>"
+                    "<html>"
+                    "<head>"
+                    "<title>Page Title</title>"
+                    "</head>"
+                    "<body>"
+
+                    "<h1>This is a Heading</h1>"
+                    "<p>This is a paragraph. Instances of \"foo.com\" here should not change</p>"
+                    "<div id=foo>"
+                    "<a href=\"https://bar.com\">website</a>"
+                    "</div>"
+                    "<a href=\"https://bar.com\">website</a>"
+                    "</body>"
+                    "</html>"
+      }
+    }
+  }
+}

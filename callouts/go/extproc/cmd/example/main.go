@@ -21,6 +21,7 @@ import (
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/add_body"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/add_header"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/basic_callout_server"
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/dynamic_forwarding"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/jwt_auth"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/redirect"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/internal/server"
@@ -48,17 +49,21 @@ func main() {
 		customService = basic_callout_server.NewExampleCalloutService()
 	case "jwt_auth":
 		customService = jwt_auth.NewExampleCalloutService()
+	case "dynamic_forwarding":
+		customService = dynamic_forwarding.NewExampleCalloutService()
 	default:
 		fmt.Println("Unknown EXAMPLE_TYPE. Please set it to a valid example")
 		return
 	}
 
 	config := server.Config{
-		Address:            "0.0.0.0:8443",
-		InsecureAddress:    "0.0.0.0:8181",
-		HealthCheckAddress: "0.0.0.0:8000",
-		CertFile:           "extproc/ssl_creds/localhost.crt",
-		KeyFile:            "extproc/ssl_creds/localhost.key",
+		SecureAddress:        "0.0.0.0:443",
+		InsecureAddress:      "0.0.0.0:8080",
+		HealthCheckAddress:   "0.0.0.0:80",
+		CertFile:             "extproc/ssl_creds/localhost.crt",
+		KeyFile:              "extproc/ssl_creds/localhost.key",
+		EnableTLS:            false,
+		EnableInsecureServer: true,
 	}
 
 	calloutServer := server.NewCalloutServer(config)

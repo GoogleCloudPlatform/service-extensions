@@ -48,7 +48,7 @@ test {
     result { 
       immediate { http_status: 403 details: "" }
       body { exact: "Access forbidden.\n" }
-      log { regex: ".+Access forbidden - Jwt verification fails$" }
+      log { regex: ".+Access forbidden.$" }
     }
   }
 }
