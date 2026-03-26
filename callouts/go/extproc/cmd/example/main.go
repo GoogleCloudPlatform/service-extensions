@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/basic_callout_server"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/dynamic_forwarding"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/jwt_auth"
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/receive_body"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/redirect"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/internal/server"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
@@ -49,6 +50,8 @@ func main() {
 		customService = basic_callout_server.NewExampleCalloutService()
 	case "jwt_auth":
 		customService = jwt_auth.NewExampleCalloutService()
+	case "receive_body":
+		customService = receive_body.NewReceiveBodyCalloutService()
 	case "dynamic_forwarding":
 		customService = dynamic_forwarding.NewExampleCalloutService()
 	default:
