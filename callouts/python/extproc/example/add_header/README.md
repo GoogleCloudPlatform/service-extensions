@@ -1,75 +1,63 @@
-# Add Header Plugin (Python)
+# Add Header Callout
 
-This plugin demonstrates HTTP header manipulation at the proxy layer by intercepting both incoming request headers and outgoing response headers. It adds a new header to each phase, removes a specific header from the response, and controls route cache invalidation independently per phase. Use this plugin when you need to inject metadata headers into requests, enrich or sanitise response headers, or force Envoy to recompute its routing decision after a header mutation. It operates during the **request headers** and **response headers** processing phases.
+This callout server adds custom headers to both HTTP requests and responses as
+they pass through the load balancer. It demonstrates the core header mutation
+pattern — adding headers, removing headers, and controlling the route cache. It
+overrides `on_request_headers` and `on_response_headers` to apply different
+mutations on each path. Use this callout when you need to inject metadata,
+routing signals, or tracking headers into traffic flowing through your load
+balancer.
 
 ## How It Works
 
-1. The proxy receives an HTTP request and invokes the plugin's `on_request_headers` callback.
-2. The handler adds the header `header-request: request` to the incoming request headers and sets `clear_route_cache=True`, instructing Envoy to recompute the routing decision after the mutation.
-3. The modified request is forwarded to the upstream service.
-4. When the upstream responds, the proxy invokes the plugin's `on_response_headers` callback.
-5. The handler adds the header `header-response: response` to the outgoing response headers and simultaneously removes the `foo` header. The route cache is left intact (no `clear_route_cache` argument).
-6. The modified response is returned to the client.
+1. The load balancer intercepts an HTTP request and sends a `ProcessingRequest`
+   with `request_headers` to the callout server.
+2. The server's `on_request_headers` callback adds a `header-request: request`
+   header and clears the route cache (forcing the load balancer to re-evaluate
+   routing with the new headers).
+3. When the origin server responds, the load balancer sends a second
+   `ProcessingRequest` with `response_headers`.
+4. The server's `on_response_headers` callback adds a
+   `header-response: response` header and removes any existing `foo` header.
+5. The modified response is returned to the client.
 
-## Implementation Notes
+## Callbacks Overridden
 
-- **Class structure**: `CalloutServerExample` extends `callout_server.CalloutServer` and overrides only the two header phase callbacks. No constructor override is needed; the base class handles all server lifecycle concerns. The server is started by calling `.run()` directly on an instance.
-- **Request header mutation**: `on_request_headers` calls `callout_tools.add_header_mutation` with `add=[('header-request', 'request')]` and `clear_route_cache=True`. No `remove` argument is passed, so no existing headers are stripped. Setting `clear_route_cache=True` tells Envoy to discard any previously computed route and re-evaluate routing based on the mutated headers.
-- **Response header mutation**: `on_response_headers` calls `callout_tools.add_header_mutation` with `add=[('header-response', 'response')]` and `remove=['foo']`. No `clear_route_cache` argument is passed, so it defaults to `False`, preserving the route cache — appropriate for the response phase where routing decisions are already finalised.
-- **`add_header_mutation` utility**: Both callbacks delegate to `callout_tools.add_header_mutation`, a shared helper from the `extproc.service` package that constructs the appropriate `HeadersResponse` protobuf message, abstracting away the boilerplate of building the header mutation directly.
-- **Server startup**: The `__main__` block sets the log level to `DEBUG` and calls `CalloutServerExample().run()` to start the gRPC server with default configuration.
+| Callback | Behavior |
+|---|---|
+| `on_request_headers` | Adds `header-request: request`, clears route cache |
+| `on_response_headers` | Adds `header-response: response`, removes the `foo` header |
 
-## Configuration
-
-No configuration is required for the default setup. All header names, values, and cache settings are hardcoded directly in each callback:
-- `request header added`: `header-request: request`
-- `request phase route cache`: cleared (`True`)
-- `response header added`: `header-response: response`
-- `response header removed`: `foo`
-- `response phase route cache`: preserved (default `False`)
-
-## Build
-
-Install the required dependencies from the repository root:
-```bash
-pip install -r requirements.txt
-```
 
 ## Run
 
-Start the callout server with default configuration:
 ```bash
-python -m extproc.example.add_header
-```
-
-Or run directly:
-```bash
-python add_header.py
+cd callouts/python
+python -m extproc.example.add_header.service_callout_example
 ```
 
 ## Test
 
-Run the unit tests for this sample:
 ```bash
-# Run all tests for the add_header sample
-python -m pytest tests/add_header_test.py
-
-# With verbose output
-python -m pytest -v tests/add_header_test.py
+cd callouts/python
+pytest extproc/tests/basic_grpc_test.py
 ```
+
+The `add_header` example is tested as part of the basic gRPC integration tests
+rather than having a dedicated test file.
+
 
 ## Expected Behavior
 
 | Scenario | Description |
 |---|---|
-| **Request header injected** | Every incoming HTTP request gets `header-request: request` added to its headers. |
-| **Request route cache cleared** | Envoy recomputes its routing decision after the request header mutation. |
-| **Response header injected** | Every outgoing HTTP response gets `header-response: response` added to its headers. |
-| **Response header removed** | The `foo` header is stripped from the response if present. |
-| **Response route cache preserved** | Envoy's routing decision remains unchanged after the response header mutation. |
+| **Request header addition** | For any incoming HTTP request, the system injects the header-request: request field and clears the route cache to ensure fresh processing. |
+| **Response header addition** | For any HTTP response received from the origin, the system appends the header-response: response field to the response headers |
+| **Response header removal** | When a response contains a foo header, the system identifies and strips that specific header before final delivery. |
+| **No `foo` header present** | f the foo header is missing from the response, the system performs a "no-op," meaning it continues processing without error or modification. |
 
 ## Available Languages
 
-- [x] [Go](add_header.go)
-- [x] [Java](AddHeader.java)
-- [x] [Python](service_callout_example.py)
+- [x] [Python](.) (this directory)
+- [x] [Go](../../../../go/extproc/examples/add_header/)
+- [x] [Java](../../../../java/service-callout/src/main/java/example/AddHeader.java)

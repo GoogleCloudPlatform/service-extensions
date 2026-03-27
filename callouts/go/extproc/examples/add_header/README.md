@@ -1,59 +1,79 @@
-# Add Header Plugin
+# Add Header Callout (Go)
 
-This plugin modifies HTTP request and response headers by injecting custom key-value pairs into each phase. It intercepts both the incoming request headers and the outgoing response headers, adding a predefined header to each without removing or clearing existing ones. Use this plugin when you need to inject headers at the proxy layer for purposes such as request tagging, routing hints, or downstream metadata — without modifying application logic. It operates during the **request headers** and **response headers** processing phases.
+This callout server demonstrates how to modify HTTP request and response headers
+using a gRPC-based service callout in Go. It showcases how to **inject custom
+headers** into both request and response flows in a Layer 7 load balancer.
+
+On incoming requests, the server adds a custom request header. On outgoing
+responses, it adds a custom response header.
+
+Use this callout when you need **header enrichment**, **metadata propagation**,
+or **lightweight request/response augmentation**.
+
+---
 
 ## How It Works
 
-1. The proxy receives an HTTP request and invokes the plugin's `HandleRequestHeaders` handler.
-2. The handler appends the header `header-request: Value-request` to the incoming request headers, using a non-clearing, non-removing mutation that preserves all existing headers.
-3. The modified request is forwarded to the upstream server.
-4. When the upstream server responds, the proxy invokes the plugin's `HandleResponseHeaders` handler.
-5. The handler appends the header `header-response: Value-response` to the outgoing response headers, following the same non-destructive mutation pattern.
+1. The load balancer intercepts an HTTP request and sends a `ProcessingRequest`
+   with `request_headers` to the callout server.
+2. The server's `HandleRequestHeaders` handler:
+   - Adds the header `header-request: Value-request`.
+3. The request continues to the backend service with the updated headers.
+4. When the backend responds, the load balancer sends a `ProcessingRequest`
+   with `response_headers`.
+5. The server's `HandleResponseHeaders` handler:
+   - Adds the header `header-response: Value-response`.
 6. The modified response is returned to the client.
 
-## Implementation Notes
+---
 
-- **Service structure**: `ExampleCalloutService` embeds `server.GRPCCalloutService` and registers both header handlers in `NewExampleCalloutService()`. Handlers are assigned as function references on the `Handlers` struct, following the standard service extension pattern.
-- **Request header mutation**: `HandleRequestHeaders` receives an `*extproc.HttpHeaders` and returns a `ProcessingResponse` wrapping a `RequestHeaders` mutation. It calls `utils.AddHeaderMutation` with a single `{Key: "header-request", Value: "Value-request"}` entry. The second and fourth arguments (`nil`) indicate no headers to remove and no additional options, while `false` signals that existing headers should not be cleared.
-- **Response header mutation**: `HandleResponseHeaders` follows the identical pattern, wrapping a `ResponseHeaders` mutation with `{Key: "header-response", Value: "Value-response"}` using the same non-destructive arguments.
-- **Mutation utility**: Both handlers delegate to `utils.AddHeaderMutation`, a shared helper from the `pkg/utils` package. It accepts a slice of key-value structs to add, a slice of header keys to remove, a boolean to clear all existing headers, and an optional additional options argument — abstracting away the boilerplate of building the `HeaderMutation` protobuf message.
+## Callbacks / Handlers
 
-## Configuration
+| Handler | Behavior |
+|---|---|
+| `HandleRequestHeaders` | Adds `header-request: Value-request` to incoming requests. |
+| `HandleResponseHeaders` | Adds `header-response: Value-response` to outgoing responses. |
 
-No configuration required. The injected header names and values are hardcoded directly in each handler:
-- `request header`: `header-request: Value-request`
-- `response header`: `header-response: Value-response`
+---
 
-## Build
+## Run
 
-Build the callout service from the repository root:
+**Go:**
+
 ```bash
-# Go
-go build ./callouts/go/extproc/...
+cd callouts/go
+EXAMPLE_TYPE=add_header go run ./extproc/cmd/example/main.go
 ```
+
+---
 
 ## Test
 
-Run the unit tests for this sample:
-```bash
-# Run all tests in the add_header package
-go test ./callouts/go/extproc/samples/add_header/...
+**Go:**
 
-# With verbose output
-go test -v ./callouts/go/extproc/samples/add_header/...
+```bash
+cd callouts/go
+go test ./extproc/examples/add_header/...
 ```
+
+This example may also be covered by shared gRPC integration tests depending on
+the repository setup.
+
+---
 
 ## Expected Behavior
 
 | Scenario | Description |
 |---|---|
-| **Request header is injected** | Any incoming HTTP request gets `header-request: Value-request` added to its headers. |
-| **Response header is injected** | Any outgoing HTTP response gets `header-response: Value-response` added to its headers. |
-| **Existing headers are preserved** | All original headers are retained; `clear_headers` is `false`. |
-| **No headers are removed** | No headers are stripped; the remove list is `nil`. |
+| **Request header addition** | Adds `header-request: Value-request` to all incoming requests. |
+| **Response header addition** | Adds `header-response: Value-response` to all outgoing responses. |
+| **Non-destructive mutation** | Existing headers are preserved; only new headers are added. |
+| **No route cache impact** | Route cache remains unchanged during processing. |
+
+---
 
 ## Available Languages
 
-- [x] [Go](add_header.go)
-- [x] [Java](add_header.java)
-- [x] [Python](add_header.py)
+- [x] [Go](.) (this directory)
+- [ ] Python
+- [ ] Java

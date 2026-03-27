@@ -1,95 +1,80 @@
-# Basic Callout Server Plugin (Python)
+# Add Custom Response Callout
 
-This plugin demonstrates a complete ext_proc callout service by handling all four HTTP processing phases simultaneously: request headers, response headers, request body, and response body. Each phase supports three distinct behaviours: denying the connection on a forbidden signal, returning a mock response on a mock signal, and applying a standard mutation otherwise. Use this plugin as a reference implementation or starting point when you need a full-featured callout service that intercepts every phase of the HTTP lifecycle with conditional logic. It operates during the **request headers**, **response headers**, **request body**, and **response body** processing phases.
+This callout server applies conditional mutations to both HTTP headers and
+bodies as they pass through the load balancer. It demonstrates advanced traffic
+control patterns — mock responses, body replacement, header injection, and
+connection denial. It overrides all four core callbacks (`on_request_headers`,
+`on_response_headers`, `on_request_body`, and `on_response_body`) to evaluate
+each request and response against a set of rules before deciding which mutation
+to apply. Use this callout when you need fine-grained control over traffic
+based on the content of headers or bodies, including short-circuiting requests
+with mock responses or blocking malicious traffic entirely.
 
 ## How It Works
 
-1. The proxy receives an HTTP request and invokes the plugin's `on_request_headers` callback.
-2. If the request contains a header named `bad-header`, the connection is denied and closed immediately.
-3. If the request contains a header named `mock`, a mock response with `Mock-Response: Mocked-Value` is returned instead of the standard mutation.
-4. Otherwise, the header `header-request: request` is added, the `foo` header is removed, and the route cache is cleared.
-5. The proxy then invokes `on_request_body`.
-6. If the body contains the substring `bad-body`, the connection is denied. If it contains `mock`, a mock body of `"Mocked-Body"` is returned. Otherwise, the body is replaced with `"replaced-body"`.
-7. The modified request is forwarded to the upstream service.
-8. When the upstream responds, the proxy invokes `on_response_headers`.
-9. The same deny and mock checks are applied. Otherwise, the header `header-response: response` is added.
-10. The proxy then invokes `on_response_body`.
-11. The same deny and mock checks are applied. Otherwise, the body is cleared (no explicit replacement value passed).
-12. The fully modified response is returned to the client.
+1. The load balancer intercepts an HTTP request and sends a `ProcessingRequest`
+   with `request_headers` to the callout server.
+2. The server's `on_request_headers` callback inspects the headers: if
+   `bad-header` is present, the connection is denied; if a `mock` header is
+   found, a mock response with `Mock-Response: Mocked-Value` is returned;
+   otherwise, `header-request: request` is added and the route cache is
+   cleared.
+3. The load balancer then sends a `ProcessingRequest` with `request_body`.
+4. The server's `on_request_body` callback inspects the body: if it contains
+   `bad-body`, the connection is denied; if it contains `mock`, a mock body
+   of `Mocked-Body` is returned; otherwise, the body is replaced with
+   `replaced-body`.
+5. When the origin server responds, the load balancer sends a
+   `ProcessingRequest` with `response_headers`.
+6. The server's `on_response_headers` callback applies the same deny/mock
+   logic, and otherwise injects the `header-response: response` header.
+7. The load balancer sends a final `ProcessingRequest` with `response_body`.
+8. The server's `on_response_body` callback applies the same deny/mock logic,
+   and otherwise clears the body.
+9. The fully modified response is returned to the client.
 
-## Implementation Notes
+## Callbacks Overridden
 
-- **Class structure**: `CalloutServerExample` extends `callout_server.CalloutServer` and overrides all four processing callbacks. No constructor override is needed; the base class handles server lifecycle. The server is started by calling `.run()` directly on an instance.
-- **Deny logic**: All four callbacks call `callout_tools.deny_callout(context)` as the first check, using `callout_tools.headers_contain` or `callout_tools.body_contains` to inspect the incoming data. Denial closes the gRPC connection immediately, preventing any further processing or upstream forwarding.
-- **Mock responses**: `generate_mock_header_response` returns `callout_tools.add_header_mutation([("Mock-Response", "Mocked-Value")])` and `generate_mock_body_response` returns `callout_tools.add_body_mutation("Mocked-Body")`. These are returned early when the `mock` signal is detected, bypassing the standard mutation path entirely.
-- **Request header mutation**: The standard path calls `callout_tools.add_header_mutation` with `add=[('header-request', 'request')]`, `remove=['foo']`, and `clear_route_cache=True`, injecting a new header, stripping `foo`, and forcing Envoy to recompute its routing decision.
-- **Response header mutation**: The standard path calls `callout_tools.add_header_mutation` with only `add=[('header-response', 'response')]`, preserving all existing response headers and leaving the route cache intact.
-- **Request body mutation**: The standard path calls `callout_tools.add_body_mutation(body='replaced-body')`, replacing the incoming request body with the static string `"replaced-body"`.
-- **Response body mutation**: The standard path calls `callout_tools.add_body_mutation()` with no arguments, which clears the response body without substituting new content.
-- **Server startup**: The `__main__` block sets the log level to `DEBUG` and calls `CalloutServerExample().run()` to start the gRPC server with default configuration.
-
-## Configuration
-
-No configuration is required for the default setup. All signal strings, injected header names and values, and body replacement strings are hardcoded in the callbacks:
-- `deny signal (headers)`: `bad-header`
-- `deny signal (body)`: `bad-body`
-- `mock signal (headers and body)`: `mock`
-- `mock header added`: `Mock-Response: Mocked-Value`
-- `mock body replacement`: `"Mocked-Body"`
-- `request header added`: `header-request: request`
-- `request header removed`: `foo`
-- `request route cache`: cleared (`True`)
-- `response header added`: `header-response: response`
-- `request body replacement`: `"replaced-body"`
-- `response body`: cleared (no replacement)
-
-## Build
-
-Install the required dependencies from the repository root:
-```bash
-pip install -r requirements.txt
-```
+| Callback | Behavior |
+|---|---|
+| `on_request_headers` | Denies on `bad-header`; returns mock on `mock`; otherwise adds `header-request: request` and clears route cache |
+| `on_response_headers` | Denies on `bad-header`; returns mock on `mock`; otherwise adds `header-response: response` |
+| `on_request_body` | Denies on `bad-body`; returns mock body on `mock`; otherwise replaces body with `replaced-body` |
+| `on_response_body` | Denies on `bad-body`; returns mock body on `mock`; otherwise clears the body |
 
 ## Run
 
-Start the callout server with default configuration:
 ```bash
-python -m extproc.example.basic_callout_server
-```
-
-Or run directly:
-```bash
-python basic_callout_server.py
+cd callouts/python
+python -m extproc.example.add_custom_response.service_callout_example
 ```
 
 ## Test
 
-Run the unit tests for this sample:
 ```bash
-# Run all tests for the basic callout server
-python -m pytest tests/basic_callout_server_test.py
-
-# With verbose output
-python -m pytest -v tests/basic_callout_server_test.py
+cd callouts/python
+pytest extproc/tests/basic_grpc_test.py
 ```
+
+The `add_custom_response` example is tested as part of the basic gRPC
+integration tests rather than having a dedicated test file.
+
 
 ## Expected Behavior
 
 | Scenario | Description |
 |---|---|
-| **Request header injected** | Any request without `bad-header` or `mock` gets `header-request: request` added, `foo` removed, and the route cache cleared. |
-| **Request header denied** | A request containing `bad-header` has the connection denied and closed immediately. |
-| **Request header mocked** | A request containing `mock` returns `Mock-Response: Mocked-Value` instead of the standard mutation. |
-| **Response header injected** | Any response without `bad-header` or `mock` gets `header-response: response` added. |
-| **Response header denied** | A response containing `bad-header` has the connection denied and closed immediately. |
-| **Response header mocked** | A response containing `mock` returns `Mock-Response: Mocked-Value` instead of the standard mutation. |
-| **Request body replaced** | A body without `bad-body` or `mock` is replaced with `"replaced-body"`. |
-| **Request body denied** | A body containing `bad-body` has the connection denied and closed immediately. |
-| **Request body mocked** | A body containing `mock` is replaced with `"Mocked-Body"`. |
-| **Response body cleared** | A body without `bad-body` or `mock` is cleared with no replacement. |
-| **Response body denied** | A body containing `bad-body` has the connection denied and closed immediately. |
-| **Response body mocked** | A body containing `mock` is replaced with `"Mocked-Body"`. |
+| **Bad header detected** | If any request or response contains the `bad-header` header, the server immediately denies the callout and closes the connection. |
+| **Mock header detected** | If any request or response contains the `mock` header, the server short-circuits normal processing and returns a `Mock-Response: Mocked-Value` header mutation. |
+| **Standard request header flow** | For normal requests with no special headers, the server injects `header-request: request`, removes `foo`, and clears the route cache. |
+| **Standard response header flow** | For normal responses with no special headers, the server injects `header-response: response` into the response headers. |
+| **Bad body detected** | If a request or response body contains the substring `bad-body`, the server immediately denies the callout and closes the connection. |
+| **Mock body detected** | If a request or response body contains the substring `mock`, the server short-circuits normal processing and returns a body mutation with `Mocked-Body`. |
+| **Standard request body flow** | For normal request bodies with no special substrings, the server replaces the body with `replaced-body`. |
+| **Standard response body flow** | For normal response bodies with no special substrings, the server clears the body content. |
 
 ## Available Languages
 
-- [x] [Python](basic_callout_server.py)
+- [x] [Python](.) (this directory)
+- [ ] Go
+- [ ] Java

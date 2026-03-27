@@ -1,72 +1,76 @@
-# Add Body Plugin (Python)
+# Add Body Callout
 
-This plugin demonstrates HTTP body manipulation at the proxy layer by intercepting both the incoming request body and the outgoing response body. It appends a fixed suffix to the request body and fully replaces the response body with a static string. Use this plugin when you need to modify body content at the proxy layer without changing application logic — for example, enriching request payloads with metadata or normalising upstream responses. It operates during the **request body** and **response body** processing phases.
+This callout server modifies HTTP request and response bodies as they pass
+through the load balancer. It demonstrates the core body mutation pattern —
+appending content to a request body and replacing a response body entirely. It
+overrides `on_request_body` and `on_response_body` to apply different mutations
+on each path. Use this callout when you need to enrich, transform, or replace
+body content flowing through your load balancer.
 
 ## How It Works
 
-1. The proxy receives an HTTP request and invokes the plugin's `on_request_body` callback.
-2. The handler decodes the existing request body as UTF-8 and appends `"-added-request-body"` to it, producing a modified body.
-3. The modified request is forwarded to the upstream service.
-4. When the upstream responds, the proxy invokes the plugin's `on_response_body` callback.
-5. The handler discards the original response body and replaces it entirely with the static string `"new-body"`.
-6. The modified response is returned to the client.
+1. The load balancer intercepts an HTTP request and sends a `ProcessingRequest`
+   with `request_body` to the callout server.
+2. The server's `on_request_body` callback reads the existing body, appends
+   `-added-request-body` to it, and returns the mutation to the load balancer.
+3. When the origin server responds, the load balancer sends a second
+   `ProcessingRequest` with `response_body`.
+4. The server's `on_response_body` callback replaces the entire body with the
+   string `new-body`.
+5. The modified response is returned to the client.
 
-## Implementation Notes
+## Callbacks Overridden
 
-- **Class structure**: `CalloutServerExample` extends `callout_server.CalloutServer` and overrides only the two body phase callbacks. No constructor override is needed; the base class handles all server lifecycle concerns. The server is started by calling `.run()` directly on an instance.
-- **Request body mutation**: `on_request_body` decodes the raw body bytes with `body.body.decode('utf-8')`, appends the static suffix `"-added-request-body"`, and passes the concatenated string to `callout_tools.add_body_mutation`. This overwrites the request body with the appended content before forwarding to the upstream.
-- **Response body mutation**: `on_response_body` passes the static string `"new-body"` directly to `callout_tools.add_body_mutation`, discarding the original response body entirely and substituting the fixed replacement.
-- **`add_body_mutation` utility**: Both callbacks delegate to `callout_tools.add_body_mutation`, a shared helper from the `extproc.service` package that constructs the appropriate `BodyResponse` protobuf message, abstracting away the boilerplate of building the mutation directly.
-- **Server startup**: The `__main__` block sets the log level to `DEBUG` and calls `CalloutServerExample().run()` to start the gRPC server with default configuration.
-
-## Configuration
-
-No configuration is required for the default setup. The body strings are hardcoded directly in each callback:
-- `request body suffix`: `"-added-request-body"` (appended to existing UTF-8 content)
-- `response body replacement`: `"new-body"` (replaces existing content entirely)
-
-## Build
-
-Install the required dependencies from the repository root:
-```bash
-pip install -r requirements.txt
-```
+| Callback | Behavior |
+|---|---|
+| `on_request_body` | Appends `-added-request-body` to the existing request body |
+| `on_response_body` | Replaces the response body entirely with `new-body` |
 
 ## Run
 
-Start the callout server with default configuration:
+**Python:**
+
 ```bash
-python -m extproc.example.add_body
+cd callouts/python
+python -m extproc.example.add_body.service_callout_example
 ```
 
-Or run directly:
+**Go:**
+
 ```bash
-python add_body.py
+cd callouts/go
+EXAMPLE_TYPE=add_body go run ./extproc/cmd/example/main.go
+```
+
+**Java:**
+
+```bash
+cd callouts/java/service-callout
+./gradlew run -PmainClass=example.AddBody
 ```
 
 ## Test
 
-Run the unit tests for this sample:
 ```bash
-# Run all tests for the add_body sample
-python -m pytest tests/add_body_test.py
-
-# With verbose output
-python -m pytest -v tests/add_body_test.py
+cd callouts/python
+pytest extproc/tests/basic_grpc_test.py
 ```
+
+The `add_body` example is tested as part of the basic gRPC integration tests
+rather than having a dedicated test file.
+
 
 ## Expected Behavior
 
 | Scenario | Description |
 |---|---|
-| **Request body is appended** | A request body of `"hello"` is modified to `"hello-added-request-body"` before being forwarded to the upstream. |
-| **Empty request body is appended** | An empty request body `""` is modified to `"-added-request-body"` before being forwarded to the upstream. |
-| **Response body is replaced** | Any response body from the upstream is replaced with `"new-body"`. |
-| **Non-UTF-8 request body** | A request body with non-UTF-8 bytes causes `decode('utf-8')` to raise a `UnicodeDecodeError`; no mutation is applied. |
+| **Request body mutation** | For any incoming HTTP request, the system reads the existing body and appends `-added-request-body` to it before forwarding to the origin. |
+| **Response body replacement** | For any HTTP response received from the origin, the system discards the original body and replaces it with the static string `new-body`. |
+| **Empty request body** | If the request body is empty, the mutation appends `-added-request-body` to an empty string, resulting in the body containing only `-added-request-body`. |
+| **No body present** | If no body is present in the response, the replacement still applies, and the client receives `new-body` as the response payload. |
 
 ## Available Languages
 
-- [x] [Go](add_body.go)
-- [x] [Java](AddBody.java)
-- [x] [Python](service_callout_example.py)
-ss
+- [x] [Python](.) (this directory)
+- [ ] Go
+- [ ] Java

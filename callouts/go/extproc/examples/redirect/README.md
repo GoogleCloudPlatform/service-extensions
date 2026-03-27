@@ -1,60 +1,69 @@
-# Redirect Plugin
+# Redirect Callout (Go)
 
-This plugin implements an unconditional HTTP redirect at the proxy layer by intercepting every incoming request and immediately returning a `301 Moved Permanently` response with a hardcoded `Location` header, before the request ever reaches the upstream service. Use this plugin when you need to enforce a blanket redirect for all traffic through a proxy — such as domain migrations, protocol enforcement, or legacy endpoint retirement — without involving any backend logic. It operates during the **request headers** processing phase.
+This callout server performs an HTTP redirect for incoming requests using an
+immediate response. It demonstrates how to short-circuit normal request
+processing in a Layer 7 load balancer and return a redirect response directly
+to the client.
+
+The server intercepts request headers and responds with a `301 Moved Permanently`
+status, instructing the client to navigate to a different URL via the `Location`
+header.
+
+Use this callout when you need **URL redirection**, **traffic migration**, or
+**request short-circuiting** without forwarding the request to a backend service.
+
+---
 
 ## How It Works
 
-1. The proxy receives an HTTP request and invokes the plugin's `HandleRequestHeaders` handler.
-2. The handler unconditionally constructs an immediate response with HTTP status `301`.
-3. A `Location: http://service-extensions.com/redirect` header is attached to the immediate response.
-4. The `ProcessingResponse` is returned with an `ImmediateResponse` variant, instructing Envoy to short-circuit the request and send the redirect directly to the client.
-5. The upstream service is never contacted.
+1. Intercepts request headers.
+2. Returns an immediate response:
+   - Status: `301 Moved Permanently`
+   - Header: `Location: http://service-extensions.com/redirect`
+3. Request is never forwarded to backend.
 
-## Implementation Notes
+---
 
-- **Service structure**: `ExampleCalloutService` embeds `server.GRPCCalloutService` and registers only the request headers handler in `NewExampleCalloutService()`. No other phases are needed since the request is terminated before reaching the body or response phases.
-- **Immediate response**: `HandleRequestHeaders` returns a `ProcessingResponse` wrapping a `ProcessingResponse_ImmediateResponse` variant rather than a `ProcessingResponse_RequestHeaders` variant. This tells Envoy to stop processing the request and reply to the client directly, bypassing the upstream entirely.
-- **Redirect construction**: The immediate response is built by `utils.HeaderImmediateResponse(301, headers, body, trailers)`, a shared utility that constructs the `ImmediateResponse` protobuf message. The status code is `301`, the headers slice contains a single `Location: http://service-extensions.com/redirect` entry, and both the body and trailers arguments are `nil`.
-- **Unconditional behaviour**: Unlike routing or filtering plugins, this handler performs no inspection of the incoming request. Every request — regardless of path, method, or headers — receives the same redirect response.
 
-## Configuration
+## Callbacks / Handlers
 
-No configuration required. The redirect target and status code are hardcoded directly in the handler:
-- `HTTP status code`: `301` (Moved Permanently)
-- `redirect target`: `http://service-extensions.com/redirect`
-- `response body`: none
-- `response trailers`: none
+| Handler | Behavior |
+|---|---|
+| `HandleRequestHeaders` | Returns immediate 301 redirect response. |
 
-## Build
+---
 
-Build the callout service from the repository root:
+## Run
+
 ```bash
-# Go
-go build ./callouts/go/extproc/...
+cd callouts/go
+EXAMPLE_TYPE=redirect go run ./extproc/cmd/example/main.go
 ```
+
+---
 
 ## Test
 
-Run the unit tests for this sample:
 ```bash
-# Run all tests in the redirect package
-go test ./callouts/go/extproc/samples/redirect/...
-
-# With verbose output
-go test -v ./callouts/go/extproc/samples/redirect/...
+cd callouts/go
+go test ./extproc/examples/redirect/...
 ```
+
+---
 
 ## Expected Behavior
 
 | Scenario | Description |
 |---|---|
-| **Any request is redirected** | Every HTTP request, regardless of path or method, receives a `301 Moved Permanently` with `Location: http://service-extensions.com/redirect`. |
-| **Upstream is never reached** | The request is short-circuited at the proxy on every call; no upstream connection is made. |
-| **No body in response** | The immediate response is returned with no body content. |
-| **No trailers in response** | The immediate response is returned with no trailers. |
+| **Any incoming request** | The request is not forwarded to a backend. |
+| **Redirect response** | The client receives a `301 Moved Permanently` response. |
+| **Location header** | The response includes `Location: http://service-extensions.com/redirect`. |
+| **Immediate response** | Processing is short-circuited and handled entirely by the callout. |
+
+---
 
 ## Available Languages
 
-- [x] [Go](redirect.go)
-- [x] [Java](redirect.java)
-- [x] [Python](redirect.py)
+- [x] [Python](.) (this directory)
+- [x] [Go](../../../../go/extproc/examples/redirect/)
+- [x] [Java](../../../../java/service-callout/src/main/java/example/Redirect.java)

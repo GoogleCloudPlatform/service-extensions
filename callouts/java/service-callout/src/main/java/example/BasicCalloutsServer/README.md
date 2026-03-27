@@ -1,57 +1,58 @@
-# Basic Callout Server Plugin (Java)
+# Basic Callout Server (Java)
 
-This plugin demonstrates a complete ext_proc callout service by handling all four HTTP processing phases simultaneously: request headers, response headers, request body, and response body. It injects custom headers into both the request and response, appends a suffix to the request body, and fully replaces the response body with a static string. Use this plugin as a reference implementation or starting point when you need a full-featured callout service that intercepts every phase of the HTTP lifecycle. It operates during the **request headers**, **response headers**, **request body**, and **response body** processing phases.
+This callout server demonstrates a complete example of HTTP request and response
+manipulation using a gRPC-based service callout. It combines both **header** and
+**body** mutations across request and response flows in a Layer 7 load balancer.
+
+The server showcases how to:
+- Add and remove headers
+- Control route cache behavior
+- Append to request bodies
+- Replace response bodies
+
+Use this callout when you need a **full reference implementation** or want to
+combine multiple transformation patterns in a single service.
+
+---
 
 ## How It Works
 
-1. The proxy receives an HTTP request and invokes the plugin's `onRequestHeaders` callback.
-2. The handler adds `request-header: added-request` and `c: d` to the incoming request headers, and sets `clearRouteCache` to `true` to force Envoy to recompute its routing decision.
-3. The proxy then invokes `onRequestBody`, which reads the existing request body and appends `"-added-body"` to it.
-4. The modified request is forwarded to the upstream service.
-5. When the upstream responds, the proxy invokes `onResponseHeaders`, which adds `response-header: added-response` and `c: d` to the response headers, removes the `foo` header, and preserves the route cache.
-6. The proxy then invokes `onResponseBody`, which discards the original response body and replaces it entirely with `"body replaced"`.
-7. The fully modified response is returned to the client.
+1. The load balancer intercepts an HTTP request and sends a `ProcessingRequest`
+   with `request_headers` to the callout server.
+2. The server's `onRequestHeaders` callback:
+   - Adds headers:
+     - `request-header: added-request`
+     - `c: d`
+   - Clears the route cache to ensure routing decisions consider the new headers.
+3. The load balancer sends a `ProcessingRequest` with `request_body`.
+4. The server's `onRequestBody` callback:
+   - Appends `-added-body` to the existing request body.
+5. The request continues to the backend service with updated headers and body.
+6. When the backend responds, the load balancer sends a `ProcessingRequest`
+   with `response_headers`.
+7. The server's `onResponseHeaders` callback:
+   - Adds headers:
+     - `response-header: added-response`
+     - `c: d`
+   - Removes the `foo` header if present.
+   - Does not clear the route cache.
+8. The load balancer sends a `ProcessingRequest` with `response_body`.
+9. The server's `onResponseBody` callback:
+   - Replaces the entire response body with `body replaced`.
+10. The modified response is returned to the client.
 
-## Implementation Notes
+---
 
-- **Class structure**: `BasicCalloutServer` extends `ServiceCallout` and follows the Builder pattern. The inner `Builder` class extends `ServiceCallout.Builder<BasicCalloutServer.Builder>`, implementing `build()` to return a new `BasicCalloutServer` instance and `self()` to return the concrete builder type for fluent chaining. This is the most complete example of the standard Java callout service pattern.
-- **Request header mutation**: `onRequestHeaders` calls `addHeaderMutations` on `processingResponseBuilder.getRequestHeadersBuilder()`, passing an `ImmutableMap` of two entries as headers to add, `null` for headers to remove, `true` for `clearRouteCache`, and `null` for the append action. Setting `clearRouteCache` to `true` tells Envoy to discard any previously computed route and re-evaluate routing based on the mutated headers.
-- **Response header mutation**: `onResponseHeaders` calls `addHeaderMutations` on `processingResponseBuilder.getResponseHeadersBuilder()`, passing a different `ImmutableMap` of two entries as headers to add, an `ImmutableList.of("foo")` as the header to remove, `false` for `clearRouteCache`, and `null` for the append action. Route cache is preserved because response-phase routing decisions are already finalised.
-- **Request body mutation**: `onRequestBody` calls `addBodyMutations` on `processingResponseBuilder.getRequestBodyBuilder()`, passing `body.getBody().toStringUtf8() + "-added-body"` as the new body content. Both remaining arguments are `null`, indicating no clear action and no additional options — the original content is overwritten with the appended string.
-- **Response body mutation**: `onResponseBody` calls `addBodyMutations` on `processingResponseBuilder.getResponseBodyBuilder()`, passing the static string `"body replaced"` as the new body content, discarding the original response body entirely.
-- **Mutation utilities**: All four callbacks delegate to static helpers from `ServiceCalloutTools`: `addHeaderMutations` for header phase callbacks and `addBodyMutations` for body phase callbacks, both abstracting away the protobuf mutation boilerplate.
-- **Server startup**: The `main` method constructs a `BasicCalloutServer` instance using its `Builder` with default configuration, then calls `server.start()` followed by `server.blockUntilShutdown()` to keep the process alive until manually terminated.
+## Callbacks Overridden
 
-## Configuration
-
-No configuration is required for the default setup. All injected values are hardcoded directly in each callback:
-- `request headers added`: `request-header: added-request`, `c: d`
-- `response headers added`: `response-header: added-response`, `c: d`
-- `response headers removed`: `foo`
-- `request body`: original content with `"-added-body"` appended
-- `response body replacement`: `"body replaced"`
-- `request phase route cache`: cleared (`true`)
-- `response phase route cache`: preserved (`false`)
-
-Optional builder parameters inherited from `ServiceCallout.Builder`:
-
-| Builder Method | Purpose |
+| Callback | Behavior |
 |---|---|
-| `setIp(String)` | Overrides the server bind address |
-| `setSecurePort(int)` | Sets the port for TLS-secured gRPC communication |
-| `setEnablePlainTextPort(boolean)` | Enables a plaintext (insecure) gRPC port |
-| `setServerThreadCount(int)` | Sets the number of threads for handling gRPC requests |
+| `onRequestHeaders` | Adds headers and clears route cache. |
+| `onRequestBody` | Appends `-added-body` to the request body. |
+| `onResponseHeaders` | Adds headers and removes `foo` header. |
+| `onResponseBody` | Replaces response body with `body replaced`. |
 
-## Build
-
-Build the plugin from the project root using Maven or Gradle:
-```bash
-# Maven
-mvn compile
-
-# Gradle
-gradle build
-```
+---
 
 ## Run
 
@@ -59,9 +60,6 @@ Start the callout server with default configuration:
 ```bash
 # Maven
 mvn exec:java -Dexec.mainClass="example.BasicCalloutServer"
-
-# Gradle
-gradle run --main-class="example.BasicCalloutServer"
 
 # JAR
 java -cp target/your-artifact.jar example.BasicCalloutServer
@@ -72,27 +70,27 @@ java -cp target/your-artifact.jar example.BasicCalloutServer
 Run the unit tests for this sample:
 ```bash
 # Maven
-mvn test -Dtest=BasicCalloutServerTest
+mvn test -Dtest=BasicCalloutServer
 
-# Gradle
-gradle test --tests "example.BasicCalloutServerTest"
-```
+This example may also be covered by shared gRPC integration tests depending on
+the repository setup.
+
+---
 
 ## Expected Behavior
 
 | Scenario | Description |
 |---|---|
-| **Request headers added** | `request-header: added-request` and `c: d` are injected into the request headers on every incoming request. |
-| **Request route cache cleared** | Envoy recomputes its routing decision after the request header mutation. |
-| **Response headers added** | `response-header: added-response` and `c: d` are injected into the response headers on every outgoing response. |
-| **Response header removed** | The `foo` header is stripped from the response if present. |
-| **Response route cache preserved** | Envoy's routing decision remains unchanged after the response header mutation. |
-| **Request body appended** | A request body of `"hello"` is modified to `"hello-added-body"` before being forwarded to the upstream. |
-| **Empty request body appended** | An empty request body `""` is modified to `"-added-body"` before being forwarded to the upstream. |
-| **Response body replaced** | Any response body from the upstream is replaced with `"body replaced"`. |
-| **No append action** | Headers are set (overwriting existing values) rather than appended. |
+| **Request header mutation** | Adds `request-header: added-request` and `c: d`; clears route cache. |
+| **Request body mutation** | Appends `-added-body` to the original request body. |
+| **Response header mutation** | Adds `response-header: added-response` and `c: d`; removes `foo`. |
+| **Response body mutation** | Replaces response body with `body replaced`. |
+| **Combined transformations** | Demonstrates full request/response lifecycle mutation. |
+
+---
 
 ## Available Languages
 
-- [x] [Java](BasicCalloutServer.java)
-- [x] [Go](basic_callout_server.go)
+- [x] [Java](.) (this directory)
+- [ ] Python
+- [ ] Go

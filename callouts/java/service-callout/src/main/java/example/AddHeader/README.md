@@ -1,65 +1,58 @@
-# Add Header Plugin (Java)
+# Add Header Callout (Java)
 
-This plugin demonstrates HTTP header manipulation at the proxy layer by intercepting both incoming request headers and outgoing response headers. It adds new headers to each phase, removes a specific header from the response, and controls route cache invalidation independently per phase. Use this plugin when you need to inject metadata headers into requests, enrich or sanitise response headers, or force Envoy to recompute its routing decision after a header mutation. It operates during the **request headers** and **response headers** processing phases.
+This callout server demonstrates how to modify HTTP request and response headers
+using a gRPC-based service callout in Java. It showcases adding, removing, and
+managing headers while optionally controlling the route cache in a Layer 7 load balancer.
+
+On incoming requests, the server adds new headers and clears the route cache. On
+outgoing responses, it adds new headers and removes specific ones without
+affecting the route cache.
+
+Use this callout when you need **header enrichment**, **header cleanup**, or
+**routing influence via headers** without modifying backend services.
+
+---
 
 ## How It Works
 
-1. The proxy receives an HTTP request and invokes the plugin's `onRequestHeaders` callback.
-2. The handler adds two headers to the request — `request-header: added-request` and `c: d` — and sets `clearRouteCache` to `true`, instructing Envoy to recompute the routing decision after the mutation.
-3. The modified request is forwarded to the upstream service.
-4. When the upstream responds, the proxy invokes the plugin's `onResponseHeaders` callback.
-5. The handler adds two headers to the response — `response-header: added-response` and `c: d` — and simultaneously removes the `foo` header. The route cache is left intact (`clearRouteCache: false`).
+1. The load balancer intercepts an HTTP request and sends a `ProcessingRequest`
+   with `request_headers` to the callout server.
+2. The server's `onRequestHeaders` callback:
+   - Adds headers:
+     - `request-header: added-request`
+     - `c: d`
+   - Clears the route cache to ensure routing decisions consider the new headers.
+3. The request continues to the backend service with updated headers.
+4. When the backend responds, the load balancer sends another `ProcessingRequest`
+   with `response_headers`.
+5. The server's `onResponseHeaders` callback:
+   - Adds headers:
+     - `response-header: added-response`
+     - `c: d`
+   - Removes the `foo` header if present.
+   - Does not clear the route cache.
 6. The modified response is returned to the client.
 
-## Implementation Notes
+---
 
-- **Class structure**: `AddHeader` extends `ServiceCallout` and follows the Builder pattern. The inner `Builder` class extends `ServiceCallout.Builder<AddHeader.Builder>`, implementing `build()` to return a new `AddHeader` instance and `self()` to return the concrete builder type for fluent chaining.
-- **Request header mutation**: `onRequestHeaders` calls `addHeaderMutations` on `processingResponseBuilder.getRequestHeadersBuilder()`, passing an `ImmutableMap` of two entries as the headers to add, `null` for headers to remove, `true` for `clearRouteCache`, and `null` for the append action. Setting `clearRouteCache` to `true` tells Envoy to discard any previously computed route and re-evaluate routing based on the mutated headers.
-- **Response header mutation**: `onResponseHeaders` calls `addHeaderMutations` on `processingResponseBuilder.getResponseHeadersBuilder()`, passing a different `ImmutableMap` of two entries as headers to add, an `ImmutableList.of("foo")` as the single header to remove, `false` for `clearRouteCache`, and `null` for the append action. Route cache is preserved because response-phase routing decisions are already finalised.
-- **`addHeaderMutations` utility**: Both callbacks delegate to `ServiceCalloutTools.addHeaderMutations`, a shared static helper that applies the provided add, remove, cache, and append instructions to the given response builder, abstracting away the protobuf mutation boilerplate.
-- **Server startup**: The `main` method constructs an `AddHeader` instance using its `Builder` with default configuration, then calls `server.start()` followed by `server.blockUntilShutdown()` to keep the process alive until manually terminated.
+## Callbacks Overridden
 
-## Configuration
-
-No configuration is required for the default setup. All header names, values, and cache settings are hardcoded in the handlers:
-- `request headers added`: `request-header: added-request`, `c: d`
-- `response headers added`: `response-header: added-response`, `c: d`
-- `response headers removed`: `foo`
-- `request phase route cache`: cleared (`true`)
-- `response phase route cache`: preserved (`false`)
-
-Optional builder parameters inherited from `ServiceCallout.Builder`:
-
-| Builder Method | Purpose |
+| Callback | Behavior |
 |---|---|
-| `setIp(String)` | Overrides the server bind address |
-| `setSecurePort(int)` | Sets the port for TLS-secured gRPC communication |
-| `setEnablePlainTextPort(boolean)` | Enables a plaintext (insecure) gRPC port |
-| `setServerThreadCount(int)` | Sets the number of threads for handling gRPC requests |
+| `onRequestHeaders` | Adds headers (`request-header`, `c`) and clears route cache. |
+| `onResponseHeaders` | Adds headers (`response-header`, `c`) and removes `foo` header. |
 
-## Build
-
-Build the plugin from the project root using Maven or Gradle:
-```bash
-# Maven
-mvn compile
-
-# Gradle
-gradle build
-```
+---
 
 ## Run
 
 Start the callout server with default configuration:
 ```bash
 # Maven
-mvn exec:java -Dexec.mainClass="example.AddHeader"
-
-# Gradle
-gradle run --main-class="example.AddHeader"
+mvn exec:java -Dexec.mainClass="example.ddHeader"
 
 # JAR
-java -cp target/your-artifact.jar example.AddHeader
+java -cp target/your-artifact.jar example.ddHeader
 ```
 
 ## Test
@@ -69,23 +62,25 @@ Run the unit tests for this sample:
 # Maven
 mvn test -Dtest=AddHeaderTest
 
-# Gradle
-gradle test --tests "example.AddHeaderTest"
-```
+This example may also be covered by shared gRPC integration tests depending on
+the repository setup.
+
+---
 
 ## Expected Behavior
 
 | Scenario | Description |
 |---|---|
-| **Request headers added** | `request-header: added-request` and `c: d` are injected into the request headers on every incoming request. |
-| **Request route cache cleared** | Envoy recomputes its routing decision after the request header mutation. |
-| **Response headers added** | `response-header: added-response` and `c: d` are injected into the response headers on every outgoing response. |
-| **Response header removed** | The `foo` header is stripped from the response if present. |
-| **Response route cache preserved** | Envoy's routing decision remains unchanged after the response header mutation. |
-| **No append action** | Headers are set (overwriting existing values) rather than appended. |
+| **Request header addition** | Adds `request-header: added-request` and `c: d` to incoming requests. |
+| **Response header addition** | Adds `response-header: added-response` and `c: d` to outgoing responses. |
+| **Response header removal** | Removes `foo` header if present in the response. |
+| **Route recalculation (request)** | Route cache is cleared after request mutation. |
+| **No route change (response)** | Route cache remains unchanged during response mutation. |
+
+---
 
 ## Available Languages
 
-- [x] [Go](add_header.go)
-- [x] [Java](AddHeader.java)
-- [x] [Python](service_callout_example.py)
+- [x] [Java](.) (this directory)
+- [ ] Python
+- [ ] Go

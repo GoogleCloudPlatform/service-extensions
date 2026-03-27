@@ -1,61 +1,73 @@
-# Dynamic Forwarding Plugin
+# Dynamic Forwarding Callout (Go)
 
-This plugin implements dynamic backend routing by extracting a target IP address from an incoming request header and embedding it as dynamic metadata on the processing response. Envoy reads this metadata to forward the request to the specified backend at runtime, enabling per-request routing decisions without static cluster configuration. Use this plugin when you need to route individual requests to different upstream backends based on request-level context, such as user identity, tenant ID, or custom routing headers. It operates during the **request headers** processing phase.
+This callout server dynamically selects a backend endpoint based on an incoming
+HTTP request header. It demonstrates how to use **dynamic metadata** to influence
+routing decisions in a Layer 7 load balancer.
+
+The server inspects the `ip-to-return` request header and, if it matches a known
+set of IP addresses, forwards traffic to that address. If the header is missing
+or contains an unknown value, a default fallback endpoint is used.
+
+Use this callout when you need **header-based routing**, simple traffic steering,
+or dynamic backend selection without modifying the load balancer configuration.
+
+---
 
 ## How It Works
 
-1. The proxy receives an HTTP request and invokes the plugin's `HandleRequestHeaders` handler.
-2. The handler inspects the incoming headers looking for a custom `ip-to-return` header.
-3. If the `ip-to-return` header is present, its value is used as the target backend IP address.
-4. If the header is absent or the headers object is nil, the handler falls back to a hardcoded default backend IP of `10.1.10.3`.
-5. The resolved IP address and port `80` are passed to `utils.AddDynamicForwardingMetadata`, which constructs the appropriate protobuf metadata structure.
-6. The handler returns a `ProcessingResponse` with an empty `HeadersResponse` and the dynamic metadata attached, signalling Envoy to forward the request to the resolved backend.
+1. The load balancer intercepts an HTTP request and sends a `ProcessingRequest`
+   with `request_headers` to the callout server.
+2. The server's `on_request_headers` callback looks for the `ip-to-return`
+   header in the incoming request.
+3. If the header value matches one of the known IPs (`10.1.10.2` or `10.1.10.3`),
+   that IP is selected as the target endpoint.
+4. If the header is missing or invalid, the server falls back to the default
+   IP `10.1.10.4`.
+5. The selected IP is encoded into `dynamic_metadata` using
+   `build_dynamic_forwarding_metadata`.
+6. The load balancer uses this metadata to route the request to the selected
+   backend.
 
-## Implementation Notes
+---
 
-- **Service structure**: `ExampleCalloutService` embeds `server.GRPCCalloutService` and registers only the request headers handler in `NewExampleCalloutService()`, as dynamic forwarding decisions must be made before the request reaches the upstream.
-- **Header extraction**: `extractIpToReturnHeader` iterates over the raw header list in `headers.Headers.Headers`, matching on `header.Key == "ip-to-return"` and returning the value of `header.RawValue` as a string. It returns an error if the headers object is nil or if no matching header is found, allowing the caller to apply a fallback.
-- **Fallback routing**: If `extractIpToReturnHeader` returns an error (header missing or nil input), `HandleRequestHeaders` silently falls back to `"10.1.10.3"` as the default backend IP. This ensures the plugin never blocks a request due to a missing routing hint.
-- **Dynamic metadata construction**: `utils.AddDynamicForwardingMetadata(ipToReturn, 80)` builds a protobuf `Struct` containing the target IP and port in the format Envoy expects for dynamic forwarding. The result is attached to the `ProcessingResponse` via the `DynamicMetadata` field, not through header mutation.
-- **Response structure**: The returned `ProcessingResponse` carries an empty `HeadersResponse` (no header mutations are applied) alongside the populated `DynamicMetadata`, keeping header processing transparent while still influencing upstream routing.
+## Callbacks / Handlers
 
-## Configuration
+| Handler | Behavior |
+|---|---|
+| `HandleRequestHeaders` | Injects dynamic metadata with selected backend IP. |
 
-No configuration required. The fallback backend and forwarding port are hardcoded as constants in the handler:
-- `default backend IP`: `10.1.10.3`
-- `forwarding port`: `80`
-- `routing header`: `ip-to-return`
+---
 
-## Build
+## Run
 
-Build the callout service from the repository root:
 ```bash
-# Go
-go build ./callouts/go/extproc/...
+cd callouts/go
+EXAMPLE_TYPE=dynamic_forwarding go run ./extproc/cmd/example/main.go
 ```
+
+---
 
 ## Test
 
-Run the unit tests for this sample:
 ```bash
-# Run all tests in the dynamic_forwarding package
-go test ./callouts/go/extproc/samples/dynamic_forwarding/...
-
-# With verbose output
-go test -v ./callouts/go/extproc/samples/dynamic_forwarding/...
+cd callouts/go
+go test ./extproc/examples/dynamic_forwarding/...
 ```
+
+---
 
 ## Expected Behavior
 
 | Scenario | Description |
 |---|---|
-| **Custom backend is used** | A request with `ip-to-return: 192.168.1.5` sets dynamic metadata to `192.168.1.5:80` and forwards to the custom backend. |
-| **Default backend is used** | A request without the `ip-to-return` header sets dynamic metadata to `10.1.10.3:80` and forwards to the default backend. |
-| **Nil headers fallback** | A nil or empty headers object sets dynamic metadata to `10.1.10.3:80` with no error returned to the proxy. |
-| **Metadata build failure** | If `AddDynamicForwardingMetadata` returns an error, the handler returns a `nil` response and propagates the error to the proxy. |
-| **No header mutations** | Headers pass through unmodified on any request; only `DynamicMetadata` is populated. |
+| **Header present** | Uses provided IP for routing. |
+| **Header missing** | Falls back to default backend. |
+| **Dynamic routing** | Enables runtime traffic steering. |
+
+---
 
 ## Available Languages
 
-- [x] [Go](dynamic_forwarding.go)
-- [x] [Python](dynamic_forwarding.py)
+- [x] [Go](.) (this directory)
+- [ ] Python
+- [ ] Java

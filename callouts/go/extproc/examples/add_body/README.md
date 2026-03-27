@@ -1,58 +1,79 @@
-# Add Body Plugin
+# Add Body Callout (Go)
 
-This plugin modifies HTTP request and response bodies by replacing their content with predefined strings. It intercepts both the incoming request body and the outgoing response body, substituting each with a new hardcoded value. Use this plugin when you need to replace or inject body content at the proxy layer without modifying application logic. It operates during the **request body** and **response body** processing phases.
+This callout server demonstrates how to modify HTTP request and response bodies
+using a gRPC-based service callout in Go. It showcases how to **replace or inject
+new body content** during both request and response processing in a Layer 7 load balancer.
+
+On incoming requests, the server replaces the request body with a new value. On
+outgoing responses, it replaces the response body with another predefined value.
+
+Use this callout when you need **payload transformation**, **content rewriting**,
+or **body-level control** without modifying backend services.
+
+---
 
 ## How It Works
 
-1. The proxy receives an HTTP request and invokes the plugin's `HandleRequestBody` handler.
-2. The handler replaces the incoming request body with the string `"new-body-request"`, using a non-clearing mutation (preserving existing body structure while overwriting content).
-3. The modified request is forwarded to the upstream server.
-4. When the upstream server responds, the proxy invokes the plugin's `HandleResponseBody` handler.
-5. The handler replaces the outgoing response body with the string `"new-body-response"`, again using a non-clearing mutation.
+1. The load balancer intercepts an HTTP request and sends a `ProcessingRequest`
+   with `request_body` to the callout server.
+2. The server's `HandleRequestBody` handler:
+   - Replaces the request body with `new-body-request`.
+3. The request continues to the backend service with the modified body.
+4. When the backend responds, the load balancer sends a `ProcessingRequest`
+   with `response_body`.
+5. The server's `HandleResponseBody` handler:
+   - Replaces the response body with `new-body-response`.
 6. The modified response is returned to the client.
 
-## Implementation Notes
+---
 
-- **Service structure**: `ExampleCalloutService` embeds `server.GRPCCalloutService` and registers both body handlers in `NewExampleCalloutService()`, following the standard service extension pattern where handlers are assigned as function references on the `Handlers` struct.
-- **Request body mutation**: `HandleRequestBody` receives an `*extproc.HttpBody` and returns a `ProcessingResponse` wrapping a `RequestBody` mutation. It calls `utils.AddBodyStringMutation("new-body-request", false)`, where `false` indicates the mutation should not clear the existing body before setting new content.
-- **Response body mutation**: `HandleResponseBody` follows the identical pattern, wrapping a `ResponseBody` mutation with `utils.AddBodyStringMutation("new-body-response", false)`.
-- **Mutation utility**: Both handlers delegate to `utils.AddBodyStringMutation`, a shared helper from the `pkg/utils` package that constructs the appropriate `BodyMutation` protobuf message, abstracting away the boilerplate of building the `ProcessingResponse`.
+## Callbacks / Handlers
 
-## Configuration
+| Handler | Behavior |
+|---|---|
+| `HandleRequestBody` | Replaces the request body with `new-body-request`. |
+| `HandleResponseBody` | Replaces the response body with `new-body-response`. |
 
-No configuration required. The replacement body strings are hardcoded directly in each handler:
-- `request body replacement`: `"new-body-request"`
-- `response body replacement`: `"new-body-response"`
+---
 
-## Build
+## Run
 
-Build the callout service from the repository root:
+**Go:**
+
 ```bash
-# Go
-go build ./callouts/go/extproc/...
+cd callouts/go
+EXAMPLE_TYPE=add_body go run ./extproc/cmd/example/main.go
 ```
+
+---
 
 ## Test
 
-Run the unit tests for this sample:
-```bash
-# Run all tests in the add_body package
-go test ./callouts/go/extproc/samples/add_body/...
+**Go:**
 
-# With verbose output
-go test -v ./callouts/go/extproc/samples/add_body/...
+```bash
+cd callouts/go
+go test ./extproc/examples/add_body/...
 ```
+
+This example may also be covered by shared gRPC integration tests depending on
+the repository setup.
+
+---
 
 ## Expected Behavior
 
 | Scenario | Description |
 |---|---|
-| **Request body is replaced** | Any incoming HTTP request body is replaced with `"new-body-request"`. |
-| **Response body is replaced** | Any outgoing HTTP response body is replaced with `"new-body-response"`. |
-| **Mutation is non-clearing** | Existing body content is overwritten without clearing; `clear_body` is `false`. |
+| **Request body replacement** | Incoming request body is replaced with `new-body-request`. |
+| **Response body replacement** | Outgoing response body is replaced with `new-body-response`. |
+| **Full mutation** | Both request and response bodies are completely overwritten. |
+| **Payload control** | Enables dynamic manipulation of HTTP message bodies. |
+
+---
 
 ## Available Languages
 
-- [x] [Go](add_body.go)
-- [x] [Java](add_body.java)
-- [x] [Python](add_body.py)
+- [x] [Go](.) (this directory)
+- [ ] Python
+- [ ] Java

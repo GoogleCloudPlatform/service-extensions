@@ -1,87 +1,90 @@
-# Basic Callout Server Plugin (Python)
+# Basic Callout
 
-This plugin demonstrates a complete ext_proc callout service by handling all four HTTP processing phases simultaneously: request headers, response headers, request body, and response body. It rewrites pseudo-headers and injects custom headers into the request, adds a header to the response, replaces the request body with a static string, and clears the response body entirely. Use this plugin as a comprehensive reference implementation when you need a full-featured callout service that intercepts every phase of the HTTP lifecycle. It operates during the **request headers**, **response headers**, **request body**, and **response body** processing phases.
+This callout server provides a non-comprehensive reference implementation
+covering all four core callback types — request headers, response headers,
+request body, and response body. It demonstrates the most common mutation
+patterns in a single server: rewriting pseudo-headers, injecting custom
+headers, removing headers, clearing the route cache, replacing a request body,
+and clearing a response body. It overrides all four callbacks to apply a
+distinct mutation on each path. Use this callout as a starting point or
+reference when building a new callout server from scratch.
 
 ## How It Works
 
-1. The proxy receives an HTTP request and invokes the plugin's `on_request_headers` callback.
-2. The handler rewrites the `:authority` header to `"service-extensions.com"` and the `:path` header to `"/"`, adds `header-request: request`, removes the `foo` header, and clears the route cache to force Envoy to recompute its routing decision.
-3. The proxy then invokes `on_request_body`, which replaces the incoming request body with the static string `"replaced-body"`.
-4. The modified request is forwarded to the upstream service.
-5. When the upstream responds, the proxy invokes `on_response_headers`, which adds the header `hello: service-extensions` to the outgoing response headers.
-6. The proxy then invokes `on_response_body`, which clears the response body entirely without substituting any new content.
-7. The fully modified response is returned to the client.
+1. The load balancer intercepts an HTTP request and sends a `ProcessingRequest`
+   with `request_headers` to the callout server.
+2. The server's `on_request_headers` callback rewrites the `:authority` header
+   to `service-extensions.com` and the `:path` header to `/`, adds the header
+   `header-request: request`, removes any existing `foo` header, and clears the
+   route cache.
+3. The load balancer then sends a `ProcessingRequest` with `request_body`.
+4. The server's `on_request_body` callback replaces the entire request body
+   with the string `replaced-body`.
+5. When the origin server responds, the load balancer sends a
+   `ProcessingRequest` with `response_headers`.
+6. The server's `on_response_headers` callback injects the header
+   `hello: service-extensions` into the response.
+7. The load balancer sends a final `ProcessingRequest` with `response_body`.
+8. The server's `on_response_body` callback clears the response body entirely.
+9. The modified response is returned to the client.
 
-## Implementation Notes
+## Callbacks Overridden
 
-- **Class structure**: `BasicCalloutServer` extends `CalloutServer` and overrides all four processing callbacks. The `context` argument is unused in every callback and is therefore named `_` throughout, keeping the signatures clean. The server accepts command-line arguments at startup via `add_command_line_args()`.
-- **Request header mutation**: `on_request_headers` calls `add_header_mutation` with three entries in the `add` list: `(':authority', 'service-extensions.com')` and `(':path', '/')` to rewrite Envoy pseudo-headers, and `('header-request', 'request')` to inject a custom header. The `remove=['foo']` argument strips the `foo` header, and `clear_route_cache=True` forces Envoy to discard its previously computed route. Each incoming callout is logged at `DEBUG` level before processing.
-- **Response header mutation**: `on_response_headers` calls `add_header_mutation` with only `add=[('hello', 'service-extensions')]`, preserving all existing response headers and leaving the route cache intact.
-- **Request body mutation**: `on_request_body` calls `add_body_mutation(body='replaced-body')`, substituting the incoming request body with the static string `"replaced-body"`.
-- **Response body mutation**: `on_response_body` calls `add_body_mutation(clear_body=True)`, removing the response body entirely without providing a replacement string. This is distinct from replacing the body with an empty string — `clear_body=True` instructs Envoy to drop the body at the proxy layer.
-- **Command-line arguments**: The `__main__` block uses `add_command_line_args().parse_args()` to parse startup flags and passes them as keyword arguments to `BasicCalloutServer(**vars(args))`, allowing server address, port, and TLS settings to be configured at runtime without code changes.
-- **Logging**: Every callback logs the received callout at `DEBUG` level before applying any mutation, making it straightforward to trace the exact headers and body values seen by the proxy during development and testing.
-
-## Configuration
-
-Runtime configuration is provided via command-line arguments parsed by `add_command_line_args()`. All mutation values are hardcoded in the callbacks:
-- `:authority` rewritten to: `service-extensions.com`
-- `:path` rewritten to: `/`
-- `request header added`: `header-request: request`
-- `request header removed`: `foo`
-- `request phase route cache`: cleared (`True`)
-- `response header added`: `hello: service-extensions`
-- `request body replacement`: `"replaced-body"`
-- `response body`: cleared (`clear_body=True`)
-
-## Build
-
-Install the required dependencies from the repository root:
-```bash
-pip install -r requirements.txt
-```
+| Callback | Behavior |
+|---|---|
+| `on_request_headers` | Rewrites `:authority` to `service-extensions.com` and `:path` to `/`, adds `header-request: request`, removes `foo`, clears route cache |
+| `on_response_headers` | Adds `hello: service-extensions` |
+| `on_request_body` | Replaces the request body with `replaced-body` |
+| `on_response_body` | Clears the response body |
 
 ## Run
 
-Start the callout server with default configuration:
+**Python:**
+
 ```bash
-python -m extproc.example.basic_callout_server
+cd callouts/python
+python -m extproc.example.basic_callout.service_callout_example
 ```
 
-Or run directly, optionally passing command-line arguments:
-```bash
-# Default configuration
-python basic_callout_server.py
+**Go:**
 
-# Custom address and port
-python basic_callout_server.py --address 0.0.0.0 --port 8443
+```bash
+cd callouts/go
+EXAMPLE_TYPE=basic_callout go run ./extproc/cmd/example/main.go
+```
+
+**Java:**
+
+```bash
+cd callouts/java/service-callout
+./gradlew run -PmainClass=example.BasicCallout
 ```
 
 ## Test
 
-Run the unit tests for this sample:
 ```bash
-# Run all tests for the basic_callout_server sample
-python -m pytest tests/basic_callout_server_test.py
-
-# With verbose output
-python -m pytest -v tests/basic_callout_server_test.py
+cd callouts/python
+pytest extproc/tests/basic_grpc_test.py
 ```
+
+The `basic_callout` example is tested as part of the basic gRPC integration
+tests rather than having a dedicated test file.
+
 
 ## Expected Behavior
 
 | Scenario | Description |
 |---|---|
-| **Pseudo-headers rewritten** | Every incoming HTTP request has `:authority` set to `service-extensions.com` and `:path` set to `/`. |
-| **Request header injected** | Every incoming HTTP request gets `header-request: request` added to its headers. |
-| **Request header removed** | The `foo` header is stripped from the request if present. |
-| **Request route cache cleared** | Envoy recomputes its routing decision after the request header mutation. |
-| **Response header injected** | Every outgoing HTTP response gets `hello: service-extensions` added to its headers. |
-| **Request body replaced** | Any incoming HTTP request body is replaced with `"replaced-body"`. |
-| **Response body cleared** | Any outgoing HTTP response body is dropped entirely at the proxy layer. |
+| **Authority and path rewrite** | For any incoming HTTP request, the system rewrites the `:authority` header to `service-extensions.com` and the `:path` header to `/` before forwarding to the origin. |
+| **Request header injection** | The system adds the `header-request: request` header to every incoming request. |
+| **Request header removal** | When a request contains a `foo` header, the system strips it before forwarding. If the `foo` header is absent, processing continues without modification. |
+| **Route cache cleared** | After mutating request headers, the route cache is always cleared so the load balancer re-evaluates routing with the updated headers. |
+| **Response header injection** | For any HTTP response received from the origin, the system appends the `hello: service-extensions` header before delivery to the client. |
+| **Request body replacement** | For any incoming request body, the system discards the original content and replaces it with the static string `replaced-body`. |
+| **Response body cleared** | For any HTTP response received from the origin, the system clears the body entirely before delivery to the client. |
 
 ## Available Languages
 
-- [x] [Python](basic_callout_server.py)
-- [x] [Go](add_header.go)
-- [x] [Java](AddHeader.java)
+- [x] [Python](.) (this directory)
+- [ ] Go
+- [ ] Java
