@@ -1,0 +1,180 @@
+# Generate JWT Token for Pro User
+test {
+  name: "generate_jwt_token_pro_user"
+  description: "Generate a valid JWT token for a pro-tier user with permissions lookup from KV store"
+  
+  config {
+    vm_config {
+      code {
+        local {
+          filename: "jwt_plugin.wasm"
+        }
+      }
+      runtime: "envoy.wasm.runtime.v8"
+      vm_id: "jwt_test_vm"
+      configuration {
+        value: '{
+          "secret_key": "test-secret-key-for-jwt-signing-256bit",
+          "default_expiration_minutes": 60,
+          "data": {
+            "user-451": {
+              "plan": "pro",
+              "permissions": ["read:data", "write:data", "delete:data"],
+              "roles": ["developer", "admin"]
+            },
+            "user-123": {
+              "plan": "free",
+              "permissions": ["read:data"],
+              "roles": ["viewer"]
+            }
+          }
+        }'
+      }
+    }
+  }
+  
+  request {
+    headers {
+      key: ":method"
+      value: "POST"
+    }
+    headers {
+      key: ":path"
+      value: "/generate-token"
+    }
+    headers {
+      key: ":authority"
+      value: "api.example.com"
+    }
+    headers {
+      key: "x-user-id"
+      value: "user-451"
+    }
+    headers {
+      key: "x-expiration-minutes"
+      value: "120"
+    }
+  }
+  
+  expected_response {
+    status: 200
+    headers {
+      key: "content-type"
+      value: "application/json"
+    }
+    body_contains: "token"
+    body_contains: "expires_in"
+    body_contains: "Bearer"
+    body_json_path {
+      path: "$.expires_in"
+      value: "7200"
+    }
+    body_json_path {
+      path: "$.token_type"
+      value: "Bearer"
+    }
+  }
+}
+
+# Generate JWT Token with Default Expiration
+test {
+  name: "generate_jwt_token_default_expiration"
+  description: "Generate JWT token using default expiration time from config"
+  
+  config {
+    vm_config {
+      code {
+        local {
+          filename: "jwt_plugin.wasm"
+        }
+      }
+      runtime: "envoy.wasm.runtime.v8"
+      vm_id: "jwt_test_vm"
+      configuration {
+        value: '{
+          "secret_key": "test-secret-key-for-jwt-signing-256bit",
+          "default_expiration_minutes": 60,
+          "data": {
+            "user-789": {
+              "plan": "enterprise",
+              "permissions": ["read:data", "write:data", "delete:data", "admin:users"],
+              "roles": ["super_admin"]
+            }
+          }
+        }'
+      }
+    }
+  }
+  
+  request {
+    headers {
+      key: ":method"
+      value: "POST"
+    }
+    headers {
+      key: ":path"
+      value: "/generate-token"
+    }
+    headers {
+      key: ":authority"
+      value: "api.example.com"
+    }
+    headers {
+      key: "x-user-id"
+      value: "user-789"
+    }
+  }
+  
+  expected_response {
+    status: 200
+    body_json_path {
+      path: "$.expires_in"
+      value: "3600"
+    }
+  }
+}
+
+# Generate Token - Missing User ID
+test {
+  name: "generate_token_missing_user_id"
+  description: "Attempt to generate token without providing x-user-id header"
+  
+  config {
+    vm_config {
+      code {
+        local {
+          filename: "jwt_plugin.wasm"
+        }
+      }
+      runtime: "envoy.wasm.runtime.v8"
+      vm_id: "jwt_test_vm"
+      configuration {
+        value: '{
+          "secret_key": "test-secret-key-for-jwt-signing-256bit",
+          "default_expiration_minutes": 60,
+          "data": {}
+        }'
+      }
+    }
+  }
+  
+  request {
+    headers {
+      key: ":method"
+      value: "POST"
+    }
+    headers {
+      key: ":path"
+      value: "/generate-token"
+    }
+    headers {
+      key: ":authority"
+      value: "api.example.com"
+    }
+  }
+  
+  expected_response {
+    status: 400
+    body_contains: "Missing x-user-id header"
+  }
+}
