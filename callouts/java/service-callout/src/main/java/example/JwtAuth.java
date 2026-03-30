@@ -16,7 +16,6 @@
 
 package example;
 
-import com.amazon.corretto.crypto.provider.AmazonCorrettoCryptoProvider;
 import io.envoyproxy.envoy.service.ext_proc.v3.HttpHeaders;
 import io.envoyproxy.envoy.service.ext_proc.v3.ProcessingResponse;
 import io.jsonwebtoken.Claims;
@@ -24,6 +23,7 @@ import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.openssl.PEMParser;
+import org.conscrypt.Conscrypt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import service.ServiceCallout;
@@ -42,10 +42,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * JWT authentication handler with Amazon Corretto Crypto Provider (ACCP) acceleration.
+ * JWT authentication handler with Google Conscrypt acceleration.
  * <p>
  * This variant uses:
- * - ACCP for native OpenSSL-backed RSA operations (2-3x faster)
+ * - Conscrypt for native BoringSSL-backed crypto operations
  * - Cached JwtParser instance (thread-safe, reusable)
  */
 public class JwtAuth extends ServiceCallout {
@@ -59,26 +59,20 @@ public class JwtAuth extends ServiceCallout {
 
     static {
         try {
-            // Install ACCP as the highest priority security provider
-            // This makes RSA operations use native OpenSSL instead of Java crypto
-            AmazonCorrettoCryptoProvider.install();
+            // Install Conscrypt as the highest priority security provider
+            // This makes crypto operations use native BoringSSL instead of Java crypto
+            Security.insertProviderAt(Conscrypt.newProvider(), 1);
 
-            // Verify ACCP is working correctly
-            if (AmazonCorrettoCryptoProvider.INSTANCE.getLoadingError() != null) {
-                logger.warn("ACCP loading error: {}",
-                    AmazonCorrettoCryptoProvider.INSTANCE.getLoadingError().getMessage());
-            } else {
-                // Check which provider is being used for RSA
-                String rsaProvider = Security.getProviders("Signature.SHA256withRSA")[0].getName();
-                logger.info("ACCP installed successfully. RSA provider: {}", rsaProvider);
-            }
+            // Verify Conscrypt is working correctly
+            String rsaProvider = Security.getProviders("Signature.SHA256withRSA")[0].getName();
+            logger.info("Conscrypt installed successfully. RSA provider: {}", rsaProvider);
         } catch (Exception e) {
-            logger.warn("Failed to install ACCP, falling back to default provider: {}", e.getMessage());
+            logger.warn("Failed to install Conscrypt, falling back to default provider: {}", e.getMessage());
         }
     }
 
     /**
-     * Constructs a JwtAuth instance with ACCP-accelerated crypto.
+     * Constructs a JwtAuth instance with Conscrypt-accelerated crypto.
      *
      * @param builder The builder instance containing configuration parameters.
      * @throws GeneralSecurityException If there is an issue generating the PublicKey.
@@ -178,7 +172,7 @@ public class JwtAuth extends ServiceCallout {
 
     /**
      * Validates JWT token synchronously - called from executor thread.
-     * Uses ACCP-accelerated RSA verification.
+     * Uses Conscrypt-accelerated RSA verification.
      *
      * @param jwtToken The JWT token string to validate.
      * @return The decoded JWT claims if valid, otherwise null.
@@ -194,7 +188,7 @@ public class JwtAuth extends ServiceCallout {
     /**
      * Processes incoming request headers by validating the JWT token and mutating headers based on validation.
      * Note: Currently synchronous due to gRPC servicer interface constraints.
-     * The ACCP provider still accelerates the crypto operations.
+     * The Conscrypt provider still accelerates the crypto operations.
      *
      * @param processingResponseBuilder The builder for constructing the processing response.
      * @param headers                   The HTTP headers to process.

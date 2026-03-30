@@ -129,12 +129,12 @@
             <artifactId>bcpkix-jdk15on</artifactId>
             <version>1.70</version>
         </dependency>
-        <!-- Amazon Corretto Crypto Provider (ACCP) for native OpenSSL acceleration -->
-        <!-- Provides 2-3x faster RSA operations (Docker/Linux only) -->
+        <!-- Google Conscrypt - BoringSSL-backed Java Security Provider -->
+        <!-- Provides faster TLS and RSA operations via native BoringSSL -->
         <dependency>
-            <groupId>software.amazon.cryptools</groupId>
-            <artifactId>AmazonCorrettoCryptoProvider</artifactId>
-            <version>2.4.1</version>
+            <groupId>org.conscrypt</groupId>
+            <artifactId>conscrypt-openjdk</artifactId>
+            <version>2.5.2</version>
             <classifier>linux-x86_64</classifier>
         </dependency>
         <!-- JUnit 5 -->

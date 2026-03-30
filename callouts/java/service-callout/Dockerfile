@@ -13,8 +13,8 @@
 # limitations under the License.
 
 # Stage 1: Build the Java application using Maven
-# Using Amazon Corretto 21 for optimal ACCP compatibility and virtual threads
-FROM maven:3.9-amazoncorretto-21 AS builder
+# Using Eclipse Temurin 21 for virtual threads support
+FROM maven:3.9-eclipse-temurin-21 AS builder
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -29,8 +29,8 @@ COPY src ./src
 # Build the application
 RUN mvn clean package -DskipTests
 
-# Stage 2: Create the runtime image using Amazon Corretto for optimal ACCP compatibility
-FROM amazoncorretto:21
+# Stage 2: Create the runtime image
+FROM eclipse-temurin:21-jre
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -47,10 +47,8 @@ EXPOSE 80 443 8080
 # Environment variable for JVM options (optional)
 ENV JAVA_OPTS=""
 
-# Install shadow-utils for user management and create a non-root user
-RUN yum install -y shadow-utils && \
-    yum clean all && \
-    groupadd -r appgroup && \
+# Create a non-root user
+RUN groupadd -r appgroup && \
     useradd -r -g appgroup appuser
 
 # Change ownership and switch to the non-root user
