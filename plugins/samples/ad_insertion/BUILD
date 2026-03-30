@@ -12,6 +12,7 @@ proxy_wasm_plugin_rust(
 
 proxy_wasm_tests(
     name = "tests",
+    config = ":tests.config",
     plugins = [
         ":plugin_rust.wasm",
     ],

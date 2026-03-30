@@ -17,9 +17,6 @@ use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
 use std::collections::HashMap;
 
-// Static GPT library URL
-const GPT_LIBRARY_URL: &str = "https://securepubads.g.doubleclick.net/tag/js/gpt.js";
-
 proxy_wasm::main! {{
     proxy_wasm::set_root_context(|_| -> Box<dyn RootContext> {
         Box::new(MyRootContext::new())
@@ -28,43 +25,43 @@ proxy_wasm::main! {{
 
 #[derive(Clone)]
 struct AdConfig {
-    slot: &'static str,     // GAM ad slot path (e.g., "/1234/header_ad")
-    size: &'static str,     // Ad dimensions (e.g., "728x90")
-    marker: &'static str,   // HTML tag to insert ads relative to
+    slot: String,           // GAM ad slot path (e.g., "/1234/header_ad")
+    size: String,           // Ad dimensions (e.g., "728x90")
+    marker: String,         // HTML tag to insert ads relative to
     insert_before: bool,    // Insert before (true) or after (false) the marker
 }
 
 struct MyRootContext {
-    ad_configs: HashMap<&'static str, AdConfig>,
+    ad_configs: HashMap<String, AdConfig>,
+    gpt_library_url: String,
     inject_gpt_library: bool,
 }
 
 impl MyRootContext {
     fn new() -> Self {
-        // Ad configuration - set this to be loaded from plugin config
-        // Format: {position_name, {gam_slot, ad_size, html_marker, insert_before}}
         let mut ad_configs = HashMap::new();
-        ad_configs.insert("header", AdConfig {
-            slot: "/1234/header_ad",
-            size: "728x90",
-            marker: "<body>",
+        ad_configs.insert("header".to_string(), AdConfig {
+            slot: "/1234/header_ad".to_string(),
+            size: "728x90".to_string(),
+            marker: "<body>".to_string(),
             insert_before: false,
         });
-        ad_configs.insert("content", AdConfig {
-            slot: "/1234/content_ad",
-            size: "300x250",
-            marker: "<article>",
+        ad_configs.insert("content".to_string(), AdConfig {
+            slot: "/1234/content_ad".to_string(),
+            size: "300x250".to_string(),
+            marker: "<article>".to_string(),
             insert_before: false,
         });
-        ad_configs.insert("sidebar", AdConfig {
-            slot: "/1234/sidebar_ad",
-            size: "160x600",
-            marker: "</article>",
+        ad_configs.insert("sidebar".to_string(), AdConfig {
+            slot: "/1234/sidebar_ad".to_string(),
+            size: "160x600".to_string(),
+            marker: "</article>".to_string(),
             insert_before: true,
         });
 
         Self {
             ad_configs,
+            gpt_library_url: "https://securepubads.g.doubleclick.net/tag/js/gpt.js".to_string(),
             inject_gpt_library: true,
         }
     }
@@ -73,13 +70,58 @@ impl MyRootContext {
 impl Context for MyRootContext {}
 
 impl RootContext for MyRootContext {
-    fn on_configure(&mut self, _: usize) -> bool {
+    fn on_configure(&mut self, config_size: usize) -> bool {
+        if config_size == 0 {
+            return true;
+        }
+
+        if let Some(config_bytes) = self.get_plugin_configuration() {
+            if let Ok(config_str) = String::from_utf8(config_bytes) {
+                // Clear defaults
+                self.ad_configs.clear();
+
+                for line in config_str.lines() {
+                    let line = line.trim();
+                    if line.is_empty() || line.starts_with('#') {
+                        continue;
+                    }
+
+                    let parts: Vec<&str> = line.split(',').map(|s| s.trim()).collect();
+                    if parts.is_empty() {
+                        continue;
+                    }
+
+                    match parts[0] {
+                        "gpt_url" if parts.len() >= 2 => {
+                            self.gpt_library_url = parts[1].to_string();
+                        }
+                        "inject_gpt" if parts.len() >= 2 => {
+                            self.inject_gpt_library = parts[1] == "true";
+                        }
+                        "ad" if parts.len() >= 6 => {
+                            let position = parts[1].to_string();
+                            let config = AdConfig {
+                                slot: parts[2].to_string(),
+                                size: parts[3].to_string(),
+                                insert_before: parts[4] == "true",
+                                marker: parts[5].to_string(),
+                            };
+                            self.ad_configs.insert(position, config);
+                        }
+                        _ => {
+                            // Ignore unknown configurations
+                        }
+                    }
+                }
+            }
+        }
         true
     }
 
     fn create_http_context(&self, _: u32) -> Option<Box<dyn HttpContext>> {
         Some(Box::new(MyHttpContext {
             ad_configs: self.ad_configs.clone(),
+            gpt_library_url: self.gpt_library_url.clone(),
             inject_gpt_library: self.inject_gpt_library,
             should_insert_ads: false,
             is_ad_request: false,
@@ -92,7 +134,8 @@ impl RootContext for MyRootContext {
 }
 
 struct MyHttpContext {
-    ad_configs: HashMap<&'static str, AdConfig>,
+    ad_configs: HashMap<String, AdConfig>,
+    gpt_library_url: String,
     inject_gpt_library: bool,
     should_insert_ads: bool,
     is_ad_request: bool,
@@ -107,13 +150,13 @@ impl MyHttpContext {
 
     fn prepare_gpt_library_injection(&self, body: &str, insertions: &mut Vec<(usize, String)>) {
         if let Some(head_pos) = body.find("<head>") {
-            let gpt_script = format!("\n  <script async src=\"{}\"></script>", GPT_LIBRARY_URL);
+            let gpt_script = format!("\n  <script async src=\"{}\"></script>", self.gpt_library_url);
             insertions.push((head_pos + 6, gpt_script));
             return;
         }
 
         if let Some(body_pos) = body.find("<body>") {
-            let gpt_script = format!("<script async src=\"{}\"></script>\n", GPT_LIBRARY_URL);
+            let gpt_script = format!("<script async src=\"{}\"></script>\n", self.gpt_library_url);
             insertions.push((body_pos, gpt_script));
         }
     }
@@ -121,11 +164,11 @@ impl MyHttpContext {
     fn prepare_ad_insertion(
         &self,
         body: &str,
-        position: &'static str,
+        position: &str,
         config: &AdConfig,
         insertions: &mut Vec<(usize, String)>,
     ) {
-        if let Some(marker_pos) = body.find(config.marker) {
+        if let Some(marker_pos) = body.find(&config.marker) {
             let insert_pos = if config.insert_before {
                 marker_pos
             } else {
