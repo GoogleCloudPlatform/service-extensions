@@ -9,6 +9,7 @@ proxy_wasm_plugin_go(
 
 proxy_wasm_tests(
     name = "tests",
+    config = ":tests.config",
     plugins = [
         ":plugin_go.wasm",
     ],

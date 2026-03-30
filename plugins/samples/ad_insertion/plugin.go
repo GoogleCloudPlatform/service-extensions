@@ -64,9 +64,10 @@ func (*vmContext) NewPluginContext(contextID uint32) types.PluginContext {
 	return &pluginContext{}
 }
 
-func (ctx *pluginContext) OnPluginStart(int) types.OnPluginStartStatus {
-	// Ad configuration - set this to be loaded from plugin config
-	// Format: {position_name, {gam_slot, ad_size, html_marker, insert_before}}
+func (ctx *pluginContext) OnPluginStart(pluginConfigurationSize int) types.OnPluginStartStatus {
+	// Set default configurations for fallback and testing purposes.
+	ctx.gptLibraryURL = "https://securepubads.g.doubleclick.net/tag/js/gpt.js"
+	ctx.injectGptLibrary = true
 	ctx.adConfigs = map[string]adConfig{
 		"header": {
 			Slot:         "/1234/header_ad",
@@ -88,10 +89,49 @@ func (ctx *pluginContext) OnPluginStart(int) types.OnPluginStartStatus {
 		},
 	}
 
-	// GPT library configuration
-	ctx.gptLibraryURL = "https://securepubads.g.doubleclick.net/tag/js/gpt.js"
-	ctx.injectGptLibrary = true
+	if pluginConfigurationSize == 0 {
+		proxywasm.LogInfo("No configuration provided. Using default ad insertion config.")
+		return types.OnPluginStartStatusOK
+	}
 
+	config, err := proxywasm.GetPluginConfiguration()
+	if err != nil || len(config) == 0 {
+		return types.OnPluginStartStatusOK
+	}
+
+	// Clear default ad configs since we are loading custom ones
+	ctx.adConfigs = make(map[string]adConfig)
+
+	// Parse the CSV-like configuration format
+	for _, line := range strings.Split(string(config), "\n") {
+		line = strings.TrimSpace(line)
+		if len(line) == 0 || strings.HasPrefix(line, "#") {
+			continue // Skip empty lines and comments
+		}
+
+		parts := strings.Split(line, ",")
+		for i := range parts {
+			parts[i] = strings.TrimSpace(parts[i])
+		}
+
+		if parts[0] == "gpt_url" && len(parts) >= 2 {
+			ctx.gptLibraryURL = parts[1]
+		} else if parts[0] == "inject_gpt" && len(parts) >= 2 {
+			ctx.injectGptLibrary = parts[1] == "true"
+		} else if parts[0] == "ad" && len(parts) >= 6 {
+			position := parts[1]
+			ctx.adConfigs[position] = adConfig{
+				Slot:         parts[2],
+				Size:         parts[3],
+				InsertBefore: parts[4] == "true",
+				Marker:       parts[5],
+			}
+		} else {
+			proxywasm.LogWarnf("Invalid configuration line: %s", line)
+		}
+	}
+
+	proxywasm.LogInfo("Ad Insertion plugin configured successfully from custom payload.")
 	return types.OnPluginStartStatusOK
 }
 
