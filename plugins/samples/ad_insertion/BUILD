@@ -10,11 +10,20 @@ proxy_wasm_plugin_rust(
     ],
 )
 
+proxy_wasm_plugin_cpp(
+    name = "plugin_cpp.wasm",
+    srcs = ["plugin.cc"],
+    deps = [
+        "@com_google_absl//absl/strings",
+    ],
+)
+
 proxy_wasm_tests(
     name = "tests",
     config = ":tests.config",
     plugins = [
         ":plugin_rust.wasm",
+        ":plugin_cpp.wasm",
     ],
     tests = ":tests.textpb",
 )
