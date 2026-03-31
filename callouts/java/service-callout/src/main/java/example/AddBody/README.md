@@ -58,7 +58,7 @@ mvn test -Dtest=AddBodyTest
 
 This example may also be covered by shared gRPC integration tests depending on
 the repository setup.
-
+```
 ---
 
 ## Expected Behavior

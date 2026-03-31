@@ -54,7 +54,7 @@ rather than having a dedicated test file.
 | **Request header addition** | For any incoming HTTP request, the system injects the header-request: request field and clears the route cache to ensure fresh processing. |
 | **Response header addition** | For any HTTP response received from the origin, the system appends the header-response: response field to the response headers |
 | **Response header removal** | When a response contains a foo header, the system identifies and strips that specific header before final delivery. |
-| **No `foo` header present** | f the foo header is missing from the response, the system performs a "no-op," meaning it continues processing without error or modification. |
+| **No `foo` header present** | If the foo header is missing from the response, the system performs a "no-op," meaning it continues processing without error or modification. |
 
 ## Available Languages
 

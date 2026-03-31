@@ -49,10 +49,10 @@ Use this callout when you need **header enrichment**, **header cleanup**, or
 Start the callout server with default configuration:
 ```bash
 # Maven
-mvn exec:java -Dexec.mainClass="example.ddHeader"
+mvn exec:java -Dexec.mainClass="example.AddHeader"
 
 # JAR
-java -cp target/your-artifact.jar example.ddHeader
+java -cp target/your-artifact.jar example.AddHeader
 ```
 
 ## Test
@@ -64,7 +64,7 @@ mvn test -Dtest=AddHeaderTest
 
 This example may also be covered by shared gRPC integration tests depending on
 the repository setup.
-
+```
 ---
 
 ## Expected Behavior
