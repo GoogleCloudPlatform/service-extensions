@@ -211,7 +211,7 @@ func (s *ExampleCalloutService) handleModelsRequest() (*extproc.ProcessingRespon
 				Headers: &extproc.HeaderMutation{
 					SetHeaders: responseHeaders,
 				},
-				Body: string(body),
+				Body: body,
 			},
 		},
 	}, nil
@@ -354,7 +354,7 @@ func (s *ExampleCalloutService) HandleRequestBody(body *extproc.HttpBody) (*extp
 				Headers: &extproc.HeaderMutation{
 					SetHeaders: responseHeaders,
 				},
-				Body: string(litellmResp),
+				Body: litellmResp,
 			},
 		},
 	}, nil

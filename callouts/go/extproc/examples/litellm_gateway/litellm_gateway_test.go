@@ -207,7 +207,7 @@ func TestHandleRequestBody_ForwardToLiteLLM(t *testing.T) {
 		t.Errorf("Expected status 200, got: %d", ir.GetStatus().GetCode().Number())
 	}
 
-	if diff := cmp.Diff(string(mockRespBytes), ir.GetBody()); diff != "" {
+	if diff := cmp.Diff(mockRespBytes, ir.GetBody()); diff != "" {
 		t.Errorf("Body mismatch (-want +got):\n%s", diff)
 	}
 
@@ -334,7 +334,7 @@ func TestHandleRequestBody_LiteLLM4xxPassedThrough(t *testing.T) {
 	}
 
 	// Should contain the error message from LiteLLM.
-	if ir.GetBody() == "" {
+	if len(ir.GetBody()) == 0 {
 		t.Error("Expected error body from LiteLLM, got empty")
 	}
 }
@@ -369,7 +369,7 @@ func TestHandleRequestBody_LiteLLM429PassedThrough(t *testing.T) {
 		t.Errorf("Expected status 429, got %d", ir.GetStatus().GetCode().Number())
 	}
 
-	if ir.GetBody() == "" {
+	if len(ir.GetBody()) == 0 {
 		t.Error("Expected error body from LiteLLM, got empty")
 	}
 }
