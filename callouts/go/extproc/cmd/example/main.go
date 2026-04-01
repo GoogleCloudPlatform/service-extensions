@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/basic_callout_server"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/dynamic_forwarding"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/jwt_auth"
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/litellm_gateway"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/redirect"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/internal/server"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
@@ -51,6 +52,8 @@ func main() {
 		customService = jwt_auth.NewExampleCalloutService()
 	case "dynamic_forwarding":
 		customService = dynamic_forwarding.NewExampleCalloutService()
+	case "litellm_gateway":
+		customService = litellm_gateway.NewExampleCalloutService()
 	default:
 		fmt.Println("Unknown EXAMPLE_TYPE. Please set it to a valid example")
 		return
