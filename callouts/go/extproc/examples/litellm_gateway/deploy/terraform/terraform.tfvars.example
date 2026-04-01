@@ -1,0 +1,20 @@
+# Copy this file to terraform.tfvars and fill in your values.
+
+project_id = "your-gcp-project-id"
+region     = "us-central1"
+
+# Container images — build and push using the cloudbuild configs.
+callout_image = "us-central1-docker.pkg.dev/your-project/litellm-gateway/callout:latest"
+litellm_image = "us-central1-docker.pkg.dev/your-project/litellm-gateway/litellm:latest"
+
+# Upstream app image (receives non-LLM traffic).
+# upstream_app_image = "gcr.io/google-samples/hello-app:1.0"
+
+# Gemini API key — used by LiteLLM to call Gemini models.
+gemini_api_key = "your-gemini-api-key"
+
+# Enable CORS for browser-based access.
+# enable_cors = true
+
+# Comma-separated keywords to detect in prompts. Adds x-sec-keyword response header.
+# sec_keywords = "sec,litellm"
