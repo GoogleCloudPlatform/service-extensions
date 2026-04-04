@@ -125,6 +125,28 @@ class LogTestBounds {
   ContextOptions& options_;
 };
 
+long getVmRSS() {
+  std::ifstream status_file("/proc/self/status");
+  if (!status_file.is_open()) {
+    std::cerr << "Error: Could not open /proc/self/status" << std::endl;
+    return -1;
+  }
+
+  std::string line;
+  while (std::getline(status_file, line)) {
+    if (line.rfind("VmRSS:", 0) == 0) {
+      // Line looks like "VmRSS:   12345 kB"
+      size_t start = line.find_first_of("0123456789");
+      size_t end = line.find_last_of("0123456789");
+      if (start != std::string::npos && end != std::string::npos) {
+        std::string rss_kib_str = line.substr(start, (end - start) + 1);
+	      return std::stol(rss_kib_str);
+      }
+    }
+  }
+  return -1; // VmRSS not found.
+}
+
 // Class that manages the state for an additional stream running in a
 // benchmark.
 class AdditionalStream {
@@ -439,6 +461,7 @@ void DynamicTest::EmitStats(benchmark::State& state,
   state.counters["WasmSizeB"] = benchmark::Counter(
       std::filesystem::file_size(env_.wasm_path()),
       benchmark::Counter::kDefaults, benchmark::Counter::kIs1024);
+  state.counters["PeakVmRSS_KiB"] = peak_rss_kib_;
 }
 
 void DynamicTest::BenchPluginLifecycle(benchmark::State& state) {
@@ -446,6 +469,9 @@ void DynamicTest::BenchPluginLifecycle(benchmark::State& state) {
   auto load_wasm = LoadWasm(/*benchmark=*/true);
   BM_RETURN_IF_ERROR(load_wasm.status());
   auto handle = *load_wasm;
+
+  // Initialize peak RSS at the start of the benchmark.
+  peak_rss_kib_ = getVmRSS();
 
   // Benchmark plugin initialization and teardown.
   bool first = true;
@@ -466,7 +492,11 @@ void DynamicTest::BenchPluginLifecycle(benchmark::State& state) {
     // Explicit shutdown; required to recreate root context in the next loop.
     handle->wasm()->startShutdown(handle->plugin()->key());
     BM_RETURN_IF_FAILED(handle);
+    peak_rss_kib_ = std::max(peak_rss_kib_, getVmRSS());
   }
+
+  // Emit peak RSS again, since the stats were only emitted at the first run earlier.
+  state.counters["PeakVmRSS_KiB"] = peak_rss_kib_;
 }
 
 void DynamicTest::BenchStreamLifecycle(benchmark::State& state) {
@@ -489,12 +519,16 @@ void DynamicTest::BenchStreamLifecycle(benchmark::State& state) {
     BM_RETURN_IF_ERROR(additional_streams.back().Advance());
   }
 
+   // Initialize peak RSS at the start of the benchmark.
+  peak_rss_kib_ = getVmRSS();
+
   // Benchmark stream initialization and teardown.
   bool first = true;
   for (auto _ : state) {
     auto stream = TestHttpContext(handle, &cfg_);
     benchmark::DoNotOptimize(stream);
     BM_RETURN_IF_FAILED(handle);
+    peak_rss_kib_ = std::max(peak_rss_kib_, getVmRSS());
     stream.TearDown();
 
     if (first) {
@@ -502,6 +536,9 @@ void DynamicTest::BenchStreamLifecycle(benchmark::State& state) {
       EmitStats(state, *handle, stream);
     }
   }
+
+  // Emit peak RSS again, since the stats were only emitted at the first run earlier.
+  state.counters["PeakVmRSS_KiB"] = peak_rss_kib_;
 }
 
 void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
@@ -553,6 +590,9 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
           ? env_.additional_stream_advance_rate()
           : 3;
 
+  // Initialize peak RSS at the start of the benchmark.
+  peak_rss_kib_ = getVmRSS();
+
   std::optional<TestHttpContext> stream;
   for (auto _ : state) {
     // Pausing timing is not recommended. One way we could avoid it:
@@ -599,9 +639,96 @@ void DynamicTest::BenchHttpHandlers(benchmark::State& state) {
       benchmark::DoNotOptimize(res);
       BM_RETURN_IF_FAILED(handle);
     }
+    peak_rss_kib_ = std::max(peak_rss_kib_, getVmRSS());
   }
-
   EmitStats(state, *handle, *stream);
+}
+
+void DynamicTest::BenchCreateVm(benchmark::State& state) {
+  // Initialize peak RSS.
+  peak_rss_kib_ = getVmRSS();
+
+  for (auto _ : state) {
+    ContextOptions opt;
+    auto wasm_or = CreateVm(engine_, std::move(opt));
+    BM_RETURN_IF_ERROR(wasm_or.status());
+
+    // Ensure compiler doesn't optimize away VM creation, since it's not being used.
+    benchmark::DoNotOptimize(wasm_or->get());
+
+    peak_rss_kib_ = std::max(peak_rss_kib_, getVmRSS());
+  }
+  state.counters["PeakVmRSS_KiB"] = peak_rss_kib_;
+}
+
+void DynamicTest::BenchLoadPlugin(benchmark::State& state) {
+  // Load wasm bytes.
+  auto wasm_bytes = ReadDataFile(env_.wasm_path());
+  BM_RETURN_IF_ERROR(wasm_bytes.status());
+
+  // Initialize peak RSS.
+  peak_rss_kib_ = getVmRSS();
+
+  for (auto _ : state) {
+    // We don't want VM creation to be included in the benchmark.
+    state.PauseTiming();
+    ContextOptions opt;
+    auto wasm_or = CreateVm(engine_, std::move(opt));
+    BM_RETURN_IF_ERROR(wasm_or.status())
+    auto wasm = *wasm_or;
+    state.ResumeTiming();
+
+    bool loaded = wasm->load(*wasm_bytes, /*allow_precompiled=*/true);
+    if (!loaded) {
+      state.SkipWithError("Failed to load Wasm code.");
+      return;
+    }
+    benchmark::DoNotOptimize(wasm->isFailed());
+    peak_rss_kib_ = std::max(peak_rss_kib_, getVmRSS());
+  }
+  state.counters["PeakVmRSS_KiB"] = peak_rss_kib_;
+}
+
+void DynamicTest::BenchStartPlugin(benchmark::State& state) {
+  // Create VM and load wasm outside of the benchmarking loop.
+  auto load_wasm = LoadWasm(/*benchmark=*/true);
+  BM_RETURN_IF_ERROR(load_wasm.status());
+  auto handle = *load_wasm;
+
+  // This pointer will hold the context from the previous iteration.
+  // It starts as null.
+  TestContext* root_context_to_shutdown = nullptr;
+
+  // Initialize peak RSS.
+  peak_rss_kib_ = getVmRSS();
+
+  // Benchmark plugin onStart and teardown.
+  for (auto _ : state) {
+    // Before creating the new context, shut down the one from the
+    // previous iteration.
+    state.PauseTiming();
+    if (root_context_to_shutdown) {
+      handle->wasm()->startShutdown(handle->plugin()->key());
+      BM_RETURN_IF_FAILED(handle);
+    }
+    state.ResumeTiming();
+
+    // Create root context, call start and configure on it.
+    auto plugin_init = InitializePlugin(handle);
+    BM_RETURN_IF_ERROR(plugin_init);
+
+    // After the work is done, get a pointer to the context we just created.
+    // We'll shut it down in the next iteration. This is so that we have the
+    // pointers at the end of the final loop in order to call EmitStats.
+    state.PauseTiming();
+    root_context_to_shutdown = static_cast<TestContext*>(
+        handle->wasm()->getRootContext(handle->plugin(),
+                                       /*allow_closed=*/false));
+    peak_rss_kib_ = std::max(peak_rss_kib_, getVmRSS());
+    state.ResumeTiming();
+  }
+  EmitStats(state, *handle, *root_context_to_shutdown);
+  handle->wasm()->startShutdown(handle->plugin()->key());
 }
 
 void DynamicTest::CheckSideEffects(const std::string& phase,

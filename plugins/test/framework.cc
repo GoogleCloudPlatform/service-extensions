@@ -68,6 +68,31 @@ uint64_t TestContext::getMonotonicTimeNanoseconds() {
   // Return some frozen timestamp.
   return absl::ToUnixNanos(options().clock_time);
 }
+
+bool TestWasm::load(std::string_view bytecode, bool allow_precompiled) {
+  // Check the magic bytes directly in this wrapper layer.
+  if (bytecode.size() >= 4) {
+    // Read the first 4 bytes for the magic number.
+    const uint32_t magic = *reinterpret_cast<const uint32_t*>(bytecode.data());
+    const uint32_t elf_magic = 0x464c457f; // Little-endian for: \x7fELF
+
+    if (magic == elf_magic) {
+      // If we detect the ELF format, this means we have inputted an
+      // AOT-compiled Wasmtime file, so we bypass the WasmBase's validation logic
+      // and instead directly call WasmVm::load.
+
+      // Set AOT bytes as the first parameter.
+      return wasm_vm_->load(bytecode, 
+                            /*precompiled_data=*/std::string_view{}, 
+                            function_names_);
+    }
+  }
+
+  // If it's not ELF we rely on the base class implementation, which performs 
+  // validation then calls WasmVm::load.
+  return proxy_wasm::WasmBase::load(std::string(bytecode), allow_precompiled);
+}
+
 proxy_wasm::WasmResult TestContext::log(uint32_t log_level,
                                         std::string_view message) {
   logging_entries_++;
@@ -199,6 +224,12 @@ proxy_wasm::WasmResult TestHttpContext::sendLocalResponse(
   return proxy_wasm::WasmResult::Ok;
 }
 
+absl::StatusOr<std::shared_ptr<TestWasm>> CreateVm(const std::string& engine, ContextOptions options) {
+  auto vm = proxy_wasm::TestVm::makeVm(engine);
+  auto wasm = std::make_shared<TestWasm>(std::move(vm), std::move(options));
+  return wasm;
+}
+
 TestHttpContext::Result TestHttpContext::SendRequestHeaders(
     TestHttpContext::Headers headers) {
   phase_logs_.clear();
@@ -288,7 +319,7 @@ absl::StatusOr<std::shared_ptr<proxy_wasm::PluginHandleBase>> CreatePluginVm(
 
   // Load the plugin.
   auto wasm = std::make_shared<TestWasm>(std::move(vm), std::move(options));
-  if (!wasm->load(wasm_bytes, /*allow_precompiled=*/false)) {
+  if (!wasm->load(wasm_bytes, /*allow_precompiled=*/true)) {
     absl::string_view err = "Failed to load Wasm code";
     wasm->fail(proxy_wasm::FailState::UnableToInitializeCode, err);
     return absl::FailedPreconditionError(err);
