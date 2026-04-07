@@ -17,6 +17,7 @@ use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
@@ -86,7 +87,7 @@ struct VerifyResponse {
 
 // Root context for plugin configuration
 struct JwtRootContext {
-    config: Option<PluginConfig>,
+    config: Option<Rc<PluginConfig>>,
 }
 
 impl Context for JwtRootContext {}
@@ -96,31 +97,25 @@ impl RootContext for JwtRootContext {
         if let Some(config_bytes) = self.get_plugin_configuration() {
             match serde_json::from_slice::<PluginConfig>(&config_bytes) {
                 Ok(config) => {
-                    proxy_wasm::hostcalls::log(
-                        LogLevel::Info,
-                        &format!("JWT Plugin configured with {} KV store entries", config.data.len())
-                    ).unwrap();
-                    self.config = Some(config);
+                    info!(
+                        "JWT Plugin configured with {} KV store entries",
+                        config.data.len()
+                    );
+                    self.config = Some(Rc::new(config));
                     true
                 }
                 Err(e) => {
-                    proxy_wasm::hostcalls::log(
-                        LogLevel::Error,
-                        &format!("Failed to parse configuration: {}", e)
-                    ).unwrap();
+                    error!("Failed to parse configuration: {}", e);
                     false
                 }
             }
         } else {
-            proxy_wasm::hostcalls::log(
-                LogLevel::Warn,
-                "No configuration provided, using defaults"
-            ).unwrap();
-            self.config = Some(PluginConfig {
+            warn!("No configuration provided, using defaults");
+            self.config = Some(Rc::new(PluginConfig {
                 secret_key: "default_secret_key_change_me".to_string(),
                 default_expiration_minutes: Some(60),
                 data: HashMap::new(),
-            });
+            }));
             true
         }
     }
@@ -138,7 +133,7 @@ impl RootContext for JwtRootContext {
 
 // HTTP context for request handling
 struct JwtHttpContext {
-    config: Option<PluginConfig>,
+    config: Option<Rc<PluginConfig>>,
 }
 
 impl Context for JwtHttpContext {}
@@ -148,7 +143,7 @@ impl HttpContext for JwtHttpContext {
         let path = match self.get_http_request_header(":path") {
             Some(p) => p,
             None => {
-                proxy_wasm::hostcalls::log(LogLevel::Error, "Failed to get :path header").unwrap();
+                error!("Failed to get :path header");
                 return Action::Continue;
             }
         };
@@ -197,10 +192,7 @@ impl JwtHttpContext {
                 self.send_json_response(200, &response);
             }
             Err(e) => {
-                proxy_wasm::hostcalls::log(
-                    LogLevel::Error,
-                    &format!("Failed to generate JWT: {}", e)
-                ).unwrap();
+                error!("Failed to generate JWT: {}", e);
                 self.send_json_response(
                     500,
                     &serde_json::json!({"error": "Failed to generate token"})
@@ -374,18 +366,18 @@ impl JwtHttpContext {
         let payload: JwtPayload = serde_json::from_slice(&payload_bytes)
             .map_err(|e| format!("Failed to parse payload: {}", e))?;
 
-        // Verify expiration
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|e| format!("System time error: {}", e))?
             .as_secs() as i64;
 
-        if payload.exp < now {
+        // Verify expiration with a 1-minute buffer to tolerate clock skew between services.
+        if payload.exp < now - 60 {
             return Err("Token expired".to_string());
         }
 
-        // Verify not-before
-        if payload.nbf > now {
+        // Verify not-before with a 1-minute buffer to tolerate clock skew between services.
+        if payload.nbf > now + 60 {
             return Err("Token not yet valid".to_string());
         }
 
@@ -433,10 +425,7 @@ impl JwtHttpContext {
                 );
             }
             Err(e) => {
-                proxy_wasm::hostcalls::log(
-                    LogLevel::Error,
-                    &format!("Failed to serialize response: {}", e)
-                ).unwrap();
+                error!("Failed to serialize response: {}", e);
                 self.send_http_response(
                     500,
                     vec![("Content-Type", "application/json")],
