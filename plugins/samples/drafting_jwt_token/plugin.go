@@ -42,9 +42,9 @@ func (*vmContext) NewPluginContext(contextID uint32) types.PluginContext {
 
 type pluginContext struct {
 	types.DefaultPluginContext
-	secretKey          string
-	defaultExpiration  int
-	kvStore            map[string]*UserEntitlements
+	secretKey         string
+	defaultExpiration int
+	kvStore           map[string]*UserEntitlements
 }
 
 // UserEntitlements represents user permissions and roles from KV store
@@ -56,9 +56,9 @@ type UserEntitlements struct {
 
 // Config represents the plugin configuration
 type Config struct {
-	SecretKey                string                          `json:"secret_key"`
-	DefaultExpirationMinutes int                             `json:"default_expiration_minutes"`
-	Data                     map[string]*UserEntitlements    `json:"data"`
+	SecretKey                string                       `json:"secret_key"`
+	DefaultExpirationMinutes int                          `json:"default_expiration_minutes"`
+	Data                     map[string]*UserEntitlements `json:"data"`
 }
 
 // JWTHeader represents the JWT header structure
@@ -320,13 +320,12 @@ func (ctx *httpContext) generateJWT(userID string, expirationMinutes int) (strin
 	}
 	payloadEncoded := base64URLEncode(payloadJSON)
 
-	// Create signature
-	signingInput := headerEncoded + "." + payloadEncoded
+	signingInput := strings.Join([]string{headerEncoded, payloadEncoded}, ".")
 	signature := ctx.hmacSHA256(ctx.plugin.secretKey, signingInput)
 	signatureEncoded := base64URLEncode(signature)
 
 	// Assemble final JWT
-	return signingInput + "." + signatureEncoded, nil
+	return strings.Join([]string{signingInput, signatureEncoded}, "."), nil
 }
 
 func (ctx *httpContext) verifyJWT(token string) error {
@@ -337,7 +336,7 @@ func (ctx *httpContext) verifyJWT(token string) error {
 	}
 
 	// Verify signature
-	signingInput := parts[0] + "." + parts[1]
+	signingInput := strings.Join([]string{parts[0], parts[1]}, ".")
 	expectedSignature := ctx.hmacSHA256(ctx.plugin.secretKey, signingInput)
 	expectedSignatureEncoded := base64URLEncode(expectedSignature)
 
@@ -351,14 +350,16 @@ func (ctx *httpContext) verifyJWT(token string) error {
 		return fmt.Errorf("token verification failed: %w", err)
 	}
 
-	// Verify expiration
+	const clockSkewBuffer = int64(60)
 	now := time.Now().Unix()
-	if payload.Exp < now {
+
+	// Verify expiration (allow 1-minute buffer)
+	if payload.Exp+clockSkewBuffer < now {
 		return fmt.Errorf("token expired")
 	}
 
-	// Verify not-before
-	if payload.Nbf > now {
+	// Verify not-before (allow 1-minute buffer)
+	if payload.Nbf > now+clockSkewBuffer {
 		return fmt.Errorf("token not yet valid")
 	}
 
@@ -420,28 +421,12 @@ func (ctx *httpContext) sendTextResponse(statusCode uint32, message string) {
 	}
 }
 
-// base64URLEncode encodes bytes to base64 URL-safe format
 func base64URLEncode(data []byte) string {
-	encoded := base64.StdEncoding.EncodeToString(data)
-	encoded = strings.ReplaceAll(encoded, "+", "-")
-	encoded = strings.ReplaceAll(encoded, "/", "_")
-	encoded = strings.TrimRight(encoded, "=")
-	return encoded
+	return base64.RawURLEncoding.EncodeToString(data)
 }
 
-// base64URLDecode decodes base64 URL-safe format to bytes
 func base64URLDecode(data string) ([]byte, error) {
-	data = strings.ReplaceAll(data, "-", "+")
-	data = strings.ReplaceAll(data, "_", "/")
-
-	// Add padding if needed
-	switch len(data) % 4 {
-	case 2:
-		data += "=="
-	case 3:
-		data += "="
-	}
-
-	return base64.StdEncoding.DecodeString(data)
+	return base64.RawURLEncoding.DecodeString(data)
 }
+
 // [END serviceextensions_plugin_drafting_jwt_token]
