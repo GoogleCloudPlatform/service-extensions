@@ -1,4 +1,4 @@
-// Copyright 2024 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ class MyHttpContext : public Context {
     // the request is served by the v2 file. Otherwise, it is served by the
     // original file.
     const auto user = extractUserFromPath(path);
-    if (absl::StartsWithIgnoreCase(path, a_path) && user != "" &&
+    if (absl::StartsWithIgnoreCase(path, a_path) && !user.empty() &&
         (std::hash<std::string_view>{}(user) % 100 <= percentile)) {
       std::string new_path = absl::StrCat(b_path, path.substr(a_path.length()));
       replaceRequestHeader(":path", new_path);
