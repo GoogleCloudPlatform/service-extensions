@@ -10,17 +10,10 @@ common --noenable_bzlmod
 # `bazel test //... --define engine=wasmtime` for example.
 build --define engine=v8
 
-# For unit testing, remove randomness from BoringSSL.
-# This doesn't capture 'bazel run' test invocations. Oh well.
-test --per_file_copt=external/boringssl/.*@-DBORINGSSL_UNSAFE_DETERMINISTIC_MODE=1
-test --host_per_file_copt=external/boringssl/.*@-DBORINGSSL_UNSAFE_DETERMINISTIC_MODE=1
-
 # For benchmarking, set specific build options.
 build:bench --compilation_mode opt
 build:bench --dynamic_mode=off
 build:bench --copt -g1  # equals -gmlt in clang
-build:bench --per_file_copt=external/boringssl/.*@-DBORINGSSL_UNSAFE_DETERMINISTIC_MODE=1
-build:bench --host_per_file_copt=external/boringssl/.*@-DBORINGSSL_UNSAFE_DETERMINISTIC_MODE=1
 
 # Pass CC, CXX, LLVM_CONFIG from the environment.
 build --action_env=CC
