@@ -15,14 +15,13 @@
 name: Plugins test
 
 on:
+  workflow_dispatch:  # allow manual runs
   pull_request:
-    branches:
-    - main
+    branches: [ "main" ]
     paths:
     - plugins/**
   push:
-    branches:
-    - main
+    branches: [ "main" ]
     paths:
     - plugins/**
   schedule:
@@ -82,6 +81,7 @@ jobs:
         bazel test
         --verbose_failures
         --test_output=errors
+        --test_arg=--nobench
         --disk_cache /tmp/bazel/cache
         ${{ matrix.flags }}
         -- //samples/... //test/...

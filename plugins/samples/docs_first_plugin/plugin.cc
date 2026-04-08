@@ -1,4 +1,4 @@
-// Copyright 2024 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,17 +24,23 @@ class MyHttpContext : public Context {
     LOG_INFO("onRequestHeaders: hello from wasm");
 
     // Route Extension example: host rewrite
-    replaceRequestHeader(":host", "service-extensions.com");
-    replaceRequestHeader(":path", "/");
+    if (replaceRequestHeader(":authority", "service-extensions.com") != WasmResult::Ok) {
+      LOG_ERROR("Failed to replace :authority header");
+    }
+    if (replaceRequestHeader(":path", "/") != WasmResult::Ok) {
+      LOG_ERROR("Failed to replace :path header");
+    }
     return FilterHeadersStatus::Continue;
   }
 
   FilterHeadersStatus onResponseHeaders(uint32_t headers,
                                         bool end_of_stream) override {
     LOG_INFO("onResponseHeaders: hello from wasm");
-
+    
     // Traffic Extension example: add response header
-    addResponseHeader("hello", "service-extensions");
+    if (addResponseHeader("hello", "service-extensions") != WasmResult::Ok) {
+      LOG_ERROR("Failed to add response header");
+    }
     return FilterHeadersStatus::Continue;
   }
 };

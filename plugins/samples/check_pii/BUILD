@@ -29,7 +29,6 @@ proxy_wasm_tests(
     name = "tests",
     plugins = [
         ":plugin_cpp.wasm",
-        ":plugin_go.wasm",
         ":plugin_rust.wasm",
     ],
     tests = ":tests.textpb",

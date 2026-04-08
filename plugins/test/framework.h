@@ -26,6 +26,7 @@
 #include "gtest/gtest.h"
 #include "include/proxy-wasm/exports.h"
 #include "include/proxy-wasm/wasm.h"
+#include "test/runner.pb.h"
 #include "test/utility.h"
 
 namespace service_extensions_samples {
@@ -106,12 +107,16 @@ class TestContext : public proxy_wasm::TestContext {
   // --- BEGIN Testing facilities ---
   // Unsafe access to logs. Not thread safe w.r.t. plugin execution.
   const std::vector<std::string>& phase_logs() const { return phase_logs_; }
+  const uint64_t logging_bytes() const { return logging_bytes_; }
+  const uint64_t logging_entries() const { return logging_entries_; }
   // Options to customize context behavior.
   ContextOptions& options() const;
   // --- END   Testing facilities ---
 
  protected:
   std::vector<std::string> phase_logs_;
+  uint64_t logging_bytes_ = 0;
+  uint64_t logging_entries_ = 0;
 
  private:
   proxy_wasm::BufferBase plugin_config_;
@@ -128,13 +133,15 @@ class TestContext : public proxy_wasm::TestContext {
 // - size checks
 class TestHttpContext : public TestContext {
  public:
-  TestHttpContext(std::shared_ptr<proxy_wasm::PluginHandleBase> plugin_handle)
+  TestHttpContext(std::shared_ptr<proxy_wasm::PluginHandleBase> plugin_handle,
+                  const pb::Test* cfg)
       : TestContext(plugin_handle->wasm().get(),
                     plugin_handle->wasm()
                         ->getRootContext(plugin_handle->plugin(),
                                          /*allow_closed=*/false)
                         ->id(),
-                    plugin_handle) {
+                    plugin_handle),
+        cfg_(*cfg) {
     this->onCreate();
   }
   ~TestHttpContext() override { TearDown(); }
@@ -170,6 +177,8 @@ class TestHttpContext : public TestContext {
   proxy_wasm::WasmResult setHeaderMapPairs(
       proxy_wasm::WasmHeaderMapType type,
       const proxy_wasm::Pairs& pairs) override;
+  proxy_wasm::WasmResult getProperty(std::string_view path,
+                                    std::string* result) override;
 
   // Ignore failStream, avoid calling unimplemented closeStream.
   void failStream(proxy_wasm::WasmStreamType) override {}
@@ -219,9 +228,9 @@ class TestHttpContext : public TestContext {
 
   // Testing helpers. Use these instead of direct on*Headers methods.
   Result SendRequestHeaders(Headers headers);
-  Result SendRequestBody(std::string body);
+  Result SendRequestBody(std::string body, bool end_of_stream);
   Result SendResponseHeaders(Headers headers);
-  Result SendResponseBody(std::string body);
+  Result SendResponseBody(std::string body, bool end_of_stream);
 
   enum CallbackType {
     None,
@@ -232,11 +241,13 @@ class TestHttpContext : public TestContext {
   };
 
  private:
+  const pb::Test& cfg_;
   // Ensure that we invoke teardown handlers just once.
   bool torn_down_ = false;
   // State tracked during a headers call. Invalid otherwise.
   proxy_wasm::WasmHeaderMapType phase_;
   Result result_;
+  bool sent_local_response_ = false;
 
   Buffer body_buffer_;
   CallbackType current_callback_;
