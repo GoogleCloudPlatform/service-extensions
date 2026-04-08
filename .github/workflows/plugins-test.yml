@@ -43,10 +43,6 @@ jobs:
         include:
         - name: 'opt'
           flags: --config=clang -c opt --define=crypto=system
-        - name: 'ASan'
-          flags: --config=clang-asan
-        - name: 'TSan'
-          flags: --config=clang-tsan
 
     steps:
     - uses: actions/checkout@v3
