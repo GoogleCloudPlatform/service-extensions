@@ -79,7 +79,7 @@ resource "google_compute_subnetwork" "proxy_only" {
 }
 
 # ===================================================================
-# SECRET MANAGER — GEMINI API KEY
+# SECRET MANAGER — LLM PROVIDER API KEYS
 # ===================================================================
 
 resource "google_secret_manager_secret" "gemini_api_key" {
@@ -95,9 +95,54 @@ resource "google_secret_manager_secret_version" "gemini_api_key" {
   secret_data = var.gemini_api_key
 }
 
-# Grant the Cloud Run service account access to the secret.
 resource "google_secret_manager_secret_iam_member" "gemini_key_accessor" {
   secret_id = google_secret_manager_secret.gemini_api_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+}
+
+# Groq (optional — only created if groq_api_key is set).
+resource "google_secret_manager_secret" "groq_api_key" {
+  count     = var.groq_api_key == "" ? 0 : 1
+  secret_id = "litellm-groq-api-key"
+  replication {
+    auto {}
+  }
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_version" "groq_api_key" {
+  count       = var.groq_api_key == "" ? 0 : 1
+  secret      = google_secret_manager_secret.groq_api_key[0].id
+  secret_data = var.groq_api_key
+}
+
+resource "google_secret_manager_secret_iam_member" "groq_key_accessor" {
+  count     = var.groq_api_key == "" ? 0 : 1
+  secret_id = google_secret_manager_secret.groq_api_key[0].id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+}
+
+# OpenRouter (optional — only created if openrouter_api_key is set).
+resource "google_secret_manager_secret" "openrouter_api_key" {
+  count     = var.openrouter_api_key == "" ? 0 : 1
+  secret_id = "litellm-openrouter-api-key"
+  replication {
+    auto {}
+  }
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_version" "openrouter_api_key" {
+  count       = var.openrouter_api_key == "" ? 0 : 1
+  secret      = google_secret_manager_secret.openrouter_api_key[0].id
+  secret_data = var.openrouter_api_key
+}
+
+resource "google_secret_manager_secret_iam_member" "openrouter_key_accessor" {
+  count     = var.openrouter_api_key == "" ? 0 : 1
+  secret_id = google_secret_manager_secret.openrouter_api_key[0].id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
 }
@@ -161,7 +206,7 @@ resource "google_cloud_run_v2_service" "litellm_gateway" {
       }
     }
 
-    # LiteLLM proxy sidecar — routes to Gemini/OpenAI/etc.
+    # LiteLLM proxy sidecar — routes to Gemini/Groq/OpenRouter/etc.
     containers {
       name  = "litellm"
       image = var.litellm_image
@@ -171,6 +216,30 @@ resource "google_cloud_run_v2_service" "litellm_gateway" {
           secret_key_ref {
             secret  = google_secret_manager_secret.gemini_api_key.secret_id
             version = "latest"
+          }
+        }
+      }
+      dynamic "env" {
+        for_each = var.groq_api_key == "" ? [] : [1]
+        content {
+          name = "GROQ_API_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.groq_api_key[0].secret_id
+              version = "latest"
+            }
+          }
+        }
+      }
+      dynamic "env" {
+        for_each = var.openrouter_api_key == "" ? [] : [1]
+        content {
+          name = "OPENROUTER_API_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.openrouter_api_key[0].secret_id
+              version = "latest"
+            }
           }
         }
       }

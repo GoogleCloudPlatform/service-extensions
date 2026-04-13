@@ -8,10 +8,17 @@ callout_image = "us-central1-docker.pkg.dev/your-project/litellm-gateway/callout
 litellm_image = "us-central1-docker.pkg.dev/your-project/litellm-gateway/litellm:latest"
 
 # Upstream app image (receives non-LLM traffic).
-# upstream_app_image = "gcr.io/google-samples/hello-app:1.0"
+# Default is a "Hello, world!" image. Use the sample-ui image to serve the chat interface:
+# upstream_app_image = "us-central1-docker.pkg.dev/your-project/litellm-gateway/sample-ui:latest"
 
 # Gemini API key — used by LiteLLM to call Gemini models.
 gemini_api_key = "your-gemini-api-key"
+
+# Groq API key (optional) — free tier at https://console.groq.com/keys
+# groq_api_key = "your-groq-api-key"
+
+# OpenRouter API key (optional) — free models at https://openrouter.ai/keys
+# openrouter_api_key = "your-openrouter-api-key"
 
 # Enable CORS for browser-based access.
 # enable_cors = true

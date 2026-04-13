@@ -1,25 +1,53 @@
 model_list:
   # Google Gemini
-  - model_name: gemini-2.5-flash
+  - model_name: gemini/2.5-flash
     litellm_params:
       model: gemini/gemini-2.5-flash
       api_key: os.environ/GEMINI_API_KEY
-  - model_name: gemini-2.5-pro
+  - model_name: gemini/2.5-pro
     litellm_params:
       model: gemini/gemini-2.5-pro
       api_key: os.environ/GEMINI_API_KEY
 
   # Anthropic (uncomment to enable)
-  # - model_name: claude-sonnet
+  # - model_name: anthropic/claude-sonnet
   #   litellm_params:
   #     model: anthropic/claude-sonnet-4-20250514
   #     api_key: os.environ/ANTHROPIC_API_KEY
 
   # OpenAI (uncomment to enable)
-  # - model_name: gpt-4o
+  # - model_name: openai/gpt-4o
   #   litellm_params:
   #     model: openai/gpt-4o
   #     api_key: os.environ/OPENAI_API_KEY
+
+  # Groq (free tier)
+  - model_name: groq/llama-3.3-70b
+    litellm_params:
+      model: groq/llama-3.3-70b-versatile
+      api_key: os.environ/GROQ_API_KEY
+  - model_name: groq/llama-4-scout
+    litellm_params:
+      model: groq/meta-llama/llama-4-scout-17b-16e-instruct
+      api_key: os.environ/GROQ_API_KEY
+  - model_name: groq/qwen3-32b
+    litellm_params:
+      model: groq/qwen/qwen3-32b
+      api_key: os.environ/GROQ_API_KEY
+
+  # OpenRouter (free models)
+  - model_name: openrouter/gemma-4
+    litellm_params:
+      model: openrouter/google/gemma-4-31b-it:free
+      api_key: os.environ/OPENROUTER_API_KEY
+  - model_name: openrouter/gpt-oss
+    litellm_params:
+      model: openrouter/openai/gpt-oss-120b:free
+      api_key: os.environ/OPENROUTER_API_KEY
+  - model_name: openrouter/qwen3-coder
+    litellm_params:
+      model: openrouter/qwen/qwen3-coder:free
+      api_key: os.environ/OPENROUTER_API_KEY
 
 litellm_settings:
   drop_params: true

@@ -45,6 +45,20 @@ variable "gemini_api_key" {
   sensitive   = true
 }
 
+variable "groq_api_key" {
+  description = "The Groq API key for LiteLLM to use when routing to Groq models. Leave empty to disable."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "openrouter_api_key" {
+  description = "The OpenRouter API key for LiteLLM to use when routing to OpenRouter models. Leave empty to disable."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "enable_cors" {
   description = "Enable CORS headers and OPTIONS preflight handling for browser-based access."
   type        = bool

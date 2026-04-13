@@ -30,6 +30,8 @@ services:
     environment:
       - LITELLM_MASTER_KEY=sk-test-master-key
       - GEMINI_API_KEY=YOUR_API_KEY_HERE
+      - OPENROUTER_API_KEY=YOUR_API_KEY_HERE
+      - GROQ_API_KEY=YOUR_API_KEY_HERE
       # Uncomment to enable additional providers:
       # - ANTHROPIC_API_KEY=YOUR_API_KEY_HERE
       # - OPENAI_API_KEY=YOUR_API_KEY_HERE
