@@ -246,7 +246,7 @@ resource "google_cloud_run_v2_service" "litellm_gateway" {
       resources {
         limits = {
           cpu    = "1"
-          memory = "1Gi"
+          memory = "2Gi"
         }
       }
       startup_probe {
