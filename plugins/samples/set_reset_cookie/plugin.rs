@@ -14,6 +14,7 @@
 
 // [START serviceextensions_plugin_set_reset_cookie]
 use log::*;
+use prost_reflect::{DescriptorPool, DynamicMessage, Value};
 use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
 use std::rc::Rc;
@@ -27,42 +28,26 @@ proxy_wasm::main! {{
     });
 }}
 
-// Cookie operation types.
-#[derive(Clone)]
-enum CookieOp {
-    Set,
-    Delete,
-    Overwrite,
-}
+// FileDescriptorSet compiled from cookie_config.proto via Bazel genrule.
+const DESCRIPTOR_BYTES: &[u8] = include_bytes!(env!("PROTO_DESCRIPTOR"));
+
+// Cookie operation enum values from cookie_config.proto.
+const OP_UNSPECIFIED: i32 = 0;
+const OP_SET: i32 = 1;
+const OP_DELETE: i32 = 2;
+const OP_OVERWRITE: i32 = 3;
 
 // Parsed cookie configuration.
-#[derive(Clone)]
 struct CookieConfig {
-    operation: CookieOp,
+    operation: i32,
     name: String,
     value: String,
     path: String,
     domain: String,
-    max_age: i64,
+    max_age: i32,
     http_only: bool,
     secure: bool,
     same_site_strict: bool,
-}
-
-impl CookieConfig {
-    fn new() -> Self {
-        CookieConfig {
-            operation: CookieOp::Set,
-            name: String::new(),
-            value: String::new(),
-            path: "/".to_string(),
-            domain: String::new(),
-            max_age: -1,
-            http_only: false,
-            secure: false,
-            same_site_strict: false,
-        }
-    }
 }
 
 struct MyRootContext {
@@ -87,72 +72,63 @@ impl RootContext for MyRootContext {
                 return true;
             }
 
+            // Parse text-format protobuf using prost-reflect.
+            let pool = match DescriptorPool::decode(DESCRIPTOR_BYTES) {
+                Ok(pool) => pool,
+                Err(e) => {
+                    error!("Failed to decode proto descriptor pool: {}", e);
+                    return false;
+                }
+            };
+
+            let msg_desc = match pool.get_message_by_name(
+                "serviceextensions.cookie_manager.CookieManagerConfig",
+            ) {
+                Some(desc) => desc,
+                None => {
+                    error!("CookieManagerConfig message not found in proto descriptor");
+                    return false;
+                }
+            };
+
+            let config_msg = match DynamicMessage::parse_text_format(msg_desc, &config_str) {
+                Ok(msg) => msg,
+                Err(e) => {
+                    error!(
+                        "Failed to parse cookie manager configuration. \
+                         Example: cookies {{ name: \"session\" value: \"abc\" operation: SET }}: {}",
+                        e
+                    );
+                    return false;
+                }
+            };
+
+            // Extract cookie configs from the parsed protobuf message.
             let mut configs = Vec::new();
+            if let Some(cookies_cow) = config_msg.get_field_by_name("cookies") {
+                if let Value::List(ref cookies) = *cookies_cow {
+                    for cookie_value in cookies {
+                        if let Value::Message(ref msg) = cookie_value {
+                            let cookie = CookieConfig {
+                                name: get_string(msg, "name"),
+                                value: get_string(msg, "value"),
+                                domain: get_string(msg, "domain"),
+                                path: get_string(msg, "path"),
+                                max_age: get_i32(msg, "max_age"),
+                                secure: get_bool(msg, "secure"),
+                                http_only: get_bool(msg, "http_only"),
+                                same_site_strict: get_bool(msg, "same_site_strict"),
+                                operation: get_enum(msg, "operation"),
+                            };
 
-            // Parse pipe-delimited config lines:
-            // OPERATION|name|value|path|domain|max_age|http_only|secure|same_site_strict
-            for line in config_str.lines() {
-                let line = line.trim();
-                // Skip empty lines and comments.
-                if line.is_empty() || line.starts_with('#') {
-                    continue;
-                }
-
-                let fields: Vec<&str> = line.split('|').collect();
-                if fields.len() < 2 {
-                    error!("Invalid config line: {}", line);
-                    continue;
-                }
-
-                let mut cookie = CookieConfig::new();
-
-                // Parse operation.
-                match fields[0] {
-                    "SET" => cookie.operation = CookieOp::Set,
-                    "DELETE" => cookie.operation = CookieOp::Delete,
-                    "OVERWRITE" => cookie.operation = CookieOp::Overwrite,
-                    _ => {
-                        error!("Unknown operation: {}", fields[0]);
-                        continue;
-                    }
-                }
-
-                cookie.name = fields[1].to_string();
-                if cookie.name.is_empty() {
-                    error!("Cookie name cannot be empty");
-                    continue;
-                }
-
-                // Parse optional fields.
-                if fields.len() > 2 {
-                    cookie.value = fields[2].to_string();
-                }
-                if fields.len() > 3 && !fields[3].is_empty() {
-                    cookie.path = fields[3].to_string();
-                }
-                if fields.len() > 4 {
-                    cookie.domain = fields[4].to_string();
-                }
-                if fields.len() > 5 && !fields[5].is_empty() {
-                    match fields[5].parse::<i64>() {
-                        Ok(v) => cookie.max_age = v,
-                        Err(_) => {
-                            error!("Invalid max_age value: {}", fields[5]);
-                            continue;
+                            if cookie.name.is_empty() {
+                                error!("Cookie configuration missing required 'name' field");
+                                continue;
+                            }
+                            configs.push(cookie);
                         }
                     }
                 }
-                if fields.len() > 6 {
-                    cookie.http_only = fields[6] == "true";
-                }
-                if fields.len() > 7 {
-                    cookie.secure = fields[7] == "true";
-                }
-                if fields.len() > 8 {
-                    cookie.same_site_strict = fields[8] == "true";
-                }
-
-                configs.push(cookie);
             }
 
             if configs.is_empty() {
@@ -183,6 +159,43 @@ impl RootContext for MyRootContext {
     }
 }
 
+// Helper functions to extract typed values from a DynamicMessage.
+fn get_string(msg: &DynamicMessage, field: &str) -> String {
+    msg.get_field_by_name(field)
+        .and_then(|cow| match cow.into_owned() {
+            Value::String(s) => Some(s),
+            _ => None,
+        })
+        .unwrap_or_default()
+}
+
+fn get_i32(msg: &DynamicMessage, field: &str) -> i32 {
+    msg.get_field_by_name(field)
+        .and_then(|cow| match *cow {
+            Value::I32(v) => Some(v),
+            _ => None,
+        })
+        .unwrap_or_default()
+}
+
+fn get_bool(msg: &DynamicMessage, field: &str) -> bool {
+    msg.get_field_by_name(field)
+        .and_then(|cow| match *cow {
+            Value::Bool(v) => Some(v),
+            _ => None,
+        })
+        .unwrap_or_default()
+}
+
+fn get_enum(msg: &DynamicMessage, field: &str) -> i32 {
+    msg.get_field_by_name(field)
+        .and_then(|cow| match *cow {
+            Value::EnumNumber(v) => Some(v),
+            _ => None,
+        })
+        .unwrap_or_default()
+}
+
 struct MyHttpContext {
     cookie_configs: Rc<Vec<CookieConfig>>,
 }
@@ -203,8 +216,6 @@ impl HttpContext for MyHttpContext {
 }
 
 impl MyHttpContext {
-    // Parse cookies from the Cookie request header.
-    // Returns a vector of (name, value) pairs to preserve original order.
     fn parse_request_cookies(&self) -> Vec<(String, String)> {
         let mut cookies = Vec::new();
         if let Some(cookie_header) = self.get_http_request_header("Cookie") {
@@ -213,29 +224,26 @@ impl MyHttpContext {
             }
             for pair in cookie_header.split("; ") {
                 if let Some(eq_pos) = pair.find('=') {
-                    let name = &pair[..eq_pos];
-                    let value = &pair[eq_pos + 1..];
-                    cookies.push((name.to_string(), value.to_string()));
+                    cookies.push((pair[..eq_pos].to_string(), pair[eq_pos + 1..].to_string()));
                 }
             }
         }
         cookies
     }
 
-    // Remove cookies marked for DELETE from the request Cookie header.
     fn process_cookie_deletions(&self, mut request_cookies: Vec<(String, String)>) {
         let mut modified = false;
         for config in self.cookie_configs.iter() {
-            if let CookieOp::Delete = config.operation {
-                if let Some(pos) = request_cookies.iter().position(|(name, _)| name == &config.name)
-                {
-                    request_cookies.remove(pos);
-                    modified = true;
-                    info!(
-                        "Marking cookie for deletion before CDN cache: {}",
-                        config.name
-                    );
-                }
+            if config.operation != OP_DELETE {
+                continue;
+            }
+            if let Some(pos) = request_cookies.iter().position(|(name, _)| name == &config.name) {
+                request_cookies.remove(pos);
+                modified = true;
+                info!(
+                    "Marking cookie for deletion before CDN cache: {}",
+                    config.name
+                );
             }
         }
 
@@ -243,39 +251,43 @@ impl MyHttpContext {
             if request_cookies.is_empty() {
                 self.set_http_request_header("Cookie", None);
             } else {
-                let rebuilt: Vec<String> = request_cookies
-                    .iter()
-                    .map(|(name, value)| format!("{}={}", name, value))
-                    .collect();
-                self.set_http_request_header("Cookie", Some(&rebuilt.join("; ")));
+                let mut rebuilt = String::new();
+                for (i, (name, value)) in request_cookies.iter().enumerate() {
+                    if i > 0 {
+                        rebuilt.push_str("; ");
+                    }
+                    rebuilt.push_str(name);
+                    rebuilt.push('=');
+                    rebuilt.push_str(value);
+                }
+                self.set_http_request_header("Cookie", Some(&rebuilt));
             }
         }
     }
 
-    // Process SET and OVERWRITE operations on response headers.
     fn process_cookie_operations(&self) {
         for config in self.cookie_configs.iter() {
             match config.operation {
-                CookieOp::Set => {
-                    self.add_set_cookie_header(config);
-                }
-                CookieOp::Overwrite => {
-                    self.overwrite_cookie(config);
-                }
-                CookieOp::Delete => {} // Handled in request phase.
+                OP_SET | OP_UNSPECIFIED => self.add_set_cookie_header(config),
+                OP_OVERWRITE => self.overwrite_cookie(config),
+                _ => {}
             }
         }
     }
 
-    // Build a Set-Cookie header value string from config attributes.
+    fn effective_path(config: &CookieConfig) -> &str {
+        if config.path.is_empty() { "/" } else { &config.path }
+    }
+
     fn build_set_cookie_value(&self, config: &CookieConfig) -> String {
-        let mut val = format!("{}={}", config.name, config.value);
-        val.push_str(&format!("; Path={}", config.path));
+        let mut val = format!("{}={}; Path={}", config.name, config.value, Self::effective_path(config));
         if !config.domain.is_empty() {
-            val.push_str(&format!("; Domain={}", config.domain));
+            val.push_str("; Domain=");
+            val.push_str(&config.domain);
         }
         if config.max_age > 0 {
-            val.push_str(&format!("; Max-Age={}", config.max_age));
+            val.push_str("; Max-Age=");
+            val.push_str(&config.max_age.to_string());
         }
         if config.http_only {
             val.push_str("; HttpOnly");
@@ -289,14 +301,9 @@ impl MyHttpContext {
         val
     }
 
-    // Add a new Set-Cookie response header.
     fn add_set_cookie_header(&self, config: &CookieConfig) {
         self.add_http_response_header("Set-Cookie", &self.build_set_cookie_value(config));
-        let log_type = if config.max_age == -1 {
-            "session"
-        } else {
-            "persistent"
-        };
+        let log_type = if config.max_age <= 0 { "session" } else { "persistent" };
         info!("Setting {} cookie: {}", log_type, config.name);
     }
 
@@ -310,7 +317,6 @@ impl MyHttpContext {
         let existing = self.get_http_response_header("Set-Cookie");
         self.set_http_response_header("Set-Cookie", None);
 
-        // Preserve non-matching Set-Cookie values from the combined header.
         if let Some(existing_value) = existing {
             if !existing_value.is_empty() {
                 let prefix = format!("{}=", config.name);
@@ -322,13 +328,13 @@ impl MyHttpContext {
             }
         }
 
-        // Set the new value or expire the cookie.
         if !config.value.is_empty() {
             self.add_set_cookie_header(config);
         } else {
-            let mut expire = format!("{}=; Path={}; Max-Age=0", config.name, config.path);
+            let mut expire = format!("{}=; Path={}; Max-Age=0", config.name, Self::effective_path(config));
             if !config.domain.is_empty() {
-                expire.push_str(&format!("; Domain={}", config.domain));
+                expire.push_str("; Domain=");
+                expire.push_str(&config.domain);
             }
             self.add_http_response_header("Set-Cookie", &expire);
             info!("Removing Set-Cookie directive for: {}", config.name);
