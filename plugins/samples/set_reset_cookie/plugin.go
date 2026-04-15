@@ -22,6 +22,7 @@ import (
 
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm"
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm/types"
+	"google.golang.org/protobuf/encoding/prototext"
 )
 
 func main() {}
@@ -30,33 +31,13 @@ func init() {
 	proxywasm.SetVMContext(&vmContext{})
 }
 
-// Cookie operation types.
-const (
-	opSET       = "SET"
-	opDELETE    = "DELETE"
-	opOVERWRITE = "OVERWRITE"
-)
-
-// cookieConfig holds the parsed configuration for a single cookie operation.
-type cookieConfig struct {
-	operation      string
-	name           string
-	value          string
-	path           string
-	domain         string
-	maxAge         int
-	httpOnly       bool
-	secure         bool
-	sameSiteStrict bool
-}
-
 type vmContext struct {
 	types.DefaultVMContext
 }
 
 type pluginContext struct {
 	types.DefaultPluginContext
-	cookieConfigs []cookieConfig
+	cookieConfigs []*CookieConfig
 }
 
 type httpContext struct {
@@ -72,8 +53,7 @@ func (ctx *pluginContext) NewHttpContext(contextID uint32) types.HttpContext {
 	return &httpContext{pluginCtx: ctx}
 }
 
-// OnPluginStart parses the pipe-delimited configuration.
-// Format: OPERATION|name|value|path|domain|max_age|http_only|secure|same_site_strict
+// OnPluginStart parses the text protobuf configuration.
 func (ctx *pluginContext) OnPluginStart(pluginConfigurationSize int) types.OnPluginStartStatus {
 	config, err := proxywasm.GetPluginConfiguration()
 	if err != nil {
@@ -87,71 +67,23 @@ func (ctx *pluginContext) OnPluginStart(pluginConfigurationSize int) types.OnPlu
 		return types.OnPluginStartStatusOK
 	}
 
-	for _, line := range strings.Split(configStr, "\n") {
-		line = strings.TrimSpace(line)
-		// Skip empty lines and comments.
-		if line == "" || line[0] == '#' {
+	// Parse text-format protobuf configuration.
+	var managerConfig CookieManagerConfig
+	if err := prototext.Unmarshal(config, &managerConfig); err != nil {
+		proxywasm.LogErrorf("Failed to parse cookie manager configuration: %v", err)
+		return types.OnPluginStartStatusFailed
+	}
+
+	if len(managerConfig.GetCookies()) == 0 {
+		proxywasm.LogWarnf("No cookie configurations found, no cookies will be managed")
+		return types.OnPluginStartStatusOK
+	}
+
+	for _, cookie := range managerConfig.GetCookies() {
+		if cookie.GetName() == "" {
+			proxywasm.LogErrorf("Cookie configuration missing required 'name' field")
 			continue
 		}
-
-		fields := strings.Split(line, "|")
-		if len(fields) < 2 {
-			proxywasm.LogErrorf("Invalid config line: %s", line)
-			continue
-		}
-
-		cookie := cookieConfig{
-			path:   "/",
-			maxAge: -1, // -1 for session cookie
-		}
-
-		// Parse operation.
-		switch fields[0] {
-		case opSET:
-			cookie.operation = opSET
-		case opDELETE:
-			cookie.operation = opDELETE
-		case opOVERWRITE:
-			cookie.operation = opOVERWRITE
-		default:
-			proxywasm.LogErrorf("Unknown operation: %s", fields[0])
-			continue
-		}
-
-		cookie.name = fields[1]
-		if cookie.name == "" {
-			proxywasm.LogErrorf("Cookie name cannot be empty")
-			continue
-		}
-
-		// Parse optional fields.
-		if len(fields) > 2 {
-			cookie.value = fields[2]
-		}
-		if len(fields) > 3 && fields[3] != "" {
-			cookie.path = fields[3]
-		}
-		if len(fields) > 4 {
-			cookie.domain = fields[4]
-		}
-		if len(fields) > 5 && fields[5] != "" {
-			maxAge, err := strconv.Atoi(fields[5])
-			if err != nil {
-				proxywasm.LogErrorf("Invalid max_age value: %s", fields[5])
-				continue
-			}
-			cookie.maxAge = maxAge
-		}
-		if len(fields) > 6 {
-			cookie.httpOnly = fields[6] == "true"
-		}
-		if len(fields) > 7 {
-			cookie.secure = fields[7] == "true"
-		}
-		if len(fields) > 8 {
-			cookie.sameSiteStrict = fields[8] == "true"
-		}
-
 		ctx.cookieConfigs = append(ctx.cookieConfigs, cookie)
 	}
 
@@ -177,14 +109,14 @@ func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) t
 	// Process DELETE operations: remove matching cookies from the request.
 	modified := false
 	for _, config := range ctx.pluginCtx.cookieConfigs {
-		if config.operation != opDELETE {
+		if config.GetOperation() != CookieOperation_DELETE {
 			continue
 		}
 		for i, cookie := range requestCookies {
-			if cookie[0] == config.name {
+			if cookie[0] == config.GetName() {
 				requestCookies = append(requestCookies[:i], requestCookies[i+1:]...)
 				modified = true
-				proxywasm.LogInfof("Marking cookie for deletion before CDN cache: %s", config.name)
+				proxywasm.LogInfof("Marking cookie for deletion before CDN cache: %s", config.GetName())
 				break
 			}
 		}
@@ -218,10 +150,10 @@ func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) 
 	}()
 
 	for _, config := range ctx.pluginCtx.cookieConfigs {
-		switch config.operation {
-		case opSET:
+		switch config.GetOperation() {
+		case CookieOperation_SET, CookieOperation_COOKIE_OPERATION_UNSPECIFIED:
 			addSetCookieHeader(config)
-		case opOVERWRITE:
+		case CookieOperation_OVERWRITE:
 			overwriteCookie(config)
 		}
 	}
@@ -230,7 +162,6 @@ func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) 
 }
 
 // parseRequestCookies parses the Cookie header into ordered name-value pairs.
-// Uses a slice to preserve original cookie order.
 func parseRequestCookies() [][2]string {
 	cookieHeader, err := proxywasm.GetHttpRequestHeader("Cookie")
 	if err != nil || cookieHeader == "" {
@@ -247,62 +178,65 @@ func parseRequestCookies() [][2]string {
 	return cookies
 }
 
+func effectivePath(config *CookieConfig) string {
+	if p := config.GetPath(); p != "" {
+		return p
+	}
+	return "/"
+}
+
 // buildSetCookieValue constructs a Set-Cookie header value from config attributes.
-func buildSetCookieValue(config cookieConfig) string {
+func buildSetCookieValue(config *CookieConfig) string {
 	var b strings.Builder
-	b.WriteString(config.name)
+	b.WriteString(config.GetName())
 	b.WriteString("=")
-	b.WriteString(config.value)
+	b.WriteString(config.GetValue())
 	b.WriteString("; Path=")
-	b.WriteString(config.path)
-	if config.domain != "" {
+	b.WriteString(effectivePath(config))
+	if config.GetDomain() != "" {
 		b.WriteString("; Domain=")
-		b.WriteString(config.domain)
+		b.WriteString(config.GetDomain())
 	}
-	if config.maxAge > 0 {
+	if config.GetMaxAge() > 0 {
 		b.WriteString("; Max-Age=")
-		b.WriteString(strconv.Itoa(config.maxAge))
+		b.WriteString(strconv.Itoa(int(config.GetMaxAge())))
 	}
-	if config.httpOnly {
+	if config.GetHttpOnly() {
 		b.WriteString("; HttpOnly")
 	}
-	if config.secure {
+	if config.GetSecure() {
 		b.WriteString("; Secure")
 	}
-	if config.sameSiteStrict {
+	if config.GetSameSiteStrict() {
 		b.WriteString("; SameSite=Strict")
 	}
 	return b.String()
 }
 
 // addSetCookieHeader adds a new Set-Cookie response header.
-func addSetCookieHeader(config cookieConfig) {
+func addSetCookieHeader(config *CookieConfig) {
 	if err := proxywasm.AddHttpResponseHeader("Set-Cookie", buildSetCookieValue(config)); err != nil {
 		proxywasm.LogErrorf("failed to add Set-Cookie header: %v", err)
 		return
 	}
 	logType := "session"
-	if config.maxAge != -1 {
+	if config.GetMaxAge() > 0 {
 		logType = "persistent"
 	}
-	proxywasm.LogInfof("Setting %s cookie: %s", logType, config.name)
+	proxywasm.LogInfof("Setting %s cookie: %s", logType, config.GetName())
 }
 
 // overwriteCookie replaces an existing Set-Cookie header for the target cookie
 // name while preserving other Set-Cookie headers.
-// Note: The proxy-wasm host combines multiple Set-Cookie headers into a single
-// comma-separated value, so we split by ", " and reconstruct. This means
-// origin cookies using the Expires attribute (which contains a comma in its
-// date format) will be corrupted. Use Max-Age instead of Expires.
-func overwriteCookie(config cookieConfig) {
-	existing, err := proxywasm.GetHttpResponseHeader("Set-Cookie")
+func overwriteCookie(config *CookieConfig) {
+	existing, getErr := proxywasm.GetHttpResponseHeader("Set-Cookie")
 	if err := proxywasm.RemoveHttpResponseHeader("Set-Cookie"); err != nil {
 		proxywasm.LogErrorf("failed to remove Set-Cookie header: %v", err)
 	}
 
 	// Preserve non-matching Set-Cookie values from the combined header.
-	if err == nil && existing != "" {
-		prefix := config.name + "="
+	if getErr == nil && existing != "" {
+		prefix := config.GetName() + "="
 		for _, cookie := range strings.Split(existing, ", ") {
 			if !strings.HasPrefix(cookie, prefix) {
 				if err := proxywasm.AddHttpResponseHeader("Set-Cookie", cookie); err != nil {
@@ -313,17 +247,17 @@ func overwriteCookie(config cookieConfig) {
 	}
 
 	// Set the new value or expire the cookie.
-	if config.value != "" {
+	if config.GetValue() != "" {
 		addSetCookieHeader(config)
 	} else {
-		expire := config.name + "=; Path=" + config.path + "; Max-Age=0"
-		if config.domain != "" {
-			expire += "; Domain=" + config.domain
+		expire := config.GetName() + "=; Path=" + effectivePath(config) + "; Max-Age=0"
+		if config.GetDomain() != "" {
+			expire += "; Domain=" + config.GetDomain()
 		}
 		if err := proxywasm.AddHttpResponseHeader("Set-Cookie", expire); err != nil {
 			proxywasm.LogErrorf("failed to add expiry Set-Cookie header: %v", err)
 		}
-		proxywasm.LogInfof("Removing Set-Cookie directive for: %s", config.name)
+		proxywasm.LogInfof("Removing Set-Cookie directive for: %s", config.GetName())
 	}
 }
 
