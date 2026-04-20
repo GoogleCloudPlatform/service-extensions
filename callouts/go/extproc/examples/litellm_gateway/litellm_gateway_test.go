@@ -16,381 +16,432 @@ package litellm_gateway
 
 import (
 	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	extprocfilter "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ext_proc/v3"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
-	"github.com/google/go-cmp/cmp"
-	"google.golang.org/protobuf/testing/protocmp"
+	httpstatus "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 )
 
-// newTestService creates a service pointing at a mock LiteLLM server.
-func newTestService(litellmURL string) *ExampleCalloutService {
-	service := &ExampleCalloutService{
-		httpClient: &http.Client{},
-		litellmURL: litellmURL,
-		litellmKey: "test-key",
+// --- Test fixtures -----------------------------------------------------------
+//
+// Test constants.
+
+const (
+	// Prompt keywords used by the detector.
+	kwSec     = "sec"
+	kwLiteLLM = "litellm"
+
+	// Model identifiers used in policy tests.
+	modelAllowed    = "vertex/gemini-2.5-flash"
+	modelDisallowed = "secret-internal-model"
+	modelAnything   = "anything-goes"
+
+	// HTTP paths and methods.
+	pathChatCompletions = "/v1/chat/completions"
+	pathModels          = "/v1/models"
+	pathNonLLM          = "/api/health"
+	methodGet           = "GET"
+	methodPost          = "POST"
+
+	// Header name constants (headerRouted / headerPolicy / headerSecKW /
+	// policyAllowed) are declared in the production file and shared here.
+
+	// Prompts used across tests.
+	promptWithBothKeywords = "This request covers sec tagging and the litellm gateway."
+	promptWithNoKeywords   = "Tell me a joke"
+	promptGeneric          = "hello"
+)
+
+// matchedKeywords returns the expected keyword list (in the order the detector
+// emits them, which matches s.secKeywords order).
+func matchedKeywords() []string { return []string{kwSec, kwLiteLLM} }
+
+// --- Service construction helpers --------------------------------------------
+
+// newTestService constructs an ExampleCalloutService with the given options,
+// bypassing environment variable parsing so tests are deterministic.
+func newTestService(opts ...func(*ExampleCalloutService)) *ExampleCalloutService {
+	service := &ExampleCalloutService{}
+	for _, opt := range opts {
+		opt(service)
 	}
-	service.Handlers.RequestHeadersHandler = service.HandleRequestHeaders
-	service.Handlers.RequestBodyHandler = service.HandleRequestBody
 	return service
 }
 
-func TestHandleRequestHeaders_LLMEndpoint(t *testing.T) {
-	service := newTestService("http://localhost:4000")
-
-	headers := &extproc.HttpHeaders{
-		Headers: &core.HeaderMap{
-			Headers: []*core.HeaderValue{
-				{Key: ":path", RawValue: []byte("/v1/chat/completions")},
-			},
-		},
-	}
-
-	resp, err := service.HandleRequestHeaders(headers)
-	if err != nil {
-		t.Fatalf("HandleRequestHeaders got err: %v", err)
-	}
-	if resp == nil {
-		t.Fatal("HandleRequestHeaders returned nil")
-	}
-
-	// Should have x-litellm-routed header and ModeOverride for body buffering.
-	want := &extproc.ProcessingResponse{
-		Response: &extproc.ProcessingResponse_RequestHeaders{
-			RequestHeaders: &extproc.HeadersResponse{
-				Response: &extproc.CommonResponse{
-					HeaderMutation: &extproc.HeaderMutation{
-						SetHeaders: []*core.HeaderValueOption{
-							{
-								Header: &core.HeaderValue{
-									Key:      "x-litellm-routed",
-									RawValue: []byte("true"),
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		ModeOverride: &extprocfilter.ProcessingMode{
-			RequestBodyMode: extprocfilter.ProcessingMode_BUFFERED,
-		},
-	}
-
-	if diff := cmp.Diff(want, resp, protocmp.Transform()); diff != "" {
-		t.Errorf("HandleRequestHeaders() LLM endpoint mismatch (-want +got):\n%s", diff)
+func withKeywords(keywords ...string) func(*ExampleCalloutService) {
+	return func(s *ExampleCalloutService) {
+		s.secKeywords = keywords
 	}
 }
 
-func TestHandleRequestHeaders_NonLLMEndpoint(t *testing.T) {
-	service := newTestService("http://localhost:4000")
+func withAllowedModels(models ...string) func(*ExampleCalloutService) {
+	return func(s *ExampleCalloutService) {
+		s.allowedModels = map[string]bool{}
+		for _, m := range models {
+			s.allowedModels[m] = true
+		}
+	}
+}
 
-	headers := &extproc.HttpHeaders{
+// --- Proto helpers -----------------------------------------------------------
+
+// headerRequest builds an HttpHeaders proto with the given path and method.
+func headerRequest(path, method string) *extproc.HttpHeaders {
+	return &extproc.HttpHeaders{
 		Headers: &core.HeaderMap{
 			Headers: []*core.HeaderValue{
-				{Key: ":path", RawValue: []byte("/api/health")},
+				{Key: ":path", RawValue: []byte(path)},
+				{Key: ":method", RawValue: []byte(method)},
 			},
 		},
 	}
+}
 
-	resp, err := service.HandleRequestHeaders(headers)
+// chatBody marshals a chat-completion request body with a single user message.
+func chatBody(t *testing.T, model, content string) []byte {
+	t.Helper()
+	body, err := json.Marshal(map[string]interface{}{
+		"model":    model,
+		"messages": []map[string]string{{"role": "user", "content": content}},
+	})
 	if err != nil {
-		t.Fatalf("HandleRequestHeaders got err: %v", err)
+		t.Fatalf("chatBody marshal: %v", err)
 	}
-	if resp == nil {
-		t.Fatal("HandleRequestHeaders returned nil")
+	return body
+}
+
+// findHeader searches a slice of HeaderValueOption for a header by key.
+func findHeader(headers []*core.HeaderValueOption, key string) (string, bool) {
+	for _, h := range headers {
+		if h.GetHeader().GetKey() == key {
+			return string(h.GetHeader().GetRawValue()), true
+		}
+	}
+	return "", false
+}
+
+// --- Header phase ------------------------------------------------------------
+
+func TestHandleRequestHeaders_PostLLMPath(t *testing.T) {
+	service := newTestService()
+
+	resp, err := service.handleRequestHeaders(headerRequest(pathChatCompletions, methodPost))
+	if err != nil {
+		t.Fatalf("handleRequestHeaders got err: %v", err)
 	}
 
-	// Should be an empty HeadersResponse (pass-through).
-	want := &extproc.ProcessingResponse{
-		Response: &extproc.ProcessingResponse_RequestHeaders{
-			RequestHeaders: &extproc.HeadersResponse{},
-		},
+	// Must request buffered body mode AND response headers so we can mirror
+	// the keyword header onto the response.
+	if resp.GetModeOverride() == nil {
+		t.Fatal("expected ModeOverride for LLM POST")
+	}
+	if resp.GetModeOverride().GetRequestBodyMode() != extprocfilter.ProcessingMode_BUFFERED {
+		t.Errorf("expected BUFFERED body mode, got %v", resp.GetModeOverride().GetRequestBodyMode())
+	}
+	if resp.GetModeOverride().GetResponseHeaderMode() != extprocfilter.ProcessingMode_SEND {
+		t.Errorf("expected SEND response header mode, got %v", resp.GetModeOverride().GetResponseHeaderMode())
 	}
 
-	if diff := cmp.Diff(want, resp, protocmp.Transform()); diff != "" {
-		t.Errorf("HandleRequestHeaders() non-LLM endpoint mismatch (-want +got):\n%s", diff)
+	// Must add the routing marker header.
+	mutation := resp.GetRequestHeaders().GetResponse().GetHeaderMutation()
+	if mutation == nil {
+		t.Fatal("expected HeaderMutation")
+	}
+	if v, ok := findHeader(mutation.GetSetHeaders(), headerRouted); !ok || v != "true" {
+		t.Errorf("expected %s=true, got %q (present=%v)", headerRouted, v, ok)
+	}
+}
+
+func TestHandleRequestHeaders_GetModels(t *testing.T) {
+	service := newTestService()
+
+	resp, err := service.handleRequestHeaders(headerRequest(pathModels, methodGet))
+	if err != nil {
+		t.Fatalf("handleRequestHeaders got err: %v", err)
+	}
+
+	// GET /v1/models has no body — must not request body buffering or
+	// response header phase.
+	if resp.GetModeOverride() != nil {
+		t.Errorf("GET %s should not request body buffering", pathModels)
+	}
+
+	// Should still add the marker so the LB/logs can see the request was inspected.
+	if _, ok := findHeader(resp.GetRequestHeaders().GetResponse().GetHeaderMutation().GetSetHeaders(), headerRouted); !ok {
+		t.Errorf("expected %s header on %s response", headerRouted, pathModels)
+	}
+}
+
+func TestHandleRequestHeaders_NonLLMPathPassesThrough(t *testing.T) {
+	service := newTestService()
+
+	resp, err := service.handleRequestHeaders(headerRequest(pathNonLLM, methodGet))
+	if err != nil {
+		t.Fatalf("handleRequestHeaders got err: %v", err)
+	}
+
+	rh := resp.GetRequestHeaders()
+	if rh == nil {
+		t.Fatal("expected RequestHeaders response")
+	}
+	if rh.GetResponse() != nil {
+		t.Error("non-LLM path should have no header mutations")
+	}
+	if resp.GetModeOverride() != nil {
+		t.Error("non-LLM path should not request body buffering")
 	}
 }
 
 func TestHandleRequestHeaders_EmptyHeaders(t *testing.T) {
-	service := newTestService("http://localhost:4000")
+	service := newTestService()
 
-	resp, err := service.HandleRequestHeaders(&extproc.HttpHeaders{})
+	resp, err := service.handleRequestHeaders(&extproc.HttpHeaders{})
 	if err != nil {
-		t.Fatalf("HandleRequestHeaders got err: %v", err)
+		t.Fatalf("handleRequestHeaders got err: %v", err)
 	}
 	if resp == nil {
-		t.Fatal("HandleRequestHeaders returned nil")
+		t.Fatal("handleRequestHeaders returned nil")
 	}
 }
+
+// --- Body phase --------------------------------------------------------------
 
 func TestHandleRequestBody_EmptyBody(t *testing.T) {
-	service := newTestService("http://localhost:4000")
+	service := newTestService()
 
-	resp, err := service.HandleRequestBody(&extproc.HttpBody{})
+	resp, matched, err := service.handleRequestBody(&extproc.HttpBody{})
 	if err != nil {
-		t.Fatalf("HandleRequestBody got err: %v", err)
+		t.Fatalf("handleRequestBody got err: %v", err)
 	}
-	if resp == nil {
-		t.Fatal("HandleRequestBody returned nil")
+	if resp.GetRequestBody() == nil {
+		t.Error("empty body should return a RequestBody pass-through")
+	}
+	if matched != nil {
+		t.Errorf("empty body should match no keywords, got %v", matched)
 	}
 }
 
-func TestHandleRequestBody_InvalidJSON(t *testing.T) {
-	service := newTestService("http://localhost:4000")
+func TestHandleRequestBody_InvalidJSONRejected(t *testing.T) {
+	service := newTestService()
 
-	body := &extproc.HttpBody{
-		Body: []byte("not json"),
-	}
-
-	resp, err := service.HandleRequestBody(body)
+	resp, _, err := service.handleRequestBody(&extproc.HttpBody{Body: []byte("not json")})
 	if err != nil {
-		t.Fatalf("HandleRequestBody got err: %v", err)
+		t.Fatalf("handleRequestBody got err: %v", err)
 	}
 
-	// Should return ImmediateResponse with BadRequest.
-	if resp.GetImmediateResponse() == nil {
-		t.Fatal("Expected ImmediateResponse for invalid JSON, got nil")
-	}
-}
-
-func TestHandleRequestBody_ForwardToLiteLLM(t *testing.T) {
-	// Mock LiteLLM server.
-	mockResp := map[string]interface{}{
-		"id":      "chatcmpl-test",
-		"object":  "chat.completion",
-		"model":   "gpt-4",
-		"choices": []interface{}{},
-	}
-	mockRespBytes, _ := json.Marshal(mockResp)
-
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Verify auth header.
-		if r.Header.Get("Authorization") != "Bearer test-key" {
-			t.Errorf("Expected Authorization header 'Bearer test-key', got '%s'", r.Header.Get("Authorization"))
-		}
-		// Verify content type.
-		if r.Header.Get("Content-Type") != "application/json" {
-			t.Errorf("Expected Content-Type 'application/json', got '%s'", r.Header.Get("Content-Type"))
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write(mockRespBytes)
-	}))
-	defer mockServer.Close()
-
-	service := newTestService(mockServer.URL)
-
-	reqBody := map[string]interface{}{
-		"model":    "gpt-4",
-		"messages": []interface{}{map[string]string{"role": "user", "content": "hello"}},
-	}
-	reqBytes, _ := json.Marshal(reqBody)
-
-	resp, err := service.HandleRequestBody(&extproc.HttpBody{Body: reqBytes})
-	if err != nil {
-		t.Fatalf("HandleRequestBody got err: %v", err)
-	}
-
-	// Should return ImmediateResponse with the LiteLLM response body.
 	ir := resp.GetImmediateResponse()
 	if ir == nil {
-		t.Fatal("Expected ImmediateResponse, got nil")
+		t.Fatal("expected ImmediateResponse for invalid JSON")
+	}
+	if ir.GetStatus().GetCode() != httpstatus.StatusCode_BadRequest {
+		t.Errorf("expected 400, got %v", ir.GetStatus().GetCode())
+	}
+}
+
+func TestHandleRequestBody_ValidRequestFlowsThrough(t *testing.T) {
+	service := newTestService()
+
+	resp, matched, err := service.handleRequestBody(&extproc.HttpBody{Body: chatBody(t, modelAllowed, promptGeneric)})
+	if err != nil {
+		t.Fatalf("handleRequestBody got err: %v", err)
+	}
+	if matched != nil {
+		t.Errorf("no keywords configured — should match nothing, got %v", matched)
 	}
 
-	if ir.GetStatus().GetCode().Number() != 200 {
-		t.Errorf("Expected status 200, got: %d", ir.GetStatus().GetCode().Number())
+	// Must NOT short-circuit.
+	if resp.GetImmediateResponse() != nil {
+		t.Fatal("valid request should flow through, not return ImmediateResponse")
 	}
 
-	if diff := cmp.Diff(mockRespBytes, ir.GetBody()); diff != "" {
-		t.Errorf("Body mismatch (-want +got):\n%s", diff)
+	rb := resp.GetRequestBody()
+	if rb == nil {
+		t.Fatal("expected RequestBody response")
 	}
 
-	// Verify gateway marker header is present.
-	foundGateway := false
-	for _, h := range ir.GetHeaders().GetSetHeaders() {
-		if h.GetHeader().GetKey() == "x-litellm-gateway" {
-			foundGateway = true
-			if string(h.GetHeader().GetRawValue()) != "true" {
-				t.Errorf("Expected x-litellm-gateway=true, got %s", string(h.GetHeader().GetRawValue()))
+	// Must tag the request with the policy marker.
+	mutation := rb.GetResponse().GetHeaderMutation()
+	if mutation == nil {
+		t.Fatal("expected HeaderMutation")
+	}
+	if v, ok := findHeader(mutation.GetSetHeaders(), headerPolicy); !ok || v != policyAllowed {
+		t.Errorf("expected %s=%s, got %q (present=%v)", headerPolicy, policyAllowed, v, ok)
+	}
+}
+
+func TestHandleRequestBody_KeywordDetection(t *testing.T) {
+	service := newTestService(withKeywords(kwSec, kwLiteLLM))
+
+	resp, matched, err := service.handleRequestBody(&extproc.HttpBody{
+		Body: chatBody(t, modelAllowed, promptWithBothKeywords),
+	})
+	if err != nil {
+		t.Fatalf("handleRequestBody got err: %v", err)
+	}
+
+	// Matched keywords must be returned so the response phase can mirror them.
+	want := matchedKeywords()
+	if len(matched) != len(want) {
+		t.Errorf("expected %d matched keywords, got %v", len(want), matched)
+	}
+
+	mutation := resp.GetRequestBody().GetResponse().GetHeaderMutation()
+	v, ok := findHeader(mutation.GetSetHeaders(), headerSecKW)
+	if !ok {
+		t.Fatalf("expected %s header", headerSecKW)
+	}
+	// Order depends on detection order; accept either permutation.
+	if v != kwSec+","+kwLiteLLM && v != kwLiteLLM+","+kwSec {
+		t.Errorf("expected %s to contain both keywords, got %q", headerSecKW, v)
+	}
+}
+
+func TestHandleRequestBody_NoKeywordsNoHeader(t *testing.T) {
+	service := newTestService(withKeywords(kwSec))
+
+	resp, matched, err := service.handleRequestBody(&extproc.HttpBody{
+		Body: chatBody(t, modelAllowed, promptWithNoKeywords),
+	})
+	if err != nil {
+		t.Fatalf("handleRequestBody got err: %v", err)
+	}
+	if matched != nil {
+		t.Errorf("expected no matches, got %v", matched)
+	}
+
+	mutation := resp.GetRequestBody().GetResponse().GetHeaderMutation()
+	if _, ok := findHeader(mutation.GetSetHeaders(), headerSecKW); ok {
+		t.Errorf("%s should not be set when no keywords match", headerSecKW)
+	}
+}
+
+func TestHandleRequestBody_AllowedModelPassesThrough(t *testing.T) {
+	service := newTestService(withAllowedModels(modelAllowed))
+
+	resp, _, err := service.handleRequestBody(&extproc.HttpBody{
+		Body: chatBody(t, modelAllowed, promptGeneric),
+	})
+	if err != nil {
+		t.Fatalf("handleRequestBody got err: %v", err)
+	}
+	if resp.GetImmediateResponse() != nil {
+		t.Error("allowed model should flow through")
+	}
+}
+
+func TestHandleRequestBody_DisallowedModelRejected(t *testing.T) {
+	service := newTestService(withAllowedModels(modelAllowed))
+
+	resp, _, err := service.handleRequestBody(&extproc.HttpBody{
+		Body: chatBody(t, modelDisallowed, promptGeneric),
+	})
+	if err != nil {
+		t.Fatalf("handleRequestBody got err: %v", err)
+	}
+
+	ir := resp.GetImmediateResponse()
+	if ir == nil {
+		t.Fatal("expected ImmediateResponse for disallowed model")
+	}
+	if ir.GetStatus().GetCode() != httpstatus.StatusCode_Forbidden {
+		t.Errorf("expected 403, got %v", ir.GetStatus().GetCode())
+	}
+}
+
+func TestHandleRequestBody_AllowlistEmptyAllowsAny(t *testing.T) {
+	// No allowlist configured — any model should pass.
+	service := newTestService()
+
+	resp, _, err := service.handleRequestBody(&extproc.HttpBody{
+		Body: chatBody(t, modelAnything, promptGeneric),
+	})
+	if err != nil {
+		t.Fatalf("handleRequestBody got err: %v", err)
+	}
+	if resp.GetImmediateResponse() != nil {
+		t.Error("empty allowlist should accept any model")
+	}
+}
+
+// --- Response header phase ---------------------------------------------------
+
+func TestHandleResponseHeaders_WithMatchedKeywords(t *testing.T) {
+	service := newTestService()
+
+	resp, err := service.handleResponseHeaders(matchedKeywords())
+	if err != nil {
+		t.Fatalf("handleResponseHeaders got err: %v", err)
+	}
+
+	rh := resp.GetResponseHeaders()
+	if rh == nil {
+		t.Fatal("expected ResponseHeaders response")
+	}
+	mutation := rh.GetResponse().GetHeaderMutation()
+	if mutation == nil {
+		t.Fatal("expected HeaderMutation on response")
+	}
+	v, ok := findHeader(mutation.GetSetHeaders(), headerSecKW)
+	if !ok {
+		t.Fatalf("expected %s on response", headerSecKW)
+	}
+	want := kwSec + "," + kwLiteLLM
+	if v != want {
+		t.Errorf("expected %s=%s, got %q", headerSecKW, want, v)
+	}
+}
+
+func TestHandleResponseHeaders_NoKeywordsNoHeader(t *testing.T) {
+	service := newTestService()
+
+	resp, err := service.handleResponseHeaders(nil)
+	if err != nil {
+		t.Fatalf("handleResponseHeaders got err: %v", err)
+	}
+
+	rh := resp.GetResponseHeaders()
+	if rh == nil {
+		t.Fatal("expected ResponseHeaders response")
+	}
+	if rh.GetResponse() != nil {
+		t.Error("no keywords should mean no response mutation")
+	}
+}
+
+// --- Parser helpers ----------------------------------------------------------
+
+func TestParseCSVLower(t *testing.T) {
+	cases := []struct {
+		in   string
+		want []string
+	}{
+		{"", nil},
+		{"SEC, LiteLLM", []string{kwSec, kwLiteLLM}},
+		{"  one  , two,three ", []string{"one", "two", "three"}},
+		{",,,", nil},
+	}
+	for _, c := range cases {
+		got := parseCSVLower(c.in)
+		if len(got) != len(c.want) {
+			t.Errorf("parseCSVLower(%q) len=%d, want %d", c.in, len(got), len(c.want))
+			continue
+		}
+		for i, v := range got {
+			if v != c.want[i] {
+				t.Errorf("parseCSVLower(%q)[%d]=%q, want %q", c.in, i, v, c.want[i])
 			}
 		}
 	}
-	if !foundGateway {
-		t.Error("Expected x-litellm-gateway header in ImmediateResponse")
-	}
 }
 
-func TestHandleRequestBody_StreamingStripped(t *testing.T) {
-	var receivedBody map[string]interface{}
-
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewDecoder(r.Body).Decode(&receivedBody)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":"test"}`))
-	}))
-	defer mockServer.Close()
-
-	service := newTestService(mockServer.URL)
-
-	reqBody := map[string]interface{}{
-		"model":          "gpt-4",
-		"messages":       []interface{}{},
-		"stream":         true,
-		"stream_options": map[string]interface{}{"include_usage": true},
+func TestParseCSVSet(t *testing.T) {
+	set := parseCSVSet("a, b ,c")
+	if len(set) != 3 || !set["a"] || !set["b"] || !set["c"] {
+		t.Errorf("parseCSVSet got %v", set)
 	}
-	reqBytes, _ := json.Marshal(reqBody)
-
-	resp, err := service.HandleRequestBody(&extproc.HttpBody{Body: reqBytes})
-	if err != nil {
-		t.Fatalf("HandleRequestBody got err: %v", err)
-	}
-
-	// Verify stream was set to false.
-	if stream, ok := receivedBody["stream"]; ok {
-		if stream != false {
-			t.Errorf("Expected stream=false, got %v", stream)
-		}
-	}
-
-	// Verify stream_options was removed.
-	if _, ok := receivedBody["stream_options"]; ok {
-		t.Error("Expected stream_options to be removed, but it was present")
-	}
-
-	// Should return ImmediateResponse.
-	if resp.GetImmediateResponse() == nil {
-		t.Fatal("Expected ImmediateResponse, got nil")
-	}
-}
-
-func TestHandleRequestBody_StreamAlwaysSetFalse(t *testing.T) {
-	var receivedBody map[string]interface{}
-
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewDecoder(r.Body).Decode(&receivedBody)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":"test"}`))
-	}))
-	defer mockServer.Close()
-
-	service := newTestService(mockServer.URL)
-
-	// Request without explicit stream field — should still get stream=false.
-	reqBody := map[string]interface{}{
-		"model":    "gpt-4",
-		"messages": []interface{}{},
-	}
-	reqBytes, _ := json.Marshal(reqBody)
-
-	_, err := service.HandleRequestBody(&extproc.HttpBody{Body: reqBytes})
-	if err != nil {
-		t.Fatalf("HandleRequestBody got err: %v", err)
-	}
-
-	if stream, ok := receivedBody["stream"]; !ok {
-		t.Error("Expected stream field to be set, but it was absent")
-	} else if stream != false {
-		t.Errorf("Expected stream=false, got %v", stream)
-	}
-}
-
-func TestHandleRequestBody_LiteLLM4xxPassedThrough(t *testing.T) {
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error":{"message":"Invalid model name","type":"invalid_request_error"}}`))
-	}))
-	defer mockServer.Close()
-
-	service := newTestService(mockServer.URL)
-
-	reqBody := map[string]interface{}{
-		"model":    "nonexistent",
-		"messages": []interface{}{},
-	}
-	reqBytes, _ := json.Marshal(reqBody)
-
-	resp, err := service.HandleRequestBody(&extproc.HttpBody{Body: reqBytes})
-	if err != nil {
-		t.Fatalf("HandleRequestBody got err: %v", err)
-	}
-
-	ir := resp.GetImmediateResponse()
-	if ir == nil {
-		t.Fatal("Expected ImmediateResponse, got nil")
-	}
-
-	// Should pass through the 400 status, not convert to 503.
-	if ir.GetStatus().GetCode().Number() != 400 {
-		t.Errorf("Expected status 400, got %d", ir.GetStatus().GetCode().Number())
-	}
-
-	// Should contain the error message from LiteLLM.
-	if len(ir.GetBody()) == 0 {
-		t.Error("Expected error body from LiteLLM, got empty")
-	}
-}
-
-func TestHandleRequestBody_LiteLLM429PassedThrough(t *testing.T) {
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusTooManyRequests)
-		w.Write([]byte(`{"error":{"message":"Rate limit exceeded","type":"rate_limit_error"}}`))
-	}))
-	defer mockServer.Close()
-
-	service := newTestService(mockServer.URL)
-
-	reqBody := map[string]interface{}{
-		"model":    "gpt-4",
-		"messages": []interface{}{},
-	}
-	reqBytes, _ := json.Marshal(reqBody)
-
-	resp, err := service.HandleRequestBody(&extproc.HttpBody{Body: reqBytes})
-	if err != nil {
-		t.Fatalf("HandleRequestBody got err: %v", err)
-	}
-
-	ir := resp.GetImmediateResponse()
-	if ir == nil {
-		t.Fatal("Expected ImmediateResponse, got nil")
-	}
-
-	if ir.GetStatus().GetCode().Number() != 429 {
-		t.Errorf("Expected status 429, got %d", ir.GetStatus().GetCode().Number())
-	}
-
-	if len(ir.GetBody()) == 0 {
-		t.Error("Expected error body from LiteLLM, got empty")
-	}
-}
-
-func TestHandleRequestBody_LiteLLMUnavailable(t *testing.T) {
-	// Point to a non-existent server.
-	service := newTestService("http://localhost:19999")
-
-	reqBody := map[string]interface{}{
-		"model":    "gpt-4",
-		"messages": []interface{}{},
-	}
-	reqBytes, _ := json.Marshal(reqBody)
-
-	resp, err := service.HandleRequestBody(&extproc.HttpBody{Body: reqBytes})
-	if err != nil {
-		t.Fatalf("HandleRequestBody got err: %v", err)
-	}
-
-	// Should return ImmediateResponse with ServiceUnavailable.
-	if resp.GetImmediateResponse() == nil {
-		t.Fatal("Expected ImmediateResponse for unavailable LiteLLM, got nil")
+	if parseCSVSet("") != nil {
+		t.Error("parseCSVSet(\"\") should return nil")
 	}
 }

@@ -1,53 +1,80 @@
+# LiteLLM configuration.
+#
+# All models are served through Vertex AI. LiteLLM uses Application Default
+# Credentials (ADC) to authenticate — the Cloud Run service account needs
+# `roles/aiplatform.user`. For local dev, run:
+#     gcloud auth application-default login
+#
+# Model names use the `provider/model` convention so users can see which
+# provider they are using in the UI dropdown.
+#
+# The MaaS (Model-as-a-Service) open-source models below require enabling in
+# Model Garden (https://console.cloud.google.com/vertex-ai/model-garden) before
+# first use, and may only be available in specific regions.
+
 model_list:
-  # Google Gemini
-  - model_name: gemini/2.5-flash
+  # Gemini (Google) — available in most Vertex AI regions.
+  - model_name: vertex/gemini-2.5-flash
     litellm_params:
-      model: gemini/gemini-2.5-flash
-      api_key: os.environ/GEMINI_API_KEY
-  - model_name: gemini/2.5-pro
+      model: vertex_ai/gemini-2.5-flash
+      vertex_project: os.environ/GCP_PROJECT_ID
+      vertex_location: os.environ/GCP_REGION
+  - model_name: vertex/gemini-2.5-pro
     litellm_params:
-      model: gemini/gemini-2.5-pro
-      api_key: os.environ/GEMINI_API_KEY
+      model: vertex_ai/gemini-2.5-pro
+      vertex_project: os.environ/GCP_PROJECT_ID
+      vertex_location: os.environ/GCP_REGION
 
-  # Anthropic (uncomment to enable)
-  # - model_name: anthropic/claude-sonnet
+  # Llama 3.3 70B (Meta) — open weights, Model Garden MaaS.
+  - model_name: vertex/llama-3.3-70b
+    litellm_params:
+      model: vertex_ai/meta/llama-3.3-70b-instruct-maas
+      vertex_project: os.environ/GCP_PROJECT_ID
+      vertex_location: us-central1
+
+  # Qwen 3 235B Instruct (Alibaba) — Apache 2.0, Model Garden MaaS.
+  - model_name: vertex/qwen-3-235b
+    litellm_params:
+      model: vertex_ai/qwen/qwen3-235b-a22b-instruct-2507-maas
+      vertex_project: os.environ/GCP_PROJECT_ID
+      vertex_location: us-central1
+
+  # Mistral Small 2503 (Mistral AI) — Mistral Research License, Model Garden MaaS.
+  - model_name: vertex/mistral-small
+    litellm_params:
+      model: vertex_ai/mistral-small-2503
+      vertex_project: os.environ/GCP_PROJECT_ID
+      vertex_location: us-central1
+
+  # Claude Sonnet 4 — intentionally NOT in the default ALLOWED_MODELS list to
+  # demonstrate the callout's allowlist policy (returns 403).
+  # If you need Claude, enable it in Model Garden (us-east5) and add it to
+  # allowed_models in terraform.tfvars.
+  - model_name: vertex/claude-sonnet
+    litellm_params:
+      model: vertex_ai/claude-sonnet-4@20250514
+      vertex_project: os.environ/GCP_PROJECT_ID
+      vertex_location: us-east5
+
+  # ---------------------------------------------------------------
+  # Self-deployed Vertex AI endpoint (uncomment + customize)
+  # ---------------------------------------------------------------
+  # Use this pattern when you deploy a model yourself (from Model Garden or
+  # Hugging Face) to a dedicated Vertex AI endpoint — for example to run Gemma,
+  # DeepSeek, or a fine-tuned model on your own GPU VMs.
+  #
+  # Steps:
+  #   1. In the Console → Vertex AI → Model Garden, click "Deploy model"
+  #      on the model you want (e.g. Gemma 3, Qwen 3.5, DeepSeek V3).
+  #      Vertex will create an Endpoint (VM with attached GPUs).
+  #   2. Copy the numeric endpoint ID from the endpoint details page.
+  #   3. Fill it into the template below and rebuild the LiteLLM image.
+  #
+  # - model_name: vertex/my-self-hosted-model
   #   litellm_params:
-  #     model: anthropic/claude-sonnet-4-20250514
-  #     api_key: os.environ/ANTHROPIC_API_KEY
-
-  # OpenAI (uncomment to enable)
-  # - model_name: openai/gpt-4o
-  #   litellm_params:
-  #     model: openai/gpt-4o
-  #     api_key: os.environ/OPENAI_API_KEY
-
-  # Groq (free tier)
-  - model_name: groq/llama-3.3-70b
-    litellm_params:
-      model: groq/llama-3.3-70b-versatile
-      api_key: os.environ/GROQ_API_KEY
-  - model_name: groq/llama-4-scout
-    litellm_params:
-      model: groq/meta-llama/llama-4-scout-17b-16e-instruct
-      api_key: os.environ/GROQ_API_KEY
-  - model_name: groq/qwen3-32b
-    litellm_params:
-      model: groq/qwen/qwen3-32b
-      api_key: os.environ/GROQ_API_KEY
-
-  # OpenRouter (free models)
-  - model_name: openrouter/gemma-4
-    litellm_params:
-      model: openrouter/google/gemma-4-31b-it:free
-      api_key: os.environ/OPENROUTER_API_KEY
-  - model_name: openrouter/gpt-oss
-    litellm_params:
-      model: openrouter/openai/gpt-oss-120b:free
-      api_key: os.environ/OPENROUTER_API_KEY
-  - model_name: openrouter/qwen3-coder
-    litellm_params:
-      model: openrouter/qwen/qwen3-coder:free
-      api_key: os.environ/OPENROUTER_API_KEY
+  #     model: vertex_ai/openai/ENDPOINT_ID_HERE
+  #     vertex_project: os.environ/GCP_PROJECT_ID
+  #     vertex_location: us-central1
 
 litellm_settings:
   drop_params: true

@@ -29,7 +29,7 @@ variable "callout_image" {
 }
 
 variable "litellm_image" {
-  description = "The container image for the LiteLLM proxy sidecar."
+  description = "The container image for the LiteLLM proxy service (with litellm_config.yaml baked in)."
   type        = string
 }
 
@@ -39,34 +39,14 @@ variable "upstream_app_image" {
   default     = "gcr.io/google-samples/hello-app:1.0"
 }
 
-variable "gemini_api_key" {
-  description = "The Gemini API key for LiteLLM to use when routing to Gemini models."
-  type        = string
-  sensitive   = true
-}
-
-variable "groq_api_key" {
-  description = "The Groq API key for LiteLLM to use when routing to Groq models. Leave empty to disable."
-  type        = string
-  default     = ""
-  sensitive   = true
-}
-
-variable "openrouter_api_key" {
-  description = "The OpenRouter API key for LiteLLM to use when routing to OpenRouter models. Leave empty to disable."
-  type        = string
-  default     = ""
-  sensitive   = true
-}
-
-variable "enable_cors" {
-  description = "Enable CORS headers and OPTIONS preflight handling for browser-based access."
-  type        = bool
-  default     = false
-}
-
 variable "sec_keywords" {
-  description = "Comma-separated keywords to detect in prompts. When found, adds x-sec-keyword response header."
+  description = "Comma-separated prompt keywords. When any message contains one, the callout adds an x-sec-keyword header to the forwarded request."
+  type        = string
+  default     = ""
+}
+
+variable "allowed_models" {
+  description = "Comma-separated model allowlist. Empty means all models are allowed. Disallowed models get rejected with HTTP 403."
   type        = string
   default     = ""
 }

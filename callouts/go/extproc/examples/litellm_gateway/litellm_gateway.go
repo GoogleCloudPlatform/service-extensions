@@ -15,15 +15,11 @@
 package litellm_gateway
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	extprocfilter "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ext_proc/v3"
@@ -34,80 +30,115 @@ import (
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/pkg/utils"
 )
 
-// llmEndpoints maps supported LLM API paths to their LiteLLM endpoint.
-var llmEndpoints = map[string]string{
-	"/v1/chat/completions": "/v1/chat/completions",
-	"/v1/completions":      "/v1/completions",
-	"/v1/embeddings":       "/v1/embeddings",
-	"/v1/models":           "/v1/models",
-	"/chat/completions":    "/v1/chat/completions",
-	"/completions":         "/v1/completions",
-	"/embeddings":          "/v1/embeddings",
+// Header names the callout emits.
+const (
+	headerRouted  = "x-litellm-routed"
+	headerPolicy  = "x-litellm-policy"
+	headerSecKW   = "x-sec-keyword"
+	policyAllowed = "allowed"
+)
+
+// llmEndpoints is the set of paths that the callout inspects.
+// Requests to other paths pass through unchanged.
+var llmEndpoints = map[string]bool{
+	"/v1/chat/completions": true,
+	"/v1/completions":      true,
+	"/v1/embeddings":       true,
+	"/v1/models":           true,
+	"/chat/completions":    true,
+	"/completions":         true,
+	"/embeddings":          true,
 }
 
-// corsHeaders returns CORS headers when ENABLE_CORS is set, or nil otherwise.
-func (s *ExampleCalloutService) corsHeaders() []*core.HeaderValueOption {
-	if !s.enableCORS {
-		return nil
-	}
-	return []*core.HeaderValueOption{
-		{Header: &core.HeaderValue{Key: "access-control-allow-origin", RawValue: []byte("*")}},
-		{Header: &core.HeaderValue{Key: "access-control-allow-methods", RawValue: []byte("GET, POST, OPTIONS")}},
-		{Header: &core.HeaderValue{Key: "access-control-allow-headers", RawValue: []byte("content-type, authorization")}},
-	}
-}
-
-// ExampleCalloutService is a gRPC callout service that routes LLM requests through LiteLLM.
+// ExampleCalloutService inspects LLM requests and enforces policies before
+// they reach the LiteLLM upstream.
 type ExampleCalloutService struct {
 	server.GRPCCalloutService
-	httpClient  *http.Client
-	litellmURL  string
-	litellmKey  string
-	enableCORS  bool
-	secKeywords []string // Keywords to detect in prompts — adds x-sec-keyword header when found.
+
+	// secKeywords are lowercased prompt keywords. When any message content
+	// contains one, the callout adds an x-sec-keyword header on both the
+	// forwarded request and the returned response.
+	secKeywords []string
+
+	// allowedModels is the set of model names a client may request. Empty
+	// means all models are allowed.
+	allowedModels map[string]bool
 }
 
-// NewExampleCalloutService creates a new LiteLLM gateway callout service.
+// NewExampleCalloutService creates a new callout configured from environment
+// variables:
+//
+//	SEC_KEYWORDS   comma-separated prompt keywords to tag with x-sec-keyword
+//	ALLOWED_MODELS comma-separated model allowlist (empty = allow all)
 func NewExampleCalloutService() *ExampleCalloutService {
-	litellmURL := os.Getenv("LITELLM_BASE_URL")
-	if litellmURL == "" {
-		litellmURL = "http://localhost:4000"
-	}
-	litellmKey := os.Getenv("LITELLM_MASTER_KEY")
-	enableCORS := os.Getenv("ENABLE_CORS") == "true"
-
-	var secKeywords []string
-	if kw := os.Getenv("SEC_KEYWORDS"); kw != "" {
-		for _, k := range strings.Split(kw, ",") {
-			if trimmed := strings.TrimSpace(k); trimmed != "" {
-				secKeywords = append(secKeywords, strings.ToLower(trimmed))
-			}
-		}
-		log.Printf("SEC_KEYWORDS enabled: %v", secKeywords)
-	}
-
 	service := &ExampleCalloutService{
-		httpClient: &http.Client{
-			// The Service Extensions traffic extension timeout is 10s.
-			// This timeout is set higher to allow for local testing without the ALB.
-			// In production behind the ALB, Envoy will terminate the ext_proc stream
-			// at the extension timeout, regardless of this value.
-			Timeout: 120 * time.Second,
-		},
-		litellmURL:  strings.TrimRight(litellmURL, "/"),
-		litellmKey:  litellmKey,
-		enableCORS:  enableCORS,
-		secKeywords: secKeywords,
+		secKeywords:   parseCSVLower(os.Getenv("SEC_KEYWORDS")),
+		allowedModels: parseCSVSet(os.Getenv("ALLOWED_MODELS")),
 	}
-	service.Handlers.RequestHeadersHandler = service.HandleRequestHeaders
-	service.Handlers.RequestBodyHandler = service.HandleRequestBody
+
+	if len(service.secKeywords) > 0 {
+		log.Printf("SEC_KEYWORDS enabled: %v", service.secKeywords)
+	}
+	if len(service.allowedModels) > 0 {
+		allowed := make([]string, 0, len(service.allowedModels))
+		for m := range service.allowedModels {
+			allowed = append(allowed, m)
+		}
+		log.Printf("ALLOWED_MODELS enabled: %v", allowed)
+	}
+
 	return service
 }
 
-// HandleRequestHeaders checks if the request path is an LLM endpoint.
-func (s *ExampleCalloutService) HandleRequestHeaders(headers *extproc.HttpHeaders) (*extproc.ProcessingResponse, error) {
-	path := ""
-	method := ""
+// Process overrides the framework's default stream loop so we can maintain
+// per-stream state. Keywords detected in the request body phase are carried
+// over to the response headers phase and mirrored onto the response.
+func (s *ExampleCalloutService) Process(stream extproc.ExternalProcessor_ProcessServer) error {
+	var matchedKeywords []string
+
+	for {
+		req, err := stream.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		var (
+			response   *extproc.ProcessingResponse
+			handlerErr error
+		)
+
+		switch {
+		case req.GetRequestHeaders() != nil:
+			response, handlerErr = s.handleRequestHeaders(req.GetRequestHeaders())
+		case req.GetRequestBody() != nil:
+			response, matchedKeywords, handlerErr = s.handleRequestBody(req.GetRequestBody())
+		case req.GetResponseHeaders() != nil:
+			response, handlerErr = s.handleResponseHeaders(matchedKeywords)
+		default:
+			// Phases we don't subscribe to — skip silently.
+			continue
+		}
+
+		if handlerErr != nil {
+			return handlerErr
+		}
+		if response == nil {
+			continue
+		}
+		if err := stream.Send(response); err != nil {
+			return err
+		}
+	}
+}
+
+// handleRequestHeaders inspects the request path. For LLM endpoints it requests
+// body buffering AND response headers so we can mirror keywords onto the
+// response. For non-LLM endpoints it returns a pass-through.
+func (s *ExampleCalloutService) handleRequestHeaders(headers *extproc.HttpHeaders) (*extproc.ProcessingResponse, error) {
+	path, method := "", ""
 	for _, h := range headers.GetHeaders().GetHeaders() {
 		switch h.GetKey() {
 		case ":path":
@@ -119,105 +150,131 @@ func (s *ExampleCalloutService) HandleRequestHeaders(headers *extproc.HttpHeader
 
 	log.Printf("Request %s %s", method, path)
 
-	// Handle CORS preflight for browser access (requires ENABLE_CORS=true).
-	if s.enableCORS && method == "OPTIONS" {
-		return &extproc.ProcessingResponse{
-			Response: &extproc.ProcessingResponse_ImmediateResponse{
-				ImmediateResponse: &extproc.ImmediateResponse{
-					Status: &httpstatus.HttpStatus{Code: httpstatus.StatusCode_NoContent},
-					Headers: &extproc.HeaderMutation{
-						SetHeaders: s.corsHeaders(),
-					},
-				},
-			},
-		}, nil
+	if !llmEndpoints[path] {
+		return passThrough(), nil
 	}
 
-	// Handle GET /v1/models — proxy directly from headers phase (no body needed).
-	if path == "/v1/models" && method == "GET" {
-		return s.handleModelsRequest()
-	}
-
-	if _, isLLM := llmEndpoints[path]; !isLLM {
-		// Not an LLM endpoint — pass through unmodified.
-		return &extproc.ProcessingResponse{
-			Response: &extproc.ProcessingResponse_RequestHeaders{
-				RequestHeaders: &extproc.HeadersResponse{},
-			},
-		}, nil
-	}
-
-	// LLM endpoint — add marker header and request body buffering.
-	return &extproc.ProcessingResponse{
+	resp := &extproc.ProcessingResponse{
 		Response: &extproc.ProcessingResponse_RequestHeaders{
 			RequestHeaders: utils.AddHeaderMutation(
-				[]struct{ Key, Value string }{
-					{Key: "x-litellm-routed", Value: "true"},
-				},
+				[]struct{ Key, Value string }{{Key: headerRouted, Value: "true"}},
 				nil, false, nil,
 			),
 		},
-		ModeOverride: &extprocfilter.ProcessingMode{
-			RequestBodyMode: extprocfilter.ProcessingMode_BUFFERED,
-		},
-	}, nil
+	}
+
+	// For POSTs we need buffered body mode so HandleRequestBody can inspect
+	// the JSON payload, and we opt into the response headers phase so we can
+	// mirror x-sec-keyword onto the client-facing response.
+	// GET /v1/models has no request body, so it flows through with only the
+	// marker header.
+	if method != "GET" {
+		resp.ModeOverride = &extprocfilter.ProcessingMode{
+			RequestBodyMode:    extprocfilter.ProcessingMode_BUFFERED,
+			ResponseHeaderMode: extprocfilter.ProcessingMode_SEND,
+		}
+	}
+	return resp, nil
 }
 
-// handleModelsRequest proxies GET /v1/models to LiteLLM and returns the result.
-func (s *ExampleCalloutService) handleModelsRequest() (*extproc.ProcessingResponse, error) {
-	url := s.litellmURL + "/v1/models"
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create models request: %w", err)
-	}
-	if s.litellmKey != "" {
-		req.Header.Set("Authorization", "Bearer "+s.litellmKey)
-	}
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		log.Printf("Failed to fetch models from LiteLLM: %v", err)
+// handleRequestBody enforces policies on the buffered request body:
+//
+//  1. Reject invalid JSON with 400.
+//  2. Reject disallowed models with 403 (if ALLOWED_MODELS is set).
+//  3. Tag requests containing configured keywords with x-sec-keyword on the
+//     forwarded request. The matched keyword list is returned so the response
+//     phase can mirror it.
+func (s *ExampleCalloutService) handleRequestBody(body *extproc.HttpBody) (*extproc.ProcessingResponse, []string, error) {
+	rawBody := body.GetBody()
+	if len(rawBody) == 0 {
 		return &extproc.ProcessingResponse{
-			Response: &extproc.ProcessingResponse_ImmediateResponse{
-				ImmediateResponse: utils.HeaderImmediateResponse(
-					httpstatus.StatusCode_ServiceUnavailable, nil, nil, nil,
-				),
+			Response: &extproc.ProcessingResponse_RequestBody{
+				RequestBody: &extproc.BodyResponse{},
+			},
+		}, nil, nil
+	}
+
+	var reqMap map[string]interface{}
+	if err := json.Unmarshal(rawBody, &reqMap); err != nil {
+		log.Printf("Invalid JSON body: %v", err)
+		return immediateError(httpstatus.StatusCode_BadRequest), nil, nil
+	}
+
+	// Model allowlist enforcement.
+	if len(s.allowedModels) > 0 {
+		model, _ := reqMap["model"].(string)
+		if !s.allowedModels[model] {
+			log.Printf("Rejected disallowed model: %q", model)
+			return immediateError(httpstatus.StatusCode_Forbidden), nil, nil
+		}
+	}
+
+	// Keyword detection.
+	matched := s.detectKeywords(reqMap)
+	if len(matched) > 0 {
+		log.Printf("SEC keywords detected: %v", matched)
+	}
+
+	// Build header mutations for the forwarded request.
+	setHeaders := []*core.HeaderValueOption{
+		{Header: &core.HeaderValue{Key: headerPolicy, RawValue: []byte(policyAllowed)}},
+	}
+	if len(matched) > 0 {
+		setHeaders = append(setHeaders, &core.HeaderValueOption{
+			Header: &core.HeaderValue{
+				Key:      headerSecKW,
+				RawValue: []byte(strings.Join(matched, ",")),
+			},
+		})
+	}
+
+	return &extproc.ProcessingResponse{
+		Response: &extproc.ProcessingResponse_RequestBody{
+			RequestBody: &extproc.BodyResponse{
+				Response: &extproc.CommonResponse{
+					HeaderMutation: &extproc.HeaderMutation{
+						SetHeaders: setHeaders,
+					},
+				},
+			},
+		},
+	}, matched, nil
+}
+
+// handleResponseHeaders mirrors the x-sec-keyword header onto the response so
+// clients can see which keywords matched without needing access to logs.
+func (s *ExampleCalloutService) handleResponseHeaders(matchedKeywords []string) (*extproc.ProcessingResponse, error) {
+	if len(matchedKeywords) == 0 {
+		// Nothing to tag — just acknowledge the phase.
+		return &extproc.ProcessingResponse{
+			Response: &extproc.ProcessingResponse_ResponseHeaders{
+				ResponseHeaders: &extproc.HeadersResponse{},
 			},
 		}, nil
 	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read models response: %w", err)
-	}
-
-	responseHeaders := append(s.corsHeaders(),
-		&core.HeaderValueOption{
-			Header: &core.HeaderValue{Key: "content-type", RawValue: []byte("application/json")},
-		},
-		&core.HeaderValueOption{
-			Header: &core.HeaderValue{Key: "x-litellm-gateway", RawValue: []byte("true")},
-		},
-	)
 
 	return &extproc.ProcessingResponse{
-		Response: &extproc.ProcessingResponse_ImmediateResponse{
-			ImmediateResponse: &extproc.ImmediateResponse{
-				Status: &httpstatus.HttpStatus{
-					Code: httpstatus.StatusCode(resp.StatusCode),
+		Response: &extproc.ProcessingResponse_ResponseHeaders{
+			ResponseHeaders: &extproc.HeadersResponse{
+				Response: &extproc.CommonResponse{
+					HeaderMutation: &extproc.HeaderMutation{
+						SetHeaders: []*core.HeaderValueOption{
+							{
+								Header: &core.HeaderValue{
+									Key:      headerSecKW,
+									RawValue: []byte(strings.Join(matchedKeywords, ",")),
+								},
+							},
+						},
+					},
 				},
-				Headers: &extproc.HeaderMutation{
-					SetHeaders: responseHeaders,
-				},
-				Body: body,
 			},
 		},
 	}, nil
 }
 
-// detectKeywords scans messages for configured keywords and returns matched ones.
+// detectKeywords scans the `messages` array in the request body for any of the
+// configured keywords. Matching is case-insensitive.
 func (s *ExampleCalloutService) detectKeywords(reqMap map[string]interface{}) []string {
 	if len(s.secKeywords) == 0 {
 		return nil
@@ -249,146 +306,61 @@ func (s *ExampleCalloutService) detectKeywords(reqMap map[string]interface{}) []
 	return matched
 }
 
-// HandleRequestBody forwards the LLM request body to LiteLLM and replaces it with the response.
-func (s *ExampleCalloutService) HandleRequestBody(body *extproc.HttpBody) (*extproc.ProcessingResponse, error) {
-	rawBody := body.GetBody()
-	if len(rawBody) == 0 {
-		return &extproc.ProcessingResponse{
-			Response: &extproc.ProcessingResponse_RequestBody{
-				RequestBody: &extproc.BodyResponse{},
-			},
-		}, nil
-	}
-
-	// Parse JSON body.
-	var reqMap map[string]interface{}
-	if err := json.Unmarshal(rawBody, &reqMap); err != nil {
-		log.Printf("Invalid JSON body: %v", err)
-		return &extproc.ProcessingResponse{
-			Response: &extproc.ProcessingResponse_ImmediateResponse{
-				ImmediateResponse: utils.HeaderImmediateResponse(
-					httpstatus.StatusCode_BadRequest, nil, nil, nil,
-				),
-			},
-		}, nil
-	}
-
-	// Force non-streaming — ImmediateResponse cannot carry SSE chunks.
-	reqMap["stream"] = false
-	delete(reqMap, "stream_options")
-
-	modifiedBody, err := json.Marshal(reqMap)
-	if err != nil {
-		log.Printf("Failed to marshal modified body: %v", err)
-		return &extproc.ProcessingResponse{
-			Response: &extproc.ProcessingResponse_ImmediateResponse{
-				ImmediateResponse: utils.HeaderImmediateResponse(
-					httpstatus.StatusCode_InternalServerError, nil, nil, nil,
-				),
-			},
-		}, nil
-	}
-
-	// Determine the LiteLLM endpoint from the request body structure.
-	// The header phase already validated this is an LLM path.
-	endpoint := "/v1/chat/completions"
-	if _, hasInput := reqMap["input"]; hasInput {
-		endpoint = "/v1/embeddings"
-	} else if _, hasPrompt := reqMap["prompt"]; hasPrompt {
-		if _, hasMessages := reqMap["messages"]; !hasMessages {
-			endpoint = "/v1/completions"
-		}
-	}
-
-	// Detect keywords in the prompt for security/demo tagging.
-	matchedKeywords := s.detectKeywords(reqMap)
-	if len(matchedKeywords) > 0 {
-		log.Printf("SEC keywords detected: %v", matchedKeywords)
-	}
-
-	// Forward to LiteLLM.
-	litellmResp, statusCode, err := s.forwardToLiteLLM(endpoint, modifiedBody)
-	if err != nil {
-		log.Printf("LiteLLM error: %v", err)
-		return &extproc.ProcessingResponse{
-			Response: &extproc.ProcessingResponse_ImmediateResponse{
-				ImmediateResponse: utils.HeaderImmediateResponse(
-					httpstatus.StatusCode_ServiceUnavailable, nil, nil, nil,
-				),
-			},
-		}, nil
-	}
-
-	// Map HTTP status to envoy status code.
-	// Verify the code is a known enum value; fall back to BadGateway for unknown codes.
-	envoyStatus := httpstatus.StatusCode(statusCode)
-	if _, valid := httpstatus.StatusCode_name[int32(statusCode)]; !valid {
-		envoyStatus = httpstatus.StatusCode_BadGateway
-	}
-
-	// Build response headers.
-	responseHeaders := append(s.corsHeaders(),
-		&core.HeaderValueOption{
-			Header: &core.HeaderValue{Key: "content-type", RawValue: []byte("application/json")},
-		},
-		&core.HeaderValueOption{
-			Header: &core.HeaderValue{Key: "x-litellm-gateway", RawValue: []byte("true")},
-		},
-	)
-	if len(matchedKeywords) > 0 {
-		responseHeaders = append(responseHeaders, &core.HeaderValueOption{
-			Header: &core.HeaderValue{
-				Key:      "x-sec-keyword",
-				RawValue: []byte(strings.Join(matchedKeywords, ",")),
-			},
-		})
-	}
-
-	// Return LiteLLM response directly to the client via ImmediateResponse.
+// passThrough returns a no-op RequestHeaders response so non-LLM traffic is
+// unaffected by the callout.
+func passThrough() *extproc.ProcessingResponse {
 	return &extproc.ProcessingResponse{
-		Response: &extproc.ProcessingResponse_ImmediateResponse{
-			ImmediateResponse: &extproc.ImmediateResponse{
-				Status: &httpstatus.HttpStatus{
-					Code: envoyStatus,
-				},
-				Headers: &extproc.HeaderMutation{
-					SetHeaders: responseHeaders,
-				},
-				Body: litellmResp,
-			},
+		Response: &extproc.ProcessingResponse_RequestHeaders{
+			RequestHeaders: &extproc.HeadersResponse{},
 		},
-	}, nil
+	}
 }
 
-// forwardToLiteLLM sends the request body to the LiteLLM proxy and returns the response body and HTTP status.
-// For client errors (4xx), the response body is returned so the caller can pass the error details to the client.
-// For network errors, it returns a nil body and a non-nil error.
-func (s *ExampleCalloutService) forwardToLiteLLM(endpoint string, body []byte) ([]byte, int, error) {
-	url := s.litellmURL + endpoint
-
-	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+// immediateError short-circuits the request with the given HTTP status code
+// and an empty body. Used to reject invalid or disallowed requests.
+func immediateError(code httpstatus.StatusCode) *extproc.ProcessingResponse {
+	return &extproc.ProcessingResponse{
+		Response: &extproc.ProcessingResponse_ImmediateResponse{
+			ImmediateResponse: utils.HeaderImmediateResponse(code, nil, nil, nil),
+		},
 	}
-	req.Header.Set("Content-Type", "application/json")
-	if s.litellmKey != "" {
-		req.Header.Set("Authorization", "Bearer "+s.litellmKey)
-	}
+}
 
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to reach LiteLLM: %w", err)
+// splitCSV splits a comma-separated list and trims whitespace around each
+// non-empty element. Returns nil for empty input.
+func splitCSV(csv string) []string {
+	if csv == "" {
+		return nil
 	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to read LiteLLM response: %w", err)
+	var out []string
+	for _, item := range strings.Split(csv, ",") {
+		if t := strings.TrimSpace(item); t != "" {
+			out = append(out, t)
+		}
 	}
+	return out
+}
 
-	if resp.StatusCode >= 500 {
-		return nil, 0, fmt.Errorf("LiteLLM returned status %d: %s", resp.StatusCode, string(respBody))
+// parseCSVLower splits a comma-separated list, trims whitespace, and lowercases
+// each element. Empty input returns nil.
+func parseCSVLower(csv string) []string {
+	items := splitCSV(csv)
+	for i, v := range items {
+		items[i] = strings.ToLower(v)
 	}
+	return items
+}
 
-	return respBody, resp.StatusCode, nil
+// parseCSVSet splits a comma-separated list into a lookup set. Empty input
+// returns nil (which callers should treat as "allow all").
+func parseCSVSet(csv string) map[string]bool {
+	items := splitCSV(csv)
+	if items == nil {
+		return nil
+	}
+	set := make(map[string]bool, len(items))
+	for _, v := range items {
+		set[v] = true
+	}
+	return set
 }

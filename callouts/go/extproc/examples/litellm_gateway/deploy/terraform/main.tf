@@ -40,12 +40,12 @@ data "google_project" "project" {
 
 resource "google_project_service" "apis" {
   for_each = toset([
+    "aiplatform.googleapis.com",
+    "artifactregistry.googleapis.com",
     "compute.googleapis.com",
     "iam.googleapis.com",
     "networkservices.googleapis.com",
     "run.googleapis.com",
-    "secretmanager.googleapis.com",
-    "artifactregistry.googleapis.com",
   ])
   service            = each.key
   disable_on_destroy = false
@@ -79,86 +79,33 @@ resource "google_compute_subnetwork" "proxy_only" {
 }
 
 # ===================================================================
-# SECRET MANAGER — LLM PROVIDER API KEYS
+# SERVICE ACCOUNT — LITELLM (calls Vertex AI via ADC)
 # ===================================================================
 
-resource "google_secret_manager_secret" "gemini_api_key" {
-  secret_id = "litellm-gemini-api-key"
-  replication {
-    auto {}
-  }
-  depends_on = [google_project_service.apis]
+resource "google_service_account" "litellm" {
+  account_id   = "litellm-gateway-sa"
+  display_name = "LiteLLM Gateway service account"
+  description  = "Runs the LiteLLM proxy Cloud Run service. Needs aiplatform.user to call Vertex AI."
+  depends_on   = [google_project_service.apis]
 }
 
-resource "google_secret_manager_secret_version" "gemini_api_key" {
-  secret      = google_secret_manager_secret.gemini_api_key.id
-  secret_data = var.gemini_api_key
-}
-
-resource "google_secret_manager_secret_iam_member" "gemini_key_accessor" {
-  secret_id = google_secret_manager_secret.gemini_api_key.id
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
-}
-
-# Groq (optional — only created if groq_api_key is set).
-resource "google_secret_manager_secret" "groq_api_key" {
-  count     = var.groq_api_key == "" ? 0 : 1
-  secret_id = "litellm-groq-api-key"
-  replication {
-    auto {}
-  }
-  depends_on = [google_project_service.apis]
-}
-
-resource "google_secret_manager_secret_version" "groq_api_key" {
-  count       = var.groq_api_key == "" ? 0 : 1
-  secret      = google_secret_manager_secret.groq_api_key[0].id
-  secret_data = var.groq_api_key
-}
-
-resource "google_secret_manager_secret_iam_member" "groq_key_accessor" {
-  count     = var.groq_api_key == "" ? 0 : 1
-  secret_id = google_secret_manager_secret.groq_api_key[0].id
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
-}
-
-# OpenRouter (optional — only created if openrouter_api_key is set).
-resource "google_secret_manager_secret" "openrouter_api_key" {
-  count     = var.openrouter_api_key == "" ? 0 : 1
-  secret_id = "litellm-openrouter-api-key"
-  replication {
-    auto {}
-  }
-  depends_on = [google_project_service.apis]
-}
-
-resource "google_secret_manager_secret_version" "openrouter_api_key" {
-  count       = var.openrouter_api_key == "" ? 0 : 1
-  secret      = google_secret_manager_secret.openrouter_api_key[0].id
-  secret_data = var.openrouter_api_key
-}
-
-resource "google_secret_manager_secret_iam_member" "openrouter_key_accessor" {
-  count     = var.openrouter_api_key == "" ? 0 : 1
-  secret_id = google_secret_manager_secret.openrouter_api_key[0].id
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+resource "google_project_iam_member" "litellm_vertex_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.litellm.email}"
 }
 
 # ===================================================================
-# CLOUD RUN — LITELLM GATEWAY CALLOUT (Go ext_proc + LiteLLM sidecar)
+# CLOUD RUN — CALLOUT
 # ===================================================================
 
-resource "google_cloud_run_v2_service" "litellm_gateway" {
+resource "google_cloud_run_v2_service" "callout" {
   name                = "litellm-gateway-callout"
   location            = var.region
   deletion_protection = false
   ingress             = "INGRESS_TRAFFIC_ALL"
 
   template {
-    # Go ext_proc callout — the ingress container.
     containers {
       name  = "callout"
       image = var.callout_image
@@ -171,16 +118,12 @@ resource "google_cloud_run_v2_service" "litellm_gateway" {
         value = "litellm_gateway"
       }
       env {
-        name  = "LITELLM_BASE_URL"
-        value = "http://localhost:4000"
-      }
-      env {
-        name  = "ENABLE_CORS"
-        value = var.enable_cors ? "true" : "false"
-      }
-      env {
         name  = "SEC_KEYWORDS"
         value = var.sec_keywords
+      }
+      env {
+        name  = "ALLOWED_MODELS"
+        value = var.allowed_models
       }
       resources {
         limits = {
@@ -206,42 +149,69 @@ resource "google_cloud_run_v2_service" "litellm_gateway" {
       }
     }
 
-    # LiteLLM proxy sidecar — routes to Gemini/Groq/OpenRouter/etc.
+    scaling {
+      min_instance_count = 1
+      max_instance_count = 10
+    }
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_cloud_run_v2_service_iam_member" "callout_public_invoker" {
+  name     = google_cloud_run_v2_service.callout.name
+  location = google_cloud_run_v2_service.callout.location
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+resource "google_compute_region_network_endpoint_group" "callout_neg" {
+  name                  = "litellm-gateway-callout-neg"
+  region                = var.region
+  network_endpoint_type = "SERVERLESS"
+  cloud_run {
+    service = google_cloud_run_v2_service.callout.name
+  }
+}
+
+resource "google_compute_region_backend_service" "callout_backend" {
+  name                  = "litellm-gateway-callout-be"
+  region                = var.region
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+  protocol              = "HTTP2"
+  backend {
+    group           = google_compute_region_network_endpoint_group.callout_neg.id
+    balancing_mode  = "UTILIZATION"
+    capacity_scaler = 1.0
+  }
+}
+
+# ===================================================================
+# CLOUD RUN — LITELLM
+# ===================================================================
+
+resource "google_cloud_run_v2_service" "litellm" {
+  name                = "litellm-gateway-litellm"
+  location            = var.region
+  deletion_protection = false
+  ingress             = "INGRESS_TRAFFIC_ALL"
+
+  template {
+    service_account = google_service_account.litellm.email
+
     containers {
       name  = "litellm"
       image = var.litellm_image
+      ports {
+        container_port = 4000
+      }
       env {
-        name = "GEMINI_API_KEY"
-        value_source {
-          secret_key_ref {
-            secret  = google_secret_manager_secret.gemini_api_key.secret_id
-            version = "latest"
-          }
-        }
+        name  = "GCP_PROJECT_ID"
+        value = var.project_id
       }
-      dynamic "env" {
-        for_each = var.groq_api_key == "" ? [] : [1]
-        content {
-          name = "GROQ_API_KEY"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.groq_api_key[0].secret_id
-              version = "latest"
-            }
-          }
-        }
-      }
-      dynamic "env" {
-        for_each = var.openrouter_api_key == "" ? [] : [1]
-        content {
-          name = "OPENROUTER_API_KEY"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.openrouter_api_key[0].secret_id
-              version = "latest"
-            }
-          }
-        }
+      env {
+        name  = "GCP_REGION"
+        value = var.region
       }
       resources {
         limits = {
@@ -275,44 +245,40 @@ resource "google_cloud_run_v2_service" "litellm_gateway" {
 
   depends_on = [
     google_project_service.apis,
-    google_secret_manager_secret_version.gemini_api_key,
-    google_secret_manager_secret_iam_member.gemini_key_accessor,
+    google_project_iam_member.litellm_vertex_user,
   ]
 }
 
-# Allow the load balancer to invoke the Cloud Run service.
-resource "google_cloud_run_v2_service_iam_member" "callout_public_invoker" {
-  name     = google_cloud_run_v2_service.litellm_gateway.name
-  location = google_cloud_run_v2_service.litellm_gateway.location
+resource "google_cloud_run_v2_service_iam_member" "litellm_public_invoker" {
+  name     = google_cloud_run_v2_service.litellm.name
+  location = google_cloud_run_v2_service.litellm.location
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
 
-# Serverless NEG to connect Cloud Run to the load balancer.
-resource "google_compute_region_network_endpoint_group" "callout_neg" {
-  name                  = "litellm-gateway-neg"
+resource "google_compute_region_network_endpoint_group" "litellm_neg" {
+  name                  = "litellm-gateway-litellm-neg"
   region                = var.region
   network_endpoint_type = "SERVERLESS"
   cloud_run {
-    service = google_cloud_run_v2_service.litellm_gateway.name
+    service = google_cloud_run_v2_service.litellm.name
   }
 }
 
-# Backend service for the callout — used by Service Extensions.
-resource "google_compute_region_backend_service" "callout_backend" {
-  name                  = "litellm-gateway-callout-be"
+resource "google_compute_region_backend_service" "litellm_backend" {
+  name                  = "litellm-gateway-litellm-be"
   region                = var.region
   load_balancing_scheme = "EXTERNAL_MANAGED"
-  protocol              = "HTTP2"
+  protocol              = "HTTPS"
   backend {
-    group           = google_compute_region_network_endpoint_group.callout_neg.id
+    group           = google_compute_region_network_endpoint_group.litellm_neg.id
     balancing_mode  = "UTILIZATION"
     capacity_scaler = 1.0
   }
 }
 
 # ===================================================================
-# CLOUD RUN — UPSTREAM APPLICATION (receives non-LLM traffic)
+# CLOUD RUN — UPSTREAM APPLICATION (non-LLM traffic)
 # ===================================================================
 
 resource "google_cloud_run_v2_service" "upstream_app" {
@@ -394,10 +360,54 @@ resource "google_compute_region_ssl_certificate" "lb_cert" {
   certificate = tls_self_signed_cert.lb_cert.cert_pem
 }
 
+# URL map routes LLM paths to the LiteLLM backend; everything else goes to
+# the upstream app.
 resource "google_compute_region_url_map" "url_map" {
   name            = "litellm-gateway-url-map"
   region          = var.region
   default_service = google_compute_region_backend_service.upstream_backend.id
+
+  host_rule {
+    hosts        = ["*"]
+    path_matcher = "llm"
+  }
+
+  path_matcher {
+    name            = "llm"
+    default_service = google_compute_region_backend_service.upstream_backend.id
+
+    route_rules {
+      priority = 1
+      match_rules {
+        prefix_match = "/v1/"
+      }
+      service = google_compute_region_backend_service.litellm_backend.id
+    }
+
+    route_rules {
+      priority = 2
+      match_rules {
+        prefix_match = "/chat/"
+      }
+      service = google_compute_region_backend_service.litellm_backend.id
+    }
+
+    route_rules {
+      priority = 3
+      match_rules {
+        prefix_match = "/completions"
+      }
+      service = google_compute_region_backend_service.litellm_backend.id
+    }
+
+    route_rules {
+      priority = 4
+      match_rules {
+        prefix_match = "/embeddings"
+      }
+      service = google_compute_region_backend_service.litellm_backend.id
+    }
+  }
 }
 
 resource "google_compute_region_target_https_proxy" "https_proxy" {
@@ -420,10 +430,10 @@ resource "google_compute_forwarding_rule" "forwarding_rule" {
 }
 
 # ===================================================================
-# SERVICE EXTENSIONS — TRAFFIC EXTENSION FOR LLM ROUTING
+# SERVICE EXTENSIONS — TRAFFIC EXTENSION (calls the callout for LLM paths)
 # ===================================================================
 
-resource "google_network_services_lb_traffic_extension" "litellm_gateway" {
+resource "google_network_services_lb_traffic_extension" "callout" {
   name                  = "litellm-gateway-traffic-ext"
   location              = var.region
   load_balancing_scheme = "EXTERNAL_MANAGED"
@@ -439,7 +449,7 @@ resource "google_network_services_lb_traffic_extension" "litellm_gateway" {
       name             = "litellm-gateway-callout"
       service          = google_compute_region_backend_service.callout_backend.self_link
       authority        = "litellm-gateway.example.com"
-      supported_events = ["REQUEST_HEADERS", "REQUEST_BODY"]
+      supported_events = ["REQUEST_HEADERS", "REQUEST_BODY", "RESPONSE_HEADERS"]
       timeout          = "10s"
     }
   }
@@ -456,8 +466,13 @@ output "load_balancer_ip" {
 }
 
 output "callout_service_url" {
-  description = "The URL of the LiteLLM Gateway callout Cloud Run service."
-  value       = google_cloud_run_v2_service.litellm_gateway.uri
+  description = "The URL of the callout (policy enforcer) Cloud Run service."
+  value       = google_cloud_run_v2_service.callout.uri
+}
+
+output "litellm_service_url" {
+  description = "The URL of the LiteLLM proxy Cloud Run service."
+  value       = google_cloud_run_v2_service.litellm.uri
 }
 
 output "upstream_service_url" {
@@ -470,6 +485,6 @@ output "curl_test_command" {
   value       = <<-EOT
     curl -sk -X POST https://${google_compute_address.lb_ip.address}/v1/chat/completions \
       -H "Content-Type: application/json" \
-      -d '{"model": "gemini", "messages": [{"role": "user", "content": "Hello"}]}'
+      -d '{"model": "vertex/gemini-2.5-flash", "messages": [{"role": "user", "content": "Hello"}]}'
   EOT
 }
