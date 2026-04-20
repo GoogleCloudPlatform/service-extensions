@@ -1,0 +1,87 @@
+# Generate JWT Token for Pro User
+test {
+  name: "generate_jwt_token_pro_user"
+
+  request {
+    headers {
+      key: ":method"
+      value: "POST"
+    }
+    headers {
+      key: ":path"
+      value: "/generate-token"
+    }
+    headers {
+      key: ":authority"
+      value: "api.example.com"
+    }
+    headers {
+      key: "x-user-id"
+      value: "user-451"
+    }
+    headers {
+      key: "x-expiration-minutes"
+      value: "120"
+    }
+  }
+
+  expected_response {
+    status: 200
+    headers {
+      key: "content-type"
+      value: "application/json"
+    }
+  }
+}
+
+# Generate JWT Token with Default Expiration
+test {
+  name: "generate_jwt_token_default_expiration"
+
+  request {
+    headers {
+      key: ":method"
+      value: "POST"
+    }
+    headers {
+      key: ":path"
+      value: "/generate-token"
+    }
+    headers {
+      key: ":authority"
+      value: "api.example.com"
+    }
+    headers {
+      key: "x-user-id"
+      value: "user-789"
+    }
+  }
+
+  expected_response {
+    status: 200
+  }
+}
+
+# Generate Token - Missing User ID
+test {
+  name: "generate_token_missing_user_id"
+
+  request {
+    headers {
+      key: ":method"
+      value: "POST"
+    }
+    headers {
+      key: ":path"
+      value: "/generate-token"
+    }
+    headers {
+      key: ":authority"
+      value: "api.example.com"
+    }
+  }
+
+  expected_response {
+    status: 400
+  }
+}
