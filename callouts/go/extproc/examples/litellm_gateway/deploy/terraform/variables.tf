@@ -39,6 +39,12 @@ variable "upstream_app_image" {
   default     = "gcr.io/google-samples/hello-app:1.0"
 }
 
+variable "litellm_service_account" {
+  description = "Email of the service account used by the LiteLLM Cloud Run service. Must have roles/aiplatform.user. If empty, the project's default compute SA is used."
+  type        = string
+  default     = ""
+}
+
 variable "sec_keywords" {
   description = "Comma-separated prompt keywords. When any message contains one, the callout adds an x-sec-keyword header to the forwarded request."
   type        = string

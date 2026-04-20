@@ -81,18 +81,23 @@ resource "google_compute_subnetwork" "proxy_only" {
 # ===================================================================
 # SERVICE ACCOUNT — LITELLM (calls Vertex AI via ADC)
 # ===================================================================
+#
+# By default the LiteLLM Cloud Run service uses the project's default compute
+# service account (PROJECT_NUMBER-compute@developer.gserviceaccount.com) which
+# Google Cloud creates automatically for every project and already has the
+# roles/editor binding (sufficient for Vertex AI calls).
+#
+# For production, we recommend creating a dedicated service account scoped to
+# just roles/aiplatform.user. To do that:
+#   1. Create a service account and grant it roles/aiplatform.user
+#   2. Set var.litellm_service_account to its email address
 
-resource "google_service_account" "litellm" {
-  account_id   = "litellm-gateway-sa"
-  display_name = "LiteLLM Gateway service account"
-  description  = "Runs the LiteLLM proxy Cloud Run service. Needs aiplatform.user to call Vertex AI."
-  depends_on   = [google_project_service.apis]
-}
-
-resource "google_project_iam_member" "litellm_vertex_user" {
-  project = var.project_id
-  role    = "roles/aiplatform.user"
-  member  = "serviceAccount:${google_service_account.litellm.email}"
+locals {
+  # Default: compute engine default SA. Overridable via var.litellm_service_account.
+  litellm_service_account = coalesce(
+    var.litellm_service_account,
+    "${data.google_project.project.number}-compute@developer.gserviceaccount.com",
+  )
 }
 
 # ===================================================================
@@ -197,7 +202,7 @@ resource "google_cloud_run_v2_service" "litellm" {
   ingress             = "INGRESS_TRAFFIC_ALL"
 
   template {
-    service_account = google_service_account.litellm.email
+    service_account = local.litellm_service_account
 
     containers {
       name  = "litellm"
@@ -243,10 +248,7 @@ resource "google_cloud_run_v2_service" "litellm" {
     }
   }
 
-  depends_on = [
-    google_project_service.apis,
-    google_project_iam_member.litellm_vertex_user,
-  ]
+  depends_on = [google_project_service.apis]
 }
 
 resource "google_cloud_run_v2_service_iam_member" "litellm_public_invoker" {
