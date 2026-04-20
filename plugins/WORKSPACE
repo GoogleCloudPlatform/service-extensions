@@ -262,8 +262,8 @@ load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_depe
 go_repository(
     name = "com_github_proxy_wasm_proxy_wasm_go_sdk",
     importpath = "github.com/proxy-wasm/proxy-wasm-go-sdk",
-    sum = "h1:UiqUl6PLcIW4S93FkmbK9gK2r2veY0MI6nKEXMk/9Ws=",
-    version = "v0.0.0-20241219182957-23e5db51ea08",
+    sum = "h1:m17/Cedqhynvsf2mruRanrvb4R77J+Xz1O8mibAQTSs=",
+    version = "v0.0.0-20260105142703-44c7d5847745",
 )
 
 go_repository(
