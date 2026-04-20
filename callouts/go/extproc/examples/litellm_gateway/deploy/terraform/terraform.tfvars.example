@@ -16,3 +16,8 @@ litellm_image = "us-central1-docker.pkg.dev/your-project/litellm-gateway/litellm
 
 # Comma-separated model allowlist. Leave empty to allow any model the LiteLLM config exposes.
 # allowed_models = "vertex/gemini-2.5-flash,vertex/gemini-2.5-pro"
+
+# Email of the service account used by the LiteLLM Cloud Run service.
+# If empty, the project's default compute SA is used (has roles/editor).
+# For tighter scoping, pre-create an SA with roles/aiplatform.user and put its email here:
+# litellm_service_account = "litellm-gateway-sa@your-project.iam.gserviceaccount.com"

@@ -257,15 +257,15 @@ The following roles are scoped for **sample/testing deployments**. For productio
 | `roles/compute.admin` | VPC, subnets, load balancer, backend services, NEGs |
 | `roles/run.admin` | Cloud Run services, revisions, IAM bindings |
 | `roles/networkservices.admin` | Service Extensions traffic policies |
-| `roles/iam.serviceAccountUser` | Bind service accounts to Cloud Run |
-| `roles/iam.serviceAccountAdmin` | Create the LiteLLM service account |
+| `roles/iam.serviceAccountUser` | Bind the Cloud Run service account to the service |
 | `roles/artifactregistry.admin` | Create repos, push/pull images |
 | `roles/serviceusage.serviceUsageAdmin` | Enable required GCP APIs |
-| `roles/aiplatform.user` (on the LiteLLM SA) | LiteLLM calls Vertex AI |
 | `roles/cloudbuild.builds.editor` | Submit Cloud Build jobs |
 | `roles/storage.admin` | Cloud Build source staging bucket |
 
-> **Production note:** Replace admin roles with granular equivalents (e.g. `compute.networkAdmin` + `compute.loadBalancerAdmin` instead of `compute.admin`, `run.developer` instead of `run.admin`).
+By default LiteLLM runs under the project's **default compute service account** (`PROJECT_NUMBER-compute@developer.gserviceaccount.com`), which already carries `roles/editor` — enough for Vertex AI calls. No additional IAM work is required.
+
+> **Production note:** Replace the admin roles above with granular equivalents (e.g. `compute.networkAdmin` + `compute.loadBalancerAdmin` instead of `compute.admin`, `run.developer` instead of `run.admin`). For tighter service-account scoping, create a dedicated SA with only `roles/aiplatform.user` and pass its email to `var.litellm_service_account` — that requires `iam.serviceAccountCreator` + `resourcemanager.projectIamAdmin` on whoever provisions it.
 
 ### 1. Authenticate
 
@@ -342,10 +342,11 @@ terraform apply
 ```
 
 Terraform creates:
-- A dedicated service account for LiteLLM with `roles/aiplatform.user`
 - Two Cloud Run services: `litellm-gateway-callout` (policy) and `litellm-gateway-litellm` (LLM gateway)
 - A URL map that routes LLM paths to the LiteLLM backend
 - A Service Extensions traffic extension that invokes the callout for LLM paths
+
+The LiteLLM service runs under the project's default compute service account by default. To use a dedicated SA with tighter scoping, set `var.litellm_service_account` to its email (the SA must already exist and have `roles/aiplatform.user`).
 
 ### 6. Test the deployment
 
@@ -391,9 +392,8 @@ gcloud storage rm -r gs://YOUR_PROJECT_ID_cloudbuild/
 | Resource | Purpose |
 |----------|---------|
 | VPC + subnets (main + proxy-only) | Network for the regional external LB |
-| Service account `litellm-gateway-sa` | Identity for LiteLLM, has `aiplatform.user` |
 | Cloud Run (callout) | Policy enforcer invoked by the traffic extension |
-| Cloud Run (litellm) | LiteLLM proxy, calls Vertex AI via ADC |
+| Cloud Run (litellm) | LiteLLM proxy, calls Vertex AI via ADC (default compute SA, or `var.litellm_service_account`) |
 | Cloud Run (upstream app) | Handles non-LLM traffic (hello-app or sample-ui) |
 | Regional HTTPS Load Balancer | Entry point with self-signed cert |
 | URL Map | Routes LLM paths to LiteLLM, rest to upstream |
