@@ -1,0 +1,23 @@
+# Copy this file to terraform.tfvars and fill in your values.
+
+project_id = "your-gcp-project-id"
+region     = "us-central1"
+
+# Container images — build and push using the cloudbuild configs.
+callout_image = "us-central1-docker.pkg.dev/your-project/litellm-gateway/callout:latest"
+litellm_image = "us-central1-docker.pkg.dev/your-project/litellm-gateway/litellm:latest"
+
+# Upstream app image (receives non-LLM traffic).
+# Defaults to a "Hello, world!" image. Use the sample-ui image to serve the chat interface:
+# upstream_app_image = "us-central1-docker.pkg.dev/your-project/litellm-gateway/sample-ui:latest"
+
+# Comma-separated prompt keywords. Matching messages get tagged with x-sec-keyword.
+# sec_keywords = "sec,litellm"
+
+# Comma-separated model allowlist. Leave empty to allow any model the LiteLLM config exposes.
+# allowed_models = "vertex/gemini-2.5-flash,vertex/gemini-2.5-pro"
+
+# Email of the service account used by the LiteLLM Cloud Run service.
+# If empty, the project's default compute SA is used (has roles/editor).
+# For tighter scoping, pre-create an SA with roles/aiplatform.user and put its email here:
+# litellm_service_account = "litellm-gateway-sa@your-project.iam.gserviceaccount.com"

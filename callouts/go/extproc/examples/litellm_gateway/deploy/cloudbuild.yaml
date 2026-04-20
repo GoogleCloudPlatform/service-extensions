@@ -1,0 +1,11 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/litellm-gateway/callout:latest'
+      - '-f'
+      - 'extproc/examples/litellm_gateway/deploy/Dockerfile.cloudrun'
+      - '.'
+images:
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/litellm-gateway/callout:latest'

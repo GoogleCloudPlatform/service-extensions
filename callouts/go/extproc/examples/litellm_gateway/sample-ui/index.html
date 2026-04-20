@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LiteLLM Gateway Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f2f5;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #1a73e8;
+      color: white;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      flex: 1;
+    }
+
+    .header-controls label {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .header-controls select,
+    .header-controls input {
+      padding: 6px 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      background: rgba(255,255,255,0.15);
+      color: white;
+      outline: none;
+    }
+
+    .header-controls select option { color: #333; background: white; }
+    .header-controls input::placeholder { color: rgba(255,255,255,0.5); }
+    .header-controls select:focus,
+    .header-controls input:focus { background: rgba(255,255,255,0.25); }
+
+    .status-badge {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-weight: 500;
+      margin-left: auto;
+    }
+
+    .status-badge.connected { background: #34a853; }
+    .status-badge.error { background: #ea4335; }
+    .status-badge.loading { background: #fbbc04; color: #333; }
+
+    #chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .message {
+      max-width: 75%;
+      padding: 12px 16px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.6;
+      word-wrap: break-word;
+    }
+
+    .message.user {
+      align-self: flex-end;
+      background: #1a73e8;
+      color: white;
+      border-bottom-right-radius: 4px;
+      white-space: pre-wrap;
+    }
+
+    .message.assistant {
+      align-self: flex-start;
+      background: white;
+      color: #333;
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+
+    .message.assistant h1,
+    .message.assistant h2,
+    .message.assistant h3 {
+      margin: 12px 0 6px 0;
+      font-weight: 600;
+    }
+    .message.assistant h1 { font-size: 1.3em; }
+    .message.assistant h2 { font-size: 1.15em; }
+    .message.assistant h3 { font-size: 1.05em; }
+    .message.assistant h1:first-child,
+    .message.assistant h2:first-child,
+    .message.assistant h3:first-child { margin-top: 0; }
+
+    .message.assistant p { margin: 8px 0; }
+    .message.assistant p:first-child { margin-top: 0; }
+    .message.assistant p:last-child { margin-bottom: 0; }
+
+    .message.assistant ul,
+    .message.assistant ol {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .message.assistant li { margin: 4px 0; }
+
+    .message.assistant code {
+      background: #f1f3f4;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.9em;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    .message.assistant pre {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 12px 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 10px 0;
+      font-size: 0.85em;
+      line-height: 1.5;
+    }
+
+    .message.assistant pre code {
+      background: none;
+      padding: 0;
+      color: inherit;
+      font-size: inherit;
+    }
+
+    .message.assistant blockquote {
+      border-left: 3px solid #1a73e8;
+      padding: 4px 12px;
+      margin: 8px 0;
+      color: #555;
+      background: #f8f9fa;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .message.assistant hr {
+      border: none;
+      border-top: 1px solid #e0e0e0;
+      margin: 12px 0;
+    }
+
+    .message.assistant strong { font-weight: 600; }
+    .message.assistant em { font-style: italic; }
+
+    .message.error {
+      align-self: flex-start;
+      background: #fce8e6;
+      color: #c5221f;
+      border-bottom-left-radius: 4px;
+      white-space: pre-wrap;
+    }
+
+    .message.thinking {
+      align-self: flex-start;
+      background: white;
+      color: #999;
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+
+    .thinking-dots span {
+      animation: blink 1.4s infinite both;
+    }
+    .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes blink {
+      0%, 80%, 100% { opacity: 0.3; }
+      40% { opacity: 1; }
+    }
+
+    #resizer {
+      height: 6px;
+      background: #e0e0e0;
+      cursor: ns-resize;
+      flex-shrink: 0;
+      position: relative;
+      transition: background 0.15s;
+    }
+
+    #resizer:hover,
+    #resizer.active { background: #1a73e8; }
+
+    #resizer::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 36px;
+      height: 3px;
+      border-radius: 2px;
+      background: rgba(0,0,0,0.2);
+    }
+
+    #resizer:hover::after,
+    #resizer.active::after { background: rgba(255,255,255,0.6); }
+
+    #chat-form {
+      padding: 12px 20px;
+      background: white;
+      display: flex;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    #user-input {
+      flex: 1;
+      height: 100%;
+      padding: 12px 16px;
+      border: 1px solid #ddd;
+      border-radius: 16px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: none;
+      outline: none;
+    }
+
+    #user-input:focus { border-color: #1a73e8; }
+
+    #send-button {
+      padding: 0 24px;
+      background: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 24px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    #send-button:hover { background: #1557b0; }
+    #send-button:disabled { background: #ccc; cursor: not-allowed; }
+
+    footer {
+      padding: 8px 20px;
+      background: #fafafa;
+      border-top: 1px solid #e0e0e0;
+      font-size: 12px;
+      color: #666;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .welcome {
+      text-align: center;
+      color: #999;
+      padding: 40px 20px;
+      font-size: 14px;
+    }
+
+    .welcome h2 {
+      font-size: 20px;
+      color: #666;
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>LiteLLM Gateway Demo</h1>
+    <div class="header-controls">
+      <label for="model-select">Model:</label>
+      <select id="model-select" data-testid="model-select" disabled>
+        <option value="">Loading models...</option>
+      </select>
+    </div>
+    <input id="api-key" data-testid="api-key" type="hidden" value="sk-test-master-key">
+    <span id="status" class="status-badge loading" data-testid="status">Connecting...</span>
+  </header>
+
+  <div id="chat-messages" data-testid="chat-messages">
+    <div class="welcome">
+      <h2>Welcome</h2>
+      <p>Select a model above and start chatting.</p>
+    </div>
+  </div>
+
+  <div id="resizer" data-testid="resizer"></div>
+
+  <form id="chat-form" style="height: 80px;">
+    <textarea id="user-input" data-testid="user-input" placeholder="Type a message..." disabled></textarea>
+    <button id="send-button" data-testid="send-button" type="submit" disabled>Send</button>
+  </form>
+
+  <footer>
+    <span id="metadata" data-testid="metadata">No messages yet</span>
+    <span>Powered by Service Extensions + LiteLLM</span>
+  </footer>
+
+  <script>
+    const state = {
+      apiBase: '',
+      apiKey: '',
+      messages: [],
+      selectedModel: '',
+      sending: false,
+    };
+
+    function getApiBase() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('api')) return params.get('api').replace(/\/+$/, '');
+      if (window.LITELLM_API_BASE) return window.LITELLM_API_BASE.replace(/\/+$/, '');
+      // When served from the same domain (e.g. behind the ALB), use relative paths.
+      // Fall back to localhost:4000 for local dev with docker-compose.
+      if (window.location.protocol === 'https:') return '';
+      return 'http://localhost:4000';
+    }
+
+    function getApiKey() {
+      return document.getElementById('api-key').value.trim();
+    }
+
+    function buildHeaders() {
+      const headers = { 'Content-Type': 'application/json' };
+      const key = getApiKey();
+      if (key) headers['Authorization'] = 'Bearer ' + key;
+      return headers;
+    }
+
+    async function fetchModels() {
+      const statusEl = document.getElementById('status');
+      const selectEl = document.getElementById('model-select');
+
+      statusEl.textContent = 'Connecting...';
+      statusEl.className = 'status-badge loading';
+
+      try {
+        const resp = await fetch(state.apiBase + '/v1/models', { headers: buildHeaders() });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+
+        selectEl.innerHTML = '';
+        const models = data.data || [];
+        if (models.length === 0) throw new Error('No models available');
+
+        models.forEach(function(m) {
+          const opt = document.createElement('option');
+          opt.value = m.id;
+          opt.textContent = m.id;
+          selectEl.appendChild(opt);
+        });
+
+        state.selectedModel = models[0].id;
+        selectEl.disabled = false;
+        document.getElementById('user-input').disabled = false;
+        document.getElementById('send-button').disabled = false;
+        statusEl.textContent = 'Connected';
+        statusEl.className = 'status-badge connected';
+      } catch (err) {
+        selectEl.innerHTML = '<option value="">Failed to load</option>';
+        statusEl.textContent = 'Error';
+        statusEl.className = 'status-badge error';
+        console.error('Failed to fetch models:', err);
+      }
+    }
+
+    // Lightweight markdown to HTML converter.
+    function markdownToHtml(md) {
+      // Escape HTML entities first.
+      var html = md
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+      // Fenced code blocks: ```lang\n...\n```
+      html = html.replace(/```(\w*)\n([\s\S]*?)```/g, function(_, lang, code) {
+        return '<pre><code>' + code.replace(/\n$/, '') + '</code></pre>';
+      });
+
+      // Inline code: `...`
+      html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+      // Headings: ### ... (process line by line).
+      html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+      html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+      html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+      // Horizontal rules: --- or ***
+      html = html.replace(/^(-{3,}|\*{3,})$/gm, '<hr>');
+
+      // Blockquotes: > ...
+      html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+      // Bold: **...**
+      html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+      // Italic: *...*
+      html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+      // Unordered lists: convert consecutive "* " or "- " lines.
+      html = html.replace(/(^[\t ]*[*\-] .+$(\n|$))+/gm, function(block) {
+        var items = block.trim().split('\n').map(function(line) {
+          return '<li>' + line.replace(/^[\t ]*[*\-] /, '') + '</li>';
+        }).join('');
+        return '<ul>' + items + '</ul>';
+      });
+
+      // Ordered lists: consecutive "1. " lines.
+      html = html.replace(/(^\d+\. .+$(\n|$))+/gm, function(block) {
+        var items = block.trim().split('\n').map(function(line) {
+          return '<li>' + line.replace(/^\d+\. /, '') + '</li>';
+        }).join('');
+        return '<ol>' + items + '</ol>';
+      });
+
+      // Paragraphs: double newlines become paragraph breaks.
+      // Split on double newlines, wrap non-tag content in <p>.
+      html = html.split(/\n{2,}/).map(function(block) {
+        block = block.trim();
+        if (!block) return '';
+        // Don't wrap blocks that already start with a block-level tag.
+        if (/^<(h[1-3]|pre|ul|ol|blockquote|hr|p)/.test(block)) return block;
+        return '<p>' + block.replace(/\n/g, '<br>') + '</p>';
+      }).join('\n');
+
+      return html;
+    }
+
+    function renderMessage(role, content) {
+      const container = document.getElementById('chat-messages');
+      // Remove welcome message on first interaction.
+      const welcome = container.querySelector('.welcome');
+      if (welcome) welcome.remove();
+
+      const div = document.createElement('div');
+      div.className = 'message ' + role;
+      div.setAttribute('data-testid', 'message-' + role);
+
+      if (role === 'assistant') {
+        div.innerHTML = markdownToHtml(content);
+      } else {
+        div.textContent = content;
+      }
+
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+      return div;
+    }
+
+    function showThinking() {
+      const container = document.getElementById('chat-messages');
+      const div = document.createElement('div');
+      div.className = 'message thinking';
+      div.id = 'thinking-indicator';
+      div.innerHTML = '<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>';
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function hideThinking() {
+      const el = document.getElementById('thinking-indicator');
+      if (el) el.remove();
+    }
+
+    function updateMetadata(usage, latencyMs, model) {
+      const el = document.getElementById('metadata');
+      const parts = ['Model: ' + model];
+      if (usage) {
+        parts.push(
+          'Tokens: ' + (usage.prompt_tokens || 0) + ' in / ' +
+          (usage.completion_tokens || 0) + ' out / ' +
+          (usage.total_tokens || 0) + ' total'
+        );
+      }
+      parts.push('Latency: ' + latencyMs + 'ms');
+      el.textContent = parts.join('  |  ');
+    }
+
+    async function sendMessage(userText) {
+      if (state.sending || !userText.trim()) return;
+      state.sending = true;
+
+      const input = document.getElementById('user-input');
+      const button = document.getElementById('send-button');
+      input.disabled = true;
+      button.disabled = true;
+
+      state.messages.push({ role: 'user', content: userText.trim() });
+      renderMessage('user', userText.trim());
+      showThinking();
+
+      const startTime = performance.now();
+
+      try {
+        const resp = await fetch(state.apiBase + '/v1/chat/completions', {
+          method: 'POST',
+          headers: buildHeaders(),
+          body: JSON.stringify({
+            model: state.selectedModel,
+            messages: state.messages,
+            stream: false,
+          }),
+        });
+
+        const latencyMs = Math.round(performance.now() - startTime);
+        hideThinking();
+
+        if (!resp.ok) {
+          const errBody = await resp.text();
+          throw new Error('HTTP ' + resp.status + ': ' + errBody);
+        }
+
+        const data = await resp.json();
+        const assistantContent = data.choices[0].message.content;
+
+        state.messages.push({ role: 'assistant', content: assistantContent });
+        renderMessage('assistant', assistantContent);
+        updateMetadata(data.usage, latencyMs, data.model || state.selectedModel);
+      } catch (err) {
+        hideThinking();
+        renderMessage('error', 'Error: ' + err.message);
+        // Remove the failed user message from history so conversation stays consistent.
+        state.messages.pop();
+      }
+
+      state.sending = false;
+      input.disabled = false;
+      button.disabled = false;
+      input.focus();
+    }
+
+    // --- Event Listeners ---
+
+    document.getElementById('chat-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      var input = document.getElementById('user-input');
+      sendMessage(input.value);
+      input.value = '';
+    });
+
+    document.getElementById('user-input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        document.getElementById('chat-form').dispatchEvent(new Event('submit'));
+      }
+    });
+
+    document.getElementById('model-select').addEventListener('change', function() {
+      state.selectedModel = this.value;
+    });
+
+    // --- Resizer drag logic ---
+    (function() {
+      var resizer = document.getElementById('resizer');
+      var form = document.getElementById('chat-form');
+      var startY, startHeight;
+
+      resizer.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        startY = e.clientY;
+        startHeight = form.offsetHeight;
+        resizer.classList.add('active');
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+
+      function onMouseMove(e) {
+        var delta = startY - e.clientY;
+        var newHeight = Math.min(Math.max(startHeight + delta, 60), window.innerHeight * 0.5);
+        form.style.height = newHeight + 'px';
+      }
+
+      function onMouseUp() {
+        resizer.classList.remove('active');
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      }
+    })();
+
+    // --- Init ---
+
+    state.apiBase = getApiBase();
+    state.apiKey = getApiKey();
+    fetchModels();
+  </script>
+</body>
+</html>

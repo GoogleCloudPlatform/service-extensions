@@ -1,0 +1,79 @@
+# Local dev environment for the LiteLLM Gateway callout.
+#
+# Before starting, run this once on the host so Vertex AI ADC is available:
+#     gcloud auth application-default login
+#     gcloud config set project YOUR_PROJECT_ID
+#
+# Then set GCP_PROJECT_ID in your shell (the compose vars below default it):
+#     export GCP_PROJECT_ID=your-project-id
+#
+# Start with:
+#     docker-compose up --build
+#
+# Endpoints:
+#   http://localhost:8000  -> Envoy (simulates the ALB — full ext_proc chain)
+#   http://localhost:4000  -> LiteLLM directly (bypasses the callout)
+#   http://localhost:9901  -> Envoy admin interface
+
+services:
+  callout:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - EXAMPLE_TYPE=litellm_gateway
+      # Comma-separated prompt keywords. Matching messages get tagged with x-sec-keyword.
+      - SEC_KEYWORDS=sec,litellm
+      # Enforce a model allowlist (rejects other models with 403).
+      - ALLOWED_MODELS=vertex/gemini-2.5-flash,vertex/gemini-2.5-pro
+    networks:
+      - llm-network
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml:ro
+      # Mount host ADC so LiteLLM can call Vertex AI without a service account key.
+      # GOOGLE_APPLICATION_CREDENTIALS below must be set by the user to the
+      # absolute host path of application_default_credentials.json. Typical values:
+      #   Linux/macOS: ${HOME}/.config/gcloud/application_default_credentials.json
+      #   Windows:     ${APPDATA}/gcloud/application_default_credentials.json
+      - ${ADC_FILE}:/adc.json:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/adc.json
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-your-project-id}
+      - GCP_REGION=${GCP_REGION:-us-central1}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - llm-network
+
+  # Envoy with the ext_proc filter simulates the Google Cloud ALB +
+  # Traffic Extension. Requests hit Envoy on :8000, get inspected by the
+  # callout, then get routed to LiteLLM — same path as in GCP.
+  envoy:
+    image: envoyproxy/envoy:v1.35-latest
+    ports:
+      - "8000:8000"
+      - "9901:9901"
+    volumes:
+      - ./envoy.yaml:/etc/envoy/envoy.yaml:ro
+    command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]
+    depends_on:
+      callout:
+        condition: service_started
+      litellm:
+        condition: service_healthy
+    networks:
+      - llm-network
+
+networks:
+  llm-network:
+    driver: bridge
