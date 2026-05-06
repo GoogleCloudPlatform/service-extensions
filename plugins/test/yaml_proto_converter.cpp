@@ -16,328 +16,185 @@
 
 #include "yaml_proto_converter.h"
 
-#include <algorithm>
-#include <optional>
 #include <string>
 #include <vector>
 #include <yaml-cpp/yaml.h>
 
 #include "absl/status/status.h"
-#include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/strip.h"
-#include "google/protobuf/repeated_field.h"
+#include "absl/strings/escaping.h"
+#include "google/protobuf/struct.pb.h"
+#include "google/protobuf/util/json_util.h"
 
 namespace service_extensions_samples::pb {
+
 namespace {
 
-// Forward declarations for helper functions.
-absl::Status ConvertTest(const YAML::Node& yaml_test, Test* proto_test);
-absl::Status ConvertInvocation(const YAML::Node& yaml_invocation, Invocation* proto_invocation);
-absl::Status ConvertInput(const YAML::Node& yaml_input, Input* proto_input);
-absl::Status ConvertExpectation(const YAML::Node& yaml_expectation, Expectation* proto_expectation);
-absl::Status ConvertHeader(const YAML::Node& yaml_header, Header* proto_header);
-absl::Status ConvertStringMatcher(const YAML::Node& yaml_matcher, StringMatcher* proto_matcher);
-absl::Status ConvertEnv(const YAML::Node& yaml_env, Env* proto_env);
-absl::Status ConvertImmediate(const YAML::Node& yaml_immediate, Expectation::Immediate* proto_immediate);
-absl::Status ConvertHeaders(const YAML::Node& yaml_headers, google::protobuf::RepeatedPtrField<Header>* proto_headers);
-absl::Status ConvertStringMatchers(const YAML::Node& yaml_matchers, google::protobuf::RepeatedPtrField<StringMatcher>* proto_matchers);
-absl::Status ConvertInvocations(const YAML::Node& yaml_invocations, google::protobuf::RepeatedPtrField<Invocation>* proto_invocations);
+// Forward declaration
+google::protobuf::Value ConvertYamlNodeToProtoValue(const YAML::Node& node, const std::string& key = "");
 
-std::optional<std::string> GetStringValue(const YAML::Node& node) {
-  if (!node.IsDefined() || node.IsNull()) {
-    return std::nullopt;
-  }
-  return node.as<std::string>();
-}
+// Normalizes a header string "Key: Value" or map {"key": K, "value": V} into a Struct Value.
+google::protobuf::Value NormalizeHeader(const YAML::Node& node) {
+  google::protobuf::Value header_val;
+  auto* struct_fields = header_val.mutable_struct_value()->mutable_fields();
 
-std::optional<int32_t> GetIntValue(const YAML::Node& node) {
-  if (!node.IsDefined() || node.IsNull()) {
-    return std::nullopt;
-  }
-  return node.as<int32_t>();
-}
-
-std::optional<int64_t> GetInt64Value(const YAML::Node& node) {
-  if (!node.IsDefined() || node.IsNull()) {
-    return std::nullopt;
-  }
-  return node.as<int64_t>();
-}
-
-std::optional<uint32_t> GetUInt32Value(const YAML::Node& node) {
-  if (!node.IsDefined() || node.IsNull()) {
-    return std::nullopt;
-  }
-  return node.as<uint32_t>();
-}
-
-std::optional<uint64_t> GetUInt64Value(const YAML::Node& node) {
-  if (!node.IsDefined() || node.IsNull()) {
-    return std::nullopt;
-  }
-  return node.as<uint64_t>();
-}
-
-std::optional<bool> GetBoolValue(const YAML::Node& node) {
-  if (!node.IsDefined() || node.IsNull()) {
-    return std::nullopt;
-  }
-  return node.as<bool>();
-}
-
-std::optional<std::string> GetBytesValue(const YAML::Node& node) {
-  if (!node.IsDefined() || node.IsNull()) {
-    return std::nullopt;
-  }
-  return node.as<std::string>();
-}
-
-Env::LogLevel ConvertLogLevel(const std::string& level_str) {
-  std::string upper_level = absl::AsciiStrToUpper(level_str);
-  if (upper_level == "TRACE") return Env::TRACE;
-  if (upper_level == "DEBUG") return Env::DEBUG;
-  if (upper_level == "INFO") return Env::INFO;
-  if (upper_level == "WARN") return Env::WARN;
-  if (upper_level == "ERROR") return Env::ERROR;
-  if (upper_level == "CRITICAL") return Env::CRITICAL;
-  return Env::UNDEFINED;
-}
-
-absl::Status ConvertTest(const YAML::Node& yaml_test, Test* proto_test) {
-  if (!yaml_test.IsMap()) {
-    return absl::InvalidArgumentError("Test must be a YAML map");
-  }
-  proto_test->set_name(GetStringValue(yaml_test["name"]).value_or(""));
-  proto_test->set_benchmark(GetBoolValue(yaml_test["benchmark"]).value_or(false));
-  if (yaml_test["body_chunking_plan"]) {
-    const auto& chunking_plan = yaml_test["body_chunking_plan"];
-    if (chunking_plan["num_chunks"]) {
-      proto_test->set_num_chunks(GetIntValue(chunking_plan["num_chunks"]).value_or(0));
-    } else if (chunking_plan["chunk_size"]) {
-      proto_test->set_chunk_size(GetInt64Value(chunking_plan["chunk_size"]).value_or(0));
-    }
-  }
-  if (yaml_test["request_headers"]) {
-    if (absl::Status status = ConvertInvocation(yaml_test["request_headers"], proto_test->mutable_request_headers()); !status.ok()) return status;
-  }
-  if (yaml_test["request_body"] && yaml_test["request_body"].IsSequence()) {
-    if (absl::Status status = ConvertInvocations(yaml_test["request_body"], proto_test->mutable_request_body()); !status.ok()) return status;
-  }
-  if (yaml_test["response_headers"]) {
-    if (absl::Status status = ConvertInvocation(yaml_test["response_headers"], proto_test->mutable_response_headers()); !status.ok()) return status;
-  }
-  if (yaml_test["response_body"] && yaml_test["response_body"].IsSequence()) {
-    if (absl::Status status = ConvertInvocations(yaml_test["response_body"], proto_test->mutable_response_body()); !status.ok()) return status;
-  }
-  if (yaml_test["plugin_init"]) {
-    if (absl::Status status = ConvertExpectation(yaml_test["plugin_init"], proto_test->mutable_plugin_init()); !status.ok()) return status;
-  }
-  if (yaml_test["stream_init"]) {
-    if (absl::Status status = ConvertExpectation(yaml_test["stream_init"], proto_test->mutable_stream_init()); !status.ok()) return status;
-  }
-  if (yaml_test["stream_destroy"]) {
-    if (absl::Status status = ConvertExpectation(yaml_test["stream_destroy"], proto_test->mutable_stream_destroy()); !status.ok()) return status;
-  }
-  return absl::OkStatus();
-}
-
-absl::Status ConvertInvocation(const YAML::Node& yaml_invocation, Invocation* proto_invocation) {
-  if (!yaml_invocation.IsMap()) {
-    return absl::InvalidArgumentError("Invocation must be a YAML map");
-  }
-  if (yaml_invocation["input"]) {
-    if (absl::Status status = ConvertInput(yaml_invocation["input"], proto_invocation->mutable_input()); !status.ok()) return status;
-  }
-  if (yaml_invocation["result"]) {
-    if (absl::Status status = ConvertExpectation(yaml_invocation["result"], proto_invocation->mutable_result()); !status.ok()) return status;
-  }
-  return absl::OkStatus();
-}
-
-absl::Status ConvertInput(const YAML::Node& yaml_input, Input* proto_input) {
-  if (!yaml_input.IsMap()) {
-    return absl::InvalidArgumentError("Input must be a YAML map");
-  }
-  if (yaml_input["headers"] && yaml_input["headers"].IsSequence()) {
-    if (absl::Status status = ConvertHeaders(yaml_input["headers"], proto_input->mutable_header()); !status.ok()) return status;
-  }
-  if (yaml_input["content"]) {
-    proto_input->set_content(GetBytesValue(yaml_input["content"]).value_or(""));
-  }
-  if (yaml_input["file"]) {
-    proto_input->set_file(GetStringValue(yaml_input["file"]).value_or(""));
-  }
-  return absl::OkStatus();
-}
-
-absl::Status ConvertExpectation(const YAML::Node& yaml_expectation, Expectation* proto_expectation) {
-  if (!yaml_expectation.IsMap()) {
-    return absl::InvalidArgumentError("Expectation must be a YAML map");
-  }
-  if (yaml_expectation["has_header"] && yaml_expectation["has_header"].IsSequence()) {
-    if (absl::Status status = ConvertHeaders(yaml_expectation["has_header"], proto_expectation->mutable_has_header()); !status.ok()) return status;
-  }
-  if (yaml_expectation["no_header"] && yaml_expectation["no_header"].IsSequence()) {
-    if (absl::Status status = ConvertHeaders(yaml_expectation["no_header"], proto_expectation->mutable_no_header()); !status.ok()) return status;
-  }
-  if (yaml_expectation["headers"] && yaml_expectation["headers"].IsSequence()) {
-    if (absl::Status status = ConvertStringMatchers(yaml_expectation["headers"], proto_expectation->mutable_headers()); !status.ok()) return status;
-  }
-  if (yaml_expectation["body"] && yaml_expectation["body"].IsSequence()) {
-    if (absl::Status status = ConvertStringMatchers(yaml_expectation["body"], proto_expectation->mutable_body()); !status.ok()) return status;
-  }
-  if (yaml_expectation["immediate"]) {
-    if (absl::Status status = ConvertImmediate(yaml_expectation["immediate"], proto_expectation->mutable_immediate()); !status.ok()) return status;
-  }
-  if (yaml_expectation["log"] && yaml_expectation["log"].IsSequence()) {
-    if (absl::Status status = ConvertStringMatchers(yaml_expectation["log"], proto_expectation->mutable_log()); !status.ok()) return status;
-  }
-  return absl::OkStatus();
-}
-
-absl::Status ConvertHeader(const YAML::Node& yaml_header, Header* proto_header) {
-  if (yaml_header.IsMap()) {
-    if (yaml_header["key"]) {
-      proto_header->set_key(GetStringValue(yaml_header["key"]).value_or(""));
-    }
-    if (yaml_header["value"]) {
-      proto_header->set_value(GetBytesValue(yaml_header["value"]).value_or(""));
-    }
-  } else if (yaml_header.IsScalar()) {
-    std::string header_str = GetStringValue(yaml_header).value_or("");
+  if (node.IsMap()) {
+    std::string key = node["key"] ? node["key"].as<std::string>() : "";
+    std::string value = node["value"] ? node["value"].as<std::string>() : "";
+    (*struct_fields)["key"].set_string_value(key);
+    
+    // Base64 encode the value because it is a bytes field in proto
+    std::string encoded;
+    absl::Base64Escape(value, &encoded);
+    (*struct_fields)["value"].set_string_value(encoded);
+  } else if (node.IsScalar()) {
+    std::string header_str = node.as<std::string>();
     std::vector<std::string> parts = absl::StrSplit(header_str, absl::MaxSplits(':', 1));
     if (parts.size() == 2) {
-      proto_header->set_key(parts[0]);
-      proto_header->set_value(std::string(absl::StripAsciiWhitespace(parts[1])));
+      (*struct_fields)["key"].set_string_value(parts[0]);
+      std::string encoded;
+      absl::Base64Escape(std::string(absl::StripAsciiWhitespace(parts[1])), &encoded);
+      (*struct_fields)["value"].set_string_value(encoded);
     } else {
-      return absl::InvalidArgumentError(absl::StrCat("Invalid header format: ", header_str));
+      (*struct_fields)["key"].set_string_value(header_str);
+      (*struct_fields)["value"].set_string_value("");
     }
-  } else {
-    return absl::InvalidArgumentError("Header must be a map or string");
   }
-  return absl::OkStatus();
+  return header_val;
 }
 
-absl::Status ConvertStringMatcher(const YAML::Node& yaml_matcher, StringMatcher* proto_matcher) {
-  if (!yaml_matcher.IsMap()) {
-    return absl::InvalidArgumentError("StringMatcher must be a YAML map");
-  }
-  proto_matcher->set_invert(GetBoolValue(yaml_matcher["invert"]).value_or(false));
-  if (yaml_matcher["exact"]) {
-    proto_matcher->set_exact(GetBytesValue(yaml_matcher["exact"]).value_or(""));
-  } else if (yaml_matcher["regex"]) {
-    proto_matcher->set_regex(GetStringValue(yaml_matcher["regex"]).value_or(""));
-  } else if (yaml_matcher["file"]) {
-    proto_matcher->set_file(GetStringValue(yaml_matcher["file"]).value_or(""));
-  } else {
-    return absl::InvalidArgumentError("StringMatcher must have one of: exact, regex, or file");
-  }
-  return absl::OkStatus();
-}
-
-absl::Status ConvertEnv(const YAML::Node& yaml_env, Env* proto_env) {
-  if (!yaml_env.IsMap()) {
-    return absl::InvalidArgumentError("Env must be a YAML map");
-  }
-  proto_env->set_test_path(GetStringValue(yaml_env["test_path"]).value_or(""));
-  proto_env->set_wasm_path(GetStringValue(yaml_env["wasm_path"]).value_or(""));
-  proto_env->set_config_path(GetStringValue(yaml_env["config_path"]).value_or(""));
-  proto_env->set_log_path(GetStringValue(yaml_env["log_path"]).value_or(""));
-
-  if (auto level_str = GetStringValue(yaml_env["log_level"])) {
-    proto_env->set_log_level(ConvertLogLevel(*level_str));
-  }
-
-  if (auto time_secs = GetUInt64Value(yaml_env["time_secs"])) {
-    proto_env->set_time_secs(*time_secs);
-  }
-
-  if (auto num_streams = GetUInt64Value(yaml_env["num_additional_streams"])) {
-    proto_env->set_num_additional_streams(*num_streams);
-  }
-
-  if (auto advance_rate = GetUInt64Value(yaml_env["additional_stream_advance_rate"])) {
-    proto_env->set_additional_stream_advance_rate(*advance_rate);
-  }
-  return absl::OkStatus();
-}
-
-absl::Status ConvertImmediate(const YAML::Node& yaml_immediate, Expectation::Immediate* proto_immediate) {
-  if (!yaml_immediate.IsMap()) {
-    return absl::InvalidArgumentError("Immediate must be a YAML map");
-  }
-  if (auto http_status = GetUInt32Value(yaml_immediate["http_status"])) {
-    proto_immediate->set_http_status(*http_status);
-  }
-  if (auto grpc_status = GetUInt32Value(yaml_immediate["grpc_status"])) {
-    proto_immediate->set_grpc_status(*grpc_status);
-  }
-  if (yaml_immediate["details"]) {
-    proto_immediate->set_details(GetStringValue(yaml_immediate["details"]).value_or(""));
-  }
-  return absl::OkStatus();
-}
-
-absl::Status ConvertHeaders(const YAML::Node& yaml_headers, google::protobuf::RepeatedPtrField<Header>* proto_headers) {
-  if (!yaml_headers.IsSequence()) {
-    return absl::InvalidArgumentError("Headers must be a YAML sequence");
-  }
-  for (const auto& yaml_header : yaml_headers) {
-    Header* proto_header = proto_headers->Add();
-    if (absl::Status status = ConvertHeader(yaml_header, proto_header); !status.ok()) return status;
-  }
-  return absl::OkStatus();
-}
-
-absl::Status ConvertStringMatchers(const YAML::Node& yaml_matchers, google::protobuf::RepeatedPtrField<StringMatcher>* proto_matchers) {
-  if (!yaml_matchers.IsSequence()) {
-    return absl::InvalidArgumentError("StringMatchers must be a YAML sequence");
-  }
-  for (const auto& yaml_matcher : yaml_matchers) {
-    StringMatcher* proto_matcher = proto_matchers->Add();
-    if (absl::Status status = ConvertStringMatcher(yaml_matcher, proto_matcher); !status.ok()) return status;
-  }
-  return absl::OkStatus();
-}
-
-absl::Status ConvertInvocations(const YAML::Node& yaml_invocations, google::protobuf::RepeatedPtrField<Invocation>* proto_invocations) {
-  if (!yaml_invocations.IsSequence()) {
-    return absl::InvalidArgumentError("Invocations must be a YAML sequence");
-  }
-  for (const auto& yaml_invocation : yaml_invocations) {
-    Invocation* proto_invocation = proto_invocations->Add();
-    if (absl::Status status = ConvertInvocation(yaml_invocation, proto_invocation); !status.ok()) return status;
-  }
-  return absl::OkStatus();
-}
-
-}  // namespace
-
-absl::StatusOr<TestSuite> ConvertYamlToTestSuite(std::string_view yaml_content) {
-  TestSuite test_suite;
-  try {
-    YAML::Node yaml_root = YAML::Load(std::string(yaml_content));
-
-    if (yaml_root["env"]) {
-      if (absl::Status env_status = ConvertEnv(yaml_root["env"], test_suite.mutable_env()); !env_status.ok()) {
-        return env_status;
-      }
-    }
-
-    if (yaml_root["tests"] && yaml_root["tests"].IsSequence()) {
-      for (const auto& yaml_test : yaml_root["tests"]) {
-        Test* proto_test = test_suite.add_test();
-        if (absl::Status test_status = ConvertTest(yaml_test, proto_test); !test_status.ok()) {
-          return test_status;
+google::protobuf::Value ConvertYamlNodeToProtoValue(const YAML::Node& node, const std::string& key) {
+  google::protobuf::Value value;
+  switch (node.Type()) {
+    case YAML::NodeType::Null:
+      value.set_null_value(google::protobuf::NULL_VALUE);
+      break;
+    case YAML::NodeType::Scalar: {
+      std::string str_val = node.as<std::string>();
+      
+      // If this key corresponds to a bytes field in the proto, we must Base64 encode it.
+      if (key == "value" || key == "exact" || key == "content") {
+        std::string encoded;
+        absl::Base64Escape(str_val, &encoded);
+        value.set_string_value(encoded);
+      } else if (str_val == "true" || str_val == "True" || str_val == "TRUE") {
+        value.set_bool_value(true);
+      } else if (str_val == "false" || str_val == "False" || str_val == "FALSE") {
+        value.set_bool_value(false);
+      } else {
+        // Try to parse as double
+        try {
+          size_t idx;
+          double d_val = std::stod(str_val, &idx);
+          if (idx == str_val.size()) {
+            value.set_number_value(d_val);
+          } else {
+            value.set_string_value(str_val);
+          }
+        } catch (...) {
+          value.set_string_value(str_val);
         }
       }
+      break;
     }
+    case YAML::NodeType::Sequence: {
+      auto* list_values = value.mutable_list_value()->mutable_values();
+      for (const auto& it : node) {
+        // Normalize headers if we are inside a header-related list
+        if (key == "header" || key == "has_header" || key == "no_header" || 
+            (key == "headers" && (it.IsScalar() || (it.IsMap() && it["key"])))) {
+          *list_values->Add() = NormalizeHeader(it);
+        } else {
+          *list_values->Add() = ConvertYamlNodeToProtoValue(it, key);
+        }
+      }
+      break;
+    }
+    case YAML::NodeType::Map: {
+      auto* struct_fields = value.mutable_struct_value()->mutable_fields();
+      for (const auto& it : node) {
+        std::string child_key = it.first.as<std::string>();
+        
+        // Root level mapping: "tests" -> "test"
+        if (key == "" && child_key == "tests") {
+          child_key = "test";
+        }
+        // Input level mapping: "headers" -> "header"
+        else if (key == "input" && child_key == "headers") {
+          child_key = "header";
+        }
+
+        // If it is a header map (has_header/no_header/header: {k: v}), convert to List of Header
+        if ((child_key == "has_header" || child_key == "no_header" || child_key == "header") && it.second.IsMap()) {
+          google::protobuf::Value list_val;
+          auto* list_values = list_val.mutable_list_value()->mutable_values();
+          for (const auto& header_it : it.second) {
+            google::protobuf::Value header_struct_val;
+            auto* header_fields = header_struct_val.mutable_struct_value()->mutable_fields();
+            (*header_fields)["key"].set_string_value(header_it.first.as<std::string>());
+            
+            std::string encoded;
+            absl::Base64Escape(header_it.second.as<std::string>(), &encoded);
+            (*header_fields)["value"].set_string_value(encoded);
+            
+            *list_values->Add() = header_struct_val;
+          }
+          (*struct_fields)[child_key] = list_val;
+        } else {
+          (*struct_fields)[child_key] = ConvertYamlNodeToProtoValue(it.second, child_key);
+        }
+      }
+      break;
+    }
+    case YAML::NodeType::Undefined:
+      break;
+  }
+  return value;
+}
+
+} // namespace
+
+absl::StatusOr<TestSuite> ConvertYamlToTestSuite(std::string_view yaml_content) {
+  try {
+    YAML::Node yaml_root = YAML::Load(std::string(yaml_content));
+    if (!yaml_root.IsDefined() || yaml_root.IsNull()) {
+      return TestSuite();
+    }
+    if (!yaml_root.IsMap()) {
+      return absl::InvalidArgumentError("YAML root must be a map");
+    }
+
+    google::protobuf::Value root_value = ConvertYamlNodeToProtoValue(yaml_root);
+    if (!root_value.has_struct_value()) {
+      return absl::InvalidArgumentError("Failed to convert YAML to proto struct");
+    }
+
+    std::string json_string;
+    google::protobuf::util::JsonPrintOptions options;
+    options.preserve_proto_field_names = true;
+    
+    auto status = google::protobuf::util::MessageToJsonString(root_value.struct_value(), &json_string, options);
+    if (!status.ok()) {
+      return absl::InvalidArgumentError(absl::StrCat("Failed to convert proto struct to JSON: ", status.ToString()));
+    }
+
+    TestSuite test_suite;
+    google::protobuf::util::JsonParseOptions parse_options;
+    parse_options.ignore_unknown_fields = false;
+    
+    status = google::protobuf::util::JsonStringToMessage(json_string, &test_suite, parse_options);
+    if (!status.ok()) {
+      return absl::InvalidArgumentError(absl::StrCat("Failed to parse JSON to TestSuite: ", status.ToString(), "\nJSON: ", json_string));
+    }
+
     return test_suite;
   } catch (const YAML::Exception& e) {
     return absl::InvalidArgumentError(absl::StrCat("YAML parsing error: ", e.what()));
+  } catch (const std::exception& e) {
+    return absl::InternalError(absl::StrCat("Internal error: ", e.what()));
   }
 }
 
-}  // namespace service_extensions_samples::pb
+} // namespace service_extensions_samples::pb
