@@ -35,20 +35,29 @@ namespace {
 // Forward declaration
 google::protobuf::Value ConvertYamlNodeToProtoValue(const YAML::Node& node, const std::string& key = "");
 
-// Normalizes a header string "Key: Value" or map {"key": K, "value": V} into a Struct Value.
+// Normalizes a header string "Key: Value" or map {"key": K, "value": V} or {K: V} into a Struct Value.
 google::protobuf::Value NormalizeHeader(const YAML::Node& node) {
   google::protobuf::Value header_val;
   auto* struct_fields = header_val.mutable_struct_value()->mutable_fields();
 
   if (node.IsMap()) {
-    std::string key = node["key"] ? node["key"].as<std::string>() : "";
-    std::string value = node["value"] ? node["value"].as<std::string>() : "";
-    (*struct_fields)["key"].set_string_value(key);
-    
-    // Base64 encode the value because it is a bytes field in proto
-    std::string encoded;
-    absl::Base64Escape(value, &encoded);
-    (*struct_fields)["value"].set_string_value(encoded);
+    if (node["key"] || node["value"]) {
+      std::string key = node["key"] ? node["key"].as<std::string>() : "";
+      std::string value = node["value"] ? node["value"].as<std::string>() : "";
+      (*struct_fields)["key"].set_string_value(key);
+      
+      std::string encoded;
+      absl::Base64Escape(value, &encoded);
+      (*struct_fields)["value"].set_string_value(encoded);
+    } else if (node.size() == 1) {
+      // Handle single-element map like {Message: hello}
+      auto it = node.begin();
+      (*struct_fields)["key"].set_string_value(it->first.as<std::string>());
+      
+      std::string encoded;
+      absl::Base64Escape(it->second.as<std::string>(), &encoded);
+      (*struct_fields)["value"].set_string_value(encoded);
+    }
   } else if (node.IsScalar()) {
     std::string header_str = node.as<std::string>();
     std::vector<std::string> parts = absl::StrSplit(header_str, absl::MaxSplits(':', 1));
@@ -103,8 +112,7 @@ google::protobuf::Value ConvertYamlNodeToProtoValue(const YAML::Node& node, cons
       auto* list_values = value.mutable_list_value()->mutable_values();
       for (const auto& it : node) {
         // Normalize headers if we are inside a header-related list
-        if (key == "header" || key == "has_header" || key == "no_header" || 
-            (key == "headers" && (it.IsScalar() || (it.IsMap() && it["key"])))) {
+        if (key == "header" || key == "has_header" || key == "no_header") {
           *list_values->Add() = NormalizeHeader(it);
         } else {
           *list_values->Add() = ConvertYamlNodeToProtoValue(it, key);
@@ -126,20 +134,28 @@ google::protobuf::Value ConvertYamlNodeToProtoValue(const YAML::Node& node, cons
           child_key = "header";
         }
 
-        // If it is a header map (has_header/no_header/header: {k: v}), convert to List of Header
+        // If it is a header map (has_header/no_header/header: {k: v} or {key: K, value: V}), convert to List of Header
         if ((child_key == "has_header" || child_key == "no_header" || child_key == "header") && it.second.IsMap()) {
           google::protobuf::Value list_val;
           auto* list_values = list_val.mutable_list_value()->mutable_values();
-          for (const auto& header_it : it.second) {
-            google::protobuf::Value header_struct_val;
-            auto* header_fields = header_struct_val.mutable_struct_value()->mutable_fields();
-            (*header_fields)["key"].set_string_value(header_it.first.as<std::string>());
-            
-            std::string encoded;
-            absl::Base64Escape(header_it.second.as<std::string>(), &encoded);
-            (*header_fields)["value"].set_string_value(encoded);
-            
-            *list_values->Add() = header_struct_val;
+          
+          const auto& map_node = it.second;
+          if (map_node["key"] || map_node["value"]) {
+            // Single Header map with "key" and/or "value" keys
+            *list_values->Add() = NormalizeHeader(map_node);
+          } else {
+            // Map of HeaderName: HeaderValue (e.g. {Message: hello})
+            for (const auto& header_it : map_node) {
+              google::protobuf::Value header_struct_val;
+              auto* header_fields = header_struct_val.mutable_struct_value()->mutable_fields();
+              (*header_fields)["key"].set_string_value(header_it.first.as<std::string>());
+              
+              std::string encoded;
+              absl::Base64Escape(header_it.second.as<std::string>(), &encoded);
+              (*header_fields)["value"].set_string_value(encoded);
+              
+              *list_values->Add() = header_struct_val;
+            }
           }
           (*struct_fields)[child_key] = list_val;
         } else {
