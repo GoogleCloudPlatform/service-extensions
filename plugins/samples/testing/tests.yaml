@@ -13,14 +13,14 @@ test:
         value: GET
     result:
       has_header:
-        key: :method
+      - key: :method
         value: GET
       headers:
       - exact: ':method: GET'
       - regex: :scheme:.*
         invert: 'true'
       no_header:
-        key: :scheme
+      - key: :scheme
       log:
       - regex: .*request headers.*
       - regex: .*response headers.*
@@ -38,10 +38,10 @@ test:
       body:
         exact: fake error
       has_header:
-        key: error
+      - key: error
         value: goaway
       no_header:
-        key: server-message
+      - key: server-message
       log:
       - regex: '.*time 1: 123456789000000000'
       - regex: '.*time 2: 123456789000000000'
@@ -50,13 +50,13 @@ test:
   request_headers:
     input:
       content: 'GET /my/path?foo=bar HTTP/1.1
-
+ 
         Host: myhost.com
-
+ 
         MyHeader: MyVal1
-
+ 
         MyHeader: MyVal2
-
+ 
         '
     result:
       has_header:
@@ -69,17 +69,17 @@ test:
       - key: MyHeader
         value: MyVal1, MyVal2
       no_header:
-        key: Host
+      - key: Host
   response_headers:
     input:
       content: 'HTTP/1.1 200 OK
-
+ 
         Content-Type: image/jpeg; charset=utf-8
-
+ 
         MyHeader: MyVal1
-
+ 
         MyHeader: MyVal2
-
+ 
         '
     result:
       has_header:
@@ -104,7 +104,7 @@ test:
       - key: MyHeader
         value: MyVal1, MyVal2
       no_header:
-        key: Host
+      - key: Host
   response_headers:
     input:
       file: response_headers.data

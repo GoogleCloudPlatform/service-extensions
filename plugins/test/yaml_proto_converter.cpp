@@ -35,41 +35,20 @@ namespace {
 // Forward declaration
 google::protobuf::Value ConvertYamlNodeToProtoValue(const YAML::Node& node, const std::string& key = "");
 
-// Normalizes a header string "Key: Value" or map {"key": K, "value": V} or {K: V} into a Struct Value.
-google::protobuf::Value NormalizeHeader(const YAML::Node& node) {
+// Normalizes a scalar header string "Key: Value" or "Key" into a Struct Value.
+google::protobuf::Value NormalizeHeaderScalar(const std::string& header_str) {
   google::protobuf::Value header_val;
   auto* struct_fields = header_val.mutable_struct_value()->mutable_fields();
 
-  if (node.IsMap()) {
-    if (node["key"] || node["value"]) {
-      std::string key = node["key"] ? node["key"].as<std::string>() : "";
-      std::string value = node["value"] ? node["value"].as<std::string>() : "";
-      (*struct_fields)["key"].set_string_value(key);
-      
-      std::string encoded;
-      absl::Base64Escape(value, &encoded);
-      (*struct_fields)["value"].set_string_value(encoded);
-    } else if (node.size() == 1) {
-      // Handle single-element map like {Message: hello}
-      auto it = node.begin();
-      (*struct_fields)["key"].set_string_value(it->first.as<std::string>());
-      
-      std::string encoded;
-      absl::Base64Escape(it->second.as<std::string>(), &encoded);
-      (*struct_fields)["value"].set_string_value(encoded);
-    }
-  } else if (node.IsScalar()) {
-    std::string header_str = node.as<std::string>();
-    std::vector<std::string> parts = absl::StrSplit(header_str, absl::MaxSplits(':', 1));
-    if (parts.size() == 2) {
-      (*struct_fields)["key"].set_string_value(parts[0]);
-      std::string encoded;
-      absl::Base64Escape(std::string(absl::StripAsciiWhitespace(parts[1])), &encoded);
-      (*struct_fields)["value"].set_string_value(encoded);
-    } else {
-      (*struct_fields)["key"].set_string_value(header_str);
-      (*struct_fields)["value"].set_string_value("");
-    }
+  std::vector<std::string> parts = absl::StrSplit(header_str, absl::MaxSplits(':', 1));
+  if (parts.size() == 2) {
+    (*struct_fields)["key"].set_string_value(parts[0]);
+    std::string encoded;
+    absl::Base64Escape(std::string(absl::StripAsciiWhitespace(parts[1])), &encoded);
+    (*struct_fields)["value"].set_string_value(encoded);
+  } else {
+    (*struct_fields)["key"].set_string_value(header_str);
+    (*struct_fields)["value"].set_string_value("");
   }
   return header_val;
 }
@@ -111,9 +90,10 @@ google::protobuf::Value ConvertYamlNodeToProtoValue(const YAML::Node& node, cons
     case YAML::NodeType::Sequence: {
       auto* list_values = value.mutable_list_value()->mutable_values();
       for (const auto& it : node) {
-        // Normalize headers if we are inside a header-related list
-        if (key == "header" || key == "has_header" || key == "no_header") {
-          *list_values->Add() = NormalizeHeader(it);
+        // Normalize headers only if they are written as scalar strings inside header-related lists.
+        // Maps are parsed normally (their "value" fields will be Base64 encoded recursively).
+        if ((key == "header" || key == "has_header" || key == "no_header") && it.IsScalar()) {
+          *list_values->Add() = NormalizeHeaderScalar(it.as<std::string>());
         } else {
           *list_values->Add() = ConvertYamlNodeToProtoValue(it, key);
         }
@@ -124,43 +104,7 @@ google::protobuf::Value ConvertYamlNodeToProtoValue(const YAML::Node& node, cons
       auto* struct_fields = value.mutable_struct_value()->mutable_fields();
       for (const auto& it : node) {
         std::string child_key = it.first.as<std::string>();
-        
-        // Root level mapping: "tests" -> "test"
-        if (key == "" && child_key == "tests") {
-          child_key = "test";
-        }
-        // Input level mapping: "headers" -> "header"
-        else if (key == "input" && child_key == "headers") {
-          child_key = "header";
-        }
-
-        // If it is a header map (has_header/no_header/header: {k: v} or {key: K, value: V}), convert to List of Header
-        if ((child_key == "has_header" || child_key == "no_header" || child_key == "header") && it.second.IsMap()) {
-          google::protobuf::Value list_val;
-          auto* list_values = list_val.mutable_list_value()->mutable_values();
-          
-          const auto& map_node = it.second;
-          if (map_node["key"] || map_node["value"]) {
-            // Single Header map with "key" and/or "value" keys
-            *list_values->Add() = NormalizeHeader(map_node);
-          } else {
-            // Map of HeaderName: HeaderValue (e.g. {Message: hello})
-            for (const auto& header_it : map_node) {
-              google::protobuf::Value header_struct_val;
-              auto* header_fields = header_struct_val.mutable_struct_value()->mutable_fields();
-              (*header_fields)["key"].set_string_value(header_it.first.as<std::string>());
-              
-              std::string encoded;
-              absl::Base64Escape(header_it.second.as<std::string>(), &encoded);
-              (*header_fields)["value"].set_string_value(encoded);
-              
-              *list_values->Add() = header_struct_val;
-            }
-          }
-          (*struct_fields)[child_key] = list_val;
-        } else {
-          (*struct_fields)[child_key] = ConvertYamlNodeToProtoValue(it.second, child_key);
-        }
+        (*struct_fields)[child_key] = ConvertYamlNodeToProtoValue(it.second, child_key);
       }
       break;
     }
