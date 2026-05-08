@@ -22,69 +22,173 @@
 
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
-#include "absl/strings/escaping.h"
-#include "google/protobuf/struct.pb.h"
-#include "google/protobuf/util/json_util.h"
+#include "absl/strings/str_split.h"
+#include "absl/strings/strip.h"
+#include "google/protobuf/message.h"
+#include "google/protobuf/descriptor.h"
 
 namespace service_extensions_samples::pb {
 
 namespace {
 
-// Recursively converts a YAML::Node to a google::protobuf::Value.
-// Automatically Base64-encodes fields known to be of 'bytes' type in the proto.
-google::protobuf::Value ConvertYamlNodeToProtoValue(const YAML::Node& node, const std::string& key = "") {
-  google::protobuf::Value value;
-  switch (node.Type()) {
-    case YAML::NodeType::Null:
-      value.set_null_value(google::protobuf::NULL_VALUE);
-      break;
-    case YAML::NodeType::Scalar: {
-      std::string str_val = node.as<std::string>();
-      
-      // If this key corresponds to a bytes field in the proto, we must Base64 encode it.
-      if (key == "value" || key == "exact" || key == "content") {
-        std::string encoded;
-        absl::Base64Escape(str_val, &encoded);
-        value.set_string_value(encoded);
-      } else if (str_val == "true" || str_val == "True" || str_val == "TRUE") {
-        value.set_bool_value(true);
-      } else if (str_val == "false" || str_val == "False" || str_val == "FALSE") {
-        value.set_bool_value(false);
-      } else {
-        // Try to parse as double
-        try {
-          size_t idx;
-          double d_val = std::stod(str_val, &idx);
-          if (idx == str_val.size()) {
-            value.set_number_value(d_val);
-          } else {
-            value.set_string_value(str_val);
+absl::Status SetSingularScalarField(const YAML::Node& node, const google::protobuf::FieldDescriptor* field, google::protobuf::Message* message, const google::protobuf::Reflection* reflection) {
+  if (!node.IsScalar()) {
+    return absl::InvalidArgumentError(absl::StrCat("Expected a Scalar for field '", field->name(), "'"));
+  }
+  std::string str_val = node.as<std::string>();
+
+  try {
+    switch (field->cpp_type()) {
+      case google::protobuf::FieldDescriptor::CPPTYPE_INT32:
+        reflection->SetInt32(message, field, node.as<int32_t>());
+        break;
+      case google::protobuf::FieldDescriptor::CPPTYPE_INT64:
+        reflection->SetInt64(message, field, node.as<int64_t>());
+        break;
+      case google::protobuf::FieldDescriptor::CPPTYPE_UINT32:
+        reflection->SetUInt32(message, field, node.as<uint32_t>());
+        break;
+      case google::protobuf::FieldDescriptor::CPPTYPE_UINT64:
+        reflection->SetUInt64(message, field, node.as<uint64_t>());
+        break;
+      case google::protobuf::FieldDescriptor::CPPTYPE_DOUBLE:
+        reflection->SetDouble(message, field, node.as<double>());
+        break;
+      case google::protobuf::FieldDescriptor::CPPTYPE_FLOAT:
+        reflection->SetFloat(message, field, node.as<float>());
+        break;
+      case google::protobuf::FieldDescriptor::CPPTYPE_BOOL:
+        reflection->SetBool(message, field, node.as<bool>());
+        break;
+      case google::protobuf::FieldDescriptor::CPPTYPE_STRING:
+        reflection->SetString(message, field, str_val);
+        break;
+      case google::protobuf::FieldDescriptor::CPPTYPE_ENUM: {
+        const google::protobuf::EnumValueDescriptor* ev = nullptr;
+        ev = field->enum_type()->FindValueByName(str_val);
+        if (!ev) {
+          try {
+            int enum_num = node.as<int>();
+            ev = field->enum_type()->FindValueByNumber(enum_num);
+          } catch (...) {}
+        }
+        if (!ev) {
+          return absl::InvalidArgumentError(absl::StrCat("Invalid enum value '", str_val, "' for field '", field->name(), "'"));
+        }
+        reflection->SetEnum(message, field, ev);
+        break;
+      }
+      default:
+        return absl::UnimplementedError(absl::StrCat("Unsupported type for field '", field->name(), "'"));
+    }
+  } catch (const YAML::Exception& e) {
+    return absl::InvalidArgumentError(absl::StrCat("Failed to parse field '", field->name(), "': ", e.what()));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status AddRepeatedScalarField(const YAML::Node& node, const google::protobuf::FieldDescriptor* field, google::protobuf::Message* message, const google::protobuf::Reflection* reflection) {
+  if (!node.IsScalar()) {
+    return absl::InvalidArgumentError(absl::StrCat("Expected a Scalar for repeated field '", field->name(), "'"));
+  }
+  std::string str_val = node.as<std::string>();
+
+  try {
+    switch (field->cpp_type()) {
+      case google::protobuf::FieldDescriptor::CPPTYPE_INT32:
+        reflection->AddInt32(message, field, node.as<int32_t>());
+        break;
+      case google::protobuf::FieldDescriptor::CPPTYPE_INT64:
+        reflection->AddInt64(message, field, node.as<int64_t>());
+        break;
+      case google::protobuf::FieldDescriptor::CPPTYPE_UINT32:
+        reflection->AddUInt32(message, field, node.as<uint32_t>());
+        break;
+      case google::protobuf::FieldDescriptor::CPPTYPE_UINT64:
+        reflection->AddUInt64(message, field, node.as<uint64_t>());
+        break;
+      case google::protobuf::FieldDescriptor::CPPTYPE_DOUBLE:
+        reflection->AddDouble(message, field, node.as<double>());
+        break;
+      case google::protobuf::FieldDescriptor::CPPTYPE_FLOAT:
+        reflection->AddFloat(message, field, node.as<float>());
+        break;
+      case google::protobuf::FieldDescriptor::CPPTYPE_BOOL:
+        reflection->AddBool(message, field, node.as<bool>());
+        break;
+      case google::protobuf::FieldDescriptor::CPPTYPE_STRING:
+        reflection->AddString(message, field, str_val);
+        break;
+      case google::protobuf::FieldDescriptor::CPPTYPE_ENUM: {
+        const google::protobuf::EnumValueDescriptor* ev = nullptr;
+        ev = field->enum_type()->FindValueByName(str_val);
+        if (!ev) {
+          try {
+            int enum_num = node.as<int>();
+            ev = field->enum_type()->FindValueByNumber(enum_num);
+          } catch (...) {}
+        }
+        if (!ev) {
+          return absl::InvalidArgumentError(absl::StrCat("Invalid enum value '", str_val, "' for repeated field '", field->name(), "'"));
+        }
+        reflection->AddEnum(message, field, ev);
+        break;
+      }
+      default:
+        return absl::UnimplementedError(absl::StrCat("Unsupported type for repeated field '", field->name(), "'"));
+    }
+  } catch (const YAML::Exception& e) {
+    return absl::InvalidArgumentError(absl::StrCat("Failed to parse repeated field '", field->name(), "': ", e.what()));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status ConvertYamlToProtoMessage(const YAML::Node& node, google::protobuf::Message* message) {
+  if (!node.IsMap()) {
+    return absl::InvalidArgumentError(absl::StrCat("Expected a Map for message ", message->GetDescriptor()->name(), " but got ", node.Type()));
+  }
+
+  const google::protobuf::Descriptor* descriptor = message->GetDescriptor();
+  const google::protobuf::Reflection* reflection = message->GetReflection();
+
+  for (const auto& it : node) {
+    std::string key = it.first.as<std::string>();
+    const google::protobuf::FieldDescriptor* field = descriptor->FindFieldByName(key);
+    if (!field) {
+      return absl::InvalidArgumentError(absl::StrCat("Field '", key, "' is not found in the ", descriptor->name(), " proto"));
+    }
+
+    const YAML::Node& value_node = it.second;
+    if (field->is_repeated()) {
+      if (!value_node.IsSequence()) {
+        return absl::InvalidArgumentError(absl::StrCat("Expected a Sequence for repeated field '", key, "'"));
+      }
+      for (const auto& elem : value_node) {
+        if (field->cpp_type() == google::protobuf::FieldDescriptor::CPPTYPE_MESSAGE) {
+          google::protobuf::Message* nested_message = reflection->AddMessage(message, field);
+          if (absl::Status status = ConvertYamlToProtoMessage(elem, nested_message); !status.ok()) {
+            return status;
           }
-        } catch (...) {
-          value.set_string_value(str_val);
+        } else {
+          if (absl::Status status = AddRepeatedScalarField(elem, field, message, reflection); !status.ok()) {
+            return status;
+          }
         }
       }
-      break;
-    }
-    case YAML::NodeType::Sequence: {
-      auto* list_values = value.mutable_list_value()->mutable_values();
-      for (const auto& it : node) {
-        *list_values->Add() = ConvertYamlNodeToProtoValue(it, key);
+    } else {
+      if (field->cpp_type() == google::protobuf::FieldDescriptor::CPPTYPE_MESSAGE) {
+        google::protobuf::Message* nested_message = reflection->MutableMessage(message, field);
+        if (absl::Status status = ConvertYamlToProtoMessage(value_node, nested_message); !status.ok()) {
+          return status;
+        }
+      } else {
+        if (absl::Status status = SetSingularScalarField(value_node, field, message, reflection); !status.ok()) {
+          return status;
+        }
       }
-      break;
     }
-    case YAML::NodeType::Map: {
-      auto* struct_fields = value.mutable_struct_value()->mutable_fields();
-      for (const auto& it : node) {
-        std::string child_key = it.first.as<std::string>();
-        (*struct_fields)[child_key] = ConvertYamlNodeToProtoValue(it.second, child_key);
-      }
-      break;
-    }
-    case YAML::NodeType::Undefined:
-      break;
   }
-  return value;
+  return absl::OkStatus();
 }
 
 } // namespace
@@ -95,33 +199,10 @@ absl::StatusOr<TestSuite> ConvertYamlToTestSuite(std::string_view yaml_content) 
     if (!yaml_root.IsDefined() || yaml_root.IsNull()) {
       return TestSuite();
     }
-    if (!yaml_root.IsMap()) {
-      return absl::InvalidArgumentError("YAML root must be a map");
-    }
-
-    google::protobuf::Value root_value = ConvertYamlNodeToProtoValue(yaml_root);
-    if (!root_value.has_struct_value()) {
-      return absl::InvalidArgumentError("Failed to convert YAML to proto struct");
-    }
-
-    std::string json_string;
-    google::protobuf::util::JsonPrintOptions options;
-    options.preserve_proto_field_names = true;
-    
-    auto status = google::protobuf::util::MessageToJsonString(root_value.struct_value(), &json_string, options);
-    if (!status.ok()) {
-      return absl::InvalidArgumentError(absl::StrCat("Failed to convert proto struct to JSON: ", status.ToString()));
-    }
-
     TestSuite test_suite;
-    google::protobuf::util::JsonParseOptions parse_options;
-    parse_options.ignore_unknown_fields = false;
-    
-    status = google::protobuf::util::JsonStringToMessage(json_string, &test_suite, parse_options);
-    if (!status.ok()) {
-      return absl::InvalidArgumentError(absl::StrCat("Failed to parse JSON to TestSuite: ", status.ToString(), "\nJSON: ", json_string));
+    if (absl::Status status = ConvertYamlToProtoMessage(yaml_root, &test_suite); !status.ok()) {
+      return absl::Status(status.code(), absl::StrCat("Failed to parse input YAML: ", status.message()));
     }
-
     return test_suite;
   } catch (const YAML::Exception& e) {
     return absl::InvalidArgumentError(absl::StrCat("YAML parsing error: ", e.what()));

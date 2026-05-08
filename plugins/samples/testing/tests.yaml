@@ -36,7 +36,7 @@ test:
       immediate:
         http_status: 500
       body:
-        exact: fake error
+        - exact: fake error
       has_header:
       - key: error
         value: goaway
