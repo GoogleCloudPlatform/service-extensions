@@ -50,13 +50,13 @@ test:
   request_headers:
     input:
       content: 'GET /my/path?foo=bar HTTP/1.1
- 
+
         Host: myhost.com
- 
+
         MyHeader: MyVal1
- 
+
         MyHeader: MyVal2
- 
+
         '
     result:
       has_header:
@@ -73,13 +73,13 @@ test:
   response_headers:
     input:
       content: 'HTTP/1.1 200 OK
- 
+
         Content-Type: image/jpeg; charset=utf-8
- 
+
         MyHeader: MyVal1
- 
+
         MyHeader: MyVal2
- 
+
         '
     result:
       has_header:
