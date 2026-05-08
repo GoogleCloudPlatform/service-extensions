@@ -22,8 +22,6 @@
 
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
-#include "absl/strings/str_split.h"
-#include "absl/strings/strip.h"
 #include "absl/strings/escaping.h"
 #include "google/protobuf/struct.pb.h"
 #include "google/protobuf/util/json_util.h"
@@ -32,28 +30,9 @@ namespace service_extensions_samples::pb {
 
 namespace {
 
-// Forward declaration
-google::protobuf::Value ConvertYamlNodeToProtoValue(const YAML::Node& node, const std::string& key = "");
-
-// Normalizes a scalar header string "Key: Value" or "Key" into a Struct Value.
-google::protobuf::Value NormalizeHeaderScalar(const std::string& header_str) {
-  google::protobuf::Value header_val;
-  auto* struct_fields = header_val.mutable_struct_value()->mutable_fields();
-
-  std::vector<std::string> parts = absl::StrSplit(header_str, absl::MaxSplits(':', 1));
-  if (parts.size() == 2) {
-    (*struct_fields)["key"].set_string_value(parts[0]);
-    std::string encoded;
-    absl::Base64Escape(std::string(absl::StripAsciiWhitespace(parts[1])), &encoded);
-    (*struct_fields)["value"].set_string_value(encoded);
-  } else {
-    (*struct_fields)["key"].set_string_value(header_str);
-    (*struct_fields)["value"].set_string_value("");
-  }
-  return header_val;
-}
-
-google::protobuf::Value ConvertYamlNodeToProtoValue(const YAML::Node& node, const std::string& key) {
+// Recursively converts a YAML::Node to a google::protobuf::Value.
+// Automatically Base64-encodes fields known to be of 'bytes' type in the proto.
+google::protobuf::Value ConvertYamlNodeToProtoValue(const YAML::Node& node, const std::string& key = "") {
   google::protobuf::Value value;
   switch (node.Type()) {
     case YAML::NodeType::Null:
@@ -90,13 +69,7 @@ google::protobuf::Value ConvertYamlNodeToProtoValue(const YAML::Node& node, cons
     case YAML::NodeType::Sequence: {
       auto* list_values = value.mutable_list_value()->mutable_values();
       for (const auto& it : node) {
-        // Normalize headers only if they are written as scalar strings inside header-related lists.
-        // Maps are parsed normally (their "value" fields will be Base64 encoded recursively).
-        if ((key == "header" || key == "has_header" || key == "no_header") && it.IsScalar()) {
-          *list_values->Add() = NormalizeHeaderScalar(it.as<std::string>());
-        } else {
-          *list_values->Add() = ConvertYamlNodeToProtoValue(it, key);
-        }
+        *list_values->Add() = ConvertYamlNodeToProtoValue(it, key);
       }
       break;
     }
