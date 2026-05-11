@@ -1,4 +1,4 @@
-// Copyright 2024 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,7 +30,9 @@ class MyHttpContext : public Context {
     const auto header = getRequestHeader(header_key);
     // It will only replace the header if it already exists.
     if (header->size() > 0) {
-      replaceRequestHeader(header_key, "changed");
+      if (replaceRequestHeader(header_key, "changed") != WasmResult::Ok) {
+        LOG_ERROR("Failed to replace RequestHeader");
+      }
     }
 
     return FilterHeadersStatus::Continue;
@@ -41,7 +43,9 @@ class MyHttpContext : public Context {
     // Unlike the previous example, the header will be added if it doesn't exist
     // or updated if it already does.
     // Change the key and value according to your needs.
-    replaceResponseHeader("ResponseHeader", "changed");
+    if (replaceResponseHeader("ResponseHeader", "changed") != WasmResult::Ok) {
+      LOG_ERROR("Failed to replace ResponseHeader");
+    }
 
     return FilterHeadersStatus::Continue;
   }
