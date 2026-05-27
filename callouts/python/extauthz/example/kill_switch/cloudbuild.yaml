@@ -1,0 +1,15 @@
+# Copyright 2026 Google LLC.
+# Licensed under the Apache License, Version 2.0
+
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/agent-gateway/kill-switch:latest'
+      - '-f'
+      - 'extauthz/example/kill_switch/Dockerfile'
+      - '.'
+
+images:
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/agent-gateway/kill-switch:latest'
