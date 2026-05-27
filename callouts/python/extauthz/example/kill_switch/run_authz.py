@@ -24,6 +24,6 @@ if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8453)) 
     KillSwitchCalloutServer(
         state_store=active_state_store, 
-        address=('0.0.0.0', port)
-        disable_tls=True
+        address=('0.0.0.0', port),
+        health_check_address=('0.0.0.0', 8081)
     ).run()
