@@ -88,7 +88,7 @@ resource "google_cloud_run_v2_service" "authz_service" {
       # The entrypoint defaults to run_authz.py as defined in the Dockerfile.
       ports {
         name           = "h2c"
-        container_port = 8453
+        container_port = 8080
       }
 
       env {

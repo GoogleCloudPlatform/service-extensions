@@ -15,12 +15,13 @@
 import json
 import logging
 import os
+import base64
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse
 from extauthz.example.kill_switch.kill_switch_core import Finding, Decider, Actuator, StateStore, Decision
 
 class WebhookHandler(BaseHTTPRequestHandler):
-    """Handle incoming security events from SCC, Wiz, and Vertex."""
+    """Handle incoming security events from SCC, Wiz, and Vertex AI."""
     
     state_store: StateStore = None
     decider: Decider = None
@@ -45,14 +46,24 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self.send_response(400)
             self.end_headers()
             return
+        
         body = self.rfile.read(content_length)
+        
         try:
             payload = json.loads(body)
+            
+            # Handle Pub/Sub Push subscription envelope encapsulation
+            if 'message' in payload and 'data' in payload['message']:
+                decoded_data = base64.b64decode(payload['message']['data']).decode('utf-8')
+                scc_finding = json.loads(decoded_data)
+            else:
+                scc_finding = payload
+
             finding = Finding(
-                agent_id=payload.get('resourceName', 'unknown'),
-                severity=payload.get('severity', 'LOW').upper(),
-                rationale=payload.get('category', 'No description'),
-                source_finding_id=payload.get('id', 'scc-unknown'),
+                agent_id=scc_finding.get('resourceName', 'unknown'),
+                severity=scc_finding.get('severity', 'LOW').upper(),
+                rationale=scc_finding.get('category', 'No description'),
+                source_finding_id=scc_finding.get('id', 'scc-unknown'),
                 source='scc'
             )
             self._process_finding(finding)
@@ -87,10 +98,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def _handle_vertex_poll(self):
-        """
-        Triggered by Cloud Scheduler to poll Vertex AI for anomalous agent behavior.
-        Uses a feature flag to prevent execution until the ML model is fully deployed.
-        """
+        """Triggered by Cloud Scheduler to poll Vertex AI for anomalous agent behavior."""
         vertex_enabled = os.environ.get("ENABLE_VERTEX_POLLING", "false").lower() == "true"
         
         if not vertex_enabled:
@@ -100,7 +108,6 @@ class WebhookHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            # Lazy import to avoid loading heavy ML libraries globally
             from google.cloud import aiplatform
             
             project_id = os.environ.get("GCP_PROJECT_ID")
@@ -110,11 +117,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
             if not endpoint_id or not project_id:
                 raise ValueError("Missing VERTEX_ENDPOINT_ID or GCP_PROJECT_ID environment variables.")
 
-            # Initialize the Vertex AI client and target the custom anomaly detection model
             aiplatform.init(project=project_id, location=location)
             endpoint = aiplatform.Endpoint(endpoint_id)
 
-            # Query the model for anomalies in the last 5 minutes (matching Cloud Scheduler frequency)
+            # Query the production machine learning model for anomalies
             response = endpoint.predict(instances=[{"time_window": "5m"}])
 
             if hasattr(response, 'predictions'):
@@ -136,7 +142,6 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self.send_response(500)
         except Exception as e:
             logging.error(f"Error querying Vertex AI: {e}")
-            # Return 500 so Cloud Scheduler logs the failure and can retry
             self.send_response(500)
             
         self.end_headers()
@@ -152,4 +157,3 @@ class WebhookHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         """Suppress default HTTP request logging to focus on audit logs."""
         pass
-

@@ -30,7 +30,7 @@ variable "kill_switch_service_account" {
 variable "dry_run" {
   description = "If true, the kill switch logs the block intent but does not isolate the agent."
   type        = string
-  default     = "true"
+  default     = "false"
 }
 
 variable "exempt_agents" {
@@ -64,7 +64,7 @@ variable "vertex_threshold" {
 variable "enable_vertex_polling" {
   description = "Feature flag to enable Cloud Scheduler polling of the Vertex AI model."
   type        = string
-  default     = "false"
+  default     = "true"
 }
 
 variable "vertex_endpoint_id" {

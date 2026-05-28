@@ -21,9 +21,8 @@ if __name__ == '__main__':
         active_state_store = InMemoryStateStore()
 
     logging.info("Starting Kill Switch gRPC ext_authz Server...")
-    port = int(os.environ.get("PORT", 8453)) 
     KillSwitchCalloutServer(
         state_store=active_state_store, 
-        address=('0.0.0.0', port),
+        address=('0.0.0.0', 8453),
         health_check_address=('0.0.0.0', 8081)
     ).run()

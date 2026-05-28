@@ -17,6 +17,14 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Protocol, Set, Dict
 
+# Explicit severity weighting matrix to evaluate threshold levels numerically
+SEVERITY_WEIGHTS = {
+    "LOW": 1,
+    "MEDIUM": 2,
+    "HIGH": 3,
+    "CRITICAL": 4
+}
+
 class Decision(Enum):
     BLOCK = "BLOCK"
     IGNORE = "IGNORE"
@@ -51,8 +59,15 @@ class Decider:
             logging.info(f"[EXEMPT] Agent {finding.agent_id} is in the exemption list. Ignoring.")
             return Decision.IGNORE
 
-        required_severity = self.severity_thresholds.get(finding.source, "CRITICAL")
-        if finding.severity != required_severity:
+        # Fetch configured severity thresholds and translate to numeric weights
+        required_severity = self.severity_thresholds.get(finding.source, "CRITICAL").upper()
+        required_weight = SEVERITY_WEIGHTS.get(required_severity, 4)
+        
+        finding_severity = finding.severity.upper()
+        finding_weight = SEVERITY_WEIGHTS.get(finding_severity, 0)
+
+        # Enforce relative severity threshold check
+        if finding_weight < required_weight:
             logging.info(f"[THRESHOLD] Finding ignored. Severity {finding.severity} is below threshold {required_severity}.")
             return Decision.IGNORE
 
@@ -65,16 +80,16 @@ class Actuator:
 
     def execute_block(self, finding: Finding) -> None:
         """Executes multi-layered containment operations."""
-        # 1. State Store update (Cache Edge)
+        # Update Distributed Cache State (Redis Edge)
         self.state_store.block_agent(finding.agent_id)
         
-        # 2. Gateway Egress Block (Patch)
+        # Real-time data plane enforcement trigger
         self._patch_gateway_deny_rule(finding.agent_id)
         
-        # 3. IAP IAM Revocation (Defense in depth)
+        # Identity plane access revocation
         self._revoke_iap_iam(finding.agent_id)
         
-        # 4. Audit log for manual restoration auditing
+        # Structural audit logging execution
         logging.info("block_succeeded", extra={
             "json_fields": {
                 "event_type": "agent_isolation",
@@ -85,9 +100,9 @@ class Actuator:
         })
 
     def _patch_gateway_deny_rule(self, agent_id: str) -> None:
-        """Stub: Implementation for the Gateway/Envoy API call to deny egress immediately."""
+        """API client stub to inject dynamic network isolation into Envoy / Gateway."""
         logging.warning(f"[ACTUATOR] STUB: Patching Agent Gateway to deny egress for agent {agent_id}")
 
     def _revoke_iap_iam(self, agent_id: str) -> None:
-        """Stub: Implementation for GCP IAM call to revoke roles/iap.egressor."""
+        """API client stub to execute asynchronous GCP Identity-Aware Proxy IAM role removals."""
         logging.warning(f"[ACTUATOR] STUB: Revoking IAP IAM roles for agent {agent_id}")
