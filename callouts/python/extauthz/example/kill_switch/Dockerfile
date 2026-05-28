@@ -3,18 +3,19 @@
 
 # Stage 1: Generate Python stubs from Envoy protobuf definitions
 FROM bufbuild/buf AS BUF
+
+# Install git to allow buf to fetch the Envoy API repository
 RUN apk add --no-cache git
 COPY ./buf.gen.yaml ./buf.gen.yaml
+
+# Allow overriding the proto path via build arg, defaulting to Envoy ext_authz service
 ARG proto_path="envoy/service/auth/v3/external_auth.proto"
+
 RUN buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api \
-      --path $proto_path --include-imports
+      --path "$proto_path" --include-imports
 
 # Stage 2: Final production image
 FROM python:3.12-slim
-
-RUN apt-get update && apt-get upgrade -y && apt-get autoremove -y \
- && apt-get install -y --no-install-recommends --no-install-suggests \
- && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /home/callouts/python
 
@@ -33,6 +34,8 @@ COPY ./extauthz/example/kill_switch ./extauthz/example/kill_switch
 # Install service-specific dependencies (e.g., redis, google-cloud-aiplatform)
 RUN pip install --no-cache-dir -r ./extauthz/example/kill_switch/additional-requirements.txt
 
+# Expose gRPC and HTTP ports
 EXPOSE 8453 8080
 
+# Default entrypoint runs the ext_authz gRPC server
 ENTRYPOINT ["python3", "-m", "extauthz.example.kill_switch.run_authz"]
