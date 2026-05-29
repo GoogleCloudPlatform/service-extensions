@@ -20,9 +20,11 @@ if __name__ == '__main__':
         logging.info("Starting in DEVELOPMENT mode (InMemoryStateStore)")
         active_state_store = InMemoryStateStore()
 
-    logging.info("Starting Kill Switch gRPC ext_authz Server...")
+    port = int(os.environ.get("PORT", 8080))
+
+    logging.info(f"Starting Kill Switch gRPC ext_authz Server on port {port}...")
+    
     KillSwitchCalloutServer(
         state_store=active_state_store, 
-        address=('0.0.0.0', 8453),
-        health_check_address=('0.0.0.0', 8081)
+        address=('0.0.0.0', port)
     ).run()

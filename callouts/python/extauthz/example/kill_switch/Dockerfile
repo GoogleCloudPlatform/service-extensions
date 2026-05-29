@@ -10,7 +10,6 @@ COPY ./buf.gen.yaml ./buf.gen.yaml
 
 # Allow overriding the proto path via build arg, defaulting to Envoy ext_authz service
 ARG proto_path="envoy/service/auth/v3/external_auth.proto"
-
 RUN buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api \
       --path "$proto_path" --include-imports
 
@@ -34,8 +33,8 @@ COPY ./extauthz/example/kill_switch ./extauthz/example/kill_switch
 # Install service-specific dependencies (e.g., redis, google-cloud-aiplatform)
 RUN pip install --no-cache-dir -r ./extauthz/example/kill_switch/additional-requirements.txt
 
-# Expose gRPC and HTTP ports
-EXPOSE 8453 8080
+# Expose HTTP port
+EXPOSE 8080
 
 # Default entrypoint runs the ext_authz gRPC server
-ENTRYPOINT ["python3", "-m", "extauthz.example.kill_switch.run_authz"]
+ENTRYPOINT ["python3", "-u", "-m", "extauthz.example.kill_switch.run_authz"]

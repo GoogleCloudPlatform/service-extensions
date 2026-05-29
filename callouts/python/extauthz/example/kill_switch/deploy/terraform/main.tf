@@ -85,10 +85,9 @@ resource "google_cloud_run_v2_service" "authz_service" {
     containers {
       image = var.kill_switch_image
 
-      # The entrypoint defaults to run_authz.py as defined in the Dockerfile.
       ports {
         name           = "h2c"
-        container_port = 8453
+        container_port = 8080
       }
 
       env {
@@ -131,13 +130,11 @@ resource "google_cloud_run_v2_service" "webhook_service" {
     containers {
       image = var.kill_switch_image
 
-      # Override the entrypoint to run the HTTP Webhook server
-      command = ["python3", "-m", "extauthz.example.kill_switch.run_webhooks"]
+      command = ["python3", "-u", "-m", "extauthz.example.kill_switch.run_webhooks"]
 
       ports {
         container_port = 8080
       }
-
       env {
         name  = "STATE_STORE_TYPE"
         value = "redis"
