@@ -11,7 +11,7 @@ Kill Switch External Authorization (ext_authz) gRPC server.
 Usage Examples:
     1. Local Development Testing (Plaintext gRPC):
        python3 agent_verification_cli.py --env local \
-           --target-url "localhost:8453" \
+           --target-url "localhost:8080" \
            --agent-id "spiffe://domain.com/agent-123"
 
     2. Cloud Production Testing (Secure gRPC with GCP Identity Token):
@@ -31,6 +31,11 @@ Prerequisites for Cloud mode:
 import argparse
 import logging
 import subprocess
+import os
+
+os.environ["GRPC_VERBOSITY"] = "ERROR"
+os.environ["GRPC_TRACE"] = "none"
+
 import grpc
 from envoy.service.auth.v3 import external_auth_pb2, external_auth_pb2_grpc, attribute_context_pb2
 
@@ -71,7 +76,7 @@ def main():
     parser.add_argument(
         "--target-url", 
         required=True, 
-        help="The target URL (e.g., 'localhost:8453' or 'kill-switch-ext-authz-xxx.a.run.app:443')."
+        help="The target URL (e.g., 'localhost:8080' or 'kill-switch-ext-authz-xxx.a.run.app:443')."
     )
 
     args = parser.parse_args()
