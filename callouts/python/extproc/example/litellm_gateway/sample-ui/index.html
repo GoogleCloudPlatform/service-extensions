@@ -366,16 +366,17 @@
       const headers = { 'Content-Type': 'application/json' };
       const key = getApiKey();
       if (key) headers['Authorization'] = 'Bearer ' + key;
-      // Routing signal — the LB's URL map matches on this header to pick
-      // the correct provider backend. The provider is the first segment
-      // of the LiteLLM model id (e.g. anthropic/claude-... → anthropic).
+      // Routing signal: the LB's URL map prefix-matches on this header
+      // to pick the correct provider backend. The header value is the
+      // LiteLLM model id verbatim (e.g. anthropic/claude-...); the URL
+      // map matches the leading `<provider>/` segment.
       if (state.selectedModel) {
-        headers['x-v2-target-provider'] = state.selectedModel.split('/', 1)[0];
+        headers['x-model-id'] = state.selectedModel;
       }
       return headers;
     }
 
-    // Models are defined here rather than fetched from /v1/models — the Python
+    // Models are defined here rather than fetched from /v1/models. The Python
     // callout uses LiteLLM in-process so /v1/models is not implemented.
     // Each entry is a LiteLLM model id: <provider>/<model>. For OpenRouter
     // (an aggregator), the model id includes the upstream publisher prefix,
