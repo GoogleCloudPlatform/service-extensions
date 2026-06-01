@@ -7,37 +7,37 @@ Anthropic, Groq, OpenRouter, …); the callout runs **LiteLLM in-process** to
 translate the OpenAI request/response to/from each provider's native format and
 to inject the right auth.
 
-The callout does **not** proxy traffic — it only mutates headers and the body.
-The load balancer forwards the rewritten request straight to the provider via an
-Internet NEG backend.
+The callout implementation does **not** itself proxy traffic, it only mutates
+headers and the body. The load balancer forwards the rewritten request straight
+to the provider via an Internet NEG backend.
 
 ## Architecture
 
 ```
-                              x-v2-target-provider: anthropic
-  Client  ──────────────────────────────────────────────────────────────┐
-   │  POST /v1/chat/completions   (OpenAI body, model="anthropic/claude…") │
-   ▼                                                                      │
- ┌────────────────────────────────────────────────────────────────────────┴───┐
- │                    Global External Application LB                            │
- │                                                                              │
- │   ┌──────────────────────────┐        ┌──────────────────────────────────┐   │
- │   │ URL Map                  │        │  Traffic Extension               │   │
- │   │  /v1/* + header          │  body  │   Callout (ext_proc, Cloud Run)  │   │
- │   │   x-v2-target-provider:  ├───────►│   - LiteLLM: provider detect     │   │
- │   │     anthropic → BE-A     │◄───────┤   - LiteLLM: OpenAI→provider body│   │
+                              x-model-id: anthropic/claude-...
+ Client  ────────────────────────────────────────────────────────────────────────┐
+  │  POST /v1/chat/completions   (OpenAI body, model="anthropic/claude…")        │
+  ▼                                                                              │
+ ┌───────────────────────────────────────────────────────────────────────────────┐
+ │                    Global External Application LB                             │
+ │                                                                               │
+ │   ┌──────────────────────────┐         ┌──────────────────────────────────┐   │
+ │   │ URL Map                  │         │  Traffic Extension               │   │
+ │   │  /v1/* + header          │  body   │   Callout (ext_proc, Cloud Run)  │   │
+ │   │   x-v2-target-provider:  ├────────►│   - LiteLLM: provider detect     │   │
+ │   │     anthropic → BE-A     │◄────────┤   - LiteLLM: OpenAI→provider body│   │
  │   │     groq      → BE-G     │ headers │   - inject auth (ADC / API key)  │   │
  │   │     openrouter→ BE-O     │  + body │   - rewrite :path / :authority   │   │
- │   │   /v1/*  (default)→ BE-V │        └──────────────────────────────────┘   │
- │   │   default → upstream UI  │                                               │
- │   └────────┬─────────────────┘                                               │
- │            │  LB forwards to the matched backend                             │
- │            ▼                                                                 │
- │   ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌────────┐ │
- │   │ BE-V Vertex │ │ BE-A Anthr. │ │ BE-G Groq   │ │ BE-O OpenR. │ │upstream│ │
- │   │ Internet NEG│ │ Internet NEG│ │ Internet NEG│ │ Internet NEG│ │ UI app │ │
- │   └──────┬──────┘ └──────┬──────┘ └──────┬──────┘ └──────┬──────┘ └────────┘ │
- └──────────┼───────────────┼───────────────┼───────────────┼───────────────────┘
+ │   │   /v1/*  (default)→ BE-V │         └──────────────────────────────────┘   │
+ │   │   default → upstream UI  │                                                │
+ │   └────────┬─────────────────┘                                                │
+ │            │  LB forwards to the matched backend                              │
+ │            ▼                                                                  │
+ │   ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌────────┐  │
+ │   │ BE-V Vertex │ │ BE-A Anthr. │ │ BE-G Groq   │ │ BE-O OpenR. │ │upstream│  │
+ │   │ Internet NEG│ │ Internet NEG│ │ Internet NEG│ │ Internet NEG│ │ UI app │  │
+ │   └──────┬──────┘ └──────┬──────┘ └──────┬──────┘ └──────┬──────┘ └────────┘  │
+ └──────────┼───────────────┼───────────────┼───────────────┼────────────────────┘
             ▼               ▼               ▼               ▼
    {region}-aiplatform  api.anthropic.com  api.groq.com   openrouter.ai
    .googleapis.com
@@ -47,19 +47,20 @@ On the response, the LB invokes the callout again; LiteLLM transforms the
 provider's response back to OpenAI format (or, for streaming, parses each SSE
 chunk and re-emits it as an OpenAI `chat.completion.chunk`).
 
-## How It Works — step by step
+## How It Works
 
 1. **Client** sends a standard OpenAI request (`POST /v1/chat/completions`,
    body `{"model": "anthropic/claude-3-5-sonnet-…", "messages": […]}`) plus a
-   routing header `x-v2-target-provider: anthropic`.
-2. **URL Map** evaluates `prefix=/v1/` + `header_matches: x-v2-target-provider`
-   and selects the matching backend service (e.g. the Anthropic Internet NEG).
-   `/v1/*` requests with no provider header fall through to the Vertex AI
-   backend; non-LLM paths go to the upstream UI app.
+   routing header `x-model-id: anthropic/claude-3-5-sonnet-…` (the model id
+   verbatim).
+2. **URL Map** evaluates `prefix=/v1/` + a `prefix_match` on `x-model-id`
+   (e.g. `anthropic/`) and selects the matching backend service (e.g. the
+   Anthropic Internet NEG). `/v1/*` requests with no matching header fall
+   through to the Vertex AI backend; non-LLM paths go to the upstream UI app.
 3. **Traffic Extension** intercepts the request and streams the headers and
    body to the callout over gRPC (`REQUEST_HEADERS`, then `REQUEST_BODY`).
 4. **Callout** (`service_callout_example.py`) hands the body to LiteLLM:
-   - `litellm.get_llm_provider(model)` → resolves the provider (`anthropic`).
+   - `litellm.get_llm_provider(model)` resolves the provider (`anthropic`).
    - The provider's `Config` class produces the request body in the provider's
      native format (`config.transform_request(...)`), the target URL
      (`config.get_complete_url(...)`), and the auth headers
@@ -69,29 +70,29 @@ chunk and re-emits it as an OpenAI `chat.completion.chunk`).
    - The callout returns a `BodyResponse` with the transformed body plus header
      mutations: `:path`, `:authority`/`host`, the auth header(s),
      `content-length`, `accept-encoding: identity`, a `user-agent`, and
-     `x-litellm-*` provenance markers. **No `clear_route_cache`** — routing was
+     `x-litellm-*` provenance markers. **No `clear_route_cache`**: routing was
      already decided by the URL map.
 5. **Load balancer** forwards the rewritten request to the chosen backend's
    Internet NEG, which connects to the provider's API.
-6. **Response phase** — the LB invokes the callout again
+6. **Response phase**: the LB invokes the callout again
    (`RESPONSE_HEADERS`, `RESPONSE_BODY`). The callout drops the upstream
    `content-length` (stale after the transform) and, on the body, runs the
    provider `Config`'s `transform_response(...)` to produce an OpenAI
    `chat.completion`. For streaming responses it parses each SSE event with the
    provider's chunk iterator and re-emits an OpenAI `chat.completion.chunk`,
    appending `data: [DONE]\n\n` at the end.
-7. **Client** receives a standard OpenAI response — same shape regardless of
-   which provider served it.
+7. **Client** receives a standard OpenAI response with the same shape
+   regardless of which provider served it.
 
-### The `x-v2-target-provider` header
+### The `x-model-id` header
 
-The client sends `x-v2-target-provider: <provider>` alongside the request — the
-URL map matches on it to pick the backend. The provider is the first segment of
-the LiteLLM model id (`anthropic/claude-…` → `anthropic`), so a one-line
-client-side mapping is all that's required. The sample UI sets it automatically
-from the selected model; OpenAI-style SDK clients can set it via
-`default_headers`. A `/v1/*` request with no provider header falls through to
-the Vertex AI backend.
+The client includes `x-model-id: <provider>/<model>` as a request header,
+and the URL map prefix-matches the leading `<provider>/` segment to
+pick the backend, so no client-side mapping is needed. The sample UI sets the
+header automatically from the selected model; OpenAI-style SDK clients can set
+it via `default_headers` (client-level) or `extra_headers` (per call).
+A `/v1/*` request with no `x-model-id` header, or one whose prefix does not
+match Anthropic, Groq, or OpenRouter, falls through to the Vertex AI backend.
 
 ### Supported endpoints
 
@@ -107,35 +108,41 @@ the Vertex AI backend.
 
 ## Providers
 
-The sample ships with four provider backends. The model id (LiteLLM convention,
-`provider/model`) and the `x-v2-target-provider` header both encode the provider:
+The sample ships with four provider backends. The model id follows the LiteLLM
+convention `<provider>/<model>`. The `x-model-id` header carries that same
+string verbatim, and the URL map prefix-matches on the leading `<provider>/`
+segment to pick the backend.
 
-| Provider | Example model id | `x-v2-target-provider` | Upstream | Auth |
-|----------|------------------|------------------------|----------|------|
-| Vertex AI | `vertex_ai/gemini-2.5-flash` | `vertex_ai` (or omit — it's the default) | `{region}-aiplatform.googleapis.com` | ADC (Cloud Run service identity, `roles/aiplatform.user`) |
-| Anthropic | `anthropic/claude-3-5-sonnet-20241022` | `anthropic` | `api.anthropic.com` | `ANTHROPIC_API_KEY` env var (Secret Manager) |
-| Groq | `groq/compound-beta` | `groq` | `api.groq.com` | `GROQ_API_KEY` env var (Secret Manager) |
-| OpenRouter | `openrouter/openai/gpt-oss-20b:free` | `openrouter` | `openrouter.ai` | `OPENROUTER_API_KEY` env var (Secret Manager) |
+| Provider | Example model id | Upstream | Auth |
+|----------|------------------|----------|------|
+| Vertex AI | `vertex_ai/gemini-2.5-flash` | `{region}-aiplatform.googleapis.com` | ADC (Cloud Run service identity, `roles/aiplatform.user`) |
+| Anthropic | `anthropic/claude-3-5-sonnet-20241022` | `api.anthropic.com` | `ANTHROPIC_API_KEY` env var (Secret Manager) |
+| Groq | `groq/compound-beta` | `api.groq.com` | `GROQ_API_KEY` env var (Secret Manager) |
+| OpenRouter | `openrouter/openai/gpt-oss-20b:free` | `openrouter.ai` | `OPENROUTER_API_KEY` env var (Secret Manager) |
+
+Vertex AI is the default backend: a request with no `x-model-id` header (or one
+whose provider prefix is none of the three above) falls through to Vertex.
 
 LiteLLM owns the actual translation, so adding a provider that LiteLLM already
-supports needs no callout code change — see below.
+supports needs no callout code change. See below.
 
 ### Adding a provider
 
 1. Add the provider's FQDN to `local.third_party_providers` in
-   `deploy/terraform/main.tf` — this creates an Internet NEG + backend service
+   `deploy/terraform/main.tf`. This creates an Internet NEG + backend service
    and a URL-map `header_matches` rule for it.
 2. If the provider needs an API key, add a `*_api_key` variable
    (`deploy/terraform/variables.tf`), wire it into the dynamic `env` block of
    the callout Cloud Run service, and set it in `terraform.tfvars`. The callout
    reads it as `<PROVIDER>_API_KEY` automatically.
 3. If LiteLLM's `Config` class for the provider exposes `transform_request`
-   directly (most do — only Vertex Gemini needs the small built-in fallback),
+   directly (most do; only Vertex Gemini needs the small built-in fallback),
    nothing else changes.
 
 ## Deploy to Google Cloud
 
-> There is intentionally **no local-dev path** for this sample — the ext_proc
+> [!IMPORTANT]
+> There is intentionally **no local-dev path** for this sample. The ext_proc
 > chain depends on a real GCLB URL map with `header_matches` routing, which an
 > Envoy stand-in doesn't replicate faithfully. Deploy to GCP to exercise it.
 
@@ -148,7 +155,7 @@ supports needs no callout code change — see below.
 
 #### IAM roles
 
-Scoped for sample/testing deployments — use least-privilege equivalents in
+Scoped for sample/testing deployments. Use least-privilege equivalents in
 production.
 
 | Role | Purpose |
@@ -199,7 +206,8 @@ gcloud artifacts repositories create litellm-gateway \
 
 ### 4. Build and push images
 
-Callout image (run from `callouts/python/` — the build context is the package root):
+Callout image (run from `callouts/python/`, since the build context is the
+package root):
 
 ```bash
 cd callouts/python
@@ -208,7 +216,7 @@ gcloud builds submit \
   --project=YOUR_PROJECT_ID
 ```
 
-(Optional) Sample chat UI image — serves as the upstream app for non-LLM paths
+(Optional) Sample chat UI image. Serves as the upstream app for non-LLM paths
 and lets you exercise the gateway from a browser:
 
 ```bash
@@ -237,22 +245,25 @@ never appear as plain env values in the console.
 ```bash
 LB_IP=$(terraform output -raw load_balancer_ip)
 
-# Vertex AI — no header needed (it's the default backend)
+# Vertex AI: no header needed (it's the default backend)
 curl -sk -X POST https://$LB_IP/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"vertex_ai/gemini-2.5-flash","messages":[{"role":"user","content":"Say hi"}]}'
 
-# Anthropic / Groq / OpenRouter — set x-v2-target-provider
+# Anthropic / Groq / OpenRouter: set x-model-id to the model id verbatim
 curl -sk -X POST https://$LB_IP/v1/chat/completions \
-  -H "Content-Type: application/json" -H "x-v2-target-provider: anthropic" \
+  -H "Content-Type: application/json" \
+  -H "x-model-id: anthropic/claude-3-5-sonnet-20241022" \
   -d '{"model":"anthropic/claude-3-5-sonnet-20241022","max_tokens":64,"messages":[{"role":"user","content":"Say hi"}]}'
 
 curl -sk -X POST https://$LB_IP/v1/chat/completions \
-  -H "Content-Type: application/json" -H "x-v2-target-provider: groq" \
+  -H "Content-Type: application/json" \
+  -H "x-model-id: groq/compound-beta" \
   -d '{"model":"groq/compound-beta","messages":[{"role":"user","content":"Say hi"}]}'
 
 curl -sk -X POST https://$LB_IP/v1/chat/completions \
-  -H "Content-Type: application/json" -H "x-v2-target-provider: openrouter" \
+  -H "Content-Type: application/json" \
+  -H "x-model-id: openrouter/openai/gpt-oss-20b:free" \
   -d '{"model":"openrouter/openai/gpt-oss-20b:free","messages":[{"role":"user","content":"Say hi"}]}'
 
 # Streaming (SSE)
@@ -262,8 +273,8 @@ curl -skN -X POST https://$LB_IP/v1/chat/completions \
 ```
 
 If you deployed the sample UI as upstream, open `https://$LB_IP/` in a browser
-(accept the self-signed cert) — it sets the `x-v2-target-provider` header for
-you based on the model you pick.
+(accept the self-signed cert). It sets the `x-model-id` header for you based
+on the model you pick.
 
 To see the LB pick a different backend per request, enable logging on the
 backend services (the Terraform sets `log_config { enable = true }`) and query:
@@ -286,7 +297,7 @@ gcloud storage rm -r gs://YOUR_PROJECT_ID_cloudbuild/
 
 | Resource | Purpose |
 |----------|---------|
-| Cloud Run (callout) | The ext_proc callout — LiteLLM in-process |
+| Cloud Run (callout) | The ext_proc callout, LiteLLM in-process |
 | Cloud Run (upstream) | Handles non-LLM traffic (hello-app or the sample UI) |
 | Global external Application LB | Entry point with a self-signed cert |
 | Internet NEGs (×4) + backend services | Vertex AI, Anthropic, Groq, OpenRouter |
@@ -304,8 +315,8 @@ pip install -r requirements.txt -r requirements-test.txt \
 python -m pytest extproc/tests/litellm_gateway_test.py -v
 ```
 
-The suite is pure unit tests — no gRPC server, no network. It covers the SSE
-parser, the OpenAI→Vertex body fallback, the ext_proc phase handlers (header
+The suite is pure unit tests: no gRPC server, no network. It covers the SSE
+parser, the OpenAI to Vertex body fallback, the ext_proc phase handlers (header
 filtering, body rewriting, response transformation, streaming chunk handling),
 and a real end-to-end pass through LiteLLM's Anthropic config (which works
 offline). The Vertex ADC token mint is patched out.
@@ -314,7 +325,7 @@ offline). The Vertex ADC token mint is patched out.
 
 ```
 litellm_gateway/
-├── service_callout_example.py     # ext_proc callout — LiteLLM in-process
+├── service_callout_example.py     # ext_proc callout, LiteLLM in-process
 ├── additional-requirements.txt    # litellm, httpx, google-cloud-aiplatform
 ├── cloudbuild.yaml                # Cloud Build config for the callout image
 ├── Dockerfile                     # Callout container image
@@ -325,7 +336,7 @@ litellm_gateway/
 │       ├── variables.tf
 │       └── terraform.tfvars.example
 └── sample-ui/
-    ├── index.html                 # Chat UI; sets x-v2-target-provider per model
+    ├── index.html                 # Chat UI; sets x-model-id per model
     ├── Dockerfile
     └── cloudbuild.yaml
 ```
@@ -336,9 +347,9 @@ litellm_gateway/
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `GCP_PROJECT_ID` | — | Required for Vertex AI requests (used to build the Vertex URL and for ADC). |
+| `GCP_PROJECT_ID` | (none) | Required for Vertex AI requests (used to build the Vertex URL and for ADC). |
 | `GCP_REGION` | `us-central1` | Vertex AI region; also the Internet-NEG FQDN (`{region}-aiplatform.googleapis.com`). |
-| `ANTHROPIC_API_KEY` | — | Picked up by LiteLLM for `anthropic/*` models. Set via Secret Manager. |
-| `GROQ_API_KEY` | — | Picked up by LiteLLM for `groq/*` models. |
-| `OPENROUTER_API_KEY` | — | Picked up by LiteLLM for `openrouter/*` models. |
-| `<PROVIDER>_API_KEY` | — | Generic pattern — any provider you add reads `<PROVIDER>_API_KEY`. |
+| `ANTHROPIC_API_KEY` | (none) | Picked up by LiteLLM for `anthropic/*` models. Set via Secret Manager. |
+| `GROQ_API_KEY` | (none) | Picked up by LiteLLM for `groq/*` models. |
+| `OPENROUTER_API_KEY` | (none) | Picked up by LiteLLM for `openrouter/*` models. |
+| `<PROVIDER>_API_KEY` | (none) | Generic pattern: any provider you add reads `<PROVIDER>_API_KEY`. |

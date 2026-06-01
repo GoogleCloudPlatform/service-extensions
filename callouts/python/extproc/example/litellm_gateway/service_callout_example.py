@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""LiteLLM Gateway callout — pure ext_proc adapter.
+"""LiteLLM Gateway callout: a pure ext_proc adapter.
 
 The callout is intentionally thin: it inspects the path, hands the OpenAI body
 to LiteLLM for translation (auth, body transform, target URL), and applies the
@@ -20,7 +20,8 @@ result as ext_proc header + body mutations. The Cloud Load Balancer then
 forwards the rewritten request to the provider via an Internet NEG backend.
 
 Routing model: the LB's URL map picks the provider backend from the client's
-`x-v2-target-provider` header — *before* this callout fires. GCP Service
+`x-model-id` header (prefix-matched on the LiteLLM model id),
+*before* this callout fires. GCP Service
 Extensions don't allow body-based routing on a single LB (route extensions
 can't read the body, traffic extensions can't change the backend), so the
 header is the routing signal. Once the LB has picked the right backend, this
@@ -45,7 +46,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, NamedTuple
 from urllib.parse import urlsplit
 
 import httpx
@@ -66,9 +67,9 @@ from extproc.service import callout_server
 from extproc.service import callout_tools
 
 
-# Provenance headers stamped on the forwarded request. Observability only —
+# Provenance headers stamped on the forwarded request. Observability only;
 # they don't affect routing (the LB already routed on the client's
-# x-v2-target-provider header before this callout ran).
+# x-model-id header before this callout ran).
 HEADER_LITELLM_ROUTED = "x-litellm-routed"
 HEADER_LITELLM_PROVIDER = "x-litellm-provider"
 HEADER_LITELLM_MODEL = "x-litellm-model"
@@ -85,7 +86,7 @@ LLM_ENDPOINTS = frozenset({
     "/embeddings",
 })
 
-# Headers the callout manages itself — never copy these from LiteLLM's output.
+# Headers the callout manages itself; never copy these from LiteLLM's output.
 _MANAGED_HEADERS = frozenset({
     "host", ":authority", ":path", "content-length", "content-type",
 })
@@ -101,10 +102,14 @@ _PROVIDER_API_BASE = {
     "anthropic":  "https://api.anthropic.com/v1/messages",
     "groq":       "https://api.groq.com/openai/v1",
     "openrouter": "https://openrouter.ai/api/v1",
-    "mistral":    "https://api.mistral.ai/v1",
-    "deepseek":   "https://api.deepseek.com",
-    "openai":     "https://api.openai.com/v1",
 }
+
+class ProviderRequest(NamedTuple):
+    api_base_url: str
+    headers: dict[str, str]
+    body: dict[str, Any]
+    provider: str
+    model: str
 
 @dataclass
 class _StreamState:
@@ -138,7 +143,11 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
             logging.warning(
                 "GCP_PROJECT_ID is unset; Vertex AI requests will fail.")
 
-    def process(self, callout, context):
+    def process(
+        self,
+        callout: service_pb2.ProcessingRequest,
+        context: ServicerContext,
+    ) -> service_pb2.ProcessingResponse:
         """Set response_body_mode on the response_headers reply.
 
         On the response_headers event we tell the LB how to deliver the
@@ -191,12 +200,20 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
         body: service_pb2.HttpBody,
         context: ServicerContext,
     ) -> service_pb2.BodyResponse | service_pb2.ImmediateResponse | None:
+        # Assumes BUFFERED request body mode: the traffic extension does not
+        # set a streamed request body mode, so the load balancer delivers the
+        # whole request body in a single REQUEST_BODY message. We rely on that
+        # to `json.loads(body.body)` and transform the payload in one pass.
+        # If the request body were streamed, this method would receive partial
+        # chunks and the JSON parse below would fail on all but the last.
         state = _state(context)
         if not state.is_llm:
             return None
 
         raw = body.body
         if not raw:
+            logging.warning(
+                "Empty request body on LLM endpoint; expected a JSON payload.")
             return service_pb2.BodyResponse()
 
         try:
@@ -211,30 +228,28 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
             return callout_tools.header_immediate_response(StatusCode.BadRequest)
 
         try:
-            api_base, headers_dict, body_dict, provider, model_name = (
-                self._build_provider_request(model, req_map)
-            )
+            pr = self._build_provider_request(model, req_map)
         except Exception:
             logging.exception("LiteLLM request transformation failed")
             return callout_tools.header_immediate_response(
                 StatusCode.InternalServerError)
 
-        state.model = model_name
-        state.provider = provider
+        state.model = pr.model
+        state.provider = pr.provider
         state.is_streaming = bool(req_map.get("stream"))
         state.request_body = req_map
 
-        new_body = json.dumps(body_dict).encode("utf-8")
+        new_body = json.dumps(pr.body).encode("utf-8")
 
-        parsed = urlsplit(api_base)
-        target_authority = parsed.netloc
-        target_path = parsed.path or "/"
-        if parsed.query:
-            target_path = f"{target_path}?{parsed.query}"
+        parsed_url = urlsplit(pr.api_base_url)
+        target_authority = parsed_url.netloc
+        target_path = parsed_url.path or "/"
+        if parsed_url.query:
+            target_path = f"{target_path}?{parsed_url.query}"
 
         logging.info(
             "Routing :authority=%s :path=%s (provider=%s, streaming=%s)",
-            target_authority, target_path, provider, state.is_streaming,
+            target_authority, target_path, pr.provider, state.is_streaming,
         )
 
         body_resp = service_pb2.BodyResponse()
@@ -246,22 +261,22 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
             ("host", target_authority),
             ("content-type", "application/json"),
             ("content-length", str(len(new_body))),
-            # Prevent gzip — the response transformation needs raw JSON bytes.
+            # Prevent gzip so the response transform sees raw JSON bytes.
             ("accept-encoding", "identity"),
             # Some upstreams (Groq via Cloudflare) reject requests with no
             # User-Agent (or a generic "Google-LB" UA) as bot traffic.
             ("user-agent", "litellm-gateway/1.0"),
-            # Provenance markers — observability only, not routing.
-            (HEADER_LITELLM_PROVIDER, provider),
-            (HEADER_LITELLM_MODEL, model_name),
+            # Provenance markers (observability only, not routing).
+            (HEADER_LITELLM_PROVIDER, pr.provider),
+            (HEADER_LITELLM_MODEL, pr.model),
             (HEADER_LITELLM_STREAMING, "true" if state.is_streaming else "false"),
         ]
         # Apply the auth + provider-specific headers LiteLLM computed
         # (Authorization: Bearer <ADC token>, x-api-key, anthropic-version, …).
-        for k, v in headers_dict.items():
+        for k, v in pr.headers.items():
             if k.lower() in _MANAGED_HEADERS:
                 continue
-            rewrites.append((k.lower(), str(v)))
+            rewrites.append((k.lower(), v))
 
         for k, v in rewrites:
             body_resp.response.header_mutation.set_headers.append(
@@ -271,8 +286,8 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
                 ))
 
         # We don't set clear_route_cache here. GCP traffic extensions can't
-        # switch backends after URL map evaluation — routing was already
-        # decided by the URL map's header_matches on x-v2-target-provider.
+        # switch backends after URL map evaluation; routing was already
+        # decided by the URL map's header_matches on x-model-id.
         return body_resp
 
     def on_response_headers(
@@ -284,8 +299,8 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
         if not state.is_llm:
             return service_pb2.HeadersResponse()
         resp = service_pb2.HeadersResponse()
-        # Provider's Content-Length will be wrong after our body transform —
-        # drop it so Envoy switches to chunked transfer encoding.
+        # Provider's Content-Length will be wrong after our body transform.
+        # Drop it so Envoy switches to chunked transfer encoding.
         resp.response.header_mutation.remove_headers.append("content-length")
         return resp
 
@@ -299,9 +314,9 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
             return None
         if state.is_streaming:
             return self._handle_streaming_chunk(
-                state, body.body or b"", bool(body.end_of_stream))
+                state, body.body or b"", body.end_of_stream)
         return self._handle_buffered_chunk(
-            state, body.body or b"", bool(body.end_of_stream))
+            state, body.body or b"", body.end_of_stream)
 
     # ------------------------------------------------------------- LiteLLM
 
@@ -309,8 +324,12 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
         self,
         model: str,
         req_map: dict,
-    ) -> tuple[str, dict, dict, str, str]:
-        """Drive LiteLLM provider config to produce (URL, headers, body)."""
+    ) -> ProviderRequest:
+        """Drive LiteLLM provider config to produce the upstream request.
+
+        Returns a `ProviderRequest` carrying api_base_url, headers, body,
+        provider, and model.
+        """
         model_name, provider, _, _ = litellm.get_llm_provider(model=model)
 
         try:
@@ -333,11 +352,15 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
         litellm_params: dict = {}
         is_vertex = provider in ("vertex_ai", "vertex_ai_beta")
         if is_vertex:
+            if not self.gcp_project:
+                logging.warning(
+                    "Vertex AI request received but GCP_PROJECT_ID is unset; "
+                    "downstream call will likely fail with a malformed URL.")
             # ADC token comes from the Cloud Run service identity at runtime.
             litellm_params["vertex_project"] = self.gcp_project
             litellm_params["vertex_location"] = self.gcp_region
 
-        default_api_base = (
+        default_api_base_url = (
             f"https://{self.gcp_region}-aiplatform.googleapis.com"
             if is_vertex else _PROVIDER_API_BASE.get(provider)
         )
@@ -358,7 +381,7 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
             model=model_name,
             messages=messages,
             optional_params=optional_params,
-            api_base=default_api_base,
+            api_base=default_api_base_url,
             litellm_params=litellm_params,
         )
 
@@ -385,9 +408,9 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
         if is_vertex:
             # VertexGeminiConfig doesn't override get_complete_url; build the
             # generateContent URL via LiteLLM's internal helper. _get_vertex_url
-            # returns (full_url_with_suffix, suffix_only) — use only the first.
+            # returns (full_url_with_suffix, suffix_only); use only the first.
             from litellm.llms.vertex_ai.common_utils import _get_vertex_url
-            api_base, _ = _get_vertex_url(
+            api_base_url, _ = _get_vertex_url(
                 mode="chat",
                 model=model_name,
                 stream=is_streaming,
@@ -396,8 +419,8 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
                 vertex_api_version="v1",
             )
         else:
-            api_base = config.get_complete_url(
-                api_base=default_api_base,
+            api_base_url = config.get_complete_url(
+                api_base=default_api_base_url,
                 api_key=None,
                 model=model_name,
                 optional_params=optional_params,
@@ -407,9 +430,15 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
 
         body_dict = self._transform_request_body(
             config, provider, model_name, messages, optional_params,
-            litellm_params, headers, api_base,
+            litellm_params, headers,
         )
-        return api_base, headers, body_dict, provider, model_name
+        return ProviderRequest(
+            api_base_url=api_base_url,
+            headers=headers,
+            body=body_dict,
+            provider=provider,
+            model=model_name,
+        )
 
     @staticmethod
     def _transform_request_body(
@@ -420,13 +449,12 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
         optional_params: dict,
         litellm_params: dict,
         headers: dict,
-        api_base: str,
     ) -> dict:
         """Call the provider config's body transform.
 
         Vertex Gemini's `transform_request` raises NotImplementedError because
         LiteLLM puts that provider's body construction on the handler, not the
-        config — its sync transform isn't exposed publicly. We fall back to a
+        config, and its sync transform isn't exposed publicly. We fall back to a
         minimal OpenAI→generateContent transform for that one provider.
         """
         try:
@@ -513,7 +541,7 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
         """Transform provider SSE chunks to OpenAI SSE chunks via LiteLLM."""
         iterator = self._stream_iterator(state)
         if iterator is None:
-            # Provider returns OpenAI-format SSE already — pass-through.
+            # Provider returns OpenAI-format SSE already; pass it through.
             body_resp = service_pb2.BodyResponse()
             body_resp.response.body_mutation.body = raw
             return body_resp
@@ -567,7 +595,7 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
             from litellm.llms.anthropic.chat.handler import ModelResponseIterator
         else:
             return None
-        # The iterator constructor signature drifts across LiteLLM versions —
+        # The iterator constructor signature drifts across LiteLLM versions;
         # try the known shapes, then fall back to pass-through streaming.
         logging_obj = self._stub_logging(state)
         for kwargs in (
