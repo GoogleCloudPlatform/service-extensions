@@ -14,7 +14,7 @@
 
 """Unit tests for the LiteLLM Gateway Python callout.
 
-Pure unit tests — no gRPC server started, no network calls. Phase methods are
+Pure unit tests: no gRPC server started, no network calls. Phase methods are
 called directly with synthetic proto objects. Provider transformations that
 LiteLLM can do offline (Anthropic body transform, Vertex generateContent
 response transform) are exercised against the real LiteLLM library; the parts
@@ -36,6 +36,7 @@ from extproc.example.litellm_gateway.service_callout_example import (
     HEADER_LITELLM_ROUTED,
     HEADER_LITELLM_STREAMING,
     LiteLLMGatewayCallout,
+    ProviderRequest,
     _StreamState,
     _extract_sse_data,
     _state,
@@ -48,7 +49,7 @@ from extproc.example.litellm_gateway.service_callout_example import (
 # ---------------------------------------------------------------------------
 
 class _Ctx:
-    """Minimal ServicerContext substitute — supports attribute assignment."""
+    """Minimal ServicerContext substitute that supports attribute assignment."""
 
 
 def _http_headers(headers_dict: dict) -> service_pb2.HttpHeaders:
@@ -72,25 +73,35 @@ def _set_headers(response) -> dict:
 
 @pytest.fixture(scope="module")
 def svc():
-    """Callout instance — no server started, no real GCP credentials."""
+    """Callout instance with no server started and no real GCP credentials."""
     with patch.dict(os.environ, {
         "GCP_PROJECT_ID": "test-project",
         "GCP_REGION": "us-central1",
         "ANTHROPIC_API_KEY": "sk-ant-test",
     }):
-        yield LiteLLMGatewayCallout(disable_tls=True)
+        callout = LiteLLMGatewayCallout(
+            disable_tls=True,
+            plaintext_address=("0.0.0.0", 0),
+        )
+        try:
+            yield callout
+        finally:
+            if callout._callout_server is not None:
+                callout._callout_server.stop()
 
 
-# A canned (URL, headers, body, provider, model) tuple matching what
-# _build_provider_request would return for a Vertex Gemini request — used to
-# patch out the GCP-credential-dependent path.
-_VERTEX_PROVIDER_REQUEST = (
-    "https://us-central1-aiplatform.googleapis.com/v1/projects/test-project"
-    "/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent",
-    {"Authorization": "Bearer fake-adc-token", "content-type": "application/json"},
-    {"contents": [{"role": "user", "parts": [{"text": "hi"}]}]},
-    "vertex_ai",
-    "gemini-2.5-flash",
+# A canned ProviderRequest matching what `_build_provider_request` would
+# return for a Vertex Gemini call. Used to patch out the GCP-credential
+# dependent path (ADC token mint).
+_VERTEX_PROVIDER_REQUEST = ProviderRequest(
+    api_base_url=(
+        "https://us-central1-aiplatform.googleapis.com/v1/projects/test-project"
+        "/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent"
+    ),
+    headers={"Authorization": "Bearer fake-adc-token", "content-type": "application/json"},
+    body={"contents": [{"role": "user", "parts": [{"text": "hi"}]}]},
+    provider="vertex_ai",
+    model="gemini-2.5-flash",
 )
 
 
@@ -163,7 +174,7 @@ class TestVertexGeminiBody:
         out = _vertex_gemini_body({"messages": [
             {"role": "user", "content": [{"type": "text", "text": "hi"}]},
         ]})
-        # Falls back to json.dumps — the important thing is it doesn't crash.
+        # Falls back to json.dumps; the important thing is it doesn't crash.
         assert out["contents"][0]["parts"][0]["text"]
 
     def test_empty_messages(self):
@@ -314,7 +325,7 @@ class TestOnRequestBody:
         assert _set_headers(result)[HEADER_LITELLM_STREAMING] == "true"
 
     def test_anthropic_request_end_to_end(self, svc):
-        # Exercises the real LiteLLM AnthropicConfig path — no network needed.
+        # Exercises the real LiteLLM AnthropicConfig path; no network needed.
         ctx = _Ctx()
         _state(ctx).is_llm = True
         body = json.dumps({
@@ -476,6 +487,6 @@ class TestHandleStreamingChunk:
     def test_crlf_normalized(self, svc):
         # Vertex emits CRLF-delimited SSE; ensure we still split events.
         state = _StreamState(model="gemini-2.5-flash", provider="vertex_ai")
-        # An empty/comment event with CRLF — should consume cleanly, no crash.
+        # An empty/comment event with CRLF; should consume cleanly, no crash.
         svc._handle_streaming_chunk(state, b": ping\r\n\r\n", end_of_stream=False)
         assert state.sse_buffer == ""
