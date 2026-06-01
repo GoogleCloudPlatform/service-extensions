@@ -53,7 +53,7 @@ resource "google_project_service" "apis" {
 }
 
 # ===================================================================
-# SERVICE ACCOUNT — CALLOUT
+# SERVICE ACCOUNT: CALLOUT
 # ===================================================================
 #
 # The callout uses ADC (via the Cloud Run service identity) to mint Vertex AI
@@ -78,8 +78,9 @@ locals {
   ]))
 
   # Each provider here gets an Internet NEG + backend on the LB. The URL
-  # map matches `prefix=/v1/` + header `x-v2-target-provider:<provider>` to
-  # pick the right backend. Vertex AI is below as a separate resource.
+  # map matches `prefix=/v1/` + `x-model-id` header with a provider prefix
+  # (e.g. `anthropic/...`) to pick the right backend. Vertex AI is below
+  # as a separate resource.
   third_party_providers = {
     anthropic  = "api.anthropic.com"
     groq       = "api.groq.com"
@@ -88,7 +89,7 @@ locals {
 }
 
 # ===================================================================
-# SECRET MANAGER — PROVIDER API KEYS
+# SECRET MANAGER: PROVIDER API KEYS
 # ===================================================================
 
 resource "google_secret_manager_secret" "api_keys" {
@@ -114,7 +115,7 @@ resource "google_secret_manager_secret_iam_member" "callout_accessor" {
 }
 
 # ===================================================================
-# CLOUD RUN — CALLOUT (Python ext_proc service)
+# CLOUD RUN: CALLOUT (Python ext_proc service)
 # ===================================================================
 
 resource "google_cloud_run_v2_service" "callout" {
@@ -220,7 +221,7 @@ resource "google_compute_backend_service" "callout_backend" {
 }
 
 # ===================================================================
-# CLOUD RUN — UPSTREAM APPLICATION (non-LLM traffic, e.g., chat UI)
+# CLOUD RUN: UPSTREAM APPLICATION (non-LLM traffic, e.g., chat UI)
 # ===================================================================
 
 resource "google_cloud_run_v2_service" "upstream_app" {
@@ -274,7 +275,7 @@ resource "google_compute_backend_service" "upstream_backend" {
 }
 
 # ===================================================================
-# VERTEX AI BACKEND — GLOBAL INTERNET NEG
+# VERTEX AI BACKEND: GLOBAL INTERNET NEG
 # ===================================================================
 
 resource "google_compute_global_network_endpoint_group" "vertex_neg" {
@@ -308,7 +309,7 @@ resource "google_compute_backend_service" "vertex_backend" {
 }
 
 # ===================================================================
-# THIRD-PARTY PROVIDER BACKENDS — GLOBAL INTERNET NEGs
+# THIRD-PARTY PROVIDER BACKENDS: GLOBAL INTERNET NEGs
 # ===================================================================
 
 resource "google_compute_global_network_endpoint_group" "provider_neg" {
@@ -345,7 +346,7 @@ resource "google_compute_backend_service" "provider_backend" {
 }
 
 # ===================================================================
-# LOAD BALANCER — GLOBAL EXTERNAL APPLICATION LB
+# LOAD BALANCER: GLOBAL EXTERNAL APPLICATION LB
 # ===================================================================
 
 resource "google_compute_global_address" "lb_ip" {
@@ -371,18 +372,19 @@ resource "google_compute_ssl_certificate" "lb_cert" {
   certificate = tls_self_signed_cert.lb_cert.cert_pem
 }
 
-# URL map: header-based routing — the URL map picks the right provider
-# backend by matching the client-supplied `x-v2-target-provider` header.
+# URL map: header-based routing. The URL map picks the right provider
+# backend by prefix-matching the client-supplied `x-model-id` header
+# (which carries the LiteLLM model id, e.g. `anthropic/claude-...`).
 # The Traffic Extension reads the body, transforms OpenAI → provider format,
 # and rewrites `:path` for the upstream call. It does NOT influence routing
 # (Traffic Extensions can't switch backends post-decision).
 #
 # So the rules are:
-#   /v1/* + x-v2-target-provider=anthropic   → Anthropic backend
-#   /v1/* + x-v2-target-provider=groq        → Groq backend
-#   /v1/* + x-v2-target-provider=openrouter  → OpenRouter backend
-#   /v1/*                                  → Vertex AI backend (default)
-#   anything else                          → upstream sample UI
+#   /v1/* + x-model-id starts with "anthropic/"   : Anthropic backend
+#   /v1/* + x-model-id starts with "groq/"        : Groq backend
+#   /v1/* + x-model-id starts with "openrouter/"  : OpenRouter backend
+#   /v1/*                                          : Vertex AI backend (default)
+#   anything else                                  : upstream sample UI
 resource "google_compute_url_map" "url_map" {
   name            = "litellm-gateway-url-map"
   default_service = google_compute_backend_service.upstream_backend.id
@@ -401,8 +403,8 @@ resource "google_compute_url_map" "url_map" {
       match_rules {
         prefix_match = "/v1/"
         header_matches {
-          header_name  = "x-v2-target-provider"
-          exact_match  = "anthropic"
+          header_name  = "x-model-id"
+          prefix_match = "anthropic/"
         }
       }
       service = google_compute_backend_service.provider_backend["anthropic"].id
@@ -418,8 +420,8 @@ resource "google_compute_url_map" "url_map" {
       match_rules {
         prefix_match = "/v1/"
         header_matches {
-          header_name  = "x-v2-target-provider"
-          exact_match  = "groq"
+          header_name  = "x-model-id"
+          prefix_match = "groq/"
         }
       }
       service = google_compute_backend_service.provider_backend["groq"].id
@@ -435,8 +437,8 @@ resource "google_compute_url_map" "url_map" {
       match_rules {
         prefix_match = "/v1/"
         header_matches {
-          header_name  = "x-v2-target-provider"
-          exact_match  = "openrouter"
+          header_name  = "x-model-id"
+          prefix_match = "openrouter/"
         }
       }
       service = google_compute_backend_service.provider_backend["openrouter"].id
@@ -478,17 +480,23 @@ resource "google_compute_global_forwarding_rule" "forwarding_rule" {
 }
 
 # ===================================================================
-# SERVICE EXTENSIONS — TRAFFIC EXTENSION
+# SERVICE EXTENSIONS: TRAFFIC EXTENSION
 # ===================================================================
 #
 # Traffic Extension on Global LB. The callout sees REQUEST_BODY and does:
 #   1. Body transform OpenAI → provider format (LiteLLM)
 #   2. :path rewrite to the provider-specific path (LiteLLM's get_complete_url)
 #   3. Auth header injection (Authorization for Vertex via ADC, x-api-key
-#      for Anthropic, etc. — all via LiteLLM's validate_environment)
+#      for Anthropic, etc., all via LiteLLM's validate_environment)
 #
 # It does NOT influence routing. Routing was decided by the URL map based on
-# the client's x-v2-target-provider header.
+# the client's x-model-id header.
+#
+# We subscribe to REQUEST_BODY without a streamed request body mode, so the LB
+# delivers the request body BUFFERED (the whole body in one message). The
+# callout's on_request_body relies on this to parse the JSON in a single pass.
+# The response body mode is chosen per request by the callout via mode_override
+# (STREAMED for SSE, BUFFERED otherwise).
 
 resource "google_network_services_lb_traffic_extension" "callout" {
   name                  = "litellm-gateway-traffic-ext"
@@ -540,15 +548,15 @@ output "vertex_endpoint" {
 output "curl_test_command" {
   description = "Example curl command to test the LiteLLM gateway through the load balancer."
   value       = <<-EOT
-    # Vertex AI (no header needed — default)
+    # Vertex AI (no header needed; default)
     curl -sk -X POST https://${google_compute_global_address.lb_ip.address}/v1/chat/completions \
       -H "Content-Type: application/json" \
       -d '{"model": "vertex_ai/gemini-2.5-flash", "messages": [{"role": "user", "content": "Hello"}]}'
 
-    # Anthropic / Groq / OpenRouter — set x-v2-target-provider header
+    # Anthropic / Groq / OpenRouter: set x-model-id header with the model id
     curl -sk -X POST https://${google_compute_global_address.lb_ip.address}/v1/chat/completions \
       -H "Content-Type: application/json" \
-      -H "x-v2-target-provider: anthropic" \
+      -H "x-model-id: anthropic/claude-haiku-4-5" \
       -d '{"model": "anthropic/claude-haiku-4-5", "messages": [{"role": "user", "content": "Hello"}]}'
   EOT
 }

@@ -17,7 +17,7 @@
 project_id = "your-gcp-project-id"
 region     = "us-central1"
 
-# Container image — build and push using cloudbuild.yaml (Python callout).
+# Container image. Build and push using cloudbuild.yaml (Python callout).
 callout_image = "us-central1-docker.pkg.dev/your-project/litellm-gateway/callout:latest"
 
 # Upstream app image (receives non-LLM traffic).
@@ -29,7 +29,7 @@ callout_image = "us-central1-docker.pkg.dev/your-project/litellm-gateway/callout
 # If empty, the project's default compute SA is used (has roles/editor).
 # callout_service_account = "litellm-gateway-sa@your-project.iam.gserviceaccount.com"
 
-# Provider API keys — only required for the providers you actually use.
+# Provider API keys. Only required for the providers you actually use.
 # These are written into Cloud Run env vars; LiteLLM reads them automatically.
 # anthropic_api_key  = "my-api-key"
 # groq_api_key       = "my-api-key"
