@@ -246,7 +246,7 @@ resource "google_cloud_scheduler_job" "vertex_anomaly_poller" {
   name             = "vertex-anomaly-detection-poller"
   description      = "Triggers the Vertex AI anomaly detection polling endpoint"
   schedule         = "*/5 * * * *"
-  attempt_deadline = "30s"
+  attempt_deadline = "120s"
 
   http_target {
     http_method = "POST"

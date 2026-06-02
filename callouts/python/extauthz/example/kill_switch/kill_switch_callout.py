@@ -56,11 +56,8 @@ class RedisStateStore:
             return False
 
     def block_agent(self, agent_id: str) -> None:
-        try:
-            # Added without expiry; requires manual removal for unblocking to ensure intentionality of the kill switch action.
-            self.client.set(f"{self.prefix}{agent_id}", "BLOCKED")
-        except Exception as e:
-            logging.error(f"Error updating Redis State Store: {e}")
+        # Added without expiry; requires manual removal for unblocking to ensure intentionality of the kill switch action.
+        self.client.set(f"{self.prefix}{agent_id}", "BLOCKED")
 
 class KillSwitchCalloutServer(CalloutServerAuth):
     """External authorization server implementing the Agent Kill Switch."""

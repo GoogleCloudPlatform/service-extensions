@@ -54,7 +54,10 @@ class Decider:
 
     def evaluate(self, finding: Finding) -> Decision:
         if self.dry_run:
-            logging.info(f"[DRY-RUN] Block decision aborted for agent: {finding.agent_id}")
+            logging.info(
+                f"[DRY-RUN] Would block agent {finding.agent_id} | "
+                f"source={finding.source} severity={finding.severity} rationale={finding.rationale}"
+            )
             return Decision.IGNORE
 
         if finding.agent_id in self.exempt_agents:
@@ -82,9 +85,12 @@ class Actuator:
 
     def execute_block(self, finding: Finding) -> None:
         """Executes multi-layered containment operations."""
-        # Update Distributed Cache State (Redis Edge)
-        self.state_store.block_agent(finding.agent_id)
-        
+        try:
+            self.state_store.block_agent(finding.agent_id)
+        except Exception as e:
+            logging.error(f"BLOCK FAILED — state store write error for agent {finding.agent_id}: {e}")
+            return
+
         # Real-time data plane enforcement trigger
         self._patch_gateway_deny_rule(finding.agent_id)
         
@@ -103,8 +109,8 @@ class Actuator:
 
     def _patch_gateway_deny_rule(self, agent_id: str) -> None:
         """API client stub to inject dynamic network isolation into Envoy / Gateway."""
-        logging.warning(f"[ACTUATOR] STUB: Patching Agent Gateway to deny egress for agent {agent_id}")
+        logging.debug(f"[ACTUATOR] STUB: Patching Agent Gateway to deny egress for agent {agent_id}")
 
     def _revoke_iap_iam(self, agent_id: str) -> None:
         """API client stub to execute asynchronous GCP Identity-Aware Proxy IAM role removals."""
-        logging.warning(f"[ACTUATOR] STUB: Revoking IAP IAM roles for agent {agent_id}")
+        logging.debug(f"[ACTUATOR] STUB: Revoking IAP IAM roles for agent {agent_id}")

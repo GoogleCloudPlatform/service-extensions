@@ -21,10 +21,16 @@ if __name__ == "__main__":
         state_store = RedisStateStore(host=redis_host, port=redis_port)
     else:
         logging.info("Starting Webhooks in DEVELOPMENT mode (InMemoryStateStore)")
+        logging.warning(
+            "DEV MODE: InMemoryStateStore is not shared with the ext_authz process. "
+            "Blocks triggered here will not be enforced at the gateway. "
+            "Use STATE_STORE_TYPE=redis for end-to-end testing."
+        )
         state_store = InMemoryStateStore()
 
     dry_run = os.environ.get("DRY_RUN", "false").lower() == "true"
-    exempt_agents = set(os.environ.get("EXEMPT_AGENTS", "").split(",")) if os.environ.get("EXEMPT_AGENTS") else set()
+    exempt_agents_raw = os.environ.get("EXEMPT_AGENTS", "")
+    exempt_agents = {a.strip() for a in exempt_agents_raw.split(",") if a.strip()}
     severity_thresholds = {
         "scc": os.environ.get("SCC_THRESHOLD", "HIGH"),
         "wiz": os.environ.get("WIZ_THRESHOLD", "CRITICAL"),

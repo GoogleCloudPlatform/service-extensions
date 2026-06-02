@@ -41,6 +41,17 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
+    def do_GET(self):
+        parsed_url = urlparse(self.path)
+        if parsed_url.path == '/healthz':
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(b'ok')
+        else:
+            self.send_response(404)
+            self.end_headers()
+
     def _handle_scc(self):
         content_length = int(self.headers.get('Content-Length', 0))
         if content_length == 0:
@@ -61,8 +72,14 @@ class WebhookHandler(BaseHTTPRequestHandler):
             else:
                 scc_finding = payload
 
+            agent_id = scc_finding.get('resourceName')
+            if not agent_id:
+                logging.warning("SCC finding missing 'resourceName' — ignoring.")
+                self.send_response(202)
+                self.end_headers()
+                return
             finding = Finding(
-                agent_id=scc_finding.get('resourceName', 'unknown'),
+                agent_id=agent_id,
                 severity=scc_finding.get('severity', 'LOW').upper(),
                 rationale=scc_finding.get('category', 'No description'),
                 source_finding_id=scc_finding.get('id', 'scc-unknown'),
@@ -90,8 +107,14 @@ class WebhookHandler(BaseHTTPRequestHandler):
             return
         try:
             payload = json.loads(body)
+            agent_id = payload.get('agent_id') or payload.get('resource')
+            if not agent_id:
+                logging.warning("Wiz finding missing agent identifier — ignoring.")
+                self.send_response(202)
+                self.end_headers()
+                return
             finding = Finding(
-                agent_id=payload.get('agent_id', payload.get('resource', 'unknown')),
+                agent_id=agent_id,
                 severity=payload.get('severity', 'MEDIUM').upper(),
                 rationale=payload.get('description', 'Wiz alert'),
                 source_finding_id=payload.get('id', 'wiz-unknown'),
@@ -138,13 +161,17 @@ class WebhookHandler(BaseHTTPRequestHandler):
             endpoint = aiplatform.Endpoint(endpoint_id)
 
             # Query the production machine learning model for anomalies
-            response = endpoint.predict(instances=[{"time_window": "5m"}])
+            response = endpoint.predict(instances=[{"time_window": "5m"}], timeout=90)
 
             if hasattr(response, 'predictions'):
                 for anomaly in response.predictions:
                     if anomaly.get('is_anomalous'):
+                        agent_id = anomaly.get('agent_id')
+                        if not agent_id:
+                            logging.warning("Vertex anomaly missing 'agent_id' — skipping.")
+                            continue
                         finding = Finding(
-                            agent_id=anomaly.get('agent_id', 'unknown'),
+                            agent_id=agent_id,
                             severity=anomaly.get('severity', 'MEDIUM').upper(),
                             rationale=anomaly.get('reason', 'Vertex ML Anomaly Detected'),
                             source_finding_id=anomaly.get('prediction_id', 'vertex-unknown'),
