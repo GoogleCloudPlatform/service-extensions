@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
+import hashlib
+import hmac
 import json
 import logging
 import os
-import base64
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse
 from extauthz.example.kill_switch.kill_switch_core import Finding, Decider, Actuator, StateStore, Decision
@@ -81,6 +83,11 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         body = self.rfile.read(content_length)
+        if not self._validate_wiz_signature(body):
+            logging.warning("[SECURITY] Wiz webhook rejected: invalid signature.")
+            self.send_response(401)
+            self.end_headers()
+            return
         try:
             payload = json.loads(body)
             finding = Finding(
@@ -96,6 +103,16 @@ class WebhookHandler(BaseHTTPRequestHandler):
             logging.error(f"Error processing Wiz webhook: {e}")
             self.send_response(500)
         self.end_headers()
+
+    def _validate_wiz_signature(self, body: bytes) -> bool:
+        """Validates the HMAC-SHA256 signature sent by Wiz in X-Wiz-Signature."""
+        secret = os.environ.get("WIZ_WEBHOOK_SECRET")
+        if not secret:
+            logging.warning("[SECURITY] WIZ_WEBHOOK_SECRET is not configured — Wiz webhook authentication is disabled.")
+            return True
+        received_sig = self.headers.get("X-Wiz-Signature", "")
+        expected_sig = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+        return hmac.compare_digest(received_sig, expected_sig)
 
     def _handle_vertex_poll(self):
         """Triggered by Cloud Scheduler to poll Vertex AI for anomalous agent behavior."""

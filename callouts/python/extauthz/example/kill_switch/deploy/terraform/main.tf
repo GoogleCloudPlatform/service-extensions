@@ -214,6 +214,14 @@ resource "google_cloud_run_v2_service_iam_member" "webhook_invoker" {
   member   = "serviceAccount:${local.kill_switch_service_account}"
 }
 
+resource "google_cloud_run_v2_service_iam_member" "authz_invoker" {
+  count    = var.agent_gateway_service_account != "" ? 1 : 0
+  name     = google_cloud_run_v2_service.authz_service.name
+  location = google_cloud_run_v2_service.authz_service.location
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${var.agent_gateway_service_account}"
+}
+
 # ===================================================================
 # INGESTION TRIGGERS (PUB/SUB & SCHEDULER)
 # ===================================================================

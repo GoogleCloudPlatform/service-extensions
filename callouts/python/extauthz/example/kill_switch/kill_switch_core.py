@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import logging
+import sys
 from dataclasses import dataclass
 from enum import Enum
 from typing import Protocol, Set, Dict
@@ -89,15 +91,15 @@ class Actuator:
         # Identity plane access revocation
         self._revoke_iap_iam(finding.agent_id)
         
-        # Structural audit logging execution
-        logging.info("block_succeeded", extra={
-            "json_fields": {
-                "event_type": "agent_isolation",
-                "agent_id": finding.agent_id,
-                "source": finding.source,
-                "rationale": finding.rationale
-            }
-        })
+        print(json.dumps({
+            "severity": "WARNING",
+            "message": "block_succeeded",
+            "event_type": "agent_isolation",
+            "agent_id": finding.agent_id,
+            "source": finding.source,
+            "source_finding_id": finding.source_finding_id,
+            "rationale": finding.rationale,
+        }), file=sys.stdout, flush=True)
 
     def _patch_gateway_deny_rule(self, agent_id: str) -> None:
         """API client stub to inject dynamic network isolation into Envoy / Gateway."""

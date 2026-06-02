@@ -23,6 +23,12 @@ variable "kill_switch_service_account" {
   default     = null
 }
 
+variable "agent_gateway_service_account" {
+  description = "Service account email of the Agent Gateway, granted roles/run.invoker on the ext_authz service. If empty, no IAM binding is created."
+  type        = string
+  default     = ""
+}
+
 # -------------------------------------------------------------------
 # KILL SWITCH POLICY VARIABLES
 # -------------------------------------------------------------------

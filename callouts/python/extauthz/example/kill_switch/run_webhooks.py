@@ -14,9 +14,9 @@ if __name__ == "__main__":
     store_type = os.environ.get("STATE_STORE_TYPE", "memory").lower()
     if store_type == "redis":
         logging.info("Starting Webhooks in PRODUCTION mode (RedisStateStore)")
-        redis_host = os.environ.get("REDIS_HOST", "localhost")
+        redis_host = os.environ.get("REDIS_HOST")
         if not redis_host:
-            raise ValueError("REDIS_HOST environment variable is missing in production mode.")
+            raise ValueError("REDIS_HOST environment variable is required in production mode.")
         redis_port = int(os.environ.get("REDIS_PORT", 6379))
         state_store = RedisStateStore(host=redis_host, port=redis_port)
     else:
