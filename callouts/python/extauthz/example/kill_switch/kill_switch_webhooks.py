@@ -53,6 +53,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
     def _handle_scc(self):
+        """Processes Security Command Center findings from a Pub/Sub push subscription."""
         content_length = int(self.headers.get('Content-Length', 0))
         if content_length == 0:
             logging.warning("Received webhook request with empty body")
@@ -93,6 +94,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def _handle_wiz(self):
+        """Processes Wiz security findings from an HTTPS webhook."""
         content_length = int(self.headers.get('Content-Length', 0))
         if content_length == 0:
             logging.warning("Received webhook request with empty body")
@@ -160,7 +162,6 @@ class WebhookHandler(BaseHTTPRequestHandler):
             aiplatform.init(project=project_id, location=location)
             endpoint = aiplatform.Endpoint(endpoint_id)
 
-            # Query the production machine learning model for anomalies
             response = endpoint.predict(instances=[{"time_window": "5m"}], timeout=90)
 
             if hasattr(response, 'predictions'):
@@ -191,6 +192,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def _process_finding(self, finding: Finding):
+        """Routes a normalized finding through the Decider and triggers actuation on a BLOCK decision."""
         decision = self.decider.evaluate(finding)
         if decision == Decision.BLOCK:
             logging.warning(f"Blocking agent {finding.agent_id} due to finding from {finding.source}")

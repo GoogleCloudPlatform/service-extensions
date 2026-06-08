@@ -38,11 +38,8 @@ resource "google_project_service" "apis" {
 # ===================================================================
 # SERVICE ACCOUNT
 # ===================================================================
-#
-# Use the project's default compute SA. Override via var.kill_switch_service_account
-# for tighter scoping. The kill-switch needs roles/iap.egressor revocation, but
-# the broader projectIamAdmin role is intentionally NOT granted here — scope a
-# narrower role at the resource level once the exact revocation surface is known.
+# projectIamAdmin is intentionally NOT granted — scope roles/iap.egressor at the
+# resource level when the IAP revocation target is defined.
 locals {
   kill_switch_service_account = coalesce(
     var.kill_switch_service_account,
@@ -104,7 +101,6 @@ resource "google_cloud_run_v2_service" "authz_service" {
       }
     }
 
-    # Direct VPC Egress configuration for Redis access
     vpc_access {
       network_interfaces {
         network = google_compute_network.kill_switch_vpc.id
@@ -193,7 +189,6 @@ resource "google_cloud_run_v2_service" "webhook_service" {
       }
     }
 
-    # Direct VPC Egress configuration for Redis access
     vpc_access {
       network_interfaces {
         network = google_compute_network.kill_switch_vpc.id

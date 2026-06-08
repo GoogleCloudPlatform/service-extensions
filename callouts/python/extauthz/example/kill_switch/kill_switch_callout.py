@@ -70,10 +70,12 @@ class KillSwitchCalloutServer(CalloutServerAuth):
         try:
             agent_id = self.extract_agent_id(request)
 
+            # Allow unidentified requests; the kill switch only acts on known agent IDs.
             if not agent_id:
                 logging.debug("Request allowed: no x-spiffe-id header found.")
                 return allow_request()
 
+            # Deny immediately if the agent is present in the blocked state store.
             if self.state_store.is_blocked(agent_id):
                 logging.warning(f"ACCESS DENIED: Agent {agent_id} is in the blocked state store.")
                 return deny_request(

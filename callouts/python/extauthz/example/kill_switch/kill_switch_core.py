@@ -19,7 +19,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Protocol, Set, Dict
 
-# Explicit severity weighting matrix to evaluate threshold levels numerically
 SEVERITY_WEIGHTS = {
     "LOW": 1,
     "MEDIUM": 2,
@@ -53,6 +52,7 @@ class Decider:
         self.severity_thresholds = severity_thresholds
 
     def evaluate(self, finding: Finding) -> Decision:
+        # Dry-run mode: log intent but skip enforcement.
         if self.dry_run:
             logging.info(
                 f"[DRY-RUN] Would block agent {finding.agent_id} | "
@@ -60,18 +60,16 @@ class Decider:
             )
             return Decision.IGNORE
 
+        # Skip agents explicitly exempted by policy.
         if finding.agent_id in self.exempt_agents:
             logging.info(f"[EXEMPT] Agent {finding.agent_id} is in the exemption list. Ignoring.")
             return Decision.IGNORE
 
-        # Fetch configured severity thresholds and translate to numeric weights
         required_severity = self.severity_thresholds.get(finding.source, "CRITICAL").upper()
         required_weight = SEVERITY_WEIGHTS.get(required_severity, 4)
-        
-        finding_severity = finding.severity.upper()
-        finding_weight = SEVERITY_WEIGHTS.get(finding_severity, 0)
+        # Unknown severities default to weight 0, ensuring they never meet any threshold.
+        finding_weight = SEVERITY_WEIGHTS.get(finding.severity.upper(), 0)
 
-        # Enforce relative severity threshold check
         if finding_weight < required_weight:
             logging.info(f"[THRESHOLD] Finding ignored. Severity {finding.severity} is below threshold {required_severity}.")
             return Decision.IGNORE
@@ -79,24 +77,19 @@ class Decider:
         return Decision.BLOCK
 
 class Actuator:
-    """Executes the containment pipeline."""
+    """Executes the containment actuation pipeline on a BLOCK decision."""
     def __init__(self, state_store: StateStore):
         self.state_store = state_store
 
     def execute_block(self, finding: Finding) -> None:
-        """Executes multi-layered containment operations."""
+        """Writes the agent to the blocked state store and emits a structured audit log."""
         try:
             self.state_store.block_agent(finding.agent_id)
         except Exception as e:
             logging.error(f"BLOCK FAILED — state store write error for agent {finding.agent_id}: {e}")
             return
 
-        # Real-time data plane enforcement trigger
-        self._patch_gateway_deny_rule(finding.agent_id)
-        
-        # Identity plane access revocation
-        self._revoke_iap_iam(finding.agent_id)
-        
+        # Audit log written only after confirmed state store write.
         print(json.dumps({
             "severity": "WARNING",
             "message": "block_succeeded",
@@ -106,11 +99,3 @@ class Actuator:
             "source_finding_id": finding.source_finding_id,
             "rationale": finding.rationale,
         }), file=sys.stdout, flush=True)
-
-    def _patch_gateway_deny_rule(self, agent_id: str) -> None:
-        """API client stub to inject dynamic network isolation into Envoy / Gateway."""
-        logging.debug(f"[ACTUATOR] STUB: Patching Agent Gateway to deny egress for agent {agent_id}")
-
-    def _revoke_iap_iam(self, agent_id: str) -> None:
-        """API client stub to execute asynchronous GCP Identity-Aware Proxy IAM role removals."""
-        logging.debug(f"[ACTUATOR] STUB: Revoking IAP IAM roles for agent {agent_id}")
