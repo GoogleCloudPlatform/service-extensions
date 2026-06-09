@@ -22,6 +22,9 @@ from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse
 from extauthz.example.kill_switch.kill_switch_core import Finding, Decider, Actuator, StateStore, Decision
 
+# Guard against oversized request DoS on public endpoints.
+MAX_PAYLOAD_SIZE = 10 * 1024 * 1024
+
 class WebhookHandler(BaseHTTPRequestHandler):
     """Handle incoming security events from SCC, Wiz, and Vertex AI."""
     
@@ -54,13 +57,22 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
     def _handle_scc(self):
         """Processes Security Command Center findings from a Pub/Sub push subscription."""
-        content_length = int(self.headers.get('Content-Length', 0))
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+        except ValueError:
+            self.send_response(400)
+            self.end_headers()
+            return
         if content_length == 0:
             logging.warning("Received webhook request with empty body")
             self.send_response(400)
             self.end_headers()
             return
-        
+        if content_length > MAX_PAYLOAD_SIZE:
+            self.send_response(413)
+            self.end_headers()
+            return
+
         body = self.rfile.read(content_length)
         
         try:
@@ -95,10 +107,19 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
     def _handle_wiz(self):
         """Processes Wiz security findings from an HTTPS webhook."""
-        content_length = int(self.headers.get('Content-Length', 0))
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+        except ValueError:
+            self.send_response(400)
+            self.end_headers()
+            return
         if content_length == 0:
             logging.warning("Received webhook request with empty body")
             self.send_response(400)
+            self.end_headers()
+            return
+        if content_length > MAX_PAYLOAD_SIZE:
+            self.send_response(413)
             self.end_headers()
             return
         body = self.rfile.read(content_length)

@@ -17,7 +17,7 @@ import logging
 import sys
 from dataclasses import dataclass
 from enum import Enum
-from typing import Protocol, Set, Dict
+from typing import Protocol
 
 SEVERITY_WEIGHTS = {
     "LOW": 1,
@@ -25,6 +25,8 @@ SEVERITY_WEIGHTS = {
     "HIGH": 3,
     "CRITICAL": 4
 }
+
+VALID_SEVERITIES = frozenset(SEVERITY_WEIGHTS)
 
 class Decision(Enum):
     BLOCK = "BLOCK"
@@ -46,10 +48,13 @@ class StateStore(Protocol):
 
 class Decider:
     """Evaluates normalized findings against security policies."""
-    def __init__(self, dry_run: bool, exempt_agents: Set[str], severity_thresholds: Dict[str, str]):
+    def __init__(self, dry_run: bool, exempt_agents: set[str], severity_thresholds: dict[str, str]):
         self.dry_run = dry_run
         self.exempt_agents = exempt_agents
         self.severity_thresholds = severity_thresholds
+        invalid = {v.upper() for v in severity_thresholds.values()} - VALID_SEVERITIES
+        if invalid:
+            logging.warning(f"Unknown severity threshold value(s) {invalid} — will never match any finding.")
 
     def evaluate(self, finding: Finding) -> Decision:
         # Dry-run mode: log intent but skip enforcement.
