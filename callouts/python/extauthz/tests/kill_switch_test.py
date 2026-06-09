@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
-
 import os
 import datetime
 import threading
@@ -254,7 +252,7 @@ class TestKillSwitchWebhooks:
         response = urllib.request.urlopen(req)
         
         assert response.getcode() == 202
-        assert http_server.is_blocked("spiffe://agents.global.org/scc-compromised") == True
+        assert http_server.is_blocked("spiffe://agents.global.org/scc-compromised")
     
     def test_vertex_poll_disabled_by_default(self, http_server):
         """Test that the Vertex endpoint safely returns 200 when the feature flag is off."""
@@ -318,4 +316,4 @@ class TestKillSwitchWebhooks:
             
             assert response.getcode() == 200
             # Ensure the Decider evaluated the mock prediction and Actuator saved it to the state store
-            assert http_server.is_blocked("spiffe://agents.global.org/vertex-compromised") == True
+            assert http_server.is_blocked("spiffe://agents.global.org/vertex-compromised")
