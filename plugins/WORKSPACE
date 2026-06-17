@@ -8,30 +8,46 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 # --- PLUGIN + TEST RUNNER DEPENDENCIES ---
 
-# Platforms update for @platforms//os:emscripten
-http_archive(
-    name = "platforms",
-    sha256 = "218efe8ee736d26a3572663b374a253c012b716d8af0c07e842e82f238a0a7ee",
-    urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.10/platforms-0.0.10.tar.gz",
-        "https://github.com/bazelbuild/platforms/releases/download/0.0.10/platforms-0.0.10.tar.gz",
-    ],
-)
-
 # Abseil for base libs. Updated to work with latest Emscripten and STANDALONE_WASM.
+
 http_archive(
     name = "com_google_absl",
-    sha256 = "95e90be7c3643e658670e0dd3c1b27092349c34b632c6e795686355f67eca89f",
-    strip_prefix = "abseil-cpp-20240722.0",
-    urls = ["https://github.com/abseil/abseil-cpp/archive/20240722.0.zip"],
+    integrity = "sha256-FpL3fRc5us8/lDNxiLeFg88JurfkINLcbFYFpPhnhaE=",
+    strip_prefix = "abseil-cpp-20250814.1",
+    urls = ["https://github.com/abseil/abseil-cpp/releases/download/20250814.1/abseil-cpp-20250814.1.tar.gz"],
 )
+
+http_archive(
+    name = "com_google_protobuf",
+    repo_mapping = {"@abseil-cpp": "@com_google_absl"},
+    sha256 = "6b6599b54c88d75904b7471f5ca34a725fa0af92e134dd1a32d5b395aa4b4ca8",
+    strip_prefix = "protobuf-33.2",
+    urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v33.2/protobuf-33.2.tar.gz"],
+)
+
+load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+
+protobuf_deps()
+
+load("@rules_java//java:rules_java_deps.bzl", "rules_java_dependencies")
+
+rules_java_dependencies()
+
+load("@rules_java//java:repositories.bzl", "rules_java_toolchains")
+
+rules_java_toolchains()
+
+load("@rules_python//python:repositories.bzl", "py_repositories")
+
+py_repositories()
 
 # RE2 for C++ regex.
 http_archive(
     name = "com_google_re2",
-    sha256 = "18cf85922e27fad3ed9c96a27733037da445f35eb1a2744c306a37c6d11e95c4",
-    strip_prefix = "re2-2023-07-01",
-    url = "https://github.com/google/re2/archive/2023-07-01.tar.gz",
+    repo_mapping = {"@abseil-cpp": "@com_google_absl"},
+    sha256 = "4e6593ac3c71de1c0f322735bc8b0492a72f66ffccfad76e259fa21c41d27d8a",
+    strip_prefix = "re2-2023-11-01",
+    url = "https://github.com/google/re2/archive/2023-11-01.tar.gz",
 )
 
 # Boost for C++ URL parsing.
@@ -46,13 +62,12 @@ load("@com_github_nelhage_rules_boost//:boost/boost.bzl", "boost_deps")
 
 boost_deps()
 
-# Update boringssl to pick up fix for strdup build issue:
-# https://boringssl-review.googlesource.com/c/boringssl/+/64047
+# Boringssl for crypto in C++ plugins.
 http_archive(
-    name = "boringssl", # 2024-04-29
-    sha256 = "cd240bf27450f75cd5f41c512a06297c00646cdbac9f87b604e9312771db15a6",
-    strip_prefix = "boringssl-2db0eb3f96a5756298dcd7f9319e56a98585bd10",
-    url = "https://github.com/google/boringssl/archive/2db0eb3f96a5756298dcd7f9319e56a98585bd10.tar.gz",
+    name = "boringssl",
+    sha256 = "52e2d96759d483e384e3964a2513781ea05cb6b2d677f1f8f5a4049aea30535d",
+    strip_prefix = "boringssl-0.20260211.0",
+    url = "https://github.com/google/boringssl/releases/download/0.20260211.0/boringssl-0.20260211.0.tar.gz",
 )
 
 # JWT verification lib for C++.
@@ -62,22 +77,27 @@ http_archive(
     strip_prefix = "jwt_verify_lib-b59e8075d4a4f975ba6f109e1916d6e60aeb5613",
     url = "https://github.com/google/jwt_verify_lib/archive/b59e8075d4a4f975ba6f109e1916d6e60aeb5613.tar.gz",
 )
+
 bind(
     name = "abseil_strings",
     actual = "@com_google_absl//absl/strings:strings",
 )
+
 bind(
     name = "abseil_flat_hash_set",
     actual = "@com_google_absl//absl/container:flat_hash_set",
 )
+
 bind(
     name = "abseil_time",
     actual = "@com_google_absl//absl/time:time",
 )
+
 bind(
     name = "protobuf",
     actual = "@com_google_protobuf//:protobuf",
 )
+
 bind(
     name = "ssl",
     actual = "@boringssl//:ssl",
@@ -95,35 +115,35 @@ http_archive(
 
 http_archive(
     name = "com_google_googletest",
-    sha256 = "8ad598c73ad796e0d8280b082cebd82a630d73e73cd3c70057938a6501bba5d7",
-    strip_prefix = "googletest-1.14.0",
-    urls = ["https://github.com/google/googletest/archive/refs/tags/v1.14.0.tar.gz"],
+    repo_mapping = {
+        "@abseil-cpp": "@com_google_absl",
+        "@re2": "@com_google_re2",
+    },
+    strip_prefix = "googletest-1.17.0",
+    urls = ["https://github.com/google/googletest/archive/refs/tags/v1.17.0.tar.gz"],
 )
 
 # For testing, include Quiche for its Balsa header library.
 http_archive(
-    name = "com_github_google_quiche",  # 2024-05-16
+    name = "com_github_google_quiche",  # 2025-11-24
     patch_args = ["-p1"],
     patches = ["//:quiche.patch"],
-    sha256 = "ae33ab0056fd5119d9aae15abfcb69e5d6f021ec5e18e77535ec0fe0c49dfa66",
-    strip_prefix = "quiche-1397c94d55af0bfc142ac7dda923cf2726857755",
-    urls = ["https://github.com/google/quiche/archive/1397c94d55af0bfc142ac7dda923cf2726857755.tar.gz"],
+    repo_mapping = {"@abseil-cpp": "@com_google_absl"},
+    strip_prefix = "quiche-89c28d4ce7df60329173a576ed52aafda88f743b",
+    urls = ["https://github.com/google/quiche/archive/89c28d4ce7df60329173a576ed52aafda88f743b.tar.gz"],
 )
 
 # For testing, GoogleURL is a Quiche dependency.
 http_archive(
-    name = "com_google_googleurl",  # 2024-10-09
-    sha256 = "3db90606ea9ca123d11f85c6fa3627a1e1e403d38c7fd1854a628cf1da3be5e2",
-    urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl-9cdb1f4d1a365ebdbcbf179dadf7f8aa5ee802e7.tar.gz"],
+    name = "com_google_googleurl",  # 2025-11-10
+    repo_mapping = {"@abseil-cpp": "@com_google_absl"},
+    sha256 = "d8a701123250e03b3c0865babdfc78540d66374db78f74aafd09bf08545c00bd",
+    strip_prefix = "gurl-94ff147fe0b96b4cca5d6d316b9af6210c0b8051",
+    urls = ["https://github.com/google/gurl/archive/94ff147fe0b96b4cca5d6d316b9af6210c0b8051.tar.gz"],
 )
 
 http_archive(
     name = "yaml_cpp",
-    urls = [
-        "https://github.com/jbeder/yaml-cpp/archive/refs/tags/0.8.0.tar.gz",
-    ],
-    strip_prefix = "yaml-cpp-0.8.0",
-    sha256 = "fbe74bbdcee21d656715688706da3c8becfd946d92cd44705cc6098bb23b3a16",
     build_file_content = r"""
 package(default_visibility = ["//visibility:public"])
 
@@ -144,13 +164,18 @@ cc_library(
     defines = ["YAML_CPP_STATIC_DEFINE"],
 )
 """,
+    sha256 = "fbe74bbdcee21d656715688706da3c8becfd946d92cd44705cc6098bb23b3a16",
+    strip_prefix = "yaml-cpp-0.8.0",
+    urls = [
+        "https://github.com/jbeder/yaml-cpp/archive/refs/tags/0.8.0.tar.gz",
+    ],
 )
 
 # --- PLUGIN DEPENDENCIES ---
 
-PROXY_WASM_CPP_HOST_COMMIT = "c4d7bb0fda912e24c64daf2aa749ec54cec99412"  # 2024-12-19
+PROXY_WASM_CPP_HOST_COMMIT = "94091cdb2fff10c9450e87d998714692632766d1"  # 2026-04-06
 
-PROXY_WASM_CPP_HOST_SHA256 = "3ea005e85d2b37685149c794c6876fd6de7f632f0ad49dc2b3cd580e7e7a5525"
+PROXY_WASM_CPP_HOST_SHA256 = "448b79c95396faba083b52ba39c3d0b4bec9fb63fa516cecf8a6106b5529a6e8"
 
 http_archive(
     name = "proxy_wasm_cpp_host",

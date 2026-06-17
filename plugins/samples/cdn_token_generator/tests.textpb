@@ -1,0 +1,124 @@
+test {
+  name: "Should sign URLs in HLS manifest response body"
+  response_body {
+    input {
+      content: "#EXTM3U\n#EXT-X-VERSION:3\n#EXTINF:10.0,\nhttps://cdn.example.com/video/segment-001.ts\n#EXTINF:10.0,\nhttps://cdn.example.com/video/segment-002.ts\n#EXT-X-ENDLIST"
+    }
+    result {
+      body {
+        regex: "(?s).*Edge-Cache-Token=URLPrefix=.*~Expires=.*~KeyName=test-key~hmac=.*"
+      }
+    }
+  }
+}
+
+test {
+  name: "Should sign single URL in response body"
+  response_body {
+    input {
+      content: "https://media.example.com/segment1.ts"
+    }
+    result {
+      body {
+        regex: ".*Edge-Cache-Token=URLPrefix=.*~Expires=.*~KeyName=test-key~hmac=.*"
+      }
+    }
+  }
+}
+
+test {
+  name: "Should handle response with no URLs"
+  response_body {
+    input {
+      content: "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-ENDLIST"
+    }
+    result {
+      body {
+        exact: "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-ENDLIST"
+      }
+    }
+  }
+}
+
+test {
+  name: "Should handle empty response body"
+  response_body {
+    input {
+    }
+    result {
+      body {
+        exact: ""
+      }
+    }
+  }
+}
+
+test {
+  name: "Should sign HTTP and HTTPS URLs"
+  response_body {
+    input {
+      content: "http://cdn.example.org/video.mp4\nhttps://secure.cdn.com/audio.m4a"
+    }
+    result {
+      body {
+        regex: "(?s).*Edge-Cache-Token=.*~hmac=.*"
+      }
+    }
+  }
+}
+
+test {
+  name: "Should handle URLs with existing query parameters"
+  response_body {
+    input {
+      content: "https://media.example.com/video.mp4?quality=high"
+    }
+    result {
+      body {
+        regex: ".*&Edge-Cache-Token=URLPrefix=.*~Expires=.*~KeyName=test-key~hmac=.*"
+      }
+    }
+  }
+}
+
+test {
+  name: "Should handle JSON response with URLs"
+  response_body {
+    input {
+      content: "{\"video_url\": \"https://cdn.example.com/video.mp4\", \"thumbnail\": \"https://cdn.example.com/thumb.jpg\"}"
+    }
+    result {
+      body {
+        regex: ".*Edge-Cache-Token=.*~hmac=.*"
+      }
+    }
+  }
+}
+
+test {
+  name: "Should handle DASH manifest with URLs"
+  response_body {
+    input {
+      content: "<?xml version=\"1.0\"?>\n<MPD>\n  <BaseURL>https://cdn.example.com/dash/</BaseURL>\n</MPD>"
+    }
+    result {
+      body {
+        regex: "(?s).*Edge-Cache-Token=.*~hmac=.*"
+      }
+    }
+  }
+}
+
+test {
+  name: "Should handle plain text with no URLs"
+  response_body {
+    input {
+      content: "This is plain text with no URLs at all"
+    }
+    result {
+      body {
+        exact: "This is plain text with no URLs at all"
+      }
+    }
+  }
+}
