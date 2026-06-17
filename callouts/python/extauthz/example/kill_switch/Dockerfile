@@ -1,0 +1,51 @@
+# Copyright 2026 Google LLC.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Stage 1: Generate Python stubs from Envoy protobuf definitions
+FROM bufbuild/buf AS BUF
+
+# Install git to allow buf to fetch the Envoy API repository
+RUN apk add --no-cache git
+COPY ./buf.gen.yaml ./buf.gen.yaml
+
+# Allow overriding the proto path via build arg, defaulting to Envoy ext_authz service
+ARG proto_path="envoy/service/auth/v3/external_auth.proto"
+RUN buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api \
+      --path "$proto_path" --include-imports
+
+# Stage 2: Final production image
+FROM python:3.12-slim
+
+WORKDIR /home/callouts/python
+
+# Copy base requirements and install
+COPY ./requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Copy generated protobufs (envoy/ and google/ directories)
+COPY --from=BUF ./protodef .
+
+# Copy application source code
+COPY ./extauthz/__init__.py ./extauthz/__init__.py
+COPY ./extauthz/service ./extauthz/service
+COPY ./extauthz/example/kill_switch ./extauthz/example/kill_switch
+
+# Install service-specific dependencies (e.g., redis, google-cloud-aiplatform)
+RUN pip install --no-cache-dir -r ./extauthz/example/kill_switch/additional-requirements.txt
+
+# Expose HTTP port
+EXPOSE 8080
+
+# Default entrypoint runs the ext_authz gRPC server
+ENTRYPOINT ["python3", "-u", "-m", "extauthz.example.kill_switch.run_authz"]
