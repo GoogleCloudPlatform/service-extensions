@@ -23,7 +23,7 @@ jobs:
       contents: read
 
     strategy:
-      matrix:
+      ext_proc_matrix:
         include:
         - image: 'python-example-basic'
           dir: 'basic'
@@ -37,6 +37,11 @@ jobs:
         - image: 'e2e-test-observability'
           dir: 'e2e_tests'
           module: 'observability_server'
+      ext_authz_matrix:
+        include:
+        - image: 'block_ip'
+          dir: 'block_ip'
+          module: 'service_callout_example'
 
     steps:
       # Get latest repo.
@@ -53,21 +58,21 @@ jobs:
 
       # Get metadata: https://github.com/docker/metadata-action#about
       # The `images` value provides the base name for tags and labels.
-      - name: Extract metadata for Docker
+      - name: Extract ExtProc metadata for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.REPOSITORY }}/${{ matrix.image }}
+          images: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.REPOSITORY }}/${{ ext_proc_matrix.image }}
           tags: |
             type=ref,event=branch
             type=sha,prefix=public-image-,format=short
           labels: |
-            org.opencontainers.image.title=${{ matrix.image }}
-            org.opencontainers.image.description=Callouts sample ${{ matrix.image }}
+            org.opencontainers.image.title=${{ ext_proc_matrix.image }}
+            org.opencontainers.image.description=Callouts sample ${{ ext_proc_matrix.image }}
 
       # Push Docker image: https://github.com/docker/build-push-action#about
       # Uses the `tags` and `labels` from the `meta` step.
-      - name: Build and push Docker image
+      - name: Build and push ExtProc Docker image
         id: push
         uses: docker/build-push-action@v5
         with:
@@ -78,6 +83,35 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            copy_path=extproc/example/${{ matrix.dir }}/
-            run_module=${{ matrix.module }}
+            copy_path=extproc/example/${{ ext_proc_matrix.dir }}/
+            run_module=${{ ext_proc_matrix.module }}
 
+      # Get metadata: https://github.com/docker/metadata-action#about
+      # The `images` value provides the base name for tags and labels.
+      - name: Extract Authz metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.REPOSITORY }}/${{ ext_authz_matrix.image }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=public-image-,format=short
+          labels: |
+            org.opencontainers.image.title=${{ ext_authz_matrix.image }}
+            org.opencontainers.image.description=Callouts sample ${{ ext_authz_matrix.image }}
+      
+      # Push Docker image: https://github.com/docker/build-push-action#about
+      # Uses the `tags` and `labels` from the `meta` step.
+      - name: Build and push ExtProc Docker image
+        id: push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./callouts/python
+          file: ./callouts/python/extauthz/example/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            copy_path=extauthz/example/${{ ext_authz_matrix.dir }}/
+            run_module=${{ ext_authz_matrix.module }}
