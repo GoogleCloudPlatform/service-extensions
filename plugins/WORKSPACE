@@ -262,8 +262,8 @@ load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_depe
 go_repository(
     name = "com_github_proxy_wasm_proxy_wasm_go_sdk",
     importpath = "github.com/proxy-wasm/proxy-wasm-go-sdk",
-    sum = "h1:UiqUl6PLcIW4S93FkmbK9gK2r2veY0MI6nKEXMk/9Ws=",
-    version = "v0.0.0-20241219182957-23e5db51ea08",
+    sum = "h1:m17/Cedqhynvsf2mruRanrvb4R77J+Xz1O8mibAQTSs=",
+    version = "v0.0.0-20260105142703-44c7d5847745",
 )
 
 go_repository(
@@ -271,6 +271,13 @@ go_repository(
     importpath = "github.com/golang-jwt/jwt/v5",
     sum = "h1:OuVbFODueb089Lh128TAcimifWaLhJwVflnrgM17wHk=",
     version = "v5.2.1",
+)
+
+go_repository(
+    name = "com_github_com_google_uuid",
+    importpath = "github.com/google/uuid",
+    sum = "h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=",
+    version = "v1.6.0",
 )
 
 go_rules_dependencies()
