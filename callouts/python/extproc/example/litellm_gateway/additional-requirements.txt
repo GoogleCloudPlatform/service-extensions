@@ -1,0 +1,3 @@
+litellm==1.83.0
+httpx>=0.27,<1.0
+google-cloud-aiplatform>=1.50.0
