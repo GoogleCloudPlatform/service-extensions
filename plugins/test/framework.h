@@ -16,13 +16,13 @@
 
 #pragma once
 
-#include <boost/algorithm/string.hpp>
-#include <boost/filesystem/path.hpp>
 #include <string>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "boost/algorithm/string.hpp"
+#include "boost/filesystem/path.hpp"
 #include "gtest/gtest.h"
 #include "include/proxy-wasm/exports.h"
 #include "include/proxy-wasm/wasm.h"
@@ -102,6 +102,7 @@ class TestContext : public proxy_wasm::TestContext {
   uint64_t getMonotonicTimeNanoseconds() override;
   proxy_wasm::WasmResult log(uint32_t log_level,
                              std::string_view message) override;
+  void error(std::string_view message) override;
   // --- END   Wasm facing API ---
 
   // --- BEGIN Testing facilities ---
@@ -178,7 +179,7 @@ class TestHttpContext : public TestContext {
       proxy_wasm::WasmHeaderMapType type,
       const proxy_wasm::Pairs& pairs) override;
   proxy_wasm::WasmResult getProperty(std::string_view path,
-                                    std::string* result) override;
+                                     std::string* result) override;
 
   // Ignore failStream, avoid calling unimplemented closeStream.
   void failStream(proxy_wasm::WasmStreamType) override {}
