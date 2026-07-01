@@ -295,7 +295,7 @@ async def test_translate_includes_extra_headers_in_forward_list():
 
 @pytest.fixture(scope="module")
 def svc():
-    """Callout instance: no gRPC server, no GCP creds, no Portkey sidecar."""
+    """Callout instance with no server started and no real GCP credentials."""
     with patch.dict(os.environ, {
         "GCP_PROJECT_ID": "test-project",
         "GCP_REGION": "us-central1",
@@ -312,8 +312,13 @@ def svc():
         callout = PortkeyGatewayCallout(
             disable_tls=True,
             combined_health_check=True,
+            plaintext_address=("0.0.0.0", 0),
         )
-        yield callout
+        try:
+            yield callout
+        finally:
+            if callout._callout_server is not None:
+                callout._callout_server.stop()
 
 
 def _http_headers(d: dict) -> service_pb2.HttpHeaders:
