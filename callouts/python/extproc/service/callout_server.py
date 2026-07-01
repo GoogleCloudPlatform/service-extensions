@@ -85,7 +85,7 @@ class CalloutServer:
     private_key: PEM private key of the server.
     private_key_path: Relative file path pointing to a file containing private_key data.
     server_thread_count: Threads allocated to the main grpc service.
-    disable_tls: If True, disables the secure (TLS) server. Defaults to True (TLS disabled).
+    disable_tls: If True, disables the secure (TLS) server. Defaults to False.
   """
 
   def __init__(
@@ -96,7 +96,7 @@ class CalloutServer:
     secure_health_check: bool = False,
     plaintext_address: tuple[str, int] | None = None,
     disable_plaintext: bool = False,
-    disable_tls: bool = True,
+    disable_tls: bool = False,
     default_ip: str | None = None,
     cert_chain: bytes | None = None,
     cert_chain_path: str | None = './extproc/ssl_creds/chain.pem',
@@ -128,8 +128,19 @@ class CalloutServer:
 
     def _read_cert_file(path: str | None) -> bytes | None:
       if path:
-        with open(path, 'rb') as file:
-          return file.read()
+        logging.info(f"Attempting to read cert/key file at: '{path}'")
+        try:
+          with open(path, 'rb') as file:
+            content = file.read()
+            if content:
+              logging.info(f"Successfully read '{path}'.")
+            else:
+              logging.warning(f"File at '{path}' is empty.")
+            return content
+        except FileNotFoundError:
+          logging.error(f"File not found at '{path}'.")
+        except Exception as e:
+          logging.error(f"Failed to read '{path}': {e}", exc_info=True)
       return None
 
     self.server_thread_count = server_thread_count

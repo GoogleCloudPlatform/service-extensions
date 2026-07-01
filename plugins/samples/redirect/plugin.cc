@@ -1,4 +1,4 @@
-// Copyright 2024 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,10 +28,15 @@ class MyHttpContext : public Context {
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
-    auto path = getRequestHeader(":path")->toString();
-    if (absl::StartsWith(path, old_path_prefix)) {
+    const auto path = getRequestHeader(":path");
+    if (!path) {
+      LOG_ERROR("Failed to get :path header");
+      return FilterHeadersStatus::Continue;
+    }
+
+    if (absl::StartsWith(path->view(), old_path_prefix)) {
       std::string new_path =
-          absl::StrCat(new_path_prefix, path.substr(old_path_prefix.length()));
+          absl::StrCat(new_path_prefix, path->view().substr(old_path_prefix.size()));
       sendLocalResponse(301, "", absl::StrCat("Content moved to ", new_path),
                         {{"Location", new_path}});
       return FilterHeadersStatus::ContinueAndEndStream;

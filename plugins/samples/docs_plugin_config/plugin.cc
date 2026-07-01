@@ -1,4 +1,4 @@
-// Copyright 2024 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,8 +24,12 @@ class MyRootContext : public RootContext {
       : RootContext(id, root_id) {}
 
   bool onConfigure(size_t config_len) override {
-    secret_ = getBufferBytes(WasmBufferType::PluginConfiguration, 0, config_len)
-                  ->toString();
+    auto buffer = getBufferBytes(WasmBufferType::PluginConfiguration, 0, config_len);
+    if (!buffer) {
+      LOG_ERROR("Failed to retrieve plugin configuration");
+      return false;
+    }
+    secret_ = buffer->toString();
     return true;
   }
 

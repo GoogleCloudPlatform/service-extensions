@@ -1,0 +1,139 @@
+# Test basic country parameter addition using request.client_region
+test {
+  name: "AddCountryParameterWithClientRegion"
+  properties {
+    path: "request.client_region"
+    value: "BR"
+  }
+  request_headers {
+    input {
+      header { key: ":path" value: "/api/data" }
+    }
+    result {
+      has_header { key: ":path" value: "/api/data?country=BR" }
+      log { regex: ".*country: BR.*" }
+    }
+  }
+}
+
+# Test fallback to unknown when client_region property is missing
+test {
+  name: "FallbackToUnknownWhenNoClientRegion"
+  request_headers {
+    input {
+      header { key: ":path" value: "/api/data" }
+    }
+    result {
+      has_header { key: ":path" value: "/api/data?country=unknown" }
+      log { regex: ".*country: unknown.*" }
+    }
+  }
+}
+
+# Test fallback to unknown when client_region is present but empty
+test {
+  name: "FallbackToUnknownWhenClientRegionEmpty"
+  properties {
+    path: "request.client_region"
+    value: ""
+  }
+  request_headers {
+    input {
+      header { key: ":path" value: "/api/data" }
+    }
+    result {
+      has_header { key: ":path" value: "/api/data?country=unknown" }
+      log { regex: ".*country: unknown.*" }
+    }
+  }
+}
+
+# Test appending to existing query string
+test {
+  name: "AppendCountryToExistingQueryString"
+  properties {
+    path: "request.client_region"
+    value: "DE"
+  }
+  request_headers {
+    input {
+      header { key: ":path" value: "/api/data?page=1&limit=10" }
+    }
+    result {
+      headers { regex: ":path: /api/data\\?.*country=DE.*" }
+      log { regex: ".*country: DE.*" }
+    }
+  }
+}
+
+# Test root path without query string
+test {
+  name: "AddCountryToRootPath"
+  properties {
+    path: "request.client_region"
+    value: "MX"
+  }
+  request_headers {
+    input {
+      header { key: ":path" value: "/" }
+    }
+    result {
+      has_header { key: ":path" value: "/?country=MX" }
+      log { regex: ".*country: MX.*" }
+    }
+  }
+}
+
+# Test special characters
+test {
+  name: "HandleClientRegionCountryCodeUK"
+  properties {
+    path: "request.client_region"
+    value: "UK"
+  }
+  request_headers {
+    input {
+      header { key: ":path" value: "/api/data" }
+    }
+    result {
+      has_header { key: ":path" value: "/api/data?country=UK" }
+      log { regex: ".*country: UK.*" }
+    }
+  }
+}
+
+# Test empty path scenario
+test {
+  name: "HandleEmptyPath"
+  properties {
+    path: "request.client_region"
+    value: "AU"
+  }
+  request_headers {
+    input {
+      header { key: ":path" value: "" }
+    }
+    result {
+      has_header { key: ":path" value: "?country=AU" }
+      log { regex: ".*country: AU.*" }
+    }
+  }
+}
+
+# Test anti-spoofing: replaces existing country parameter
+test {
+  name: "RemoveExistingCountryParameter"
+  properties {
+    path: "request.client_region"
+    value: "US"
+  }
+  request_headers {
+    input {
+      header { key: ":path" value: "/api/data?country=SPOOFED&page=1" }
+    }
+    result {
+      headers { regex: ":path: /api/data\\?.*country=US.*" }
+      log { regex: ".*country: US.*" }
+    }
+  }
+}
