@@ -23,7 +23,7 @@ constexpr std::string_view kGeoHeaderKey = "x-country-code";
 // HTTP context class that handles incoming HTTP requests and sets geographic
 // routing headers based on client location.
 //
-// This plugin reads the client's geographic region from request properties
+// This plugin reads the client's geographic region from source properties
 // provided by the load balancer and sets a custom header that can be used
 // by URL Map routing rules to direct traffic to geographically appropriate
 // backend services.
@@ -34,7 +34,7 @@ class MyHttpContext : public Context {
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
     // Retrieve the client's geographic region from load balancer properties.
-    auto country_property = getProperty({"request", "client_region"});
+    auto country_property = getProperty({"source", "client_region"});
 
     if (country_property) {
       const auto country_view = country_property.value()->view();
