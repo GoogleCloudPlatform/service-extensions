@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	clientRegionProperty = "request.client_region"
+	clientRegionProperty = "source.client_region"
 	countryCodeHeader    = "x-country-code"
 )
 
