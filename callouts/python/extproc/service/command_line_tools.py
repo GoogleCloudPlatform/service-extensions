@@ -69,10 +69,12 @@ def add_command_line_args() -> argparse.ArgumentParser:
       '--cert_chain_path',
       type=str,
       help='File path to the cert chain to use for TLS.',
+      default=argparse.SUPPRESS,
   )
   parser.add_argument(
       '--private_key_path',
       type=str,
       help='File path to the private key to use for TLS.',
+      default=argparse.SUPPRESS,
   )
   return parser
