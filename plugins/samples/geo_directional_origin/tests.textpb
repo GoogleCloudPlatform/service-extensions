@@ -97,7 +97,7 @@ test {
   }
 }
 
-# Test: Empty country code → header should be removed (not set).
+# Test: Empty country code, header should be removed (not set).
 test {
   name: "EmptyCountryCode"
   benchmark: false
@@ -158,7 +158,7 @@ test {
   }
 }
 
-# Test: Benchmark test (validates performance baseline).
+# Test: Benchmark test.
 test {
   name: "BenchmarkGeoRouting"
   benchmark: true

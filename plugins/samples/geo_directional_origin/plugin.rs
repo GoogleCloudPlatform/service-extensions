@@ -16,33 +16,38 @@
 use proxy_wasm::traits::{Context, HttpContext};
 use proxy_wasm::types::{Action, LogLevel};
 
-const CLIENT_REGION_PROPERTY: &[&str] = &["request", "client_region"];
+const CLIENT_REGION_PROPERTY: &[&str] = &["source", "client_region"];
 const COUNTRY_CODE_HEADER: &str = "x-country-code";
 
 proxy_wasm::main! {{
     proxy_wasm::set_log_level(LogLevel::Trace);
     proxy_wasm::set_http_context(|_, _| -> Box<dyn HttpContext> {
-        Box::new(GeoRoutingContext)
+        Box::new(MyHttpContext)
     });
 }}
 
-struct GeoRoutingContext;
+struct MyHttpContext;
 
-impl Context for GeoRoutingContext {}
+impl Context for MyHttpContext {}
 
-impl HttpContext for GeoRoutingContext {
-    fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
-        if let Some(country_bytes) = self.get_property(CLIENT_REGION_PROPERTY.to_vec()) {
-            if let Ok(country_code) = std::str::from_utf8(&country_bytes) {
-                if !country_code.is_empty() {
-                    self.set_http_request_header(COUNTRY_CODE_HEADER, Some(country_code));
-                    return Action::Continue;
+impl MyHttpContext {
+    #[inline]
+    fn set_geo_header(&mut self, property: &[&str], header: &str) {
+        if let Some(bytes) = self.get_property(property.to_vec()) {
+            if let Ok(value) = std::str::from_utf8(&bytes) {
+                if !value.is_empty() {
+                    self.set_http_request_header(header, Some(value));
+                    return;
                 }
             }
         }
+        self.set_http_request_header(header, None);
+    }
+}
 
-        self.set_http_request_header(COUNTRY_CODE_HEADER, None);
-
+impl HttpContext for MyHttpContext {
+    fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
+        self.set_geo_header(CLIENT_REGION_PROPERTY, COUNTRY_CODE_HEADER);
         Action::Continue
     }
 }
