@@ -6,7 +6,7 @@ This plugin reads the client's geographic region from the proxy's request metada
 
 1. The proxy receives an HTTP request from a client and invokes the plugin's `on_http_request_headers` callback.
 
-2. The plugin reads the `request.client_region` property from the proxy's request metadata using `proxywasm.GetProperty()`. This property is populated by the proxy based on the client's IP address using GeoIP lookup.
+2. The plugin reads the `source.client_region` property from the proxy's request metadata using `self.get_property()`. This property is populated by the proxy based on the client's IP address using GeoIP lookup. (The property path follows the Google Cloud Service Extensions [supported attributes](https://cloud.google.com/service-extensions/docs/attributes?hl=pt-br) documentation.)
 
 3. **If a country code is available** (non-empty):
    - The plugin sets the `x-country-code` header to the country code value (e.g., `"US"`, `"DE"`, `"JP"`, `"BR"`).
@@ -19,28 +19,57 @@ This plugin reads the client's geographic region from the proxy's request metada
 
 6. The plugin returns `types.ActionContinue`, forwarding the modified request to the upstream server.
 
+## How to Use the Injected Header for Geo‑Routing
+
+The plugin **only injects the header** – it does **not** perform routing itself. To use the country code for routing decisions, you must configure your load balancer or Envoy proxy to read the `x-country-code` header and forward traffic to the appropriate backend.
+
+For example, on a Google Cloud Application Load Balancer, you can use a URL map with `headerMatcher` rules:
+
+```yaml
+routeRules:
+  - priority: 1
+    matchRules:
+      - prefixMatch: "/"
+        headerMatches:
+          - headerName: "x-country-code"
+            exactMatch: "US"
+    service: "backend-us"
+  - priority: 2
+    matchRules:
+      - prefixMatch: "/"
+        headerMatches:
+          - headerName: "x-country-code"
+            exactMatch: "FR"
+    service: "backend-eu"
+  # default fallback
+
 ## Implementation Notes
 
-- **Metadata retrieval**: Reads the client's country code dynamically assigned by proxy metadata via `proxywasm.GetProperty()`.
+- **Metadata retrieval**: Reads the client's country code dynamically assigned by proxy metadata via `self.get_property()` using the official `source.client_region` attribute.
 - **Authoritative routing header**: Replaces any existing `x-country-code` header to prevent spoofed client origins.
 - **Spoofing mitigation**: Completely removes the header if valid proxy geo-metadata cannot be retrieved.
 
 ## Configuration
 
-No configuration required. The property path (`request.client_region`) and header name (`x-country-code`) are hardcoded in the plugin source.
+No configuration required. The property path (`source.client_region`) and header name (`x-country-code`) are in the plugin source.
 
-**Property source**: The `request.client_region` property is populated by the proxy (e.g., Envoy, Google Cloud Service Extensions) based on GeoIP lookup of the client's source IP address. The property must be made available by the proxy environment for this plugin to function correctly.
+Property source: The `source.client_region` property is populated by the proxy (e.g., Envoy, Google Cloud Service Extensions) based on GeoIP lookup of the client's source IP address. The property must be made available by the proxy environment for this plugin to function correctly.
+
+Important for Google Cloud Service Extensions: To receive the `source.client_region` property, you must explicitly list it in the `forwardAttributes` field of your extension configuration. Example:
+
+extension_chains:
+  extensions:
+    forward_attributes:
+      - source.client_region
 
 ## Build
 
-Build the plugin for Go from the `plugins/` directory:
+Build the plugin for from the `plugins/` directory:
 
 ```bash
 # Go
-bazelisk build //samples/geo_routing:plugin_go.wasm
+bazelisk build //samples/geo_directional_origin:plugin_rust.wasm
 ```
-
-**Note**: Only Go implementation is available for this plugin.
 
 ## Test
 
@@ -50,11 +79,11 @@ Run the unit tests defined in `tests.textpb`:
 # Using Docker (recommended)
 docker run -it -v $(pwd):/mnt \
     us-docker.pkg.dev/service-extensions-samples/plugins/wasm-tester:main \
-    --proto /mnt/samples/geo_routing/tests.textpb \
-    --plugin /mnt/bazel-bin/samples/geo_routing/plugin_go.wasm
+    --proto /mnt/samples/geo_directional_origin/tests.textpb \
+    --plugin /mnt/bazel-bin/samples/geo_directional_origin/plugin_go.wasm
 
 # Using Bazel
-bazelisk test --test_output=all //samples/geo_routing:tests
+bazelisk test --test_output=all //samples/geo_directional_origin:tests
 ```
 
 ## Expected Behavior
@@ -75,6 +104,6 @@ Derived from [`tests.textpb`](tests.textpb):
 
 ## Available Languages
 
-- [ ] Rust (not available)
+- [x] Rust (plugin.rs)
 - [ ] C++ (not available)
-- [x] [Go](plugin.go)
+- [ ] Go (not available)
