@@ -1,0 +1,10 @@
+project_id     = "my-gcp-project"
+project_number = "123456789012"
+region         = "us-central1"
+image_uri      = "us-central1-docker.pkg.dev/my-gcp-project/token-exchange/token-exchange:latest"
+
+token_exchange_mode = "INBOUND"
+
+# Inbound setup
+wif_pool_id     = "azure-ad-pool"
+wif_provider_id = "azure-ad-provider"
