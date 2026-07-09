@@ -1,35 +1,34 @@
 # Check PII Plugin
 
-This plugin detects and masks credit card numbers in HTTP response headers and bodies to prevent accidental exposure of personally identifiable information (PII). It uses regular expressions to find credit card numbers in a 19-character hyphenated format (e.g., `1234-5678-9123-4567`) and masks the first 12 digits while preserving the last 4 digits (e.g., `XXXX-XXXX-XXXX-4567`). The plugin only activates when the response includes a `google-run-pii-check: true` header. Use this plugin when you need to sanitize sensitive data in responses, implement data loss prevention (DLP), or ensure compliance with privacy regulations. It operates during the **response headers** and **response body** processing phases.
+This plugin detects and masks sensitive numbers such as credit card numbers and 10-digit numeric codes in HTTP response headers and bodies to prevent accidental exposure of personally identifiable information (PII). It uses regular expressions to find credit card numbers in a 19-character hyphenated format (e.g., `1234-5678-9123-4567`) and masks the first 12 digits while preserving the last 4 digits (e.g., `XXXX-XXXX-XXXX-4567`). Additionally, it detects 10-digit codes and masks the first 7 digits (e.g., `XXXXXXX123`). Use this plugin when you need to sanitize sensitive data in responses, implement data loss prevention (DLP), or ensure compliance with privacy regulations. It operates during the **request headers**, **response headers**, and **response body** processing phases.
 
 ## How It Works
 
-1. The proxy receives an HTTP response from the upstream server and invokes the plugin's `on_http_response_headers` callback.
-2. The plugin checks if the `google-run-pii-check` header is present and set to `"true"`.
-3. If PII checking is enabled:
-   - The plugin scans all response headers for credit card numbers matching the pattern `\d{4}-\d{4}-\d{4}-(\d{4})`.
-   - For each match, the plugin replaces the first 12 digits with `XXXX-XXXX-XXXX-` while preserving the last 4 digits.
-   - The plugin sets an internal flag (`check_body_`) to indicate that the response body should also be checked.
-4. When the response body arrives, the plugin invokes `on_http_response_body`:
-   - If the `check_body_` flag is set, the plugin scans the entire body for credit card numbers.
-   - The plugin applies the same masking pattern, replacing matched numbers with `XXXX-XXXX-XXXX-[last 4 digits]`.
-5. The plugin returns `Action::Continue`, forwarding the sanitized response to the client.
+1. The proxy receives an HTTP request and invokes the plugin's `on_http_request_headers` callback.
+   - The plugin forces uncompressed responses by changing the `Accept-Encoding` header to `identity`, as compressed bodies cannot be regex-matched directly.
+2. The proxy receives the HTTP response from the upstream server and invokes the plugin's `on_http_response_headers`.
+   - The plugin scans all response headers for credit card numbers and 10-digit codes.
+   - For each match, the plugin replaces the first digits appropriately.
+3. When the response body arrives, the plugin invokes `on_http_response_body`:
+   - The plugin scans the response body chunks.
+   - It applies the same masking patterns, replacing matched numbers while preserving the final digits.
+4. The plugin returns `Action::Continue`, forwarding the sanitized response to the client.
 
-**Important limitation**: For simplicity, this plugin does not handle credit card numbers that are split across multiple `on_http_response_body` calls (chunk boundaries). In production, you would need to implement buffering or stateful pattern matching to handle this edge case.
+**Important limitation**: For simplicity, this plugin does not handle credit card numbers or codes that are split across multiple `on_http_response_body` calls (chunk boundaries). It also prevents response compression to allow body scanning. In production, you would need to implement buffering or stateful pattern matching to handle chunking, and possibly decompress/recompress payloads.
 
 ## Implementation Notes
 
-- **Regular expression compilation**: The regex is compiled once during plugin initialization (`onConfigure` or `NewPluginContext`) for optimal performance.
-- **Conditional execution**: Processing is bypassed entirely unless the specific `google-run-pii-check` header is present and set to true.
-- **Header sweeping**: The plugin iterates through all response headers, matching and masking credit card numbers in-place.
-- **Body scanning**: The response body is fully read into a buffer, scanned against the regex pattern, and replaced if matches occur.
+- **Regular expression compilation**: The regex patterns are compiled once during plugin initialization (`onConfigure` or `NewPluginContext`) for optimal performance.
+- **Header sweeping**: The plugin iterates through all response headers, matching and masking data in-place.
+- **Body scanning**: The response body bytes are loaded as strings, scanned against the regex patterns, and replaced if matches occur.
+- **Compression handling**: Overwrites `Accept-Encoding` on requests to guarantee plaintext responses from backend.
 
 ## Configuration
 
-No configuration required. The credit card regex pattern and activation header (`google-run-pii-check`) are hardcoded in the plugin source.
+No configuration required. The regex patterns are hardcoded in the plugin source.
 
 **Credit card pattern**: `\d{4}-\d{4}-\d{4}-(\d{4})` (19 characters with hyphens)  
-**Activation header**: `google-run-pii-check: true`
+**10-Digit Code pattern**: `\d{7}(\d{3})`
 
 ## Build
 
@@ -64,10 +63,17 @@ Derived from [`tests.textpb`](tests.textpb):
 
 | Scenario | Description |
 |---|---|
-| **WithRunCheckHeaderOverwriteCardNumberOnResponseHeader** | Correctly masks credit card numbers in response headers when the check is enabled. |
-| **WithoutRunCheckHeaderKeepTheOriginalHeaders** | Leaves response headers untouched when the PII check is disabled. |
-| **WithRunCheckHeaderOverwriteCardNumberOnBody** | Correctly masks multiple credit card numbers within the response body when enabled. |
-| **WithoutRunCheckHeaderKeepTheOriginalBody** | Leaves the response body untouched when the PII check is disabled. |
+| **OverwriteCardNumberOnResponseHeader** | Correctly masks credit card numbers found in response headers. |
+| **OverwriteCardNumberOnBody** | Correctly masks multiple credit card numbers within the response body. |
+| **Overwrite10DigitCodeOnResponseHeader** | Correctly masks 10-digit codes found in response headers. |
+| **Overwrite10DigitCodeOnResponseBody** | Correctly masks 10-digit codes within the response body. |
+| **OverwritePIIOnResponseBody** | Masks both 10-digit codes and credit card formats correctly within the body. |
+| **OverwriteMultiplePIIInHeadersAndBody** | Successfully masks multiple variations of PII data across both headers and bodies. |
+| **EnsureNonPIIDataRemainsUnchanged** | Leaves headers and body text untouched that do not match the PII formats. |
+| **OverwriteMultiple10DigitCodesInBody** | Handles multiple consecutive 10-digit code instances in the same body content. |
+| **Overwrite10DigitCodesAdjacentToOtherCharacters** | Masks 10-digit codes correctly even when they adjoin text characters. |
+| **OverwritePIIDataAdjacentToOtherCharacters** | Masks credit card formats correctly even when they adjoin text characters. |
+| **OverwriteAcceptEncodingRequestHeader** | Intercepts the request and sets `Accept-Encoding` header to `identity`. |
 
 ## Available Languages
 
