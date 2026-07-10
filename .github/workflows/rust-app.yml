@@ -1,0 +1,96 @@
+# This workflow will install Rust dependencies, run tests and lint with a single version of Rust
+
+name: Callouts test Rust SDK
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - callouts/rust/**
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - callouts/rust/**
+
+# Default permissions are read-only.
+permissions: read-all
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      # Workflow can publish documentation
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: 1.32.2
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - name: Install Protobuf Compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Generate protodefs with buf
+        working-directory: callouts/rust/extproc/
+        run: |
+          mkdir -p proto
+          buf export buf.build/envoyproxy/envoy -o proto
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            callouts/rust/extproc/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install dependencies
+        working-directory: callouts/rust/extproc/
+        run: cargo build --verbose
+
+      - name: Run Tests
+        working-directory: callouts/rust/extproc/
+        run: cargo test --verbose
+
+      - name: Run Clippy
+        working-directory: callouts/rust/extproc/
+        run: cargo clippy -- -D warnings
+
+      - name: Check formatting
+        working-directory: callouts/rust/extproc/
+        run: cargo fmt -- --check
+
+      - name: Generate Documentation
+        working-directory: callouts/rust/extproc/
+        run: cargo doc --no-deps --examples
+
+      - name: Copy Documentation to Build Directory
+        run: |
+          mkdir -p docs/rust/_build
+          cp -r callouts/rust/target/doc/* docs/rust/_build/
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        with:
+          publish_branch: gh-pages
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs/rust/_build
+          destination_dir: rust/_build
+          keep_files: false
+          force_orphan: false
