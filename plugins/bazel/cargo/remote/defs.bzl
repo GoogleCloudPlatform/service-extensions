@@ -298,6 +298,7 @@ _NORMAL_DEPENDENCIES = {
             "log": Label("@cu__log-0.4.25//:log"),
             "lol_html": Label("@cu__lol_html-2.0.0//:lol_html"),
             "proxy-wasm": Label("@cu__proxy-wasm-0.2.1//:proxy_wasm"),
+            "rand": Label("@cu__rand-0.8.5//:rand"),
             "regex": Label("@cu__regex-1.9.6//:regex"),
             "serde": Label("@cu__serde-1.0.228//:serde"),
             "serde_json": Label("@cu__serde_json-1.0.145//:serde_json"),
@@ -825,6 +826,16 @@ def crate_repositories():
 
     maybe(
         http_archive,
+        name = "cu__rand-0.8.5",
+        sha256 = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404",
+        type = "tar.gz",
+        urls = ["https://static.crates.io/crates/rand/0.8.5/download"],
+        strip_prefix = "rand-0.8.5",
+        build_file = Label("@//bazel/cargo/remote:BUILD.rand-0.8.5.bazel"),
+    )
+
+    maybe(
+        http_archive,
         name = "cu__rand_chacha-0.2.2",
         sha256 = "f4c8ed856279c9737206bf725bf36935d8666ead7aa69b52be55af369d193402",
         type = "tar.gz",
@@ -841,6 +852,16 @@ def crate_repositories():
         urls = ["https://static.crates.io/crates/rand_core/0.5.1/download"],
         strip_prefix = "rand_core-0.5.1",
         build_file = Label("@//bazel/cargo/remote:BUILD.rand_core-0.5.1.bazel"),
+    )
+
+    maybe(
+        http_archive,
+        name = "cu__rand_core-0.6.4",
+        sha256 = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c",
+        type = "tar.gz",
+        urls = ["https://static.crates.io/crates/rand_core/0.6.4/download"],
+        strip_prefix = "rand_core-0.6.4",
+        build_file = Label("@//bazel/cargo/remote:BUILD.rand_core-0.6.4.bazel"),
     )
 
     maybe(
@@ -1207,6 +1228,7 @@ def crate_repositories():
         struct(repo = "cu__log-0.4.25", is_dev_dep = False),
         struct(repo = "cu__lol_html-2.0.0", is_dev_dep = False),
         struct(repo = "cu__proxy-wasm-0.2.1", is_dev_dep = False),
+        struct(repo = "cu__rand-0.8.5", is_dev_dep = False),
         struct(repo = "cu__regex-1.9.6", is_dev_dep = False),
         struct(repo = "cu__serde-1.0.228", is_dev_dep = False),
         struct(repo = "cu__serde_json-1.0.145", is_dev_dep = False),
