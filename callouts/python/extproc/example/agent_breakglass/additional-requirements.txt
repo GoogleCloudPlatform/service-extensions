@@ -1,0 +1,5 @@
+google-cloud-firestore>=2.16.0
+google-auth>=2.29.0
+requests>=2.32.0
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0

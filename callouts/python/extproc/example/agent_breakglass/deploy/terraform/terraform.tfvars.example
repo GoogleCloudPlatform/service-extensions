@@ -1,0 +1,46 @@
+# Copyright 2026 Google LLC.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Copy this file to terraform.tfvars and fill in your values.
+
+project_id = "your-gcp-project-id"
+region     = "us-central1"
+
+callout_image = "us-central1-docker.pkg.dev/your-project/agent-breakglass/callout:latest"
+
+# callout_service_account = "agent-breakglass-sa@your-project.iam.gserviceaccount.com"
+
+fail_open = false # deliberate: an unreachable kill switch should fail closed
+dry_run   = false
+
+exempt_agents = [
+  # "incident-response-sa@your-project.iam.gserviceaccount.com",
+]
+
+min_severity_vertex_anomaly = 70
+min_severity_scc            = 60
+min_severity_wiz            = 60
+
+mcp_resource_list = [
+  # "projects/your-project/locations/us-central1/mcpServers/support-mcp",
+]
+
+# Enables the Cloud Scheduler poll job. Leave empty to disable.
+# vertex_anomaly_poll_endpoint = "https://us-central1-aiplatform.googleapis.com/v1/projects/your-project/locations/us-central1/anomalies:poll"
+
+# Required if you're wiring up Wiz: Wiz can't present a Google OIDC token,
+# so the ingestion service must allow unauthenticated calls, and rely on
+# this HMAC secret (checked in code) for authenticity instead.
+# wiz_webhook_shared_secret        = "change-me"
+# ingestion_allow_unauthenticated  = true
