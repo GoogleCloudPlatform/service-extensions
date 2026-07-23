@@ -26,3 +26,14 @@ opt-level = 3
 codegen-units = 1
 panic = "abort"
 strip = "debuginfo"
+
+[dependencies]
+proxy-wasm = "0.2.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+hmac = "0.12"
+sha2 = "0.10"
+base64 = "0.22"
+
+[profile.dev]
+opt-level = 0
