@@ -277,6 +277,20 @@ resource "google_compute_url_map" "url_map" {
         prefix_match = "/"
       }
       service = google_compute_backend_service.vertex_backend.id
+      # X1: this demo LB has no Agent Gateway / mTLS-SVID layer in front of
+      # it, so a client-supplied `x-spiffe-id` header would otherwise reach
+      # the callout unverified -- a trivial identity spoof, and exactly
+      # what the design assumes never happens (identity selectors are only
+      # trustworthy when the header is injected by a gateway AFTER mTLS
+      # validation, never when it arrives from the raw client). Strip it
+      # here so the callout only ever sees a header it, or a real upstream
+      # gateway, set itself. Verify in your own topology that this header
+      # action is applied before the traffic extension runs -- ordering
+      # between URL map header actions and extension invocation is
+      # deployment-specific.
+      header_action {
+        request_headers_to_remove = ["x-spiffe-id"]
+      }
       route_action {
         url_rewrite {
           host_rewrite = "${var.region}-aiplatform.googleapis.com"

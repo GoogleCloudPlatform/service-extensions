@@ -27,7 +27,7 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 
-from findings import DetectionSource, Finding
+from extproc.example.agent_breakglass.findings import DetectionSource, Finding
 
 _THRESHOLD_ATTR_BY_SOURCE = {
     DetectionSource.VERTEX_ANOMALY_DETECTION: "min_severity_vertex_anomaly",

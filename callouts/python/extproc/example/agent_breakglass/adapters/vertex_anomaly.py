@@ -21,7 +21,7 @@ import logging
 
 import requests
 
-from findings import DetectionSource, Finding
+from extproc.example.agent_breakglass.findings import DetectionSource, Finding
 
 
 class VertexAnomalyAdapter:

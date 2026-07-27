@@ -65,13 +65,14 @@ from envoy.type.v3.http_status_pb2 import StatusCode
 from extproc.service import callout_server
 from extproc.service import callout_tools
 
-from actuator import Actuator
-from adapters.scc import SccAdapter
-from adapters.vertex_anomaly import VertexAnomalyAdapter
-from adapters.wiz import WizAdapter
-from decider import Decider
-from findings import BlockedStateStore
-from ingestion import build_ingestion_app
+from extproc.example.agent_breakglass.actuator import Actuator
+from extproc.example.agent_breakglass.adapters.scc import SccAdapter
+from extproc.example.agent_breakglass.adapters.vertex_anomaly import (
+    VertexAnomalyAdapter)
+from extproc.example.agent_breakglass.adapters.wiz import WizAdapter
+from extproc.example.agent_breakglass.decider import Decider
+from extproc.example.agent_breakglass.findings import BlockedStateStore
+from extproc.example.agent_breakglass.ingestion import build_ingestion_app
 
 AGENT_ID_HEADER = "x-agent-id"  # falls back to x-spiffe-id if unset
 

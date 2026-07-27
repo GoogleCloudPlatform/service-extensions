@@ -28,11 +28,12 @@ import os
 
 from fastapi import FastAPI, Header, HTTPException, Request
 
-from actuator import Actuator
-from adapters.scc import SccAdapter
-from adapters.vertex_anomaly import VertexAnomalyAdapter
-from adapters.wiz import WizAdapter
-from decider import Decider, Decision
+from extproc.example.agent_breakglass.actuator import Actuator
+from extproc.example.agent_breakglass.adapters.scc import SccAdapter
+from extproc.example.agent_breakglass.adapters.vertex_anomaly import (
+    VertexAnomalyAdapter)
+from extproc.example.agent_breakglass.adapters.wiz import WizAdapter
+from extproc.example.agent_breakglass.decider import Decider, Decision
 
 
 def build_ingestion_app(

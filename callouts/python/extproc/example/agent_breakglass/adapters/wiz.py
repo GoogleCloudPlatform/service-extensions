@@ -20,7 +20,7 @@ ingestion.py.
 """
 import logging
 
-from findings import DetectionSource, Finding
+from extproc.example.agent_breakglass.findings import DetectionSource, Finding
 
 _SEVERITY_MAP = {"INFORMATIONAL": 10, "LOW": 25, "MEDIUM": 50, "HIGH": 75, "CRITICAL": 95}
 

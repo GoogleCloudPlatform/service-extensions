@@ -33,7 +33,7 @@ import logging
 import time
 from dataclasses import dataclass
 
-from findings import BlockedStateStore, Finding
+from extproc.example.agent_breakglass.findings import BlockedStateStore, Finding
 
 
 @dataclass

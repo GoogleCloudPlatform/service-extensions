@@ -27,7 +27,7 @@ import logging
 import os
 import sys
 
-from findings import BlockedStateStore
+from extproc.example.agent_breakglass.findings import BlockedStateStore
 
 
 def main() -> None:

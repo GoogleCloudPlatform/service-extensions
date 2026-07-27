@@ -254,8 +254,13 @@ gcloud storage rm -r gs://YOUR_PROJECT_ID_cloudbuild/
 cd callouts/python
 pip install -r requirements.txt -r requirements-test.txt \
   -r extproc/example/agent_breakglass/additional-requirements.txt
-python -m pytest extproc/example/agent_breakglass/tests/test_decider.py -v
+python -m pytest extproc/tests/agent_breakglass_test.py -v
 ```
+
+The test file lives in the shared `extproc/tests/` tree (flat
+`agent_breakglass_test.py` naming), not under `extproc/example/
+agent_breakglass/`, so it's picked up by CI's `pytest extproc/tests/` the
+same way every other example's tests are.
 
 Pure unit tests: no gRPC server, no Firestore, no network. Covers the
 Decider's dry-run/exemption/severity-threshold logic.
@@ -265,12 +270,14 @@ Decider's dry-run/exemption/severity-threshold logic.
 ```
 agent_breakglass/
 ├── service_callout_example.py     # ext_proc callout: hot-path ALLOW/DENY + boots ingestion
+├── __init__.py
 ├── decider.py                     # dry_run -> exempt_agents -> severity threshold
 ├── actuator.py                    # stage 1: Firestore block; stage 2: IAP IAM revocation; audit log
 ├── findings.py                    # Finding contract + Blocked State Store (Firestore)
 ├── ingestion.py                   # FastAPI app: /webhook/scc, /webhook/wiz, /poll/anomaly-detection
 ├── admin_cli.py                   # manual-only restoration (`unblock --confirm`)
 ├── adapters/
+│   ├── __init__.py
 │   ├── vertex_anomaly.py
 │   ├── scc.py
 │   └── wiz.py
@@ -278,13 +285,14 @@ agent_breakglass/
 ├── cloudbuild.yaml
 ├── Dockerfile
 ├── README.md
-├── tests/
-│   └── test_decider.py
 └── deploy/
     └── terraform/
         ├── main.tf                # Firestore, Cloud Run x2, Pub/Sub, Scheduler, LB, Traffic Ext
         ├── variables.tf
         └── terraform.tfvars.example
+
+extproc/tests/
+└── agent_breakglass_test.py       # pure unit tests -- shared tree, not per-example
 ```
 
 ## Environment variables (callout / ingestion)

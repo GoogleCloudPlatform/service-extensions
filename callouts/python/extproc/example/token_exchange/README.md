@@ -233,8 +233,13 @@ gcloud storage rm -r gs://YOUR_PROJECT_ID_cloudbuild/
 cd callouts/python
 pip install -r requirements.txt -r requirements-test.txt \
   -r extproc/example/token_exchange/additional-requirements.txt
-python -m pytest extproc/example/token_exchange/tests/test_token_exchange.py -v
+python -m pytest extproc/tests/token_exchange_test.py -v
 ```
+
+The test file lives in the shared `extproc/tests/` tree (flat
+`token_exchange_test.py` naming), not under `extproc/example/
+token_exchange/`, so it's picked up by CI's `pytest extproc/tests/` the
+same way every other example's tests are.
 
 Pure unit tests: no gRPC server, no network. Covers the SHA-256 cache
 keying/TTL and the best-effort JWT claim extraction used for audit headers.
@@ -244,17 +249,19 @@ keying/TTL and the best-effort JWT claim extraction used for audit headers.
 ```
 token_exchange/
 ├── service_callout_example.py     # ext_proc callout, header-only
+├── __init__.py
 ├── additional-requirements.txt    # requests
 ├── cloudbuild.yaml                # Cloud Build config for the callout image
 ├── Dockerfile                     # Callout container image
 ├── README.md
-├── tests/
-│   └── test_token_exchange.py
 └── deploy/
     └── terraform/
         ├── main.tf                # LB, NEG, backend, URL map, Traffic Ext
         ├── variables.tf
         └── terraform.tfvars.example
+
+extproc/tests/
+└── token_exchange_test.py         # pure unit tests -- shared tree, not per-example
 ```
 
 ## Environment variables (callout)

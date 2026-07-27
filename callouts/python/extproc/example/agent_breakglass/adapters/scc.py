@@ -20,7 +20,7 @@ import base64
 import json
 import logging
 
-from findings import DetectionSource, Finding
+from extproc.example.agent_breakglass.findings import DetectionSource, Finding
 
 _SEVERITY_MAP = {"LOW": 25, "MEDIUM": 50, "HIGH": 75, "CRITICAL": 95}
 
