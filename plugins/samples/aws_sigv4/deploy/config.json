@@ -1,0 +1,7 @@
+{
+  "access_key": "YOUR_AWS_ACCESS_KEY_ID",
+  "secret_key": "YOUR_AWS_SECRET_ACCESS_KEY",
+  "region": "us-east-1",
+  "service": "s3",
+  "signature_type": "v4"
+}

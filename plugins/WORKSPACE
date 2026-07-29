@@ -182,6 +182,9 @@ http_archive(
     sha256 = PROXY_WASM_CPP_HOST_SHA256,
     strip_prefix = "proxy-wasm-cpp-host-" + PROXY_WASM_CPP_HOST_COMMIT,
     url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/" + PROXY_WASM_CPP_HOST_COMMIT + ".tar.gz",
+    patch_cmds = [
+        "find . -type f -name '*.bzl' -exec sed -i 's/wasm32-wasip1/wasm32-wasi/g' {} +",
+    ],
 )
 
 PROXY_WASM_CPP_SDK_COMMIT = "7465dee8b2953beebff99f6dc3720ad0c79bab99"  # 2025-03-04
@@ -201,6 +204,18 @@ http_archive(
 load("@proxy_wasm_cpp_host//bazel:repositories.bzl", "proxy_wasm_cpp_host_repositories")
 
 proxy_wasm_cpp_host_repositories()
+
+load("@rules_rust//rust:repositories.bzl", "rust_register_toolchains")
+
+rust_register_toolchains(
+    edition = "2021",
+    versions = ["1.86.0"],
+    extra_target_triples = ["wasm32-wasi"],
+)
+
+load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
+
+crate_universe_dependencies(bootstrap = True)
 
 load("@proxy_wasm_cpp_host//bazel:dependencies.bzl", "proxy_wasm_cpp_host_dependencies")
 
@@ -229,10 +244,6 @@ proxy_wasm_cpp_sdk_dependencies_extra()
 # Cargo for Bazel to define Rust dependencies.
 # http://bazelbuild.github.io/rules_rust/crate_universe.html
 # Depends on rules_rust imported by ProxyWasm.
-load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
-
-crate_universe_dependencies(bootstrap = True)
-
 # Regenerate: $ bazelisk run bazel/cargo:crates_vendor -- --repin
 # Reference: //bazel/cargo/remote:proxy-wasm (etc)
 load("//bazel/cargo/remote:crates.bzl", "crate_repositories")
