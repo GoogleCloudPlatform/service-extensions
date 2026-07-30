@@ -1,0 +1,39 @@
+# Copyright 2026 Google LLC.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Virtual keys for the gateway, shaped like LiteLLM /key/generate parameters
+# (budgets in tokens, not USD). This is the input file for the seeder CLI,
+# for ad hoc changes from a machine with Redis access:
+#   cp keys.example.yaml keys.yaml
+#   python seed_keys.py --host <redis-host> --file keys.yaml
+#
+# If you deploy with deploy/terraform-regional, you do not need this file.
+# Define the same entries in the `quota_keys` variable in terraform.tfvars and
+# run the seed-keys Cloud Run Job, which needs no VPC access of your own.
+keys:
+  - key: vk-demo
+    token_budget: 100000        # tokens per budget_duration window
+    budget_duration: 30d        # 30s / 30m / 30h / 30d / 1mo
+    rpm_limit: 60
+    tpm_limit: 50000
+    soft_budget: 80000          # log a warning past this, do not block
+    expires: "2027-01-01T00:00:00+00:00"
+    models:                     # allowlist; exact ids or <provider>/*
+      - vertex_ai/*
+      - anthropic/claude-haiku-4-5
+    model_max_budget:           # per-model budget within the key
+      anthropic/claude-haiku-4-5:
+        budget_limit: 5000
+        time_period: 1d
+  - key: vk-unlimited           # a key with no limits: tracked, never blocked

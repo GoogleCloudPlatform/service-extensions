@@ -1,0 +1,139 @@
+# Copyright 2026 Google LLC.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Copy this file to terraform.tfvars and fill in your values.
+
+project_id = "your-gcp-project-id"
+region     = "us-central1"
+
+# Container image. Build and push using cloudbuild.yaml (Python callout).
+callout_image = "us-central1-docker.pkg.dev/your-project/litellm-gateway/callout:latest"
+
+# Upstream app image (receives non-LLM traffic).
+# Defaults to a "Hello, world!" image. Use the sample-ui image to serve the chat interface:
+# upstream_app_image = "us-central1-docker.pkg.dev/your-project/litellm-gateway/sample-ui:latest"
+
+# Email of the service account used by the callout Cloud Run service.
+# Must have roles/aiplatform.user so LiteLLM's ADC flow can mint Vertex AI tokens.
+# If empty, the project's default compute SA is used (has roles/editor).
+# callout_service_account = "litellm-gateway-sa@your-project.iam.gserviceaccount.com"
+
+# Provider API keys. Only required for the providers you actually use.
+# These are written into Cloud Run env vars; LiteLLM reads them automatically.
+# anthropic_api_key  = "my-api-key"
+# groq_api_key       = "my-api-key"
+# openrouter_api_key = "my-api-key"
+
+# OpenTelemetry OTLP endpoint. Leave empty to disable tracing. Point this at a
+# collector you run, for example an OpenTelemetry Collector in this VPC.
+# Google Cloud Trace's OTLP endpoint does not work directly: it requires an
+# OAuth token the callout does not send, and returns HTTP 403. To land spans
+# in Cloud Trace, run a collector configured with the googlecloud exporter and
+# point this at the collector.
+# otel_exporter_otlp_endpoint = "http://10.10.0.5:4317"
+
+# Memorystore for Redis tier: BASIC (single node) or STANDARD_HA (replicated).
+# redis_tier = "BASIC"
+
+# Gateway config mounted into the callout. Empty (the default) means the
+# plain translation gateway: no header rewrites, body model always served.
+# Enable one or more routing strategies by giving router_settings a non-empty
+# table. SCENARIOS.md walks through each one with curl and log commands.
+#
+# gateway_config = {
+#   router_settings = {
+#     # Aliases: the client sends a friendly name in x-model-id.
+#     model_group_alias = {
+#       fast  = "vertex_ai/gemini-2.5-flash"
+#       smart = "anthropic/claude-haiku-4-5"
+#       cheap = "openrouter/openai/gpt-oss-20b:free"
+#     }
+#     # Tag routing: x-tier: premium upgrades a Vertex request.
+#     tag_rules = [
+#       {
+#         provider_prefix = "vertex_ai/"
+#         tag             = "premium"
+#         target          = "vertex_ai/gemini-2.5-pro"
+#       },
+#     ]
+#     # A/B split across a model group, by a stable hash of x-request-id.
+#     weighted_groups = {
+#       "vertex_ai/gemini-2.5-flash" = [
+#         { model = "vertex_ai/gemini-2.5-flash", weight = 70 },
+#         { model = "vertex_ai/gemini-2.5-pro", weight = 30 },
+#       ]
+#     }
+#     # simple-shuffle: random member of a group per request.
+#     shuffle_groups = {
+#       "vertex-shuffle" = [
+#         "vertex_ai/gemini-2.5-flash",
+#         "vertex_ai/gemini-2.5-pro",
+#       ]
+#     }
+#   }
+#   litellm_settings = {
+#     redact_user_api_key_info = false
+#   }
+#   general_settings = {
+#     quota_fail_open = true
+#   }
+# }
+
+# Virtual keys for quota enforcement, seeded into Memorystore by the
+# litellm-gateway-seed-keys Cloud Run Job (run it after apply, and after any
+# change here). Empty by default, which seeds nothing: keyless requests pass
+# through unmetered and any request presenting a key gets 401.
+#
+# The set below exercises every enforcement path and matches the README's
+# examples. Uncomment to use it, or replace it with your own keys.
+# quota_keys = [
+#   # Happy path: budget plus a request-rate limit, and usage headers on the
+#   # response.
+#   {
+#     key             = "vk-demo"
+#     token_budget    = 100000
+#     budget_duration = "30d"
+#     rpm_limit       = 60
+#   },
+#   # Per-model budget: 402 once this model's own budget is spent, while other
+#   # models on the same key keep working.
+#   {
+#     key             = "vk-model-budget"
+#     token_budget    = 100000
+#     budget_duration = "30d"
+#     model_max_budget = {
+#       "anthropic/claude-haiku-4-5" = {
+#         budget_limit = 30
+#         time_period  = "1d"
+#       }
+#     }
+#   },
+#   # Allowlist: 403 for any model outside the list.
+#   {
+#     key    = "vk-allow"
+#     models = ["vertex_ai/*"]
+#   },
+#   # Expired key: 401.
+#   {
+#     key             = "vk-expired"
+#     token_budget    = 100000
+#     budget_duration = "30d"
+#     expires         = "2020-01-01T00:00:00+00:00"
+#   },
+#   # Tokens per minute: 429 on the second request within a minute.
+#   {
+#     key       = "vk-tpm"
+#     tpm_limit = 10
+#   },
+# ]
