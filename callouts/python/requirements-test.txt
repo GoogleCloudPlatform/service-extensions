@@ -4,3 +4,8 @@ pyjwt[crypto]==2.13.0
 litellm==1.83.0
 httpx>=0.27,<1.0
 google-cloud-aiplatform>=1.50.0
+opentelemetry-sdk>=1.27,<2.0
+opentelemetry-exporter-otlp>=1.27,<2.0
+fakeredis>=2.21,<3.0
+redis>=5.0,<6.0
+pyyaml>=6.0,<7.0
