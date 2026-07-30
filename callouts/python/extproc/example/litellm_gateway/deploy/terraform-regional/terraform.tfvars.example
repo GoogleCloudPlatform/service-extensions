@@ -49,7 +49,7 @@ callout_image = "us-central1-docker.pkg.dev/your-project/litellm-gateway/callout
 # Gateway config mounted into the callout. Empty (the default) means the
 # plain translation gateway: no header rewrites, body model always served.
 # Enable one or more routing strategies by giving router_settings a non-empty
-# table. SCENARIOS.md walks through each one with curl and log commands.
+# table. WALKTHROUGH.md walks through each one with curl and log commands.
 #
 # gateway_config = {
 #   router_settings = {
