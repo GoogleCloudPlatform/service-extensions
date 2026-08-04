@@ -23,7 +23,7 @@ import unittest
 
 from extproc.example.prompt_amender.rule_engine import (
     Action, Operation, RulesetValidationError, Selector, apply_action,
-    canonical_identity, parse_ruleset)
+    canonical_identity, locate_system_instruction, parse_ruleset)
 
 
 class TestSelectorMatching(unittest.TestCase):
@@ -49,7 +49,7 @@ class TestSelectorMatching(unittest.TestCase):
     self.assertTrue(sel.matches("anything", "anything", "anything"))
 
   def test_spiffe_header_matches_principal_set_selector(self):
-    # X3: the gateway may inject `spiffe://...` while the rule is written
+    # The gateway may inject `spiffe://...` while the rule is written
     # against `principalSet://...` (or vice versa). Both must match.
     sel = Selector(identity="principalSet://agents.example.org/support/*")
     self.assertTrue(sel.matches(
@@ -94,13 +94,79 @@ class TestMutationOperations(unittest.TestCase):
     self.assertEqual(result, "You are a bot. caller=spiffe://x")
 
   def test_template_sandbox_blocks_unsafe_attribute_access(self):
-    # X2: SandboxedEnvironment must reject SSTI attempts against a
+    # SandboxedEnvironment must reject SSTI attempts against a
     # semi-trusted template sourced from GCS/git.
     action = Action(
         operation=Operation.TEMPLATE,
         template="{{ ''.__class__.__mro__[1].__subclasses__() }}")
     with self.assertRaises(Exception):
       apply_action(action, "original", {})
+
+
+class TestLocateSystemInstruction(unittest.TestCase):
+  """Covers the shapes a malformed or adversarial request body can take.
+  None of these should raise -- a request body that doesn't match the
+  expected shape must fail open, not crash the request."""
+
+  def test_non_dict_payload_raises_value_error(self):
+    # The one case that's still an error: the top-level body isn't even a
+    # JSON object, e.g. a bare array or string. _mutate's caller treats
+    # ValueError as a fail-open case.
+    with self.assertRaises(ValueError):
+      locate_system_instruction(["not", "an", "object"])
+    with self.assertRaises(ValueError):
+      locate_system_instruction("also not an object")
+
+  def test_system_instruction_not_an_object(self):
+    payload, parts = locate_system_instruction(
+        {"systemInstruction": "a string, not an object"})
+    self.assertEqual(len(parts), 1)
+    self.assertEqual(parts[0]["text"], "")
+    self.assertIs(payload["systemInstruction"]["parts"], parts)
+
+  def test_text_field_not_a_string_int(self):
+    _, parts = locate_system_instruction(
+        {"systemInstruction": {"parts": [{"text": 123}]}})
+    # The malformed part is left alone; a usable text part is added
+    # alongside it rather than coercing 123 into a string.
+    self.assertTrue(
+        any(isinstance(p.get("text"), str) for p in parts))
+
+  def test_text_field_not_a_string_none(self):
+    _, parts = locate_system_instruction(
+        {"systemInstruction": {"parts": [{"text": None}]}})
+    self.assertTrue(
+        any(isinstance(p.get("text"), str) for p in parts))
+
+  def test_text_field_not_a_string_list(self):
+    # Regression: a list `text` value must never be silently accepted and
+    # str()-formatted into the prompt.
+    _, parts = locate_system_instruction(
+        {"systemInstruction": {"parts": [{"text": ["a"]}]}})
+    usable = [p for p in parts if isinstance(p.get("text"), str)]
+    self.assertEqual(len(usable), 1)
+    self.assertEqual(usable[0]["text"], "")
+
+  def test_missing_system_instruction_inserts_empty_one(self):
+    payload, parts = locate_system_instruction({"contents": []})
+    self.assertEqual(len(parts), 1)
+    self.assertEqual(parts[0]["text"], "")
+    self.assertIn("systemInstruction", payload)
+
+
+class TestTemplateCompiledOnce(unittest.TestCase):
+
+  def test_parsed_ruleset_reuses_compiled_template(self):
+    raw = {"rules": [{
+        "id": "r1", "selectors": {"host": "*"},
+        "action": {
+            "operation": "template", "template": "{{ original_prompt }}"},
+    }]}
+    ruleset = parse_ruleset(raw)
+    action = ruleset.rules[0].action
+    self.assertIsNotNone(action.compiled_template)
+    result = apply_action(action, "hi", {})
+    self.assertEqual(result, "hi")
 
 
 class TestRulesetValidation(unittest.TestCase):

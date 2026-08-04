@@ -132,6 +132,10 @@ resource "google_cloud_run_v2_service" "callout" {
         name  = "POLL_INTERVAL_SECONDS"
         value = tostring(var.poll_interval_seconds)
       }
+      env {
+        name  = "OTEL_EXPORTER_OTLP_ENDPOINT"
+        value = var.otel_exporter_otlp_endpoint
+      }
       resources {
         limits = {
           cpu    = "1"
@@ -277,19 +281,20 @@ resource "google_compute_url_map" "url_map" {
         prefix_match = "/"
       }
       service = google_compute_backend_service.vertex_backend.id
-      # X1: this demo LB has no Agent Gateway / mTLS-SVID layer in front of
-      # it, so a client-supplied `x-spiffe-id` header would otherwise reach
-      # the callout unverified -- a trivial identity spoof, and exactly
-      # what the design assumes never happens (identity selectors are only
-      # trustworthy when the header is injected by a gateway AFTER mTLS
-      # validation, never when it arrives from the raw client). Strip it
-      # here so the callout only ever sees a header it, or a real upstream
+      # This demo load balancer has no Agent Gateway / mTLS-SVID layer in
+      # front of it, so a client-supplied `x-spiffe-id` header would
+      # otherwise reach the callout unverified -- identity selectors are
+      # only trustworthy when the header is injected by a gateway AFTER
+      # mTLS validation, never when it arrives from the raw client.
+      # Stripping it here (default: strip_client_spiffe_id = true) means
+      # the callout only ever sees a header it, or a real upstream
       # gateway, set itself. Verify in your own topology that this header
       # action is applied before the traffic extension runs -- ordering
       # between URL map header actions and extension invocation is
       # deployment-specific.
       header_action {
-        request_headers_to_remove = ["x-spiffe-id"]
+        request_headers_to_remove = (
+            var.strip_client_spiffe_id ? ["x-spiffe-id"] : [])
       }
       route_action {
         url_rewrite {

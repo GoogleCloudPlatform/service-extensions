@@ -14,12 +14,11 @@
 
 """Real OTEL instruments for the three metrics the design doc requires.
 
-Previously these were faked as `logging.info("prompt_amender_..._total",
-extra={...})` calls -- the stdlib formatter never renders `extra` fields
-unless a custom Formatter reads them, so no metric was ever actually
-emitted. This module creates real counters/histograms via the OTEL Metrics
-API; the SDK/exporter wiring (OTLP endpoint, etc.) is configured once at
-process startup in `service_callout_example.py`.
+Creates counters/histograms via the OTEL Metrics API. `get_meter()` at
+import time is safe even before an SDK is registered -- the API returns a
+proxy meter that starts forwarding to the real provider once one is set,
+which happens (when configured) in `service_callout_example.py` at process
+startup via `_configure_otel_sdk`.
 """
 from opentelemetry import metrics
 

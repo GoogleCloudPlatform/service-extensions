@@ -67,3 +67,15 @@ variable "poll_interval_seconds" {
   type        = number
   default     = 15
 }
+
+variable "otel_exporter_otlp_endpoint" {
+  description = "OTLP endpoint (e.g. an OpenTelemetry Collector or Cloud Monitoring/Trace-compatible ingestion endpoint) the callout exports prompt_amender_* metrics and the prompt_amender.amend span to. Left empty, the callout's OTEL calls stay harmless no-ops and CUJ 2/4's metric- and trace-based verification steps have nothing to inspect."
+  type        = string
+  default     = ""
+}
+
+variable "strip_client_spiffe_id" {
+  description = "Strip any client-supplied x-spiffe-id header at the URL map before the callout ever sees it. This demo load balancer has no Agent Gateway / mTLS-SVID layer in front of it to inject a trustworthy one, so leaving this true (the default) is required for the identity selectors to mean anything -- set false only to locally smoke-test rule matching without a real gateway, never in a shared or production deployment."
+  type        = bool
+  default     = true
+}

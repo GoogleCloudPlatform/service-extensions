@@ -87,27 +87,45 @@ Per design, the callout's structured logs record only `rule_id`, `op`,
 the raw prompt text or rendered template output, to prevent sensitive
 context from leaking into operational logs.
 
+### Metrics and tracing
+
+`prompt_amender_requests_total`, `prompt_amender_amend_latency_seconds`,
+and `prompt_amender_config_reloads_total` are real OTEL instruments (see
+`metrics.py`), and the body phase emits a `prompt_amender.amend` span
+parented to the incoming `traceparent` header. Both only actually export
+somewhere once `OTEL_EXPORTER_OTLP_ENDPOINT` is set -- the Terraform
+variable of the same name wires it into the Cloud Run container; left
+unset, the OTEL API's no-op default stays in place and calls succeed
+without exporting anything.
+
+The design doc's "Prometheus-compatible" requirement is satisfied via
+OTLP ingestion into Cloud Monitoring (point
+`otel_exporter_otlp_endpoint` at a Cloud Monitoring-compatible OTLP
+endpoint, or at an OpenTelemetry Collector configured with a Google Cloud
+exporter), which then makes the metrics queryable through Cloud
+Monitoring's PromQL support -- this example doesn't run its own `/metrics`
+scrape endpoint.
+
 ### Fail-open
 
 If amendment fails (malformed JSON, a template render error, or a body
 over `MAX_REQUEST_BODY_BYTES`), the callout passes the request through
 with its original, unmutated body by default (`FAIL_OPEN=true`). Set
-`FAIL_OPEN=false` to reject with `500` instead. Note that a *missing*
-system instruction is no longer a failure case: if a matched request has
-none, the callout inserts one rather than skip governance -- see
-"Governance can't be opted out of" below.
+`FAIL_OPEN=false` to reject with `500` instead. A *missing* system
+instruction is not a failure case: if a matched request has none, the
+callout inserts one rather than skip governance -- see "Governance can't
+be opted out of" below.
 
 ### Governance can't be opted out of
 
 The callout accepts both the canonical proto3 JSON field name
 `systemInstruction` and the snake_case `system_instruction` some clients
-send -- recognizing only one would silently skip governance for whichever
-spelling it doesn't know, and `systemInstruction` is what real Vertex/
-Gemini SDK traffic actually sends. If a matched request has no system
-instruction at all, the callout inserts an empty one and applies the
-rule's mutation to it, rather than treating the absence as a pass-through:
-a client should not be able to bypass a matched policy by simply omitting
-the field.
+send, since `systemInstruction` is what real Vertex/Gemini SDK traffic
+actually sends. If a matched request has no system instruction at all, or
+has one in a shape the callout doesn't recognize, the callout inserts an
+empty one and applies the rule's mutation to it, rather than treating the
+absence as a pass-through: a client should not be able to bypass a
+matched policy by simply omitting the field or sending a malformed one.
 
 ### Identity headers must come from a trusted gateway
 
@@ -118,7 +136,8 @@ client. **The Terraform in this example ships a standalone demo load
 balancer with no such gateway in front of it.** To keep the demo from
 being a trivial identity spoof, `deploy/terraform/main.tf` strips any
 client-supplied `x-spiffe-id` at the URL map before the callout ever sees
-it (`header_action.request_headers_to_remove`). That also means the demo
+it by default (`strip_client_spiffe_id = true`,
+`header_action.request_headers_to_remove`). That also means the demo
 curl commands below, which set `x-spiffe-id` directly, only exercise rule
 matching because nothing downstream of the URL map re-injects a verified
 identity -- there is no real identity being asserted in this topology. If
@@ -129,21 +148,22 @@ own equivalent) removes anything the client sent -- ordering between URL
 map header actions and extension invocation is deployment-specific and
 worth verifying directly rather than assuming.
 
-### `mode_override` reliability on the request path
+### `mode_override` on the request path
 
-This is the first example in this collection to rely on `mode_override`
-for the *request* body mode (the litellm_gateway example only uses it on
-the *response* side). Envoy only honors `mode_override` when
-`allow_mode_override` is enabled on the extension. `on_request_body`
-doesn't assume the override was actually honored: if the gateway sends a
-body despite a no-match header decision, the callout passes it through
-unmutated rather than treating it as an error. Still, verify on a real
-deployment that unmatched traffic is actually skipping body delivery
-(check Cloud Run request logs for body-bearing calls with no matching
-rule) before relying on the fast path for latency budgeting -- if it
-isn't honored in your topology, keep `REQUEST_BODY` in `supported_events`
-(already the case here) and the no-op pass-through in `on_request_body`
-covers you either way.
+Envoy only honors `mode_override` when `allow_mode_override` is enabled
+on the extension, so this callout doesn't assume the request-side
+`BUFFERED` override is actually applied: `on_request_body` accumulates
+body chunks in per-stream state until `end_of_stream`, enforcing
+`MAX_REQUEST_BODY_BYTES` on the running total, and only amends once the
+final chunk has arrived. That covers correctness whether the gateway
+delivers the body as a single `BUFFERED` chunk or streams it in pieces.
+
+Operator note: `mode_override = NONE` on a no-match is a latency
+optimization, not a correctness dependency -- if it isn't honored in your
+topology, unmatched requests simply pay a body-buffering cost they
+wouldn't otherwise, rather than losing governance. Check Cloud Run
+request logs for body-bearing calls on unmatched traffic if you want to
+confirm the fast path is actually working as intended.
 
 ## Adding / editing rules
 
@@ -251,12 +271,12 @@ This seeds the rules bucket with `rules.example.yaml` when `config_source = gcs`
 ### 6. Test the deployment
 
 The shipped Terraform strips any client-supplied `x-spiffe-id` at the URL
-map (see "Identity headers must come from a trusted gateway" above), so
-there's no way to assert an identity from a plain curl against this demo
-topology -- that's intentional. To exercise rule matching end-to-end
-without standing up a full mTLS-terminating gateway, temporarily comment
-out the `header_action` block in `deploy/terraform/main.tf` and re-apply,
-then:
+map by default (`strip_client_spiffe_id = true` -- see "Identity headers
+must come from a trusted gateway" above), so there's no way to assert an
+identity from a plain curl against this demo topology -- that's
+intentional. To exercise rule matching end-to-end without standing up a
+full mTLS-terminating gateway, set `strip_client_spiffe_id = false` in
+`terraform.tfvars` and re-apply, then:
 
 ```bash
 LB_IP=$(terraform output -raw load_balancer_ip)
@@ -268,10 +288,10 @@ curl -sk https://$LB_IP/v1/projects/YOUR_PROJECT/locations/us-central1/publisher
 ```
 
 The response should reflect the brand-safety guardrail injected by
-`support-safety-inject` in `rules.example.yaml`. Put the `header_action`
-back before treating this as anything other than a local smoke test --
-production traffic must only ever have `x-spiffe-id` set by a component
-that has actually verified the caller.
+`support-safety-inject` in `rules.example.yaml`. Set
+`strip_client_spiffe_id` back to `true` before treating this as anything
+other than a local smoke test -- production traffic must only ever have
+`x-spiffe-id` set by a component that has actually verified the caller.
 
 ### 7. Tear down
 
@@ -302,23 +322,16 @@ pip install -r requirements.txt -r requirements-test.txt \
 python -m pytest extproc/tests/prompt_amender_test.py -v
 ```
 
-The test file lives in the shared `extproc/tests/` tree (flat
-`prompt_amender_test.py` naming), not under `extproc/example/
-prompt_amender/`, so it's picked up by CI's `pytest extproc/tests/` the
-same way every other example's tests are. If `requirements-test.txt`
-doesn't already carry PyYAML and Jinja2 (some of the other examples don't
-need them), add:
-
-```text
-PyYAML==6.0.1
-Jinja2==3.1.4
-```
+`callouts/python/requirements-test.txt` must include `Jinja2==3.1.4` --
+see `requirements-test-addition.txt` for the exact line to merge in
+(PyYAML is not needed by the test file itself).
 
 Pure unit tests: no gRPC server, no network. Covers selector glob matching
 (including `spiffe://` vs `principalSet://` scheme normalization), all
-four mutation operations, the Jinja2 sandbox rejecting an SSTI payload,
-and ruleset validation (rejecting rules with no selectors, duplicate IDs,
-and invalid Jinja2 syntax).
+four mutation operations, template compilation reuse, the Jinja2 sandbox
+rejecting an SSTI payload, `locate_system_instruction`'s handling of
+malformed/unexpected JSON shapes, and ruleset validation (rejecting rules
+with no selectors, duplicate IDs, and invalid Jinja2 syntax).
 
 ## File structure
 
@@ -331,6 +344,7 @@ prompt_amender/
 ├── metrics.py                     # OTEL counters/histogram
 ├── rules.example.yaml
 ├── additional-requirements.txt    # PyYAML, Jinja2, google-cloud-storage, opentelemetry-api
+├── requirements-test-addition.txt # merge into callouts/python/requirements-test.txt
 ├── cloudbuild.yaml
 ├── Dockerfile
 ├── README.md

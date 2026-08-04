@@ -33,3 +33,14 @@ config_source = "gcs"
 # config_source = "git"
 # git_repo_url  = "https://github.com/my-org/prompt-amender-rules.git"
 # git_branch    = "main"
+
+# Set this to actually export prompt_amender_* metrics and the
+# prompt_amender.amend span (e.g. to an OpenTelemetry Collector, or a
+# Cloud Monitoring/Trace-compatible OTLP ingestion endpoint). Left unset,
+# the callout's OTEL calls stay harmless no-ops.
+# otel_exporter_otlp_endpoint = "https://otel-collector.example.com:4317"
+
+# Keep true. Only set false to locally smoke-test rule matching without a
+# real Agent Gateway in front of this demo load balancer -- see the
+# README's "Identity headers must come from a trusted gateway" section.
+# strip_client_spiffe_id = true

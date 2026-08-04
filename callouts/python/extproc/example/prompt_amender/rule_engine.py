@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Optional
 
-from jinja2 import StrictUndefined, TemplateError
+from jinja2 import StrictUndefined, Template, TemplateError
 from jinja2.sandbox import SandboxedEnvironment
 
 # Rules are sourced from GCS or git -- semi-trusted config, not application
@@ -65,6 +65,47 @@ def canonical_identity(value: str) -> str:
   if value.startswith(_SPIFFE_PREFIX):
     return _PRINCIPAL_SET_PREFIX + value[len(_SPIFFE_PREFIX):]
   return value
+
+
+def locate_system_instruction(payload: Any) -> tuple[dict, list]:
+  """Finds (or creates) the system-instruction object and its parts list
+  in a decoded JSON request body, and returns `(payload, parts)`.
+
+  Accepts both the canonical proto3 JSON spelling `systemInstruction` (what
+  every official Vertex/Gemini SDK sends) and the legacy `system_instruction`
+  spelling. If the request has neither, or has one in a shape this function
+  doesn't recognize (not an object, `parts` not a list, no part with a
+  string `text`), a fresh `systemInstruction` object with one empty text
+  part is created and used instead of raising -- this function never
+  assumes the caller-supplied JSON matches any particular shape beyond
+  being a JSON object at the top level, since a malformed or adversarial
+  request body must fail open, not crash the request.
+  """
+  if not isinstance(payload, dict):
+    raise ValueError("request body JSON must be an object")
+
+  key = ("systemInstruction" if "systemInstruction" in payload
+         else "system_instruction")
+  si = payload.get(key)
+  if not isinstance(si, dict):
+    si = {"parts": [{"text": ""}]}
+    payload["systemInstruction"] = si
+    key = "systemInstruction"
+
+  parts = si.get("parts")
+  if not isinstance(parts, list):
+    parts = []
+    si["parts"] = parts
+
+  text_part = next(
+      (p for p in parts
+       if isinstance(p, dict) and isinstance(p.get("text"), str)),
+      None)
+  if text_part is None:
+    text_part = {"text": ""}
+    parts.append(text_part)
+
+  return payload, parts
 
 
 class RulesetValidationError(Exception):
@@ -103,7 +144,8 @@ class Selector:
 class Action:
   operation: Operation
   text: str = ""       # for prepend/append/replace
-  template: str = ""   # for template
+  template: str = ""   # for template (source text, kept for introspection)
+  compiled_template: Optional[Template] = None  # for template, parsed once
 
 
 @dataclass
@@ -185,11 +227,12 @@ def parse_ruleset(raw: Any) -> Ruleset:
         raise RulesetValidationError(
             f"rule '{rule_id}' action requires string `template`")
       try:
-        _jinja_env.from_string(template)
+        compiled = _jinja_env.from_string(template)
       except TemplateError as exc:
         raise RulesetValidationError(
             f"rule '{rule_id}' has invalid Jinja2 template: {exc}") from exc
-      action = Action(operation=op, template=template)
+      action = Action(
+          operation=op, template=template, compiled_template=compiled)
 
     parsed_rules.append(Rule(
         id=rule_id, description=entry.get("description", ""),
@@ -204,7 +247,11 @@ def apply_action(
   """Applies a rule's mutation to the original system-instruction text.
 
   `template_vars` always includes `original_prompt`, `caller_spiffe_id`,
-  `host`, `path`.
+  `host`, `path`. For the `template` operation, this renders
+  `action.compiled_template` -- parsed once by `parse_ruleset` rather than
+  recompiled on every request -- falling back to compiling `action.template`
+  on the spot only for an `Action` built directly (e.g. in tests) rather
+  than through `parse_ruleset`.
   """
   if action.operation == Operation.PREPEND:
     return f"{action.text}\n\n{original_prompt}"
@@ -214,9 +261,10 @@ def apply_action(
     return action.text
   if action.operation == Operation.TEMPLATE:
     try:
-      tmpl = _jinja_env.from_string(action.template)
+      compiled = action.compiled_template or _jinja_env.from_string(
+          action.template)
       merged_vars = {"original_prompt": original_prompt, **template_vars}
-      return tmpl.render(**merged_vars)
+      return compiled.render(**merged_vars)
     except TemplateError as exc:
       raise TemplateRenderError(str(exc)) from exc
   raise TemplateRenderError(f"unhandled operation: {action.operation}")

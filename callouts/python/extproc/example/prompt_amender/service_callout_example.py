@@ -33,18 +33,18 @@ this collection use:
   body-buffering latency for traffic the ruleset doesn't care about. This
   mirrors the technique the litellm_gateway example uses on the *response*
   body mode; here it's applied to the *request* body. Whether the managed
-  Traffic Extension actually honors a request-side mode_override has not
-  been verified against a real deployment (see the README) -- if it turns
-  out not to be, this still degrades safely: `on_request_body` already
-  returns a pass-through response whenever no rule matched, regardless of
-  why the body arrived.
+  Traffic Extension actually honors a request-side mode_override on a
+  given deployment affects only latency, not correctness: `on_request_body`
+  accumulates whatever chunks arrive and only amends once the final one
+  is seen (see the README's `mode_override` section).
 
-  Body phase (`on_request_body`): parse the buffered JSON body, locate
-  `systemInstruction.parts[].text` (accepting the legacy `system_instruction`
-  spelling too, and inserting an empty one if the request has neither --
-  see `_locate_system_instruction`), apply the matched rule's mutation
-  (prepend/append/replace/template), and return the re-serialized body plus
-  a recalculated Content-Length.
+  Body phase (`on_request_body`): accumulate body chunks until the final
+  one arrives, parse the JSON body, locate `systemInstruction.parts[].text`
+  (accepting the legacy `system_instruction` spelling too, and inserting an
+  empty one if the request has neither -- see
+  `rule_engine.locate_system_instruction`), apply the matched rule's
+  mutation (prepend/append/replace/template), and return the re-serialized
+  body plus a recalculated Content-Length.
 
 `prompt_amender` owns:
   * selector matching (identity/host/path glob) and mutation operations
@@ -86,7 +86,7 @@ from extproc.example.prompt_amender.config_sources import (
 from extproc.example.prompt_amender.logging_utils import (
     configure_json_logging, log_fields)
 from extproc.example.prompt_amender.rule_engine import (
-    Rule, TemplateRenderError, apply_action)
+    Rule, TemplateRenderError, apply_action, locate_system_instruction)
 
 SPIFFE_HEADER = "x-spiffe-id"
 AUTHORITY_HEADER = ":authority"
@@ -109,45 +109,6 @@ def _state(context: ServicerContext) -> dict:
   return state
 
 
-def _locate_system_instruction(payload: dict) -> tuple[dict, list]:
-  """Finds (or creates) the systemInstruction object and its parts list.
-
-  Accepts both the canonical proto3 JSON spelling `systemInstruction`
-  (what every official Vertex/Gemini SDK sends) and the legacy
-  `system_instruction` spelling. If the request has neither -- the CUJ 3
-  scenario, where an agent sends a raw request and expects the amender to
-  inject governance from scratch -- a new `systemInstruction` object with
-  one empty text part is created and attached to the payload, rather than
-  raising. Previously, only `system_instruction` was recognized, so real
-  Vertex traffic missed the lookup, the callout raised, and with
-  FAIL_OPEN=true the request passed through with governance silently not
-  applied for essentially all real traffic -- and any client could opt out
-  of governance simply by omitting the field. Fail-open must cover
-  malformed input, not policy bypass, so this function guarantees a
-  system-instruction object exists rather than treating its absence as an
-  error.
-  """
-  key = "systemInstruction" if "systemInstruction" in payload else "system_instruction"
-  si = payload.get(key)
-  if si is None:
-    si = {"parts": [{"text": ""}]}
-    payload["systemInstruction"] = si
-    key = "systemInstruction"
-
-  parts = si.get("parts")
-  if not isinstance(parts, list):
-    parts = []
-    si["parts"] = parts
-
-  text_part = next((p for p in parts if isinstance(p, dict) and "text" in p),
-                    None)
-  if text_part is None:
-    text_part = {"text": ""}
-    parts.append(text_part)
-
-  return payload, parts
-
-
 def _configure_otel_sdk() -> None:
   """Registers real OTEL SDK providers so the counters in metrics.py and
   the `prompt_amender.amend` span actually export somewhere, rather than
@@ -155,8 +116,9 @@ def _configure_otel_sdk() -> None:
   is set; otherwise the opentelemetry-api default no-op implementation
   stays in place, which is safe (calls succeed, nothing is exported) but
   means CUJ 2/4's metric- and trace-based verification steps have nothing
-  to inspect. Requires opentelemetry-sdk and opentelemetry-exporter-otlp,
-  both in additional-requirements.txt.
+  to inspect. Requires opentelemetry-sdk and
+  opentelemetry-exporter-otlp-proto-grpc, both in
+  additional-requirements.txt.
   """
   otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
   if not otlp_endpoint:
@@ -253,10 +215,12 @@ class PromptAmenderCallout(callout_server.CalloutServer):
     if matched_rule is None:
       metrics.requests_total.add(1, {"outcome": "skip"})
       # No rule cares about this request -- skip body buffering entirely
-      # so unmatched traffic pays near-zero latency tax. NOTE: whether the
+      # so unmatched traffic pays near-zero latency tax. Whether the
       # managed Traffic Extension honors mode_override on the request path
-      # is unverified (see README); on_request_body already no-ops when no
-      # rule matched, so this degrades safely either way.
+      # is unverified on a real deployment (see README); on_request_body
+      # accumulates and buffers chunks regardless of how many arrive, so
+      # governance is applied correctly either way -- this override only
+      # affects latency, not correctness.
       mode.request_body_mode = ProcessingMode.NONE
     else:
       mode.request_body_mode = ProcessingMode.BUFFERED
@@ -271,9 +235,24 @@ class PromptAmenderCallout(callout_server.CalloutServer):
     state = _state(context)
     matched_rule: Rule | None = state.get("matched_rule")
     if matched_rule is None:
-      # Shouldn't happen when mode_override is honored, but pass through
-      # safely if the body arrives anyway.
-      metrics.requests_total.add(1, {"outcome": "skip"})
+      # Pass through unmutated if a body arrives despite no rule matching
+      # (already counted as "skip" in on_request_headers).
+      return None
+
+    buffer = state.get("body_buffer", b"") + body.body
+    if len(buffer) > self.max_request_body_bytes:
+      return self._fail(
+          BodyTooLargeError(
+              f"body size exceeds "
+              f"MAX_REQUEST_BODY_BYTES={self.max_request_body_bytes}"),
+          matched_rule, state, time.monotonic())
+    state["body_buffer"] = buffer
+
+    if not body.end_of_stream:
+      # The gateway may deliver the body in more than one chunk -- e.g. if
+      # the request-side mode_override above isn't honored and Envoy falls
+      # back to STREAMED instead of BUFFERED. Accumulate and wait for the
+      # final chunk rather than amending a partial, invalid JSON document.
       return None
 
     ctx = extract({"traceparent": state.get("traceparent", "")})
@@ -281,25 +260,10 @@ class PromptAmenderCallout(callout_server.CalloutServer):
       start = time.monotonic()
       try:
         mutated_body, original_len, new_len = self._mutate(
-            body.body, matched_rule, state)
-      except (BodyTooLargeError, TemplateRenderError, ValueError) as exc:
-        elapsed_ms = (time.monotonic() - start) * 1000
-        # Log only the exception TYPE, never str(exc): a Jinja2
-        # TemplateRenderError's message can echo the offending template
-        # text, and this path must never leak prompt/template content into
-        # logs.
-        log_fields(
-            _LOGGER, logging.ERROR,
-            "prompt amendment failed; passing request through unmodified",
-            rule_id=matched_rule.id, op=matched_rule.action.operation.value,
-            caller_spiffe_id=state.get("spiffe_id", ""),
-            error_type=type(exc).__name__, latency_ms=round(elapsed_ms, 2))
-        metrics.requests_total.add(1, {"outcome": "error"})
-        metrics.amend_latency_seconds.record(elapsed_ms / 1000)
-        if self.fail_open:
-          return None
-        return callout_tools.header_immediate_response(
-            StatusCode.InternalServerError)
+            buffer, matched_rule, state)
+      except (BodyTooLargeError, TemplateRenderError, ValueError, TypeError,
+              AttributeError) as exc:
+        return self._fail(exc, matched_rule, state, start)
 
       elapsed_ms = (time.monotonic() - start) * 1000
       log_fields(
@@ -319,21 +283,41 @@ class PromptAmenderCallout(callout_server.CalloutServer):
         append_action=HeaderValueOption.OVERWRITE_IF_EXISTS_OR_ADD))
     return body_resp
 
+  def _fail(
+      self, exc: Exception, rule: Rule, state: dict, start: float,
+  ) -> service_pb2.BodyResponse | None:
+    """Records an amendment failure and returns the fail-open/closed
+    response. Logs only the exception TYPE, never str(exc): a Jinja2
+    TemplateRenderError's message can echo the offending template text,
+    and this path must never leak prompt/template content into logs.
+    """
+    elapsed_ms = (time.monotonic() - start) * 1000
+    log_fields(
+        _LOGGER, logging.ERROR,
+        "prompt amendment failed; passing request through unmodified",
+        rule_id=rule.id, op=rule.action.operation.value,
+        caller_spiffe_id=state.get("spiffe_id", ""),
+        error_type=type(exc).__name__, latency_ms=round(elapsed_ms, 2))
+    metrics.requests_total.add(1, {"outcome": "error"})
+    metrics.amend_latency_seconds.record(elapsed_ms / 1000)
+    if self.fail_open:
+      return None
+    return callout_tools.header_immediate_response(
+        StatusCode.InternalServerError)
+
   # ----------------------------------------------------------------- impl
 
   def _mutate(self, raw_body: bytes, rule: Rule,
               state: dict) -> tuple[bytes, int, int]:
-    if len(raw_body) > self.max_request_body_bytes:
-      raise BodyTooLargeError(
-          f"body size {len(raw_body)} exceeds "
-          f"MAX_REQUEST_BODY_BYTES={self.max_request_body_bytes}")
     try:
       payload = json.loads(raw_body)
     except ValueError as exc:
       raise ValueError(f"request body is not valid JSON: {exc}") from exc
 
-    payload, parts = _locate_system_instruction(payload)
-    text_part = next(p for p in parts if isinstance(p, dict) and "text" in p)
+    payload, parts = locate_system_instruction(payload)
+    text_part = next(
+        p for p in parts
+        if isinstance(p, dict) and isinstance(p.get("text"), str))
 
     original_prompt = text_part["text"]
     template_vars = {

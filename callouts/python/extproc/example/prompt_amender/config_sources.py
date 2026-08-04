@@ -135,7 +135,8 @@ class GitConfigSource(ConfigSource):
 
   def fetch(self) -> tuple[str, str]:
     sha = self.version()
-    with tempfile.TemporaryDirectory(prefix="prompt-amender-rules-") as clone_dir:
+    with tempfile.TemporaryDirectory(
+        prefix="prompt-amender-rules-") as clone_dir:
       subprocess.run(
           ["git", "clone", "--depth", "1", "--branch", self._branch,
            self._repo_url, clone_dir],
@@ -201,8 +202,8 @@ class HotReloadingRuleProvider:
 
   def load_initial(self) -> None:
     """Loads the ruleset at startup. Deliberately does NOT catch
-    fetch/parse errors (S4): at boot there is no last-known-good ruleset
-    to fall back to, so a misconfigured GCS_RULES_URI or missing IAM grant
+    fetch/parse errors: at boot there is no last-known-good ruleset to
+    fall back to, so a misconfigured GCS_RULES_URI or missing IAM grant
     must crash-loop the container visibly rather than boot a
     healthy-looking service enforcing zero rules."""
     raw_yaml, version_token = self._source.fetch()
@@ -230,7 +231,7 @@ class HotReloadingRuleProvider:
   def _reload_once(self) -> None:
     try:
       version_token = self._source.version()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
       log_fields(_LOGGER, logging.ERROR,
                  "failed to check prompt-amender config source version",
                  error_type=type(exc).__name__)
@@ -246,7 +247,10 @@ class HotReloadingRuleProvider:
     try:
       raw_yaml, version_token = self._source.fetch()
       new_ruleset = parse_ruleset(yaml.safe_load(raw_yaml))
-    except Exception as exc:  # noqa: BLE001 -- covers YAMLError, RulesetValidationError, and fetch errors alike
+    except Exception as exc:
+      # Broad on purpose: covers YAMLError, RulesetValidationError, and
+      # any fetch-layer error (network, IAM, malformed URI) alike -- all
+      # of them mean "keep serving the last-known-good ruleset".
       log_fields(
           _LOGGER, logging.ERROR,
           "rejected invalid prompt-amender configuration; keeping "
