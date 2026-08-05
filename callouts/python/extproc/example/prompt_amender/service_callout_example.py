@@ -35,16 +35,24 @@ this collection use:
   body mode; here it's applied to the *request* body. Whether the managed
   Traffic Extension actually honors a request-side mode_override on a
   given deployment affects only latency, not correctness: `on_request_body`
-  accumulates whatever chunks arrive and only amends once the final one
-  is seen (see the README's `mode_override` section).
+  withholds every non-final chunk via `clear_body` and emits the fully
+  assembled body only once the final chunk is seen, so a multi-chunk
+  delivery is handled correctly either way (see the README's
+  `mode_override` section and `body_assembly.py`).
 
-  Body phase (`on_request_body`): accumulate body chunks until the final
-  one arrives, parse the JSON body, locate `systemInstruction.parts[].text`
-  (accepting the legacy `system_instruction` spelling too, and inserting an
-  empty one if the request has neither -- see
-  `rule_engine.locate_system_instruction`), apply the matched rule's
-  mutation (prepend/append/replace/template), and return the re-serialized
-  body plus a recalculated Content-Length.
+  Body phase (`on_request_body`): a thin adapter over the
+  `body_assembly.process_chunk` state machine, which withholds every
+  non-final chunk (`clear_body = true` -- Envoy does not forward a
+  withheld chunk's bytes) and, once the final chunk arrives, parses the
+  assembled JSON body, locates `systemInstruction.parts[].text` (accepting
+  the legacy `system_instruction` spelling too, and inserting an empty one
+  if the request has neither -- see `rule_engine.locate_system_instruction`),
+  applies the matched rule's mutation (prepend/append/replace/template),
+  and emits the re-serialized body plus a recalculated Content-Length as
+  a single mutation. On failure, fail-open emits the untouched, fully
+  reconstructed original body instead (never just a bare pass-through --
+  earlier chunks may already be withheld, so that would truncate the
+  request); fail-closed rejects outright.
 
 `prompt_amender` owns:
   * selector matching (identity/host/path glob) and mutation operations
@@ -81,12 +89,14 @@ from extproc.service import callout_server
 from extproc.service import callout_tools
 
 from extproc.example.prompt_amender import metrics
+from extproc.example.prompt_amender.body_assembly import (
+    BodyAssemblyState, ChunkAction, process_chunk)
 from extproc.example.prompt_amender.config_sources import (
     HotReloadingRuleProvider, build_config_source)
 from extproc.example.prompt_amender.logging_utils import (
     configure_json_logging, log_fields)
 from extproc.example.prompt_amender.rule_engine import (
-    Rule, TemplateRenderError, apply_action, locate_system_instruction)
+    Rule, apply_action, locate_system_instruction)
 
 SPIFFE_HEADER = "x-spiffe-id"
 AUTHORITY_HEADER = ":authority"
@@ -95,10 +105,6 @@ TRACEPARENT_HEADER = "traceparent"
 
 _LOGGER = logging.getLogger("prompt_amender")
 _TRACER = trace.get_tracer("prompt_amender")
-
-
-class BodyTooLargeError(Exception):
-  pass
 
 
 def _state(context: ServicerContext) -> dict:
@@ -218,9 +224,9 @@ class PromptAmenderCallout(callout_server.CalloutServer):
       # so unmatched traffic pays near-zero latency tax. Whether the
       # managed Traffic Extension honors mode_override on the request path
       # is unverified on a real deployment (see README); on_request_body
-      # accumulates and buffers chunks regardless of how many arrive, so
-      # governance is applied correctly either way -- this override only
-      # affects latency, not correctness.
+      # withholds every non-final chunk via clear_body and only emits the
+      # assembled body on the last one, so governance is applied correctly
+      # either way -- this override only affects latency, not correctness.
       mode.request_body_mode = ProcessingMode.NONE
     else:
       mode.request_body_mode = ProcessingMode.BUFFERED
@@ -239,71 +245,82 @@ class PromptAmenderCallout(callout_server.CalloutServer):
       # (already counted as "skip" in on_request_headers).
       return None
 
-    buffer = state.get("body_buffer", b"") + body.body
-    if len(buffer) > self.max_request_body_bytes:
-      return self._fail(
-          BodyTooLargeError(
-              f"body size exceeds "
-              f"MAX_REQUEST_BODY_BYTES={self.max_request_body_bytes}"),
-          matched_rule, state, time.monotonic())
-    state["body_buffer"] = buffer
-
-    if not body.end_of_stream:
-      # The gateway may deliver the body in more than one chunk -- e.g. if
-      # the request-side mode_override above isn't honored and Envoy falls
-      # back to STREAMED instead of BUFFERED. Accumulate and wait for the
-      # final chunk rather than amending a partial, invalid JSON document.
-      return None
+    assembly: BodyAssemblyState = state.setdefault(
+        "assembly", BodyAssemblyState())
 
     ctx = extract({"traceparent": state.get("traceparent", "")})
     with _TRACER.start_as_current_span("prompt_amender.amend", context=ctx):
       start = time.monotonic()
-      try:
-        mutated_body, original_len, new_len = self._mutate(
-            buffer, matched_rule, state)
-      except (BodyTooLargeError, TemplateRenderError, ValueError, TypeError,
-              AttributeError) as exc:
-        return self._fail(exc, matched_rule, state, start)
-
+      result = process_chunk(
+          assembly, body.body, body.end_of_stream,
+          self.max_request_body_bytes, self.fail_open,
+          mutate=lambda buf: self._mutate(buf, matched_rule, state))
       elapsed_ms = (time.monotonic() - start) * 1000
-      log_fields(
-          _LOGGER, logging.INFO, "prompt amendment applied",
-          rule_id=matched_rule.id, op=matched_rule.action.operation.value,
-          caller_spiffe_id=state.get("spiffe_id", ""),
-          original_len=original_len, new_len=new_len,
-          latency_ms=round(elapsed_ms, 2))
-      metrics.requests_total.add(1, {"outcome": "success"})
-      metrics.amend_latency_seconds.record(elapsed_ms / 1000)
 
-    body_resp = service_pb2.BodyResponse()
-    body_resp.response.body_mutation.body = mutated_body
-    body_resp.response.header_mutation.set_headers.append(HeaderValueOption(
-        header=HeaderValue(key="content-length",
-                            raw_value=str(len(mutated_body)).encode("utf-8")),
-        append_action=HeaderValueOption.OVERWRITE_IF_EXISTS_OR_ADD))
-    return body_resp
+    if result.action == ChunkAction.PASS_THROUGH:
+      return None
+
+    if result.action == ChunkAction.WITHHOLD:
+      # Do not forward this chunk's raw bytes yet -- the fully assembled,
+      # amended (or, on failure, reconstructed-original) body is emitted
+      # as a single mutation once the final chunk arrives.
+      chunk_resp = service_pb2.BodyResponse()
+      chunk_resp.response.body_mutation.clear_body = True
+      return chunk_resp
+
+    if result.action in (ChunkAction.EMIT_ORIGINAL, ChunkAction.REJECT):
+      return self._fail(result, matched_rule, state, elapsed_ms)
+
+    # EMIT_MUTATED
+    log_fields(
+        _LOGGER, logging.INFO, "prompt amendment applied",
+        rule_id=matched_rule.id, op=matched_rule.action.operation.value,
+        caller_spiffe_id=state.get("spiffe_id", ""),
+        original_len=result.original_len, new_len=result.new_len,
+        latency_ms=round(elapsed_ms, 2))
+    metrics.requests_total.add(1, {"outcome": "success"})
+    metrics.amend_latency_seconds.record(elapsed_ms / 1000)
+
+    return self._body_response(result.body)
 
   def _fail(
-      self, exc: Exception, rule: Rule, state: dict, start: float,
+      self, result, rule: Rule, state: dict, elapsed_ms: float,
   ) -> service_pb2.BodyResponse | None:
     """Records an amendment failure and returns the fail-open/closed
-    response. Logs only the exception TYPE, never str(exc): a Jinja2
+    response. Logs only the exception TYPE, never str(error): a Jinja2
     TemplateRenderError's message can echo the offending template text,
     and this path must never leak prompt/template content into logs.
+
+    On fail-open (`EMIT_ORIGINAL`), returns `result.body` -- the
+    untouched buffer accumulated so far, not just this chunk -- as the
+    body mutation. Earlier chunks of this request may already have been
+    withheld via `clear_body`, so a bare pass-through here would forward
+    only the tail of the body and truncate the request; emitting the full
+    accumulated buffer reconstructs it intact, just unamended.
     """
-    elapsed_ms = (time.monotonic() - start) * 1000
     log_fields(
         _LOGGER, logging.ERROR,
         "prompt amendment failed; passing request through unmodified",
         rule_id=rule.id, op=rule.action.operation.value,
         caller_spiffe_id=state.get("spiffe_id", ""),
-        error_type=type(exc).__name__, latency_ms=round(elapsed_ms, 2))
+        error_type=type(result.error).__name__,
+        latency_ms=round(elapsed_ms, 2))
     metrics.requests_total.add(1, {"outcome": "error"})
     metrics.amend_latency_seconds.record(elapsed_ms / 1000)
-    if self.fail_open:
-      return None
+
+    if result.action == ChunkAction.EMIT_ORIGINAL:
+      return self._body_response(result.body)
     return callout_tools.header_immediate_response(
         StatusCode.InternalServerError)
+
+  def _body_response(self, body: bytes) -> service_pb2.BodyResponse:
+    body_resp = service_pb2.BodyResponse()
+    body_resp.response.body_mutation.body = body
+    body_resp.response.header_mutation.set_headers.append(HeaderValueOption(
+        header=HeaderValue(key="content-length",
+                            raw_value=str(len(body)).encode("utf-8")),
+        append_action=HeaderValueOption.OVERWRITE_IF_EXISTS_OR_ADD))
+    return body_resp
 
   # ----------------------------------------------------------------- impl
 

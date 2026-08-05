@@ -152,11 +152,30 @@ worth verifying directly rather than assuming.
 
 Envoy only honors `mode_override` when `allow_mode_override` is enabled
 on the extension, so this callout doesn't assume the request-side
-`BUFFERED` override is actually applied: `on_request_body` accumulates
-body chunks in per-stream state until `end_of_stream`, enforcing
-`MAX_REQUEST_BODY_BYTES` on the running total, and only amends once the
-final chunk has arrived. That covers correctness whether the gateway
-delivers the body as a single `BUFFERED` chunk or streams it in pieces.
+`BUFFERED` override is actually applied. In Envoy's streamed ext_proc
+mode, each chunk is forwarded to the upstream as soon as the callout
+responds to it -- a bare pass-through response for an intermediate chunk
+does not withhold it, it releases that chunk's bytes immediately. Simply
+accumulating chunks and only mutating the last one would therefore
+corrupt a multi-chunk request: the early, unmodified chunks would already
+be gone, and the final chunk's mutation would replace only itself with
+the *entire* amended body, producing `<raw early chunks><entire amended
+body>` upstream.
+
+`on_request_body` (via `body_assembly.process_chunk`) instead withholds
+every non-final chunk explicitly (`body_mutation.clear_body = true`,
+which tells Envoy not to forward that chunk's bytes) and emits the fully
+assembled, amended body as a single mutation only on the final chunk.
+This is what actually makes the request-side override honored-or-not a
+pure latency question rather than a correctness one: whether the gateway
+delivers the body as one `BUFFERED` chunk or streams it in pieces, the
+upstream ends up receiving exactly one well-formed body either way.
+On amendment failure, the same withholding means a bare pass-through on
+the final chunk is not safe either -- it would forward only the tail of
+the request. Fail-open therefore emits the full, untouched buffer
+accumulated so far as the mutation, reconstructing the original request
+intact; fail-closed rejects the request outright before anything more is
+sent upstream.
 
 Operator note: `mode_override = NONE` on a no-match is a latency
 optimization, not a correctness dependency -- if it isn't honored in your
@@ -315,16 +334,20 @@ gcloud storage rm -r gs://YOUR_PROJECT_ID_cloudbuild/
 
 ## Testing
 
+**Prerequisite (one-time):** `callouts/python/requirements-test.txt` does
+not list Jinja2, and `extproc/tests/prompt_amender_test.py` imports
+`rule_engine.py`, which imports it directly -- CI currently only resolves
+it as a side effect of another example's transitive dependencies. Merge
+`requirements-test-addition.txt`'s one line (`Jinja2==3.1.4`) into
+`callouts/python/requirements-test.txt` before running the suite below
+(PyYAML is not needed by the test file itself, so no change there).
+
 ```bash
 cd callouts/python
 pip install -r requirements.txt -r requirements-test.txt \
   -r extproc/example/prompt_amender/additional-requirements.txt
 python -m pytest extproc/tests/prompt_amender_test.py -v
 ```
-
-`callouts/python/requirements-test.txt` must include `Jinja2==3.1.4` --
-see `requirements-test-addition.txt` for the exact line to merge in
-(PyYAML is not needed by the test file itself).
 
 Pure unit tests: no gRPC server, no network. Covers selector glob matching
 (including `spiffe://` vs `principalSet://` scheme normalization), all
@@ -338,6 +361,7 @@ with no selectors, duplicate IDs, and invalid Jinja2 syntax).
 ```
 prompt_amender/
 ├── service_callout_example.py     # ext_proc callout, header+body mutation
+├── body_assembly.py               # chunk withhold/emit/fail-open state machine
 ├── rule_engine.py                 # selector matching + mutation operations
 ├── config_sources.py              # env/GCS/git rule sourcing + hot reload
 ├── logging_utils.py               # structured JSON logging (never logs raw prompts)
