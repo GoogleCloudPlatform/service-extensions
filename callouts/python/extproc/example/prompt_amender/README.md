@@ -12,27 +12,27 @@ code, and without a redeploy when the policy changes.
 
 ```
                                      Customer VPC / Google Cloud
- Agent (SPIFFE SVID)                                                       │
-  │  mTLS: generateContent                                                 │
-  ▼                                                                        │
+ Agent (SPIFFE SVID)   ───────────────────────────────────────────────────┐
+  │  mTLS: generateContent                                                │
+  ▼                                                                       │
  ┌────────────────────────────────────────────────────────────────────────┐
- │                         Agent Gateway                                   │
- │                                                                         │
+ │                         Agent Gateway                                  │
+ │                                                                        │
  │   ┌────────────────────────────┐        ┌─────────────────────────┐    │
- │   │ Traffic Extension           │ hdrs   │ Callout (ext_proc,      │    │
- │   │  x-spiffe-id injected by GW ├───────►│ Cloud Run)              │    │
- │   │                              │◄───────┤  - match rule (glob)   │    │
- │   │  match -> BUFFERED body      │ body  │  - mode_override:      │    │
- │   │  no match -> body skipped    │◄──────┤    request_body_mode   │    │
- │   │                              │───────►│  - mutate system_     │    │
- │   └──────────────┬───────────────┘ body  │    instruction.parts[]│    │
- │                  │                        └──────────┬───────────┘    │
- │                  ▼                                    │ HTTPS: Load   │
- │         ┌─────────────────┐                            │ Rules        │
- │         │ Vertex AI /      │                            ▼              │
- │         │ Agent Platform   │                   ┌──────────────────┐   │
- │         └──────────────────┘                   │ Config Source     │   │
- │                                                 │ GCS / Git          │   │
+ │   │ Traffic Extension          │ hdrs   │ Callout (ext_proc,      │    │
+ │   │ x-spiffe-id injected by GW ├───────►│ Cloud Run)              │    │
+ │   │                            │◄───────┤  - match rule (glob)    │    │
+ │   │  match -> BUFFERED body    │ body   │  - mode_override:       │    │
+ │   │  no match -> body skipped  │◄───────┤    request_body_mode    │    │
+ │   │                            │───────►│  - mutate system_       │    │
+ │   └──────────────┬─────────────┘ body   │    instruction.parts[]  │    │
+ │                  │                      └────────────┬────────────┘    │
+ │                  ▼                                   │ HTTPS: Load     │
+ │         ┌─────────────────┐                          │ Rules           │
+ │         │ Vertex AI /     │                             ▼              │
+ │         │ Agent Platform  │                     ┌──────────────────┐   │
+ │         └─────────────────┘                     │ Config Source    │   │
+ │                                                 │ GCS / Git        │   │
  │                                                 └──────────────────┘   │
  └────────────────────────────────────────────────────────────────────────┘
 ```

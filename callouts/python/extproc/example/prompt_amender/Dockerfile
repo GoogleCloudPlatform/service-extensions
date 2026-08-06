@@ -44,7 +44,7 @@ COPY ./extproc/ssl_creds ./extproc/ssl_creds
 COPY ./extproc/example/__init__.py ./extproc/example/__init__.py
 COPY ./extproc/example/prompt_amender ./extproc/example/prompt_amender
 
-# Example-specific dependencies (PyYAML, Jinja2, google-cloud-storage, GitPython).
+# Example-specific dependencies.
 RUN pip install -r ./extproc/example/prompt_amender/additional-requirements.txt \
       --break-system-packages --root-user-action=ignore
 
