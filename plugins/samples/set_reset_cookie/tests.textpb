@@ -1,0 +1,66 @@
+test {
+  name: "LoadsConfig"
+  plugin_init {
+    log { regex: ".*Successfully loaded 3 cookie configuration.*" }
+  }
+}
+test {
+  name: "SetsCookieOnResponse"
+  response_headers {
+    result {
+      # The host combines multiple Set-Cookie headers into one comma-separated value.
+      headers { regex: "Set-Cookie: .*session_id=abc123; Path=/; HttpOnly.*" }
+      headers { regex: "Set-Cookie: .*tracking_id=new_value; Path=/; Domain=\\.example\\.com; Max-Age=3600; HttpOnly; Secure.*" }
+      log { regex: ".*Setting session cookie: session_id" }
+    }
+  }
+}
+test {
+  name: "DeletesCookieFromRequest"
+  request_headers {
+    input {
+      header { key: "Cookie" value: "session_id=abc123; old_cookie=expired; user_pref=value" }
+    }
+    result {
+      has_header { key: "Cookie" value: "session_id=abc123; user_pref=value" }
+      log { regex: ".*Marking cookie for deletion before CDN cache: old_cookie" }
+    }
+  }
+}
+test {
+  name: "NoDeleteWhenCookieAbsent"
+  request_headers {
+    input {
+      header { key: "Cookie" value: "session_id=abc123; user_pref=value" }
+    }
+    result {
+      has_header { key: "Cookie" value: "session_id=abc123; user_pref=value" }
+    }
+  }
+}
+test {
+  name: "OverwritesExistingCookie"
+  response_headers {
+    input {
+      header { key: "Set-Cookie" value: "tracking_id=old_value; Path=/old" }
+      header { key: "Set-Cookie" value: "other_cookie=keep_me" }
+    }
+    result {
+      headers { regex: "Set-Cookie: .*other_cookie=keep_me.*" }
+      headers { regex: "Set-Cookie: .*session_id=abc123; Path=/; HttpOnly.*" }
+      headers { regex: "Set-Cookie: .*tracking_id=new_value; Path=/; Domain=\\.example\\.com; Max-Age=3600; HttpOnly; Secure.*" }
+    }
+  }
+}
+test {
+  name: "DeleteAllRequestCookies"
+  request_headers {
+    input {
+      header { key: "Cookie" value: "old_cookie=only_one" }
+    }
+    result {
+      no_header { key: "Cookie" }
+      log { regex: ".*Marking cookie for deletion before CDN cache: old_cookie" }
+    }
+  }
+}
