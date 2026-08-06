@@ -32,6 +32,7 @@ class CalloutServerExample(CalloutServerAuth):
         super().__init__(*args, **kwargs)
 
     def on_check(self, request: auth_pb2.CheckRequest, context) -> auth_pb2.CheckResponse:
+        logging.info(f"Received gRPC CheckRequest:\n{request}")
         try:
             client_ip = self.extract_client_ip(request)
 
