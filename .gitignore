@@ -1,4 +1,6 @@
 /bazel-*
+/callouts/cpp/.cache/**
+/callouts/cpp/bazel-*
 /callouts/python/env
 /callouts/python/p12
 /callouts/python/env/**

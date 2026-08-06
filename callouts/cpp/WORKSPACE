@@ -1,0 +1,81 @@
+# This WORKSPACE file defines the Envoy dependency for Bazel.
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
+
+# gRPC deps
+http_archive(
+    name = "com_github_grpc_grpc",
+    sha256 = "ebc3acfde70cfae3f4f04b8dbb72259540cb1dc427be362569fbc2607dabfe39",
+    strip_prefix = "grpc-1.65.0",
+    url = "https://github.com/grpc/grpc/archive/v1.65.0.tar.gz",
+)
+load('@com_github_grpc_grpc//bazel:grpc_deps.bzl', 'grpc_deps')
+grpc_deps()
+load('@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl', 'grpc_extra_deps')
+grpc_extra_deps()
+
+# gRPC rules
+http_archive(
+    name = "rules_proto_grpc",
+    sha256 = "2a0860a336ae836b54671cbbe0710eec17c64ef70c4c5a88ccfd47ea6e3739bd",
+    strip_prefix = "rules_proto_grpc-4.6.0",
+    urls = ["https://github.com/rules-proto-grpc/rules_proto_grpc/releases/download/4.6.0/rules_proto_grpc-4.6.0.tar.gz"],
+)
+load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains", "rules_proto_grpc_repos")
+rules_proto_grpc_toolchains()
+rules_proto_grpc_repos()
+load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies", "rules_proto_toolchains")
+rules_proto_dependencies()
+rules_proto_toolchains()
+load("@rules_proto_grpc//cpp:repositories.bzl", rules_proto_grpc_cpp_repos = "cpp_repos")
+rules_proto_grpc_cpp_repos()
+
+# Envoy API spec
+http_archive(
+    name = "envoy_api",
+    url = "https://github.com/envoyproxy/data-plane-api/archive/refs/heads/main.zip"
+)
+
+# Runtime deps
+maybe(
+    http_archive,
+    name = "com_google_absl",
+    sha256 = "95e90be7c3643e658670e0dd3c1b27092349c34b632c6e795686355f67eca89f",
+    strip_prefix = "abseil-cpp-20240722.0",
+    urls = ["https://github.com/abseil/abseil-cpp/archive/20240722.0.zip"],
+)
+
+http_archive(
+    name = "com_github_nelhage_rules_boost",
+    sha256 = "1404ffb9f3f7253927c97bc2e05ef6b4a2a5089b76d00cef0f6b7d5a678fad88",
+    strip_prefix = "rules_boost-0598ab9aa992d6ad45088b480e1bf4526ef4ad04",
+    url = "https://github.com/nelhage/rules_boost/archive/0598ab9aa992d6ad45088b480e1bf4526ef4ad04.tar.gz",
+)
+
+load("@com_github_nelhage_rules_boost//:boost/boost.bzl", "boost_deps")
+
+boost_deps()
+
+# Test deps
+http_archive(
+    name = "com_google_googletest",
+    sha256 = "9dc9157a9a1551ec7a7e43daea9a694a0bb5fb8bec81235d8a1e6ef64c716dcb",
+    strip_prefix = "googletest-release-1.10.0",
+    urls = ["https://github.com/google/googletest/archive/release-1.10.0.tar.gz"],
+)
+
+# jwt-cpp deps
+http_archive(
+    name = "com_github_thalhammer_jwt_cpp",
+    strip_prefix = "jwt-cpp-0.6.0",
+    sha256 = "0227bd6e0356b211341075c7997c837f0b388c01379bd256aa525566a5553f03",
+    url = "https://github.com/Thalhammer/jwt-cpp/archive/v0.6.0.tar.gz",
+    build_file_content = """
+cc_library(
+    name = "jwt-cpp",
+    hdrs = glob(["include/**/*.h"]),
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+)
+"""
+)
