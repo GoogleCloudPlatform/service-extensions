@@ -17,3 +17,6 @@
 /.idea/**
 **/__pycache__
 .vscode
+/callouts/rust/target
+/callouts/rust/proto
+/callouts/rust/src/gen/*.rs
