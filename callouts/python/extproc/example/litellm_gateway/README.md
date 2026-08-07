@@ -110,7 +110,6 @@ this to change the served model, not just the backend).
 | `/v1/chat/completions` | Chat |
 | `/v1/completions` | Text completion |
 | `/v1/embeddings` | Embeddings |
-| `/v1/models` | Model discovery |
 | `/chat/completions` | Chat (alias) |
 | `/completions` | Text completion (alias) |
 | `/embeddings` | Embeddings (alias) |
@@ -350,7 +349,8 @@ Regional External Application LB
   |     compute_route() rewrites x-model-id via the strategies enabled by
   |       router_settings (model_alias, tag_based, weighted_split,
   |       simple_shuffle); inert when no GATEWAY_CONFIG router_settings
-  |     returns clear_route_cache=true so URL map re-evaluates
+  |     returns clear_route_cache=true only when a strategy rewrote the
+  |       header
   |
   +-- URL map evaluates (possibly rewritten) x-model-id header prefix
   |     anthropic/ -> Anthropic backend
@@ -369,14 +369,14 @@ Regional External Application LB
 
 ### Feature environment variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `REDIS_HOST` | (none) | Redis host for quota enforcement. Set by Terraform from the Memorystore instance. |
-| `REDIS_PORT` | `6379` | Redis port. Set by Terraform. |
-| `QUOTA_FAIL_OPEN` | `true` | If `false`, quota backend errors reject the request (503). Default is fail-open. |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | (none) | OTLP endpoint for trace export, for example a collector you run. Cloud Trace's endpoint does not work directly (it requires an OAuth token the callout does not send); see "Verified on GCP" below. |
-| `OTEL_EXPORTER_OTLP_PROTOCOL` | `grpc` | OTLP protocol (`grpc` or `http/protobuf`). |
-| `OTEL_SERVICE_NAME` | `litellm-gateway` | Service name in trace data. |
+| Variable | Default | Description                                                                                                                                                                                                                                  |
+|----------|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `REDIS_HOST` | (none) | Redis host for quota enforcement. Set by Terraform from the Memorystore instance.                                                                                                                                                            |
+| `REDIS_PORT` | `6379` | Redis port. Set by Terraform.                                                                                                                                                                                                                |
+| `QUOTA_FAIL_OPEN` | `false` | If `true`, quota backend errors let the request through unmetered. Default is fail-closed.                                                                           |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | (none) | OTLP endpoint for trace export, for example a collector you run. Cloud Trace's endpoint does not work directly (it requires an OAuth token the callout does not send); see "Verified on GCP" below.                                          |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | `grpc` | OTLP protocol (`grpc` or `http/protobuf`).                                                                                                                                                                                                   |
+| `OTEL_SERVICE_NAME` | `litellm-gateway` | Service name in trace data.                                                                                                                                                                                                                  |
 | `GATEWAY_CONFIG` | (none) | Path to an optional gateway config YAML (see `config.example.yaml`). Covers `router_settings` (the routing feature flag), `litellm_settings`, and `general_settings`. Absent: routing stays disabled and the other knobs use their defaults. |
 
 ### Gateway config file
@@ -395,9 +395,9 @@ knobs:
 
 | Section | Keys | Consumed by |
 |---------|------|-------------|
-| `router_settings` | `model_group_alias`, `tag_rules`, `weighted_groups`, `shuffle_groups` | `routing.configure()`. This is the routing feature flag: the strategies ship disabled (empty tables) and this section turns them on. A strategy is active exactly when its table is non-empty. |
+| `router_settings` | `model_group_alias`, `tag_rules`, `weighted_groups`, `shuffle_groups` | Builds the `routing.Router`. This is the routing feature flag: the strategies ship disabled (empty tables) and this section turns them on. A strategy is active exactly when its table is non-empty. |
 | `litellm_settings` | `redact_user_api_key_info` | `telemetry.py`. Omits the hashed virtual key from spans when true, as in LiteLLM. |
-| `general_settings` | `quota_fail_open` | `quota.py`. The `QUOTA_FAIL_OPEN` env var wins over this when both are set. |
+| `general_settings` | `quota_fail_open`, `quota_allow_unauthenticated` | `quota.py`. Both default off, the safe choice: an unreachable Redis rejects rather than serving unmetered, and a request with no virtual key is rejected rather than passed through. The `QUOTA_FAIL_OPEN` and `QUOTA_ALLOW_UNAUTHENTICATED` env vars win over the file when both are set. |
 
 A deployment without `GATEWAY_CONFIG` set, or a file without
 `router_settings`, keeps routing disabled and every other knob at its
@@ -432,12 +432,15 @@ Cloud Shell inside the VPC):
 ```bash
 cp keys.example.yaml keys.yaml
 # Edit keys.yaml: add or adjust key entries.
+# The instance has auth and TLS on, so the seeder needs both.
+export REDIS_AUTH_STRING=$(gcloud redis instances describe   litellm-gateway-quota --region "$REGION" --format='value(authString)')
+export REDIS_TLS=true
 python seed_keys.py --host $REDIS_HOST --file keys.yaml
 ```
 
 Every entry always writes a `key` field, even one with no other
 fields, so a key with no limits (`vk-unlimited` in `keys.example.yaml`) is
-still known to `quota.check()`: it is tracked, never treated as unknown and
+still known to `Quota.check()`: it is tracked, never treated as unknown and
 blocked.
 
 Each key entry (see `keys.example.yaml`) supports:
@@ -445,15 +448,17 @@ Each key entry (see `keys.example.yaml`) supports:
 | Field | Meaning |
 |-------|---------|
 | `token_budget` | Tokens allowed per `budget_duration` window. |
-| `budget_duration` | Window length: `30s` / `30m` / `30h` / `30d` / `1mo`. |
+| `budget_duration` | Window length in seconds, e.g. `2592000` for 30 days. |
 | `rpm_limit` | Requests allowed per minute. |
 | `tpm_limit` | Tokens allowed per minute. |
 | `soft_budget` | Warn-only threshold below `token_budget`; logs a warning once spend reaches it, does not block. |
 | `expires` | ISO-8601 timestamp; requests after this time are rejected. |
 | `models` | Allowlist: exact model ids or `<provider>/*` wildcards. Omit to allow every model. |
-| `model_max_budget` | Per-model budget, tracked separately from the key-level budget: `{model: {budget_limit, time_period}}`. |
+| `model_max_budget` | Per-model budget, tracked separately from the key-level budget: `{model: {budget_limit, time_period}}`, with `time_period` in seconds. |
 
-`quota.check()` returns:
+For any limit field, setting it to `0` means zero allowed, so `rpm_limit: 0` shuts a key off.
+
+`Quota.check()` returns:
 
 - `401 Unauthorized`: unknown key, or a key whose `expires` timestamp is in
   the past.
@@ -462,7 +467,8 @@ Each key entry (see `keys.example.yaml`) supports:
 - `403 Forbidden`: the requested model is not in the key's `models` allowlist.
 - `429 Too Many Requests`: `rpm_limit` or `tpm_limit` exceeded.
 - `503 Service Unavailable`: the quota backend is unreachable and
-  `QUOTA_FAIL_OPEN=false` (the default is fail-open, so this is opt-in).
+  `QUOTA_FAIL_OPEN` is unset or `false` (the default is fail-closed, so
+  fail-open is the opt-in).
 
 Budget and rate-limit windows are fixed-size buckets, indexed by
 `int(time.time()) // window_seconds` and stored in the counter's Redis key
@@ -475,8 +481,11 @@ changing the key name, leaving the old counter to expire on its TTL. That is
 also why no reset job is needed.
 
 The trade-off is that windows are a rolling approximation: one resets the
-moment its bucket index changes, not on a calendar boundary, and `1mo` is
-treated as 30 days. The LiteLLM Proxy instead resets on calendar boundaries
+moment its bucket index changes, not on a calendar boundary. A window is a
+fixed number of seconds, so a "monthly" budget is whatever multiple of a day
+you write and does not track month lengths. The same applies to `tpm_limit`.
+`rpm_limit` is the exception: it uses the moving window `limits` provides.
+The LiteLLM Proxy instead resets on calendar boundaries
 (for example midnight UTC on the 1st for a monthly budget), which is why it
 ships a budget rescheduler to zero the counters.
 
@@ -499,26 +508,47 @@ recorded after the response body is read.
 
 ### Telemetry (OpenTelemetry)
 
-Each LLM request emits one span (`llm.request`) with GenAI
-semantic-convention attributes:
+Spans and metrics are both emitted, per the
+[OpenTelemetry GenAI semantic conventions][semconv-genai]. Two client
+metrics:
+
+| Metric | Type | Attributes |
+|---|---|---|
+| `gen_ai.client.token.usage` | Histogram, `{token}` | `gen_ai.token.type` (`input` / `output`), plus the operation, provider and model |
+| `gen_ai.client.operation.duration` | Histogram, `s` | The operation, provider and model, plus `error.type` when the request failed |
+
+Metric names, units and histogram bucket boundaries are all taken from
+[that spec][semconv-genai-metrics] rather than chosen here, so a backend
+with a prebuilt GenAI dashboard finds the shape it expects. Both metrics
+are Development stability, so the advice can still change.
+
+[semconv-genai]: https://github.com/open-telemetry/semantic-conventions-genai
+[semconv-genai-metrics]: https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-metrics.md
+
+Each LLM request emits one span, named `{gen_ai.operation.name}
+{gen_ai.request.model}` as the GenAI semantic conventions specify (for
+example `chat claude-haiku-4-5`), with these attributes:
 
 | Attribute | Meaning |
 |-----------|---------|
 | `gen_ai.operation.name` | `chat`, `text_completion`, or `embeddings`, from the endpoint path. |
-| `gen_ai.system` | Provider (`anthropic`, `vertex_ai`, `groq`, `openrouter`). |
+| `gen_ai.provider.name` | Provider (`anthropic`, `vertex_ai`, `groq`, `openrouter`). |
 | `gen_ai.request.model` | The resolved model id. |
-| `gen_ai.usage.input_tokens` / `.output_tokens` / `.total_tokens` | Token usage from the transformed response. |
-| `gen_ai.cost.total_cost` | USD cost via LiteLLM's bundled price map (`litellm.cost_per_token`); omitted when the model is not in the price map. |
+| `gen_ai.usage.input_tokens` / `.output_tokens` | Prompt and completion tokens from the transformed response. |
+| `litellm.usage.total_tokens` | Sum of the two. The spec defines no total, so it is not claimed under `gen_ai.`. |
+| `litellm.cost.total_cost` | USD cost via LiteLLM's bundled price map (`litellm.cost_per_token`); omitted when the model is not in the price map. |
 | `litellm.call_id` | Per-request UUID; also returned as the `x-litellm-call-id` response header. |
 | `user_api_key_hash` | Truncated SHA-256 (16 hex chars) of the virtual key; omitted when no key was supplied or `redact_user_api_key_info` is set. |
 | `http.response.status_code` | The status the callout returned for this request. |
 | `llm.is_streaming` | Whether the request used SSE streaming. |
+| `litellm.request.original_model` | The model the client asked for, when a routing strategy served a different one. Omitted when nothing was rewritten. |
+| `litellm.routing_strategy` | The strategies that rewrote the model, in the order they fired. Set by the route extension on the `x-litellm-routing-strategy` header (and stripped by it when nothing fired, so a client cannot forge it). Deployments without the route extension have no writer for the header. |
 
 ### Routing strategies (route extension)
 
 The `routing.py` module implements each feasible LiteLLM routing strategy as
-a separate, independently configurable function. `compute_route` composes
-the enabled ones. Routing is feature-flagged: the strategies ship disabled
+a separate, independently configurable method on `Router`. `compute_route`
+composes the enabled ones. Routing is feature-flagged: the strategies ship disabled
 (empty tables), and the `router_settings` section of a `GATEWAY_CONFIG` file
 (see "Gateway config file" above) is what turns each one on; a strategy is
 active exactly when its table is non-empty. A strategy rewrites the
@@ -529,7 +559,7 @@ re-evaluates routing on the rewritten header.
 |---|---|---|---|
 | `model_alias_route` | Model aliases / model groups | `model_group_alias` | `x-model-id: cheap` -> `openrouter/openai/gpt-oss-20b:free` |
 | `tag_based_route` | Tag-based routing | `tag_rules` | `x-model-id: vertex_ai/gemini-2.5-flash` + `x-tier: premium` -> `vertex_ai/gemini-2.5-pro` |
-| `weighted_split_route` | A/B / weighted split | `weighted_groups` | 70/30 split of a model group by a stable hash of `x-request-id` |
+| `weighted_split_route` | A/B / weighted split | `weighted_groups` | 70/30 split of a model group, by a stable hash of `x-request-id` when present, at random otherwise |
 | `simple_shuffle_route` | simple-shuffle load balancing | `shuffle_groups` | random member of a model group per request |
 
 A header rewrite changes which **backend** serves the request. The served
@@ -585,6 +615,9 @@ REDIS_HOST=$(terraform output -raw redis_host)
 
 # Seed keys (see "Seeding quota keys" above).
 cp keys.example.yaml keys.yaml
+# The instance has auth and TLS on, so the seeder needs both.
+export REDIS_AUTH_STRING=$(gcloud redis instances describe   litellm-gateway-quota --region "$REGION" --format='value(authString)')
+export REDIS_TLS=true
 python seed_keys.py --host $REDIS_HOST --file keys.yaml
 
 # Test with a valid key.
@@ -645,13 +678,13 @@ no real Redis), `telemetry.py` (an in-memory OTel exporter), `routing.py`,
 litellm_gateway/
 ├── service_callout_example.py     # ext_proc callout, LiteLLM in-process
 ├── telemetry.py                   # OpenTelemetry span helpers (env-gated)
-├── quota.py                       # Redis token budget + rate-limit (env-gated)
-├── routing.py                     # Route extension rule logic (pure function)
+├── quota.py                       # Redis token budget + rate limits (env-gated)
+├── routing.py                     # Route extension strategies (Router)
 ├── gateway_config.py              # Optional YAML config loader (GATEWAY_CONFIG)
 ├── config.example.yaml            # Example gateway config file
 ├── seed_keys.py                   # Seeds virtual keys into Redis from keys.yaml
 ├── keys.example.yaml              # Example virtual-key definitions
-├── additional-requirements.txt    # litellm, httpx, google-cloud-aiplatform, otel, redis
+├── additional-requirements.txt    # litellm, httpx, vertex, otel, redis, limits, yaml
 ├── cloudbuild.yaml                # Cloud Build config for the callout image
 ├── Dockerfile                     # Callout container image
 ├── README.md
@@ -683,3 +716,13 @@ litellm_gateway/
 | `GROQ_API_KEY` | (none) | Picked up by LiteLLM for `groq/*` models. |
 | `OPENROUTER_API_KEY` | (none) | Picked up by LiteLLM for `openrouter/*` models. |
 | `<PROVIDER>_API_KEY` | (none) | Generic pattern: any provider you add reads `<PROVIDER>_API_KEY`. |
+| `GATEWAY_CONFIG` | (none) | Path to the YAML config file. Unset means built-in defaults. A file that cannot be read or parsed stops startup. |
+| `REDIS_HOST` | (none) | Enables quota. Unset means the quota module is inert and every request passes unmetered. |
+| `REDIS_PORT` | `6379` | Memorystore port. |
+| `REDIS_AUTH_STRING` | (none) | Memorystore AUTH string, supplied from Secret Manager. Required when the instance has `auth_enabled`. |
+| `REDIS_TLS` | `false` | Set `true` to connect over TLS, which the instance requires when `transit_encryption_mode` is set. |
+| `QUOTA_FAIL_OPEN` | from config | Allow requests through when Redis is unreachable. Overrides `general_settings.quota_fail_open`. Off by default. |
+| `QUOTA_ALLOW_UNAUTHENTICATED` | from config | Let requests with no virtual key through unmetered. Overrides `general_settings.quota_allow_unauthenticated`. Off by default. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | (none) | Enables tracing. Unset means no spans are emitted. |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | `grpc` | `grpc` or `http`, selecting the OTLP exporter. |
+| `OTEL_SERVICE_NAME` | `litellm-gateway` | `service.name` resource attribute on emitted spans. |

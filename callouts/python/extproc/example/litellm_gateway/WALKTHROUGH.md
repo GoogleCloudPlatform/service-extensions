@@ -95,8 +95,13 @@ removing a field from a key also removes it from Redis. For ad hoc changes
 without Terraform, `seed_keys.py` can be run by hand from a machine inside the
 VPC; see the README's "Seeding quota keys" section.
 
-Quota is opt-in per request: a request with no `Authorization` header is never
-metered, so leaving `quota_keys` empty (the default) keeps the gateway open.
+Quota is a deployment-level switch, not a per-request one. With Redis
+configured, a request carrying no `Authorization` header is rejected with 401
+rather than passed through: allowing it would let any caller escape its budget
+by dropping the header. Leaving `quota_keys` empty still keeps the gateway
+open, because without Redis the quota module is inert. Set
+`quota_allow_unauthenticated` if a deployment genuinely wants unmetered
+anonymous traffic.
 
 ### 1.4 Where routing configuration comes from
 
@@ -242,8 +247,9 @@ call not-a-key  $V     # unknown key
 401    unknown key
 ```
 
-A request with no key at all is not metered, which is what makes quota safe to
-enable on an existing deployment:
+A request with no key at all is rejected too. Metering only the requests
+that carry a key would let any caller spend without limit by omitting the
+header, so with quota enabled a key is required:
 
 ```bash
 curl -sk -o /dev/null -w "%{http_code}\n" -X POST https://$LB/v1/chat/completions \
@@ -253,8 +259,13 @@ curl -sk -o /dev/null -w "%{http_code}\n" -X POST https://$LB/v1/chat/completion
 ```
 
 ```
-200
+401
 ```
+
+To roll quota out gradually on an existing deployment, set
+`quota_allow_unauthenticated: true` under `general_settings`: keyless
+requests pass through unmetered while keyed ones are still enforced. It is
+off by default.
 
 Per-model budgets take a few calls. `vk-model-budget` allows 30 tokens per day
 on `anthropic/claude-haiku-4-5` and each answer costs more than that, so the
@@ -434,7 +445,9 @@ The last line is the untagged request: no tag means no rewrite.
 
 **What it shows.** Traffic split across members of a model group by weight. The
 choice is a stable hash of `x-request-id`, so the same request id always lands
-on the same member, which keeps retries consistent.
+on the same member, which keeps retries consistent. Clients that send no
+`x-request-id` are assigned at random instead, so the configured weights still
+hold for traffic that carries no stable id.
 
 **Setup.** In `terraform.tfvars`:
 
@@ -623,18 +636,18 @@ curl -sk -o /dev/null -X POST https://$LB/v1/chat/completions \
 **Expect.** On the VM, the collector prints the span:
 
 ```bash
-grep -E "llm.request|gen_ai\.|litellm\.call_id|user_api_key_hash" /tmp/collector.log | tail -12
+grep -E "^ *Name |gen_ai\.|litellm\.|user_api_key_hash" /tmp/collector.log | tail -12
 ```
 
 ```
-    Name           : llm.request
+    Name           : chat claude-haiku-4-5
      -> gen_ai.operation.name: Str(chat)
-     -> gen_ai.system: Str(anthropic)
+     -> gen_ai.provider.name: Str(anthropic)
      -> gen_ai.request.model: Str(claude-haiku-4-5)
      -> gen_ai.usage.input_tokens: Int(8)
      -> gen_ai.usage.output_tokens: Int(21)
-     -> gen_ai.usage.total_tokens: Int(29)
-     -> gen_ai.cost.total_cost: Double(0.00011300000000000001)
+     -> litellm.usage.total_tokens: Int(29)
+     -> litellm.cost.total_cost: Double(0.00011300000000000001)
      -> litellm.call_id: Str(0e03a76a-ef55-46e3-a494-27a9f94981ad)
      -> user_api_key_hash: Str(99b46eb86b815a60)
      -> http.response.status_code: Int(200)
