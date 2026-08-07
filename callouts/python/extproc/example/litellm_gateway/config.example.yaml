@@ -57,9 +57,18 @@ router_settings:
 
 litellm_settings:
   # As in LiteLLM: omit the hashed virtual key from telemetry when true.
-  redact_user_api_key_info: false
+  # On by default. The hash is not the key, but it still identifies a
+  # caller across requests, so set this false only where that is wanted.
+  redact_user_api_key_info: true
 
 general_settings:
   # Allow requests through when Redis is unreachable (LiteLLM's fail-open
   # vs fail_closed_budget_enforcement choice). Env QUOTA_FAIL_OPEN wins.
-  quota_fail_open: true
+  # Off by default: LLM calls cost enough that refusing beats serving
+  # unmetered traffic for as long as the backend is down.
+  quota_fail_open: false
+
+  # Let requests with no virtual key through, unmetered. Off by default,
+  # because otherwise a caller that exhausted its budget can keep going by
+  # dropping the Authorization header.
+  quota_allow_unauthenticated: false

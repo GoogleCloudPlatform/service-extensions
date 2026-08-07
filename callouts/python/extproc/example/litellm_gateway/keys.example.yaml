@@ -16,16 +16,20 @@
 # (budgets in tokens, not USD). This is the input file for the seeder CLI,
 # for ad hoc changes from a machine with Redis access:
 #   cp keys.example.yaml keys.yaml
+#   export REDIS_AUTH_STRING=<auth-string>   # when the instance has auth on
+#   export REDIS_TLS=true                    # when transit encryption is on
 #   python seed_keys.py --host <redis-host> --file keys.yaml
 #
 # If you deploy with deploy/terraform-regional, you do not need this file.
 # Define the same entries in the `quota_keys` variable in terraform.tfvars and
 # run the seed-keys Cloud Run Job, which needs no VPC access of your own.
+# Field names are checked when seeding: an unrecognized name (rpm_limits for
+# rpm_limit, say) fails the run rather than seeding a key with no limit.
 keys:
   - key: vk-demo
     token_budget: 100000        # tokens per budget_duration window
-    budget_duration: 30d        # 30s / 30m / 30h / 30d / 1mo
-    rpm_limit: 60
+    budget_duration: 2592000    # window length in seconds (30 days)
+    rpm_limit: 60               # omit for unlimited; 0 denies everything
     tpm_limit: 50000
     soft_budget: 80000          # log a warning past this, do not block
     expires: "2027-01-01T00:00:00+00:00"
@@ -35,5 +39,5 @@ keys:
     model_max_budget:           # per-model budget within the key
       anthropic/claude-haiku-4-5:
         budget_limit: 5000
-        time_period: 1d
+        time_period: 86400      # seconds (1 day)
   - key: vk-unlimited           # a key with no limits: tracked, never blocked
