@@ -83,17 +83,18 @@ callout_image = "us-central1-docker.pkg.dev/your-project/litellm-gateway/callout
 #     }
 #   }
 #   litellm_settings = {
-#     redact_user_api_key_info = false
+#     redact_user_api_key_info = false # default true; false attaches the hashed key to spans
 #   }
 #   general_settings = {
-#     quota_fail_open = true
+#     quota_fail_open = true           # default false; true serves unmetered when Redis is down
 #   }
 # }
 
 # Virtual keys for quota enforcement, seeded into Memorystore by the
 # litellm-gateway-seed-keys Cloud Run Job (run it after apply, and after any
-# change here). Empty by default, which seeds nothing: keyless requests pass
-# through unmetered and any request presenting a key gets 401.
+# change here). Empty by default, which seeds nothing: any request presenting
+# a key gets 401, and keyless requests are rejected too unless
+# quota_allow_unauthenticated is set.
 #
 # The set below exercises every enforcement path and matches the README's
 # examples. Uncomment to use it, or replace it with your own keys.
@@ -103,7 +104,7 @@ callout_image = "us-central1-docker.pkg.dev/your-project/litellm-gateway/callout
 #   {
 #     key             = "vk-demo"
 #     token_budget    = 100000
-#     budget_duration = "30d"
+#     budget_duration = 2592000  # 30 days
 #     rpm_limit       = 60
 #   },
 #   # Per-model budget: 402 once this model's own budget is spent, while other
@@ -111,11 +112,11 @@ callout_image = "us-central1-docker.pkg.dev/your-project/litellm-gateway/callout
 #   {
 #     key             = "vk-model-budget"
 #     token_budget    = 100000
-#     budget_duration = "30d"
+#     budget_duration = 2592000  # 30 days
 #     model_max_budget = {
 #       "anthropic/claude-haiku-4-5" = {
 #         budget_limit = 30
-#         time_period  = "1d"
+#         time_period  = 86400  # 1 day
 #       }
 #     }
 #   },
@@ -128,7 +129,7 @@ callout_image = "us-central1-docker.pkg.dev/your-project/litellm-gateway/callout
 #   {
 #     key             = "vk-expired"
 #     token_budget    = 100000
-#     budget_duration = "30d"
+#     budget_duration = 2592000  # 30 days
 #     expires         = "2020-01-01T00:00:00+00:00"
 #   },
 #   # Tokens per minute: 429 on the second request within a minute.

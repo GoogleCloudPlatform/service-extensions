@@ -102,21 +102,24 @@ variable "gateway_config" {
 # exercises every enforcement path.
 #
 # The type is `any` on purpose. A typed object with optional() attributes
-# emits unset fields as explicit YAML nulls, which the seeder would store as
-# the strings "None" and "null": a key with an unset `models` field would then
-# get a one-entry allowlist and reject every request with 403.
+# emits unset fields as explicit YAML nulls, and an unset field has to stay
+# absent: absent means "no limit", while a value present but unusable is an
+# error. The seeder rejects a null rather than storing it, so this would fail
+# the seed job loudly instead of seeding a broken key, but keeping the type
+# open avoids the problem rather than reporting it.
 #
 # Supported fields per entry (all optional except `key`, matching LiteLLM's
 # /key/generate naming):
 #   key              virtual key the client sends as `Authorization: Bearer`
 #   token_budget     tokens allowed per budget_duration window
-#   budget_duration  30s / 30m / 30h / 30d / 1mo
+#   budget_duration  window length in seconds (2592000 = 30 days)
 #   rpm_limit        requests per minute
 #   tpm_limit        tokens per minute
 #   soft_budget      log a warning past this, never block
 #   expires          ISO-8601 timestamp; past means the key is rejected (401)
 #   models           allowlist of exact model ids or `<provider>/*` wildcards
-#   model_max_budget map of model id to { budget_limit, time_period }
+#   model_max_budget map of model id to { budget_limit, time_period },
+#                    time_period in seconds
 variable "quota_keys" {
   description = "Virtual keys seeded into Memorystore by the seed-keys job. Empty (the default) seeds nothing."
   type        = any

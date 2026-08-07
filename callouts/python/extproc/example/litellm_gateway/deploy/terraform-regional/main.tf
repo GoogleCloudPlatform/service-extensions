@@ -123,8 +123,10 @@ resource "google_compute_router_nat" "nat" {
 #   2. By hand, from a machine with VPC access (a VM or Cloud Shell in this
 #      network), for ad hoc changes:
 #        cp keys.example.yaml keys.yaml
+#        export REDIS_AUTH_STRING=<instance auth_string>   # auth is on
+#        export REDIS_TLS=true
 #        python seed_keys.py --host <redis-host> --file keys.yaml
-# Key fields include token_budget, budget_duration (e.g. 30d), rpm_limit,
+# Key fields include token_budget, budget_duration (seconds), rpm_limit,
 # tpm_limit, models, model_max_budget, expires, and soft_budget; see the
 # README's "Seeding quota keys" section for the full field table.
 
@@ -134,8 +136,36 @@ resource "google_redis_instance" "quota" {
   memory_size_gb     = 1
   region             = var.region
   authorized_network = google_compute_network.vpc.id
-  depends_on         = [google_project_service.apis]
+  # The instance holds spend counters and key config, so it takes a
+  # generated AUTH string and TLS on the wire rather than relying on
+  # VPC reachability alone. The callout and the seed job both read
+  # the string from Secret Manager.
+  auth_enabled            = true
+  transit_encryption_mode = "SERVER_AUTHENTICATION"
+  depends_on              = [google_project_service.apis]
 }
+# The Memorystore AUTH string, kept in Secret Manager rather than inlined
+# into the Cloud Run spec, so reading the service definition does not reveal
+# the credential.
+resource "google_secret_manager_secret" "redis_auth" {
+  secret_id = "litellm-gateway-redis-auth"
+  replication {
+    auto {}
+  }
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_version" "redis_auth" {
+  secret      = google_secret_manager_secret.redis_auth.id
+  secret_data = google_redis_instance.quota.auth_string
+}
+
+resource "google_secret_manager_secret_iam_member" "redis_auth_accessor" {
+  secret_id = google_secret_manager_secret.redis_auth.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${local.callout_service_account}"
+}
+
 
 # ===================================================================
 # SERVICE ACCOUNT: CALLOUT
@@ -153,6 +183,37 @@ locals {
     "${data.google_project.project.number}-compute@developer.gserviceaccount.com",
   )
 
+  # The OpenAI-compatible paths this gateway serves, including the aliases
+  # served without the /v1 prefix.
+  #
+  # Both extensions must match on this same list. They are two hops on one
+  # request, so a path matched by only one of them gets half the gateway:
+  # a path the traffic extension matches but the route extension does not
+  # is still served, but silently without model routing. Deriving both
+  # conditions from one local keeps them from drifting apart.
+  gateway_paths = [
+    "/v1/chat/completions",
+    "/v1/completions",
+    "/v1/embeddings",
+    "/chat/completions",
+    "/completions",
+    "/embeddings",
+  ]
+  gateway_paths_cel = "request.path in ['${join("', '", local.gateway_paths)}']"
+
+  # URL map matching only; both extension CELs keep the exact list above.
+  # The versioned namespace is matched by prefix, so a /v1 endpoint added
+  # to LLM_ENDPOINTS routes even before it is listed here. The unversioned
+  # aliases share no prefix, so each is matched in full: that is the gap
+  # the route extension exposed. An unimplemented /v1 path reaches a
+  # provider and gets its 404 rather than the sample app's.
+  gateway_prefix = "/v1/"
+  gateway_matchers = concat(
+    [{ prefix = local.gateway_prefix, full = null }],
+    [for p in local.gateway_paths :
+    { prefix = null, full = p } if !startswith(p, local.gateway_prefix)],
+  )
+
   api_keys_all = {
     anthropic  = var.anthropic_api_key
     groq       = var.groq_api_key
@@ -163,7 +224,7 @@ locals {
   ]))
 
   # Each provider here gets an Internet NEG + backend on the LB. The URL
-  # map matches prefix=/v1/ + x-model-id header with a provider prefix
+  # map matches the gateway paths + x-model-id header with a provider prefix
   # (e.g. anthropic/...) to pick the right backend. Vertex AI is below
   # as a separate resource.
   third_party_providers = {
@@ -293,6 +354,19 @@ resource "google_cloud_run_v2_job" "seed_keys" {
           "--file", "/etc/keys/keys.yaml",
           "--replace",
         ]
+        env {
+          name = "REDIS_AUTH_STRING"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.redis_auth.secret_id
+              version = "latest"
+            }
+          }
+        }
+        env {
+          name  = "REDIS_TLS"
+          value = "true"
+        }
         volume_mounts {
           name       = "quota-keys"
           mount_path = "/etc/keys"
@@ -315,6 +389,8 @@ resource "google_cloud_run_v2_job" "seed_keys" {
     google_secret_manager_secret_version.quota_keys,
     google_secret_manager_secret_iam_member.quota_keys_accessor,
     google_redis_instance.quota,
+    google_secret_manager_secret_version.redis_auth,
+    google_secret_manager_secret_iam_member.redis_auth_accessor,
   ]
 }
 
@@ -326,7 +402,13 @@ resource "google_cloud_run_v2_service" "callout" {
   name                = "litellm-gateway-callout"
   location            = var.region
   deletion_protection = false
-  ingress             = "INGRESS_TRAFFIC_ALL"
+  # The callout trusts headers the route extension sets and meters
+  # quota on the caller's virtual key, so a client able to reach it
+  # directly could forge both. Only the load balancer may call it,
+  # and the default run.app URI is switched off so there is no
+  # address to reach it on besides the LB.
+  ingress              = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+  default_uri_disabled = true
 
   template {
     service_account = local.callout_service_account
@@ -364,6 +446,19 @@ resource "google_cloud_run_v2_service" "callout" {
       env {
         name  = "REDIS_PORT"
         value = tostring(google_redis_instance.quota.port)
+      }
+      env {
+        name = "REDIS_AUTH_STRING"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.redis_auth.secret_id
+            version = "latest"
+          }
+        }
+      }
+      env {
+        name  = "REDIS_TLS"
+        value = "true"
       }
       env {
         name  = "OTEL_EXPORTER_OTLP_ENDPOINT"
@@ -443,10 +538,12 @@ resource "google_cloud_run_v2_service" "callout" {
     google_secret_manager_secret_version.gateway_config,
     google_secret_manager_secret_iam_member.gateway_config_accessor,
     google_redis_instance.quota,
+    google_secret_manager_secret_version.redis_auth,
+    google_secret_manager_secret_iam_member.redis_auth_accessor,
   ]
 }
 
-resource "google_cloud_run_v2_service_iam_member" "callout_public_invoker" {
+resource "google_cloud_run_v2_service_iam_member" "callout_invoker" {
   name     = google_cloud_run_v2_service.callout.name
   location = google_cloud_run_v2_service.callout.location
   role     = "roles/run.invoker"
@@ -536,14 +633,19 @@ resource "google_compute_region_backend_service" "upstream_backend" {
 }
 
 # ===================================================================
-# VERTEX AI BACKEND: GLOBAL INTERNET NEG
+# VERTEX AI BACKEND: REGIONAL INTERNET NEG
 # ===================================================================
 #
-# Internet NEGs for provider APIs must be global (INTERNET_FQDN_PORT is a
-# global-only NEG type in the google provider). The regional URL map below
-# references these global backend services by self_link. This is a supported
-# configuration: regional external Application LBs can reference global backend
-# services for Internet-destined traffic.
+# The provider APIs are reached through INTERNET_FQDN_PORT NEGs registered
+# regionally (google_compute_region_network_endpoint_group) in the LB's
+# region, behind regional backend services. That is what a regional external
+# Application LB takes, so this chain is regional end to end and the URL map
+# below references these backends by id.
+#
+# The global deployment in ../terraform expresses the same thing with the
+# globally-scoped resources (google_compute_global_network_endpoint_group and
+# google_compute_backend_service) to match its global LB. Outbound reach to
+# these FQDNs depends on the Cloud NAT configured above.
 
 resource "google_compute_region_network_endpoint_group" "vertex_neg" {
   name                  = "litellm-gateway-vertex-neg"
@@ -579,7 +681,7 @@ resource "google_compute_region_backend_service" "vertex_backend" {
 }
 
 # ===================================================================
-# THIRD-PARTY PROVIDER BACKENDS: GLOBAL INTERNET NEGs
+# THIRD-PARTY PROVIDER BACKENDS: REGIONAL INTERNET NEGs
 # ===================================================================
 
 resource "google_compute_region_network_endpoint_group" "provider_neg" {
@@ -629,8 +731,8 @@ resource "google_compute_region_backend_service" "provider_backend" {
 #   google_compute_region_target_https_proxy
 #   google_compute_forwarding_rule (regional, no zone argument)
 #
-# The URL map references both regional backend services (Cloud Run) and
-# global backend services (Internet NEGs for provider APIs).
+# The URL map references regional backend services throughout: the Cloud Run
+# callout backend and the Internet NEG backends for the provider APIs.
 
 resource "google_compute_address" "lb_ip" {
   name   = "litellm-gateway-lb-ip"
@@ -668,10 +770,10 @@ resource "google_compute_region_ssl_certificate" "lb_cert" {
 # map evaluates it.
 #
 # Rules:
-#   /v1/* + x-model-id starts with "anthropic/"  : Anthropic backend
-#   /v1/* + x-model-id starts with "groq/"       : Groq backend
-#   /v1/* + x-model-id starts with "openrouter/" : OpenRouter backend
-#   /v1/*                                         : Vertex AI backend (default)
+#   gateway path + x-model-id starts with "anthropic/"  : Anthropic backend
+#   gateway path + x-model-id starts with "groq/"       : Groq backend
+#   gateway path + x-model-id starts with "openrouter/" : OpenRouter backend
+#   any gateway path                                       : Vertex AI backend (default)
 #   anything else                                 : upstream sample UI
 resource "google_compute_region_url_map" "url_map" {
   name            = "litellm-gateway-url-map"
@@ -689,11 +791,15 @@ resource "google_compute_region_url_map" "url_map" {
 
     route_rules {
       priority = 1
-      match_rules {
-        prefix_match = "/v1/"
-        header_matches {
-          header_name  = "x-model-id"
-          prefix_match = "anthropic/"
+      dynamic "match_rules" {
+        for_each = local.gateway_matchers
+        content {
+          prefix_match    = match_rules.value.prefix
+          full_path_match = match_rules.value.full
+          header_matches {
+            header_name  = "x-model-id"
+            prefix_match = "anthropic/"
+          }
         }
       }
       service = google_compute_region_backend_service.provider_backend["anthropic"].id
@@ -706,11 +812,15 @@ resource "google_compute_region_url_map" "url_map" {
 
     route_rules {
       priority = 2
-      match_rules {
-        prefix_match = "/v1/"
-        header_matches {
-          header_name  = "x-model-id"
-          prefix_match = "groq/"
+      dynamic "match_rules" {
+        for_each = local.gateway_matchers
+        content {
+          prefix_match    = match_rules.value.prefix
+          full_path_match = match_rules.value.full
+          header_matches {
+            header_name  = "x-model-id"
+            prefix_match = "groq/"
+          }
         }
       }
       service = google_compute_region_backend_service.provider_backend["groq"].id
@@ -723,11 +833,15 @@ resource "google_compute_region_url_map" "url_map" {
 
     route_rules {
       priority = 3
-      match_rules {
-        prefix_match = "/v1/"
-        header_matches {
-          header_name  = "x-model-id"
-          prefix_match = "openrouter/"
+      dynamic "match_rules" {
+        for_each = local.gateway_matchers
+        content {
+          prefix_match    = match_rules.value.prefix
+          full_path_match = match_rules.value.full
+          header_matches {
+            header_name  = "x-model-id"
+            prefix_match = "openrouter/"
+          }
         }
       }
       service = google_compute_region_backend_service.provider_backend["openrouter"].id
@@ -738,11 +852,15 @@ resource "google_compute_region_url_map" "url_map" {
       }
     }
 
-    # Fallback for /v1/* with no header (or vertex_ai header) to Vertex AI.
+    # Fallback for gateway paths with no header (or vertex_ai header) to Vertex AI.
     route_rules {
       priority = 4
-      match_rules {
-        prefix_match = "/v1/"
+      dynamic "match_rules" {
+        for_each = local.gateway_matchers
+        content {
+          prefix_match    = match_rules.value.prefix
+          full_path_match = match_rules.value.full
+        }
       }
       service = google_compute_region_backend_service.vertex_backend.id
       route_action {
@@ -797,14 +915,18 @@ resource "google_network_services_lb_traffic_extension" "callout" {
   extension_chains {
     name = "litellm-gateway-chain"
     match_condition {
-      cel_expression = "request.path in ['/v1/chat/completions', '/v1/completions', '/v1/embeddings', '/v1/models', '/chat/completions', '/completions', '/embeddings']"
+      cel_expression = local.gateway_paths_cel
     }
     extensions {
       name             = "litellm-gateway-callout"
       service          = google_compute_region_backend_service.callout_backend.self_link
       authority        = "litellm-gateway.example.com"
       supported_events = ["REQUEST_HEADERS", "REQUEST_BODY", "RESPONSE_HEADERS", "RESPONSE_BODY"]
-      timeout          = "10s"
+      # The callout blocks a worker on Redis for at most
+      # _BRIDGE_TIMEOUT_S (service_callout_example.py). Keep that
+      # constant below this timeout: a bridge budget above it parks
+      # the worker past the point where the LB has given up.
+      timeout = "10s"
     }
   }
   depends_on = [google_project_service.apis]
@@ -829,7 +951,7 @@ resource "google_network_services_lb_route_extension" "callout" {
   extension_chains {
     name = "litellm-gateway-route-chain"
     match_condition {
-      cel_expression = "request.path.startsWith('/v1/')"
+      cel_expression = local.gateway_paths_cel
     }
     extensions {
       name             = "litellm-gateway-route-callout"
