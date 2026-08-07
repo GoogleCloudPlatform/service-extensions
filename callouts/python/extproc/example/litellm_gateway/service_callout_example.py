@@ -41,13 +41,16 @@ The callout owns:
   * Stamping `x-litellm-*` provenance headers for observability
 """
 
+import asyncio
 import datetime
 import json
 import logging
 import os
+import threading
+import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, Optional
 from urllib.parse import urlsplit
 
 import httpx
@@ -58,6 +61,14 @@ from litellm import ModelResponse
 from litellm.litellm_core_utils.litellm_logging import Logging as LiteLLMLogging
 from litellm.types.utils import LlmProviders
 from litellm.utils import ProviderConfigManager
+from litellm.llms.anthropic.chat.handler import (
+    ModelResponseIterator as AnthropicResponseIterator,
+)
+from litellm.llms.vertex_ai.common_utils import _get_vertex_url
+from litellm.llms.vertex_ai.gemini.vertex_and_google_ai_studio_gemini import (
+    ModelResponseIterator as VertexGeminiResponseIterator,
+)
+from litellm.llms.vertex_ai.vertex_llm_base import VertexBase
 
 from envoy.config.core.v3.base_pb2 import HeaderValue, HeaderValueOption
 from envoy.extensions.filters.http.ext_proc.v3.processing_mode_pb2 import (
@@ -87,7 +98,6 @@ LLM_ENDPOINTS = frozenset({
     "/v1/chat/completions",
     "/v1/completions",
     "/v1/embeddings",
-    "/v1/models",
     "/chat/completions",
     "/completions",
     "/embeddings",
@@ -98,6 +108,28 @@ _MANAGED_HEADERS = frozenset({
     "host", ":authority", ":path", "content-length", "content-type",
 })
 
+# Request-body parameters forwarded to LiteLLM. Everything else is dropped.
+#
+# The body is attacker-controlled, and these values reach
+# validate_environment(), get_complete_url() and the outgoing provider
+# request. Passing the body through wholesale lets a caller smuggle keys
+# LiteLLM treats as configuration (api_base, custom_llm_provider, api_key)
+# and redirect the request or override the credential. An allowlist is the
+# only form that fails closed as LiteLLM adds parameters.
+_ALLOWED_PARAMS = frozenset({
+    "frequency_penalty", "function_call", "functions", "logit_bias",
+    "logprobs", "max_completion_tokens", "max_tokens", "modalities", "n",
+    "parallel_tool_calls", "prediction", "presence_penalty",
+    "reasoning_effort", "response_format", "seed", "stop", "stream",
+    "stream_options", "temperature", "thinking", "tool_choice", "tools",
+    "top_k", "top_logprobs", "top_p", "user", "web_search_options",
+    "audio",
+    # Embeddings.
+    "dimensions", "encoding_format", "input",
+    # Text completions.
+    "best_of", "echo", "suffix",
+})
+
 # gen_ai.operation.name per endpoint path.
 _OPERATIONS = {
     "/v1/chat/completions": "chat",
@@ -106,15 +138,6 @@ _OPERATIONS = {
     "/completions": "text_completion",
     "/v1/embeddings": "embeddings",
     "/embeddings": "embeddings",
-}
-
-# Quota reject HTTP status codes mapped to Envoy StatusCode values.
-_QUOTA_STATUS = {
-    401: StatusCode.Unauthorized,
-    402: StatusCode.PaymentRequired,
-    403: StatusCode.Forbidden,
-    429: StatusCode.TooManyRequests,
-    503: StatusCode.ServiceUnavailable,
 }
 
 # Default API bases by provider. LiteLLM's BaseConfig.get_complete_url() raises
@@ -154,9 +177,68 @@ class _StreamState:
     usage: dict = field(default_factory=dict)
     route_mode: bool = False
     model_id_header: str = ""
+    requested_model: str = ""
+    routing_strategy: str = ""
+    started_at: float = 0.0
+    quota_config: dict | None = None
     call_id: str = ""
     operation: str = "chat"
     upstream_status: int = 200
+
+
+# How long a bridged coroutine may block a gRPC worker.
+#
+# This has to stay below the ext_proc timeouts the load balancer enforces
+# (10s on the traffic extension, 5s on the route extension in the deploy
+# configs). A longer value cannot help: the LB abandons the request at its
+# own deadline and the worker stays parked past the point where anyone is
+# listening, which is the thread-pool drain this timeout exists to avoid.
+# It also has to stay comfortably above a healthy call, which is bounded by
+# the Redis socket_timeout of 2s per operation.
+_BRIDGE_TIMEOUT_S = 5.0
+
+
+class _AsyncBridge:
+    """Runs the async quota calls from the synchronous ext_proc handlers.
+
+    quota.Quota uses `redis.asyncio`, but the callout SDK is still
+    synchronous, so the handlers have no await point yet.
+
+    `asyncio.run()` per call is the obvious bridge and does not work here:
+    it closes its loop on return, while the Redis connection pool outlives
+    the call and keeps connections bound to that dead loop. On real
+    infrastructure this fails intermittently from the second request on:
+
+        RuntimeError: Event loop is closed
+        RuntimeError: Task <Quota.check() ...> got Future <Future pending>
+        attached to a different loop
+
+    One long-lived loop on a background thread keeps the pool valid.
+    `limits` opens its own pool and has the same requirement.
+
+    When async SDK lands this goes away: the handlers become `async def` and
+    these calls become plain `await`.
+    """
+
+    def __init__(self) -> None:
+        self._loop = asyncio.new_event_loop()
+        self._thread = threading.Thread(
+            target=self._loop.run_forever, daemon=True,
+            name="litellm-gateway-async")
+        self._thread.start()
+
+    def run(self, coro, timeout: float = _BRIDGE_TIMEOUT_S):
+        """Run a coroutine on the shared loop and return its result.
+
+        The timeout is the safety net for the loop thread dying: without
+        it, every gRPC worker would park forever on `.result()` and the
+        pool would drain silently.
+        """
+        return asyncio.run_coroutine_threadsafe(
+            coro, self._loop).result(timeout)
+
+    def close(self) -> None:
+        self._loop.call_soon_threadsafe(self._loop.stop)
 
 
 def _state(context: ServicerContext) -> _StreamState:
@@ -165,6 +247,41 @@ def _state(context: ServicerContext) -> _StreamState:
         state = _StreamState()
         context._litellm_state = state
     return state
+
+
+def _original_model(state: "_StreamState") -> str:
+    """The client's requested model, only when a different one was served.
+
+    Compares full LiteLLM ids (state.quota_model is the post-override id;
+    state.requested_model is the raw body model). Comparing against the
+    provider-stripped state.model would fire on every `<provider>/<model>`
+    request, rewritten or not. Empty when the request was rejected before
+    a model was served.
+    """
+    if state.quota_model and state.requested_model != state.quota_model:
+        return state.requested_model
+    return ""
+
+
+def _elapsed(state: "_StreamState") -> Optional[float]:
+    """Seconds since the request was recognized, for the duration metric."""
+    if not state.started_at:
+        return None
+    return time.monotonic() - state.started_at
+
+
+def _header_map(headers: service_pb2.HttpHeaders) -> dict[str, str]:
+    """Headers as a dict, decoded once, keyed by lowercased name.
+
+    Header names are case-insensitive and arrive in whatever case the
+    client sent, so folding them here means every lookup can assume one
+    spelling. Building this once per leg also keeps the phase methods from
+    walking the repeated field again for each value they want.
+    """
+    return {
+        h.key.lower(): h.raw_value.decode("utf-8")
+        for h in headers.headers.headers
+    }
 
 
 class LiteLLMGatewayCallout(callout_server.CalloutServer):
@@ -177,10 +294,18 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
         if not self.gcp_project:
             logging.warning(
                 "GCP_PROJECT_ID is unset; Vertex AI requests will fail.")
-        gateway_config.load()
-        routing.configure(gateway_config.routing_settings())
-        telemetry.init_tracer()
-        quota.init_client()
+        # The config has to exist before the three things that read it, and
+        # passing it in is what enforces that: none of them can be built
+        # from a config that has not been loaded.
+        self.config = gateway_config.GatewayConfig.load()
+        self.router = routing.Router(self.config.routing)
+        self.telemetry = telemetry.Telemetry.from_env(self.config.telemetry)
+        self.quota = quota.Quota.from_env(self.config.quota)
+        # One VertexBase for the process. It caches the ADC credential and
+        # refreshes it as needed, so building one per request threw that
+        # cache away and re-minted a token on every Vertex call.
+        self._vertex_base = VertexBase()
+        self._async = _AsyncBridge()
 
     def process(
         self,
@@ -218,59 +343,26 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
         context: ServicerContext,
     ) -> service_pb2.ProcessingResponse | None:
         state = _state(context)
+        header_map = _header_map(headers)
         if state.route_mode:
-            header_map = {
-                h.key: h.raw_value.decode("utf-8")
-                for h in headers.headers.headers
-            }
-            rewrites = routing.compute_route(header_map)
-            if rewrites:
-                logging.info(
-                    "Route extension rewrite: %s=%r -> %r",
-                    routing.ROUTING_HEADER,
-                    header_map.get(routing.ROUTING_HEADER),
-                    rewrites.get(routing.ROUTING_HEADER),
-                )
-            else:
-                logging.info(
-                    "Route extension: no rewrite for %s=%r",
-                    routing.ROUTING_HEADER,
-                    header_map.get(routing.ROUTING_HEADER),
-                )
-            resp = service_pb2.ProcessingResponse()
-            cr = resp.request_headers.response
-            cr.clear_route_cache = True
-            for k, v in rewrites.items():
-                cr.header_mutation.set_headers.append(
-                    HeaderValueOption(
-                        header=HeaderValue(
-                            key=k, raw_value=v.encode("utf-8")),
-                        append_action=(
-                            HeaderValueOption
-                            .OVERWRITE_IF_EXISTS_OR_ADD)))
-            return resp
+            return self._route_extension_response(header_map)
 
-        path, method = "", ""
-        for h in headers.headers.headers:
-            if h.key == ":path":
-                path = h.raw_value.decode("utf-8")
-            elif h.key == ":method":
-                method = h.raw_value.decode("utf-8")
-        logging.info("Request %s %s", method, path)
+        path = header_map.get(":path", "")
+        logging.info(
+            "Request %s %s", header_map.get(":method", ""), path)
 
         if path not in LLM_ENDPOINTS:
             return None
 
         state.is_llm = True
+        state.started_at = time.monotonic()
 
-        header_map = {
-            h.key: h.raw_value.decode("utf-8")
-            for h in headers.headers.headers
-        }
         auth = header_map.get("authorization", "")
         if auth.lower().startswith("bearer "):
             state.api_key = auth[len("bearer "):].strip()
         state.model_id_header = header_map.get(routing.ROUTING_HEADER, "")
+        state.routing_strategy = header_map.get(
+            routing.STRATEGY_HEADER, "")
         state.call_id = str(uuid.uuid4())
         state.operation = _OPERATIONS.get(path, "chat")
         disabled = {
@@ -280,7 +372,7 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
             if c.strip()
         }
         if "otel" not in disabled:
-            state.span = telemetry.start_request_span(header_map)
+            state.span = self.telemetry.start_request_span(header_map)
 
         resp = service_pb2.ProcessingResponse()
         resp.request_headers.response.header_mutation.set_headers.append(
@@ -315,19 +407,16 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
             req_map = json.loads(raw)
         except json.JSONDecodeError as e:
             logging.warning("Invalid JSON body: %s", e)
-            self._end_span(state, 400)
-            return callout_tools.header_immediate_response(
-                StatusCode.BadRequest)
+            return self._reject(state, 400)
 
         model = req_map.get("model")
+        state.requested_model = model if isinstance(model, str) else ""
         if not isinstance(model, str) or not model:
             logging.warning("Request missing 'model' field")
-            self._end_span(state, 400)
-            return callout_tools.header_immediate_response(
-                StatusCode.BadRequest)
+            return self._reject(state, 400)
 
         header_model = state.model_id_header
-        if (routing.enabled() and header_model and header_model != model
+        if (self.router.enabled() and header_model and header_model != model
                 and header_model.startswith(routing.PROVIDER_PREFIXES)):
             # Routing is enabled (router_settings feature flag), so the URL
             # map routed on an x-model-id the route extension may have
@@ -341,26 +430,41 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
             model = header_model
             req_map["model"] = header_model
 
-        decision = quota.check(state.api_key, model)
-        if not decision.allowed:
-            logging.info(
-                "Quota reject (%s): %s", decision.status, decision.reason)
-            self._end_span(state, decision.status)
-            return callout_tools.header_immediate_response(
-                _QUOTA_STATUS.get(
-                    decision.status, StatusCode.TooManyRequests))
+        if self.quota.enabled():
+            # One Redis read for the whole request: check() here, then
+            # usage_headers() and record() on the response leg reuse it.
+            # Both calls are guarded: a failure here (Redis outage, bridge
+            # timeout) happens outside check()'s own try/except, and
+            # letting it propagate would 500 the request regardless of
+            # fail_open. On a failed read, cfg=None lets check() re-read
+            # inside its guarded region; returning {} instead would read
+            # as "unknown key" and 401 keys fail-open promised to admit.
+            try:
+                state.quota_config = self._async.run(
+                    self.quota.key_config(state.api_key))
+            except Exception:
+                logging.exception("Quota config read failed")
+                state.quota_config = None
+            try:
+                decision = self._async.run(self.quota.check(
+                    state.api_key, model, cfg=state.quota_config))
+            except Exception:
+                logging.exception("Quota check failed outside its guard")
+                decision = self.quota.unavailable()
+            if not decision.allowed:
+                logging.info(
+                    "Quota reject (%s): %s", decision.status, decision.reason)
+                return self._reject(state, decision.status)
 
         try:
             pr = self._build_provider_request(model, req_map)
         except Exception:
             logging.exception("LiteLLM request transformation failed")
-            self._end_span(state, 500)
-            return callout_tools.header_immediate_response(
-                StatusCode.InternalServerError)
+            return self._reject(state, 500)
 
         # state.model is the provider-stripped id (pr.model) for provenance
         # headers/telemetry. state.quota_model is the full LiteLLM id that
-        # quota.check() metered above (post header-override), so record()
+        # self.quota.check() metered above (post header-override), so record()
         # on the response leg writes the same per-model spend counter that
         # check() reads.
         state.model = pr.model
@@ -409,6 +513,19 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
                 continue
             rewrites.append((k.lower(), v))
 
+        # The caller's virtual key arrives in `authorization` and must not
+        # reach the provider. This strip runs only on LLM_ENDPOINTS body
+        # legs, which is safe because the URL map routes exactly the same
+        # path list (local.gateway_paths) to providers; keep the two in
+        # sync or an unclassified-but-routed path would forward the
+        # key. When LiteLLM produces its own Authorization
+        # header (Vertex ADC, say) the rewrite above replaces it. Providers
+        # authenticated some other way (Anthropic's x-api-key) emit none, so
+        # without this the caller's key would ride along to the upstream.
+        if not any(k == "authorization" for k, _ in rewrites):
+            body_resp.response.header_mutation.remove_headers.append(
+                "authorization")
+
         for k, v in rewrites:
             body_resp.response.header_mutation.set_headers.append(
                 HeaderValueOption(
@@ -429,14 +546,10 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
         state = _state(context)
         if not state.is_llm:
             return service_pb2.HeadersResponse()
-        for h in headers.headers.headers:
-            if h.key == ":status":
-                try:
-                    state.upstream_status = int(
-                        h.raw_value.decode("utf-8"))
-                except (ValueError, UnicodeDecodeError):
-                    state.upstream_status = 200
-                break
+        try:
+            state.upstream_status = int(_header_map(headers)[":status"])
+        except (KeyError, ValueError, UnicodeDecodeError):
+            state.upstream_status = 200
         resp = service_pb2.HeadersResponse()
         # Provider's Content-Length will be wrong after our body transform.
         # Drop it so Envoy switches to chunked transfer encoding.
@@ -445,7 +558,13 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
         # response they lag the in-flight request itself (LiteLLM Proxy
         # has the same limitation). Keyless or unknown-key requests get {}
         # here, so only x-litellm-call-id is added below.
-        extra = quota.usage_headers(state.api_key)
+        extra = {}
+        if self.quota.enabled():
+            try:
+                extra = self._async.run(self.quota.usage_headers(
+                    state.api_key, cfg=state.quota_config))
+            except Exception:
+                logging.exception("usage_headers failed outside its guard")
         if state.call_id:
             extra["x-litellm-call-id"] = state.call_id
         for k, v in extra.items():
@@ -473,7 +592,7 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
         if body.end_of_stream:
             u = state.usage
             if state.span is not None:
-                telemetry.end_request_span(
+                self.telemetry.end_request_span(
                     state.span,
                     provider=state.provider,
                     model=state.model,
@@ -484,18 +603,84 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
                     streaming=state.is_streaming,
                     operation=state.operation,
                     api_key=state.api_key,
-                    call_id=state.call_id)
+                    call_id=state.call_id,
+                    requested_model=_original_model(state),
+                    routing_strategy=state.routing_strategy,
+                    duration_s=_elapsed(state))
                 state.span = None
             total = u.get("total_tokens")
             if total:
-                quota.record(state.api_key, state.quota_model, int(total))
+                if self.quota.enabled():
+                    try:
+                        self._async.run(self.quota.record(
+                            state.api_key, state.quota_model, int(total),
+                            cfg=state.quota_config))
+                    except Exception:
+                        logging.exception(
+                            "Quota record failed outside its guard")
         return resp
 
     # ---------------------------------------------------------- telemetry
 
-    def _end_span(self, state: "_StreamState", status: int) -> None:
-        """End the request span with an error status and clear it."""
-        telemetry.end_request_span(
+    def _route_extension_response(
+        self,
+        header_map: dict[str, str],
+    ) -> service_pb2.ProcessingResponse:
+        """Header rewrites for the route extension leg.
+
+        The route extension runs before the URL map and sees headers only,
+        so this is the whole of its work: ask routing for rewrites, apply
+        them, and tell the URL map to re-resolve only if something changed.
+        """
+        rewrites = self.router.compute_route(header_map)
+        if rewrites:
+            logging.info(
+                "Route extension rewrite: %s=%r -> %r",
+                routing.ROUTING_HEADER,
+                header_map.get(routing.ROUTING_HEADER),
+                rewrites.get(routing.ROUTING_HEADER),
+            )
+        else:
+            logging.info(
+                "Route extension: no rewrite for %s=%r",
+                routing.ROUTING_HEADER,
+                header_map.get(routing.ROUTING_HEADER),
+            )
+        resp = service_pb2.ProcessingResponse()
+        cr = resp.request_headers.response
+        # Only ask the URL map to re-evaluate when a header actually
+        # changed.
+        cr.clear_route_cache = bool(rewrites)
+        if not rewrites:
+            # No strategy fired, so nothing overwrites the strategy header.
+            cr.header_mutation.remove_headers.append(
+                routing.STRATEGY_HEADER)
+        for k, v in rewrites.items():
+            cr.header_mutation.set_headers.append(
+                HeaderValueOption(
+                    header=HeaderValue(
+                        key=k, raw_value=v.encode("utf-8")),
+                    append_action=(
+                        HeaderValueOption
+                        .OVERWRITE_IF_EXISTS_OR_ADD)))
+        return resp
+
+    def _reject(self, state: "_StreamState", status: int):
+        """End the request span with an error status and reject the request.
+
+        Every early exit has to do both, and doing only the first leaves a
+        span open for the life of the stream, so they are one call.
+
+        `status` goes to Envoy as-is: envoy.type.v3.StatusCode is an int
+        enum whose values are the HTTP status codes themselves, so no
+        mapping table is needed. Assigning a number the enum does not
+        define would raise inside the proto, so an unknown status degrades
+        to 500 rather than failing the response it is trying to send.
+        """
+        if status not in StatusCode.DESCRIPTOR.values_by_number:
+            logging.error("No Envoy StatusCode for %s, sending 500", status)
+            status = 500
+        self.telemetry.end_request_span(
             state.span,
             provider=state.provider,
             model=state.model,
@@ -506,8 +691,12 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
             streaming=state.is_streaming,
             operation=state.operation,
             api_key=state.api_key,
-            call_id=state.call_id)
+            call_id=state.call_id,
+            requested_model=_original_model(state),
+            routing_strategy=state.routing_strategy,
+            duration_s=_elapsed(state))
         state.span = None
+        return callout_tools.header_immediate_response(status)
 
     @staticmethod
     def _is_route_mode(
@@ -559,9 +748,12 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
         messages = req_map.get("messages", [])
         is_streaming = bool(req_map.get("stream"))
         optional_params = {
-            k: v for k, v in req_map.items()
-            if k not in {"model", "messages"}
+            k: v for k, v in req_map.items() if k in _ALLOWED_PARAMS
         }
+        dropped = sorted(
+            set(req_map) - _ALLOWED_PARAMS - {"model", "messages"})
+        if dropped:
+            logging.info("Dropped unsupported body parameters: %s", dropped)
 
         litellm_params: dict = {}
         is_vertex = provider in ("vertex_ai", "vertex_ai_beta")
@@ -609,11 +801,11 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
         # Vertex AI's auth lives on the LLM *handler*, not the config: the
         # config's validate_environment doesn't include the ADC bearer token.
         # Call VertexBase directly to mint the token via ADC and inject it.
-        if (is_vertex and "Authorization" not in headers
-                and "authorization" not in headers):
-            from litellm.llms.vertex_ai.vertex_llm_base import VertexBase
-            vb = VertexBase()
-            token, _ = vb._ensure_access_token(
+        # Header names are case-insensitive and validate_environment() is
+        # not consistent about which spelling it returns, so compare folded
+        # rather than testing each capitalization.
+        if is_vertex and not any(k.lower() == "authorization" for k in headers):
+            token, _ = self._vertex_base._ensure_access_token(
                 credentials=None,
                 project_id=self.gcp_project,
                 custom_llm_provider="vertex_ai",
@@ -624,7 +816,6 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
             # VertexGeminiConfig doesn't override get_complete_url; build the
             # generateContent URL via LiteLLM's internal helper. _get_vertex_url
             # returns (full_url_with_suffix, suffix_only); use only the first.
-            from litellm.llms.vertex_ai.common_utils import _get_vertex_url
             api_base_url, _ = _get_vertex_url(
                 mode="chat",
                 model=model_name,
@@ -844,15 +1035,9 @@ class LiteLLMGatewayCallout(callout_server.CalloutServer):
             return state.stream_iterator
         state.stream_iterator_resolved = True
         if state.provider in ("vertex_ai", "vertex_ai_beta"):
-            from litellm.llms.vertex_ai.gemini import (
-                vertex_and_google_ai_studio_gemini as vertex_gemini,
-            )
-            ModelResponseIterator = (
-                vertex_gemini.ModelResponseIterator)
+            ModelResponseIterator = VertexGeminiResponseIterator
         elif state.provider == "anthropic":
-            from litellm.llms.anthropic.chat.handler import (
-                ModelResponseIterator,
-            )
+            ModelResponseIterator = AnthropicResponseIterator
         else:
             return None
         # The iterator constructor signature drifts across LiteLLM versions;
