@@ -60,164 +60,153 @@ from extproc.example.litellm_gateway import gateway_config
 # rewrite. Carries the LiteLLM model id (e.g. anthropic/claude-...).
 ROUTING_HEADER = "x-model-id"
 
+# Records which strategies rewrote the model, set by the route
+# extension and read by the traffic extension for the request span.
+STRATEGY_HEADER = "x-litellm-routing-strategy"
+
 # Provider prefixes the URL map routes on.
 PROVIDER_PREFIXES: tuple[str, ...] = (
     "vertex_ai/", "anthropic/", "groq/", "openrouter/")
 
-# Routing ships DISABLED: all four strategy tables below are empty, so the
-# route extension leaves every request unchanged and the callout behaves as
-# the plain translation gateway. The feature flag is the `router_settings`
-# section of a GATEWAY_CONFIG file (see config.example.yaml for a working
-# demo table); a strategy is active exactly when its table is non-empty.
+class Router:
+    """The routing strategies and the four tables that drive them.
 
-# Friendly name -> full LiteLLM model id. The client sends the alias in the
-# routing header (x-model-id); the route extension resolves it before the
-# URL map routes (the URL map alone can only prefix-match).
-MODEL_ALIASES: dict[str, str] = {}
+    Routing ships DISABLED: a Router built with no settings has empty
+    tables and leaves every request unchanged, so the callout behaves as
+    the plain translation gateway. The feature flag is the
+    `router_settings` section of a GATEWAY_CONFIG file (config.example.yaml
+    has a working demo table), which the caller parses and hands in here. A
+    strategy is active exactly when its table is non-empty.
 
-# (provider prefix, tag value) -> model id to route to, e.g. a premium tag
-# upgrading a Vertex request from flash to pro.
-TAG_RULES: dict[tuple[str, str], str] = {}
+    All four tables are keyed off the routing header:
 
-# routing-header value -> list of (member_model_id, weight): A/B / weighted
-# split across a model group by a stable hash of x-request-id.
-WEIGHTED_GROUPS: dict[str, list[tuple[str, int]]] = {}
-
-# routing-header value -> list of member model ids; one is chosen at random
-# per request (simple-shuffle).
-SHUFFLE_GROUPS: dict[str, list[str]] = {}
-
-# Active strategy config. Empty (disabled) until configure() installs values
-# from the gateway config file.
-_aliases: dict[str, str] = dict(MODEL_ALIASES)
-_tag_rules: dict[tuple[str, str], str] = dict(TAG_RULES)
-_weighted: dict[str, list[tuple[str, int]]] = dict(WEIGHTED_GROUPS)
-_shuffle: dict[str, list[str]] = dict(SHUFFLE_GROUPS)
-
-
-def configure(settings: Optional["gateway_config.RoutingSettings"]) -> None:
-    """Install strategy config from the gateway config file.
-
-    This is the routing feature flag: None (no file or no router_settings
-    section) leaves routing disabled. A provided settings object replaces
-    all four tables, so the config file fully defines the routing behavior.
+      model_group_alias  friendly name -> full LiteLLM model id, resolved
+                         before the URL map routes (the URL map alone can
+                         only prefix-match)
+      tag_rules          (provider prefix, tag value) -> model id, e.g. a
+                         premium tag upgrading Vertex flash to pro
+      weighted_groups    header value -> [(member, weight)], an A/B split
+                         across a model group
+      shuffle_groups     header value -> [members], one picked at random
+                         per request (simple-shuffle)
     """
-    global _aliases, _tag_rules, _weighted, _shuffle
-    if settings is None:
-        return
-    _aliases = dict(settings.model_group_alias)
-    _tag_rules = dict(settings.tag_rules)
-    _weighted = dict(settings.weighted_groups)
-    _shuffle = dict(settings.shuffle_groups)
 
+    def __init__(
+        self,
+        settings: Optional["gateway_config.RoutingSettings"] = None,
+    ) -> None:
+        self._aliases: dict[str, str] = (
+            dict(settings.model_group_alias) if settings else {})
+        self._tag_rules: dict[tuple[str, str], str] = (
+            dict(settings.tag_rules) if settings else {})
+        self._weighted: dict[str, list[tuple[str, int]]] = (
+            dict(settings.weighted_groups) if settings else {})
+        self._shuffle: dict[str, list[str]] = (
+            dict(settings.shuffle_groups) if settings else {})
 
-def enabled() -> bool:
-    """True when any routing strategy is active (feature flag is on).
+    def enabled(self) -> bool:
+        """True when any routing strategy is active (feature flag is on).
 
-    The traffic extension consults this before letting the x-model-id
-    header override the request body's model, so a deployment without
-    router_settings keeps the original body-driven behavior exactly.
-    """
-    return bool(_aliases or _tag_rules or _weighted or _shuffle)
+        The traffic extension consults this before letting the x-model-id
+        header override the request body's model, so a deployment without
+        router_settings keeps the original body-driven behavior exactly.
+        """
+        return bool(
+            self._aliases or self._tag_rules or self._weighted
+            or self._shuffle)
 
+    # The strategies below run in the order listed in compute_route(). Each
+    # sees the routing header as left by the previous one, so aliases
+    # resolve before tag upgrades, and so on. A strategy with an empty table
+    # returns no rewrite, which is how a disabled strategy stays inert.
 
-def _reset() -> None:
-    """Test hook: restore the disabled (empty-table) state."""
-    global _aliases, _tag_rules, _weighted, _shuffle
-    _aliases = dict(MODEL_ALIASES)
-    _tag_rules = dict(TAG_RULES)
-    _weighted = dict(WEIGHTED_GROUPS)
-    _shuffle = dict(SHUFFLE_GROUPS)
-
-
-def model_alias_route(headers: dict[str, str]) -> dict[str, str]:
-    """Resolve a friendly alias in the routing header to a full model id."""
-    model_id = headers.get(ROUTING_HEADER, "")
-    target = _aliases.get(model_id)
-    if target and target != model_id:
-        return {ROUTING_HEADER: target}
-    return {}
-
-
-def tag_based_route(headers: dict[str, str]) -> dict[str, str]:
-    """Route by a tag header (x-tier) within the request's provider."""
-    model_id = headers.get(ROUTING_HEADER, "")
-    tag = headers.get("x-tier", "").lower()
-    if not tag:
+    def model_alias_route(self, headers: dict[str, str]) -> dict[str, str]:
+        """Resolve a friendly alias in the routing header to a full model id."""
+        model_id = headers.get(ROUTING_HEADER, "")
+        target = self._aliases.get(model_id)
+        if target and target != model_id:
+            return {ROUTING_HEADER: target}
         return {}
-    for prefix in PROVIDER_PREFIXES:
-        if model_id.startswith(prefix):
-            target = _tag_rules.get((prefix, tag))
-            if target and target != model_id:
-                return {ROUTING_HEADER: target}
-            break
-    return {}
 
-
-def weighted_split_route(
-    headers: dict[str, str],
-    hash_header: str = "x-request-id",
-) -> dict[str, str]:
-    """A/B / weighted split across a model group, by a stable header hash.
-
-    Deterministic (hashes a stable header, falling back to the model id), so it
-    needs no per-request randomness and is reproducible for a given client.
-    When a request has no hash_header (the default is x-request-id, which
-    most clients don't set on their own), every such request hashes to the
-    same value and therefore lands on the same member: the split only varies
-    across requests when clients actually send a distinct id.
-    """
-    model_id = headers.get(ROUTING_HEADER, "")
-    members = _weighted.get(model_id)
-    if not members:
+    def tag_based_route(self, headers: dict[str, str]) -> dict[str, str]:
+        """Route by a tag header (x-tier) within the request's provider."""
+        model_id = headers.get(ROUTING_HEADER, "")
+        tag = headers.get("x-tier", "").lower()
+        if not tag:
+            return {}
+        for prefix in PROVIDER_PREFIXES:
+            if model_id.startswith(prefix):
+                target = self._tag_rules.get((prefix, tag))
+                if target and target != model_id:
+                    return {ROUTING_HEADER: target}
+                break
         return {}
-    total = sum(weight for _, weight in members)
-    if total <= 0:
+
+    def weighted_split_route(
+        self,
+        headers: dict[str, str],
+        hash_header: str = "x-request-id",
+    ) -> dict[str, str]:
+        """A/B / weighted split across a model group, by a stable header hash.
+
+        When the request carries hash_header (default x-request-id), the
+        member is chosen by hashing it, so the same id always lands on the
+        same member and a client retrying a request keeps its assignment.
+        """
+        model_id = headers.get(ROUTING_HEADER, "")
+        members = self._weighted.get(model_id)
+        if not members:
+            return {}
+        total = sum(weight for _, weight in members)
+        if total <= 0:
+            return {}
+        key = headers.get(hash_header)
+        bucket = (
+            int(hashlib.sha256(key.encode("utf-8")).hexdigest(), 16) % total
+            if key else random.randrange(total))
+        cumulative = 0
+        for member, weight in members:
+            cumulative += weight
+            if bucket < cumulative:
+                return {ROUTING_HEADER: member} if member != model_id else {}
         return {}
-    key = headers.get(hash_header) or model_id
-    bucket = int(hashlib.sha256(key.encode("utf-8")).hexdigest(), 16) % total
-    cumulative = 0
-    for member, weight in members:
-        cumulative += weight
-        if bucket < cumulative:
-            return {ROUTING_HEADER: member} if member != model_id else {}
-    return {}
 
+    def simple_shuffle_route(self, headers: dict[str, str]) -> dict[str, str]:
+        """Pick a random member of a model group (simple-shuffle balancing)."""
+        model_id = headers.get(ROUTING_HEADER, "")
+        members = self._shuffle.get(model_id)
+        if not members:
+            return {}
+        choice = random.choice(members)
+        return {ROUTING_HEADER: choice} if choice != model_id else {}
 
-def simple_shuffle_route(headers: dict[str, str]) -> dict[str, str]:
-    """Pick a random member of a model group (simple-shuffle load balancing)."""
-    model_id = headers.get(ROUTING_HEADER, "")
-    members = _shuffle.get(model_id)
-    if not members:
+    def compute_route(self, headers: dict[str, str]) -> dict[str, str]:
+        """Compose the enabled strategies into the net header rewrite.
+
+        Returns the header changes the route extension should apply; an
+        empty dict means leave routing unchanged.
+        """
+        original = headers.get(ROUTING_HEADER, "")
+        current = dict(headers)
+        fired: list[str] = []
+        for strategy in (
+            self.model_alias_route,
+            self.tag_based_route,
+            self.weighted_split_route,
+            self.simple_shuffle_route,
+        ):
+            rewrite = strategy(current)
+            if rewrite:
+                current.update(rewrite)
+                fired.append(strategy.__name__)
+        final = current.get(ROUTING_HEADER, "")
+        if final and final != original:
+            # The strategy names ride along as a header because the route
+            # extension and the traffic extension are separate calls: the
+            # leg that picks the model is not the leg that opens the span,
+            # so without this the rewrite is invisible in telemetry.
+            return {
+                ROUTING_HEADER: final,
+                STRATEGY_HEADER: ",".join(fired),
+            }
         return {}
-    choice = random.choice(members)
-    return {ROUTING_HEADER: choice} if choice != model_id else {}
-
-
-# Enabled strategies, in order. Each sees the routing header as left by the
-# previous one, so aliases resolve before tag upgrades, etc. To enable or
-# disable a strategy, add or remove it here (or leave its config map empty).
-_STRATEGIES = (
-    model_alias_route,
-    tag_based_route,
-    weighted_split_route,
-    simple_shuffle_route,
-)
-
-
-def compute_route(headers: dict[str, str]) -> dict[str, str]:
-    """Compose the enabled strategies into the net routing-header rewrite.
-
-    Returns the header changes the route extension should apply; an empty dict
-    means leave routing unchanged.
-    """
-    original = headers.get(ROUTING_HEADER, "")
-    current = dict(headers)
-    for strategy in _STRATEGIES:
-        rewrite = strategy(current)
-        if rewrite:
-            current.update(rewrite)
-    final = current.get(ROUTING_HEADER, "")
-    if final and final != original:
-        return {ROUTING_HEADER: final}
-    return {}
