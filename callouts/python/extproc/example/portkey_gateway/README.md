@@ -41,20 +41,23 @@ not supported in this sample and is rejected with HTTP 501.
   BE-V: {region}-aiplatform.googleapis.com    BE-A: api.anthropic.com
   BE-G: api.groq.com                          BE-O: openrouter.ai
 
-  ─── Portkey sidecar loopback (request phase) ───────────────────────────────
+  ─── Portkey sidecar loopback (one call, parked across both phases) ─────────
   Callout ──OpenAI body──► Portkey :8787 (custom_host=http://127.0.0.1:9999)
                                 │  Portkey translates and POSTs provider bytes
                                 ▼
-                          Capture server :9999  ──► Callout reads captured bytes
-                                                     (returned to LB as mutations)
-
-  ─── Portkey sidecar loopback (response phase) ──────────────────────────────
-  LB delivers provider response ──► Callout arms :9998 with provider bytes
-  Callout ──original OpenAI body──► Portkey :8787 (custom_host=http://127.0.0.1:9998)
-                                          │  Portkey reads replayed provider bytes
-                                          ▼
-                                    Portkey returns OpenAI-shaped response
-                                    Callout returns that to the LB (body mutation)
+                          Capture server :9999
+                                │  records the request, then PARKS the
+                                │  connection without answering
+                                ├──► Callout reads captured bytes
+                                │    (returned to LB as mutations)
+                                │
+                                │  ... LB calls the provider ...
+                                │
+                                ◄──  Callout hands the provider response to
+                                │    the capture server, which writes it on
+                                ▼    the parked connection
+                          Portkey translates it and the original call returns
+                          the OpenAI-shaped response to the callout
 ```
 
 ## How It Works
@@ -76,19 +79,21 @@ not supported in this sample and is rejected with HTTP 501.
    var (mounted from Secret Manager) for the others.
 5. **Callout** arms the capture server on `:9999`, then sends the OpenAI body to
    the Portkey sidecar at `localhost:8787` with
-   `x-portkey-custom-host: http://127.0.0.1:9999` and the provider API key.
+   `x-portkey-custom-host: http://127.0.0.1:9999` and the provider API key. It
+   does not wait for that call to finish.
 6. **Portkey sidecar** translates the OpenAI request to the provider's native
    format and POSTs the translated bytes to `:9999`, where the callout's capture
-   server records the path, headers, and body.
+   server records the path, headers, and body and then holds the connection
+   open without answering.
 7. **Callout** reads the captured bytes and returns them as ext_proc mutations
    (body + header rewrites for `:path`, `:authority`, `content-length`, auth,
    etc.). The LB forwards the provider-native request to the provider Internet
    NEG already selected by the URL map.
 8. **Response phase**: the LB delivers the provider's native response to the
-   callout. The callout arms `:9998` with those bytes, then calls the Portkey
-   sidecar again with `x-portkey-custom-host: http://127.0.0.1:9998`. Portkey
-   GETs the replayed bytes from `:9998` and translates them back to the OpenAI
-   response shape.
+   callout, which hands it to the capture server. The capture server writes it
+   as the response on the parked connection, so Portkey sees one ordinary
+   request/response exchange and translates it back to the OpenAI shape. The
+   call started in step 5 resolves with that translation.
 9. **Client** receives a standard OpenAI-format response, same shape regardless
    of which provider served it.
 
@@ -148,12 +153,10 @@ omit. The callout fills in a default of 4096 when the field is absent.
    `extproc/example/portkey_gateway/service_callout_example.py`: supply the
    Portkey provider id, the Internet NEG FQDN, and the API-key env var name (or
    `None` for ADC).
-2. Add a matching entry to `_STUBS` in `capture_server.py` that reflects the
-   provider's response shape (used by the unit test suite).
-3. If the provider needs an API key, add a `*_api_key` variable in
+2. If the provider needs an API key, add a `*_api_key` variable in
    `deploy/terraform/variables.tf` and wire it into the `env` block of the
    callout Cloud Run service in `deploy/terraform/main.tf`.
-4. Add the provider FQDN to the Internet NEG and URL-map `header_matches` list
+3. Add the provider FQDN to the Internet NEG and URL-map `header_matches` list
    in `deploy/terraform/main.tf`.
 
 ## Deploy to Google Cloud
@@ -339,8 +342,8 @@ python -m pytest extproc/tests/portkey_gateway_test.py -v
 
 The suite is pure unit tests: no gRPC server, no live Portkey sidecar, no
 GCP credentials required. It covers provider detection, Vertex ADC token
-minting (patched), capture-server arm/take/disarm mechanics, the request-side
-and response-side loopback paths, streaming rejection (HTTP 501), and full
+minting (patched), capture-server parking and release, the full loopback
+cycle across both ext_proc phases, streaming rejection (HTTP 501), and
 end-to-end ext_proc phase sequences for all four providers.
 
 ## File structure
@@ -348,7 +351,7 @@ end-to-end ext_proc phase sequences for all four providers.
 ```
 portkey_gateway/
 ├── service_callout_example.py      # ext_proc callout + provider registry + Vertex ADC auth
-├── capture_server.py               # Loopback capture servers (:9999 and :9998) + stub responses
+├── capture_server.py               # Loopback capture server (:9999) with connection parking
 ├── portkey_client.py               # Async HTTP client wrapping the Portkey sidecar
 ├── additional-requirements.txt     # httpx, aiohttp, google-auth, requests
 ├── cloudbuild.yaml                 # Cloud Build config for the callout image
@@ -375,8 +378,7 @@ portkey_gateway/
 | `GCP_PROJECT_ID` | (none) | Required for Vertex AI; used to build the Vertex URL and passed to the Portkey sidecar as `x-portkey-vertex-project-id`. |
 | `GCP_REGION` | `us-central1` | Vertex AI region; also determines the Internet NEG FQDN (`{region}-aiplatform.googleapis.com`). |
 | `PORTKEY_BASE_URL` | `http://127.0.0.1:8787` | URL of the Portkey sidecar. Change only if you run Portkey on a different port or host. |
-| `CAPTURE_REQUEST_PORT` | `9999` | Port the callout's request capture server listens on. |
-| `CAPTURE_RESPONSE_PORT` | `9998` | Port the callout's response capture server listens on. |
+| `CAPTURE_PORT` | `9999` | Port the callout's capture server listens on. Portkey is pointed at it via `x-portkey-custom-host`. |
 | `ANTHROPIC_API_KEY` | (none) | API key for Anthropic requests. Mounted from Secret Manager. |
 | `GROQ_API_KEY` | (none) | API key for Groq requests. Mounted from Secret Manager. |
 | `OPENROUTER_API_KEY` | (none) | API key for OpenRouter requests. Mounted from Secret Manager. |
