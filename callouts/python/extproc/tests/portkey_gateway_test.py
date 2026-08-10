@@ -20,9 +20,11 @@ proto objects or simple inputs; HTTP interactions with the Portkey sidecar
 are mocked via ``respx``.
 """
 
+import asyncio
 import gzip
 import json
 import os
+import time
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -39,8 +41,7 @@ from envoy.type.v3.http_status_pb2 import StatusCode
 
 from extproc.example.portkey_gateway import service_callout_example as sce
 from extproc.example.portkey_gateway.capture_server import (
-    REQUEST_CAPTURE_PROVIDERS,
-    build_stub_response,
+    CORRELATION_HEADER,
     CaptureServer,
 )
 from extproc.example.portkey_gateway.portkey_client import PortkeyClient
@@ -113,114 +114,103 @@ def test_mint_adc_token_refreshes_when_invalid():
         assert fake_creds.refresh.called
 
 
-def test_build_stub_response_anthropic_minimum_fields():
-    body = build_stub_response("anthropic")
-    parsed = json.loads(body)
-    # Anthropic response shape: id/type/role/content/model/usage.
-    assert parsed["type"] == "message"
-    assert parsed["role"] == "assistant"
-    assert isinstance(parsed["content"], list)
-    assert parsed["content"] and parsed["content"][0]["type"] == "text"
-    assert "usage" in parsed
-
-
-def test_build_stub_response_vertex_minimum_fields():
-    body = build_stub_response("vertex_ai")
-    parsed = json.loads(body)
-    # Vertex generateContent shape.
-    assert "candidates" in parsed and parsed["candidates"]
-    assert parsed["candidates"][0]["content"]["role"] == "model"
-
-
-def test_build_stub_response_groq_returns_openai_chat_shape():
-    body = build_stub_response("groq")
-    parsed = json.loads(body)
-    assert parsed["object"] == "chat.completion"
-    assert parsed["choices"][0]["message"]["role"] == "assistant"
-
-
-def test_build_stub_response_openrouter_returns_openai_chat_shape():
-    body = build_stub_response("openrouter")
-    parsed = json.loads(body)
-    assert parsed["object"] == "chat.completion"
-    assert parsed["choices"][0]["message"]["role"] == "assistant"
-
-
-def test_request_capture_providers_match_callout_registry():
-    # Every provider the callout can route must have a stub response shape,
-    # or the request-capture loopback breaks when that provider is used.
-    assert set(REQUEST_CAPTURE_PROVIDERS) == set(PROVIDERS)
-
-
-def test_disarm_clears_pending_correlation_state():
-    server = CaptureServer(request_port=0, response_port=0)
-    server.arm_request("corr-1", provider="anthropic")
-    server.arm_response("corr-1", b"provider bytes")
-    server.disarm("corr-1")
-    assert server._armed_request == {}
-    assert server._armed_response == {}
-    # Disarming an unknown correlation is a no-op, not an error.
-    server.disarm("corr-never-armed")
-
-
 @pytest.mark.asyncio
-async def test_request_capture_stores_body_and_returns_stub():
-    server = CaptureServer(request_port=0, response_port=0)
+async def test_capture_parks_connection_until_response_is_provided():
+    """The core of the loopback: Portkey's request is captured immediately,
+    but its connection stays open until the provider's real response is
+    supplied, so Portkey sees one request/response exchange."""
+    server = CaptureServer(port=0)
     await server.start()
+    provider_response = (
+        b'{"id":"msg_real","content":[{"type":"text","text":"hello"}]}')
     try:
-        # Pre-arm: tell the server which provider this correlation id targets.
-        server.arm_request("corr-1", provider="anthropic")
+        await server.arm("corr-1")
 
-        url = f"http://127.0.0.1:{server.request_port}/v1/messages"
         async with ClientSession() as s:
-            r = await s.post(
-                url,
+            post = asyncio.create_task(s.post(
+                f"http://127.0.0.1:{server.port}/v1/messages",
                 data=b'{"model":"claude-3","messages":[]}',
                 headers={
                     "x-api-key": "sk-ant-xxx",
                     "anthropic-version": "2023-06-01",
-                    "x-portkey-callout-correlation": "corr-1",
+                    CORRELATION_HEADER: "corr-1",
                 },
-            )
-            stub_body = await r.read()
+            ))
 
-        captured = server.take_captured_request("corr-1")
-        assert captured.body == b'{"model":"claude-3","messages":[]}'
-        assert captured.path == "/v1/messages"
-        assert captured.headers["x-api-key"] == "sk-ant-xxx"
-        # Stub response is Anthropic-shaped.
-        assert b'"type": "message"' in stub_body
+            # The translated request is readable as soon as it is captured.
+            captured = await server.wait_for_capture("corr-1", timeout=5)
+            assert captured.body == b'{"model":"claude-3","messages":[]}'
+            assert captured.path == "/v1/messages"
+            assert captured.headers["x-api-key"] == "sk-ant-xxx"
+
+            # The connection is parked: no response has been written yet.
+            assert not post.done()
+
+            # Unparking returns the provider's real bytes (no stub involved).
+            await server.provide_response("corr-1", provider_response)
+            r = await asyncio.wait_for(post, timeout=5)
+            assert r.status == 200
+            assert await r.read() == provider_response
+
+        assert server._pending == {}
     finally:
         await server.stop()
 
 
 @pytest.mark.asyncio
-async def test_response_replay_returns_armed_bytes():
-    server = CaptureServer(request_port=0, response_port=0)
+async def test_disarm_releases_parked_connection():
+    """Abandoning a stream must not leave the connection parked until the
+    park timeout expires."""
+    server = CaptureServer(port=0)
     await server.start()
-    armed = b'{"id":"msg_real","content":[{"type":"text","text":"hello"}]}'
     try:
-        server.arm_response("corr-2", armed)
+        await server.arm("corr-2")
+        async with ClientSession() as s:
+            post = asyncio.create_task(s.post(
+                f"http://127.0.0.1:{server.port}/v1/messages",
+                data=b"{}",
+                headers={CORRELATION_HEADER: "corr-2"},
+            ))
+            await server.wait_for_capture("corr-2", timeout=5)
+            await server.disarm("corr-2")
+            r = await asyncio.wait_for(post, timeout=5)
+            assert r.status == 502
+
+        assert server._pending == {}
+        # Disarming an unknown correlation is a no-op, not an error.
+        await server.disarm("corr-never-armed")
+    finally:
+        await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_park_timeout_returns_504_and_cleans_up():
+    """A stream abandoned after the request phase (no provider response
+    ever supplied) must not hold the parked connection forever."""
+    server = CaptureServer(port=0, park_timeout=0.3)
+    await server.start()
+    try:
+        await server.arm("corr-to")
         async with ClientSession() as s:
             r = await s.post(
-                f"http://127.0.0.1:{server.response_port}/v1/messages",
-                data=b'{"model":"claude-3","messages":[]}',
-                headers={"x-portkey-callout-correlation": "corr-2"},
+                f"http://127.0.0.1:{server.port}/v1/messages",
+                data=b"{}",
+                headers={CORRELATION_HEADER: "corr-to"},
             )
-            body = await r.read()
-        assert body == armed
+            assert r.status == 504
+        assert "corr-to" not in server._pending
     finally:
         await server.stop()
 
 
 @pytest.mark.asyncio
 async def test_capture_rejects_missing_correlation_header():
-    server = CaptureServer(request_port=0, response_port=0)
+    server = CaptureServer(port=0)
     await server.start()
     try:
         async with ClientSession() as s:
             r = await s.post(
-                f"http://127.0.0.1:{server.request_port}/anything",
+                f"http://127.0.0.1:{server.port}/anything",
                 data=b"",
             )
             assert r.status == 400
@@ -304,10 +294,9 @@ def svc():
         "OPENROUTER_API_KEY": "or-test",
         # Point at a port nothing is listening on; respx mocks the actual call.
         "PORTKEY_BASE_URL": "http://127.0.0.1:1",
-        # Use OS-picked ephemeral ports so test runs never collide with each
-        # other or with a real capture server.
-        "CAPTURE_REQUEST_PORT": "0",
-        "CAPTURE_RESPONSE_PORT": "0",
+        # Use an OS-picked ephemeral port so test runs never collide with
+        # each other or with a real capture server.
+        "CAPTURE_PORT": "0",
     }):
         callout = PortkeyGatewayCallout(
             disable_tls=True,
@@ -319,6 +308,24 @@ def svc():
         finally:
             if callout._callout_server is not None:
                 callout._callout_server.stop()
+
+
+def _release(svc, ctx) -> None:
+    """Release the Portkey call a request-phase test leaves parked.
+
+    In the real flow the response phase unparks the connection. Tests that
+    stop after the request phase must do it explicitly, or the capture
+    server holds the connection until its park timeout.
+    """
+    state = _state(ctx)
+    if state.portkey_call is None:
+        return
+    svc._run_async(svc._capture.disarm(state.correlation))
+    try:
+        state.portkey_call.result(timeout=5)
+    except Exception:
+        pass
+    state.portkey_call = None
 
 
 def _http_headers(d: dict) -> service_pb2.HttpHeaders:
@@ -397,7 +404,7 @@ async def test_on_request_body_anthropic_drives_capture_and_rewrites(svc):
             # The callout's `api_path_prefix` reattaches `/v1` before the LB
             # forwards to api.anthropic.com.
             await c.post(
-                f"http://127.0.0.1:{svc._capture.request_port}/messages",
+                f"http://127.0.0.1:{svc._capture.port}/messages",
                 content=(b'{"model":"claude-3-5-sonnet","max_tokens":32,'
                          b'"messages":[{"role":"user","content":"hi"}]}'),
                 headers={
@@ -420,7 +427,7 @@ async def test_on_request_body_anthropic_drives_capture_and_rewrites(svc):
         mock_router.post("http://127.0.0.1:1/v1/chat/completions").mock(
             side_effect=fake_portkey)
         mock_router.route(
-            host="127.0.0.1", port=svc._capture.request_port).pass_through()
+            host="127.0.0.1", port=svc._capture.port).pass_through()
 
         ctx = _Ctx()
         svc.on_request_headers(
@@ -431,6 +438,7 @@ async def test_on_request_body_anthropic_drives_capture_and_rewrites(svc):
             "messages": [{"role": "user", "content": "hi"}],
         }).encode())
         resp = svc.on_request_body(body, ctx)
+        _release(svc, ctx)
 
     assert isinstance(resp, service_pb2.BodyResponse)
     new_body = resp.response.body_mutation.body
@@ -477,8 +485,7 @@ def test_on_request_body_portkey_failure_disarms_capture(svc, monkeypatch):
     assert resp.status.code == StatusCode.BadGateway
     # The failed correlation must not linger in the capture server.
     corr = _state(ctx).correlation
-    assert corr not in svc._capture._armed_request
-    assert corr not in svc._capture._captured
+    assert corr not in svc._capture._pending
 
 
 def test_on_request_body_anthropic_defaults_max_tokens(svc, monkeypatch):
@@ -517,6 +524,31 @@ def test_on_request_body_anthropic_defaults_max_tokens(svc, monkeypatch):
     assert captured["openai_body"]["max_tokens"] == 32
 
 
+def test_on_request_body_fast_fails_when_portkey_never_posts(
+        svc, monkeypatch):
+    """If Portkey answers with its own error response instead of POSTing to
+    the capture server, the callout must fail promptly rather than sitting
+    out the full capture timeout."""
+    async def error_without_post(**kwargs):
+        return httpx.Response(424, text="unsupported provider config")
+
+    monkeypatch.setattr(svc._client, "translate", error_without_post)
+    ctx = _Ctx()
+    svc.on_request_headers(
+        _http_headers({":path": "/v1/chat/completions"}), ctx)
+    body = service_pb2.HttpBody(body=json.dumps({
+        "model": "anthropic/claude-haiku-4-5",
+        "messages": [{"role": "user", "content": "hi"}],
+    }).encode())
+    start = time.monotonic()
+    resp = svc.on_request_body(body, ctx)
+    elapsed = time.monotonic() - start
+    assert resp.status.code == StatusCode.BadGateway
+    # The fast path, not the 30s capture timeout.
+    assert elapsed < 10
+    assert _state(ctx).correlation not in svc._capture._pending
+
+
 def test_on_request_body_invalid_json_returns_400(svc):
     ctx = _Ctx()
     svc.on_request_headers(
@@ -548,9 +580,10 @@ def test_on_request_body_unknown_provider_returns_400(svc):
 
 
 @pytest.mark.asyncio
-async def test_on_response_body_translates_anthropic_to_openai(svc):
-    """Response phase: callout has captured request state, gets Anthropic-format
-    response from LB, replays through Portkey, returns OpenAI body."""
+async def test_full_cycle_translates_anthropic_response_to_openai(svc):
+    """One Portkey call spans both phases: the callout reads the translated
+    request off the parked connection, later writes the provider's response
+    onto that same connection, and the call resolves with OpenAI format."""
     with respx.mock(
         base_url="http://127.0.0.1:1",
         assert_all_mocked=False,
@@ -558,24 +591,29 @@ async def test_on_response_body_translates_anthropic_to_openai(svc):
     ) as mock_router:
         # Let the inner httpx.AsyncClient hit the real localhost capture server.
         mock_router.route(
-            host="127.0.0.1", port=svc._capture.response_port
+            host="127.0.0.1", port=svc._capture.port
         ).pass_through()
 
-        replay_port = svc._capture.response_port
+        capture_port = svc._capture.port
 
         async def fake_portkey(request: httpx.Request) -> httpx.Response:
-            corr = request.headers["x-portkey-callout-correlation"]
-            # Simulate Portkey: POST to :9998 and let it stream the captured
-            # provider response back; here we just verify the replay happens.
-            async with httpx.AsyncClient() as c:
+            corr = request.headers[CORRELATION_HEADER]
+            # Portkey POSTs the translated request, then blocks on the parked
+            # connection until the callout supplies the provider's response.
+            async with httpx.AsyncClient(
+                    transport=httpx.AsyncHTTPTransport()) as c:
                 r = await c.post(
-                    f"http://127.0.0.1:{replay_port}/v1/messages",
-                    content=b"",
-                    headers={"x-portkey-callout-correlation": corr},
+                    f"http://127.0.0.1:{capture_port}/messages",
+                    content=(b'{"model":"claude-3-5-sonnet","max_tokens":32,'
+                             b'"messages":[{"role":"user","content":"hi"}]}'),
+                    headers={
+                        "x-api-key": "sk-ant-test",
+                        CORRELATION_HEADER: corr,
+                    },
+                    timeout=30,
                 )
                 provider_body = await r.aread()
-            # In reality Portkey parses provider_body and emits OpenAI; we
-            # synthesize one for the test.
+            # Portkey now translates the provider response it just received.
             assert b'"msg_real"' in provider_body
             return httpx.Response(200, json={
                 "id": "chatcmpl-fake",
@@ -589,13 +627,16 @@ async def test_on_response_body_translates_anthropic_to_openai(svc):
 
         mock_router.post("/v1/chat/completions").mock(side_effect=fake_portkey)
 
-        # Arrange callout state as if the request phase had run successfully.
         ctx = _Ctx()
-        state = _state(ctx)
-        state.is_llm = True
-        state.provider = "anthropic"
-        state.correlation = "corr-rsp-1"
-        state.request_body = {"model": "claude-3-5-sonnet", "messages": []}
+        svc.on_request_headers(
+            _http_headers({":path": "/v1/chat/completions"}), ctx)
+        req = json.dumps({
+            "model": "anthropic/claude-3-5-sonnet",
+            "max_tokens": 32,
+            "messages": [{"role": "user", "content": "hi"}],
+        }).encode()
+        req_resp = svc.on_request_body(service_pb2.HttpBody(body=req), ctx)
+        assert isinstance(req_resp, service_pb2.BodyResponse)
 
         anthropic_response = (
             b'{"id":"msg_real","type":"message",'
@@ -609,6 +650,8 @@ async def test_on_response_body_translates_anthropic_to_openai(svc):
         new_body = json.loads(resp.response.body_mutation.body)
         assert new_body["object"] == "chat.completion"
         assert new_body["choices"][0]["message"]["content"] == "hi back"
+        # The parked connection is resolved and its state cleaned up.
+        assert _state(ctx).correlation not in svc._capture._pending
 
 
 @pytest.mark.asyncio
@@ -622,23 +665,26 @@ async def test_on_response_body_reassembles_chunked_gzip_response(svc):
         assert_all_called=False,
     ) as mock_router:
         mock_router.route(
-            host="127.0.0.1", port=svc._capture.response_port
+            host="127.0.0.1", port=svc._capture.port
         ).pass_through()
 
-        replay_port = svc._capture.response_port
+        capture_port = svc._capture.port
 
         async def fake_portkey(request: httpx.Request) -> httpx.Response:
-            corr = request.headers["x-portkey-callout-correlation"]
-            async with httpx.AsyncClient() as c:
+            corr = request.headers[CORRELATION_HEADER]
+            async with httpx.AsyncClient(
+                    transport=httpx.AsyncHTTPTransport()) as c:
                 r = await c.post(
-                    f"http://127.0.0.1:{replay_port}/v1/chat/completions",
-                    content=b"",
-                    headers={"x-portkey-callout-correlation": corr},
+                    f"http://127.0.0.1:{capture_port}/v1/chat/completions",
+                    content=(b'{"model":"openai/gpt-oss-20b:free",'
+                             b'"messages":[{"role":"user","content":"hi"}]}'),
+                    headers={CORRELATION_HEADER: corr},
+                    timeout=30,
                 )
                 provider_body = await r.aread()
-            # The replayed body must be the gunzipped, reassembled JSON.
-            replayed = json.loads(provider_body)
-            assert replayed["id"] == "gen-or-1"
+            # The unparked body must be the gunzipped, reassembled JSON.
+            unparked = json.loads(provider_body)
+            assert unparked["id"] == "gen-or-1"
             return httpx.Response(200, json={
                 "id": "chatcmpl-or",
                 "object": "chat.completion",
@@ -652,12 +698,15 @@ async def test_on_response_body_reassembles_chunked_gzip_response(svc):
         mock_router.post("/v1/chat/completions").mock(side_effect=fake_portkey)
 
         ctx = _Ctx()
-        state = _state(ctx)
-        state.is_llm = True
-        state.provider = "openrouter"
-        state.correlation = "corr-or-1"
-        state.request_body = {"model": "openai/gpt-oss-20b:free",
-                              "messages": []}
+        svc.on_request_headers(
+            _http_headers({":path": "/v1/chat/completions"}), ctx)
+        req = json.dumps({
+            "model": "openrouter/openai/gpt-oss-20b:free",
+            "messages": [{"role": "user", "content": "hi"}],
+        }).encode()
+        assert isinstance(
+            svc.on_request_body(service_pb2.HttpBody(body=req), ctx),
+            service_pb2.BodyResponse)
 
         compressed = gzip.compress(
             b'{"id":"gen-or-1","object":"chat.completion","choices":[]}')
@@ -728,10 +777,10 @@ async def test_on_request_body_vertex_uses_adc_token_and_region(svc):
         assert_all_called=False,
     ) as mock_router:
         mock_router.route(
-            host="127.0.0.1", port=svc._capture.request_port
+            host="127.0.0.1", port=svc._capture.port
         ).pass_through()
 
-        capture_port = svc._capture.request_port
+        capture_port = svc._capture.port
         # Vertex AI is the no-prefix provider: Portkey emits the full
         # generateContent path, so the callout forwards it verbatim.
         vertex_path = (
@@ -775,6 +824,7 @@ async def test_on_request_body_vertex_uses_adc_token_and_region(svc):
                 "messages": [{"role": "user", "content": "hi"}],
             }).encode()
             resp = svc.on_request_body(service_pb2.HttpBody(body=req), ctx)
+            _release(svc, ctx)
 
         assert isinstance(resp, service_pb2.BodyResponse)
         set_headers = {
@@ -799,10 +849,10 @@ async def test_on_request_body_groq_uses_api_key_env(svc):
         assert_all_called=False,
     ) as mock_router:
         mock_router.route(
-            host="127.0.0.1", port=svc._capture.request_port
+            host="127.0.0.1", port=svc._capture.port
         ).pass_through()
 
-        capture_port = svc._capture.request_port
+        capture_port = svc._capture.port
 
         async def fake_portkey(request: httpx.Request) -> httpx.Response:
             corr = request.headers["x-portkey-callout-correlation"]
@@ -832,6 +882,7 @@ async def test_on_request_body_groq_uses_api_key_env(svc):
             "messages": [{"role": "user", "content": "hi"}],
         }).encode()
         resp = svc.on_request_body(service_pb2.HttpBody(body=req), ctx)
+        _release(svc, ctx)
 
         assert isinstance(resp, service_pb2.BodyResponse)
         set_headers = {
@@ -852,10 +903,10 @@ async def test_on_request_body_openrouter_preserves_inner_slash_in_model(svc):
         assert_all_called=False,
     ) as mock_router:
         mock_router.route(
-            host="127.0.0.1", port=svc._capture.request_port
+            host="127.0.0.1", port=svc._capture.port
         ).pass_through()
 
-        capture_port = svc._capture.request_port
+        capture_port = svc._capture.port
 
         async def fake_portkey(request: httpx.Request) -> httpx.Response:
             corr = request.headers["x-portkey-callout-correlation"]
@@ -889,6 +940,7 @@ async def test_on_request_body_openrouter_preserves_inner_slash_in_model(svc):
             "messages": [{"role": "user", "content": "hi"}],
         }).encode()
         resp = svc.on_request_body(service_pb2.HttpBody(body=req), ctx)
+        _release(svc, ctx)
 
         assert isinstance(resp, service_pb2.BodyResponse)
         set_headers = {

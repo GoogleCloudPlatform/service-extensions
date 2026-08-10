@@ -14,120 +14,50 @@
 
 """Localhost HTTP server for the Portkey ``custom_host`` loopback.
 
-Two endpoints, both running in-process on the callout container:
+Portkey is configured to treat this server as the provider endpoint. A single
+port serves both ext_proc phases by *parking* the connection:
 
-* **request port (``:9999``)**: Portkey POSTs the translated provider-native
-  request here. We record body + headers + path against a correlation id, then
-  return a stub response (so Portkey does not error parsing it).
+1. Portkey POSTs the translated provider-native request here. The server
+   records the path, headers, and body, then holds the connection open
+   without writing a response.
+2. The callout takes the recorded bytes and returns them to the LB, which
+   forwards them to the real provider.
+3. When the provider's response reaches the callout's response phase, the
+   callout hands those bytes to this server, which finally writes them as the
+   response on the parked connection.
+4. Portkey reads that response and translates it back to OpenAI format.
 
-* **response port (``:9998``)**: when the LB sends the provider's response back
-  through the callout's response phase, we arm this endpoint with the captured
-  bytes; the callout then makes a second Portkey call with
-  ``x-portkey-custom-host`` pointing here, and Portkey reads our armed bytes as
-  if they were a real upstream response, runs its translator, and returns OpenAI
-  format.
+Parking matters because Portkey sees one ordinary request/response exchange
+on one connection, exactly as it would when calling a real provider. The
+callout therefore makes no assumptions about whether Portkey keeps state
+between a request and its response.
 
-Correlation id (``X-Portkey-Callout-Correlation``) ties the two phases together
-so concurrent requests do not cross-contaminate. The callout generates the id
-(uuid4) and forwards it through Portkey via ``x-portkey-forward-headers``.
+Correlation id (``X-Portkey-Callout-Correlation``) ties a parked connection to
+its ext_proc stream so concurrent requests do not cross-contaminate. The
+callout generates the id (uuid4) and forwards it through Portkey via
+``x-portkey-forward-headers``.
 
-The endpoints bind to 127.0.0.1 only. They are reachable only from inside the
-same Cloud Run pod (the Portkey sidecar shares the network namespace) and never
-from external traffic.
+The endpoint binds to 127.0.0.1 only. It is reachable only from inside the
+same Cloud Run pod (the Portkey sidecar shares the network namespace) and
+never from external traffic.
 """
 
 from __future__ import annotations
 
-import json
+import asyncio
+from dataclasses import dataclass, field
 from typing import NamedTuple
 
 from aiohttp import web
 
-# ---------------------------------------------------------------------------
-# Provider response stubs for the request-capture loopback
-#
-# When the callout uses the ``x-portkey-custom-host`` loopback to extract
-# provider-native request bytes from Portkey, the local capture endpoint
-# (``:9999``) has to return *something*: Portkey will try to parse it as the
-# provider's native response and translate it to OpenAI format. We discard that
-# translated reply (we only wanted the captured request); but Portkey must not
-# error parsing the stub, or it will fail the whole call.
-#
-# Each stub here is the minimum response shape that satisfies the corresponding
-# Portkey response transformer.
-# ---------------------------------------------------------------------------
-
-_STUBS: dict[str, dict] = {
-    "anthropic": {
-        "id": "msg_stub",
-        "type": "message",
-        "role": "assistant",
-        "model": "claude-stub",
-        "content": [{"type": "text", "text": ""}],
-        "stop_reason": "end_turn",
-        "usage": {"input_tokens": 0, "output_tokens": 0},
-    },
-    "vertex_ai": {
-        "candidates": [{
-            "content": {"role": "model", "parts": [{"text": ""}]},
-            "finishReason": "STOP",
-        }],
-        "usageMetadata": {
-            "promptTokenCount": 0,
-            "candidatesTokenCount": 0,
-            "totalTokenCount": 0,
-        },
-    },
-    "groq": {
-        "id": "chatcmpl-stub",
-        "object": "chat.completion",
-        "created": 0,
-        "model": "groq-stub",
-        "choices": [{
-            "index": 0,
-            "message": {"role": "assistant", "content": ""},
-            "finish_reason": "stop",
-        }],
-        "usage": {
-            "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
-    },
-    "openrouter": {
-        "id": "chatcmpl-stub",
-        "object": "chat.completion",
-        "created": 0,
-        "model": "openrouter-stub",
-        "choices": [{
-            "index": 0,
-            "message": {"role": "assistant", "content": ""},
-            "finish_reason": "stop",
-        }],
-        "usage": {
-            "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
-    },
-}
-
-
-# Providers the stub generator knows about; derived from _STUBS so the two
-# can never drift apart.
-REQUEST_CAPTURE_PROVIDERS = tuple(_STUBS)
-
-
-def build_stub_response(provider: str) -> bytes:
-    """Return the JSON-encoded stub body for ``provider``.
-
-    Raises ``KeyError`` for unknown providers. Callers should validate against
-    ``REQUEST_CAPTURE_PROVIDERS`` first.
-    """
-    return json.dumps(_STUBS[provider]).encode("utf-8")
-
-
-# ---------------------------------------------------------------------------
-# Capture server
-# ---------------------------------------------------------------------------
-
 # Correlation header contract shared with portkey_client (which forwards it
 # through Portkey via x-portkey-forward-headers).
 CORRELATION_HEADER = "x-portkey-callout-correlation"
+
+# Upper bound on how long a connection stays parked. It must exceed the LB
+# backend timeout (see timeout_sec in deploy/terraform/main.tf) so that a slow
+# provider does not trip this first.
+DEFAULT_PARK_TIMEOUT = 300.0
 
 
 class CapturedRequest(NamedTuple):
@@ -136,102 +66,146 @@ class CapturedRequest(NamedTuple):
     body: bytes
 
 
-class CaptureServer:
-    """Runs the :9999 and :9998 HTTP listeners with per-correlation state.
+@dataclass
+class _Pending:
+    """State for one in-flight correlation."""
+    captured: CapturedRequest | None = None
+    captured_event: asyncio.Event = field(default_factory=asyncio.Event)
+    response: bytes | None = None
+    response_event: asyncio.Event = field(default_factory=asyncio.Event)
 
-    Pass ``request_port=0`` / ``response_port=0`` to let the OS pick an
-    ephemeral port (useful in tests). After ``start()`` the actual bound ports
-    are available as ``request_port`` / ``response_port`` attributes.
+
+class CaptureServer:
+    """Serves the Portkey ``custom_host`` loopback on a single port.
+
+    Pass ``port=0`` to let the OS pick an ephemeral port (useful in tests).
+    After ``start()`` the actual bound port is available as ``port``.
+
+    Every public coroutine is intended to be scheduled onto the server's own
+    event loop (the callout does this through ``_run_async``), so the
+    ``asyncio.Event`` objects are only ever touched from that loop.
     """
 
-    def __init__(self, request_port: int = 9999,
-                 response_port: int = 9998) -> None:
-        self._req_configured = request_port
-        self._rsp_configured = response_port
-        self._req_runner: web.AppRunner | None = None
-        self._rsp_runner: web.AppRunner | None = None
-        self._armed_request: dict[str, str] = {}      # corr -> provider
-        self._captured: dict[str, CapturedRequest] = {}
-        self._armed_response: dict[str, bytes] = {}   # corr -> response bytes
+    def __init__(self, port: int = 9999,
+                 park_timeout: float = DEFAULT_PARK_TIMEOUT) -> None:
+        self._configured_port = port
+        self._park_timeout = park_timeout
+        self._runner: web.AppRunner | None = None
+        self._pending: dict[str, _Pending] = {}
+        self.port = port
 
     # -- lifecycle ---------------------------------------------------------
 
     async def start(self) -> None:
-        req_app = web.Application()
-        req_app.router.add_route("*", "/{tail:.*}", self._on_request_capture)
-        self._req_runner = web.AppRunner(req_app)
-        await self._req_runner.setup()
-        req_site = web.TCPSite(
-            self._req_runner, "127.0.0.1", self._req_configured)
-        await req_site.start()
+        app = web.Application()
+        app.router.add_route("*", "/{tail:.*}", self._on_capture)
+        self._runner = web.AppRunner(app)
+        await self._runner.setup()
+        site = web.TCPSite(self._runner, "127.0.0.1", self._configured_port)
+        await site.start()
         # _server may be None on some aiohttp versions until the site is
         # started; by this point start() has completed, so sockets are bound.
-        self.request_port = (
-            req_site._server.sockets[0]  # type: ignore[union-attr]
-            .getsockname()[1])
-
-        rsp_app = web.Application()
-        rsp_app.router.add_route("*", "/{tail:.*}", self._on_response_replay)
-        self._rsp_runner = web.AppRunner(rsp_app)
-        await self._rsp_runner.setup()
-        rsp_site = web.TCPSite(
-            self._rsp_runner, "127.0.0.1", self._rsp_configured)
-        await rsp_site.start()
-        self.response_port = (
-            rsp_site._server.sockets[0]  # type: ignore[union-attr]
+        self.port = (
+            site._server.sockets[0]  # type: ignore[union-attr]
             .getsockname()[1])
 
     async def stop(self) -> None:
-        if self._req_runner is not None:
-            await self._req_runner.cleanup()
-        if self._rsp_runner is not None:
-            await self._rsp_runner.cleanup()
+        if self._runner is not None:
+            await self._runner.cleanup()
 
-    # -- public arming / extraction API ------------------------------------
+    # -- public API --------------------------------------------------------
 
-    def arm_request(self, correlation: str, provider: str) -> None:
-        self._armed_request[correlation] = provider
+    async def arm(self, correlation: str) -> None:
+        """Register ``correlation`` before triggering the Portkey call."""
+        self._pending[correlation] = _Pending()
 
-    def take_captured_request(self, correlation: str) -> CapturedRequest:
-        return self._captured.pop(correlation)
+    async def wait_for_capture(self, correlation: str,
+                               timeout: float) -> CapturedRequest:
+        """Wait until Portkey POSTs the translated request.
 
-    def arm_response(self, correlation: str, body: bytes) -> None:
-        self._armed_response[correlation] = body
-
-    def disarm(self, correlation: str) -> None:
-        """Drop any pending state for ``correlation``.
-
-        Called by the callout on error paths (Portkey call failed, capture
-        never happened) so abandoned correlations do not accumulate in a
-        long-running server.
+        Raises ``KeyError`` if the correlation was never armed,
+        ``asyncio.TimeoutError`` if Portkey does not call within ``timeout``,
+        and ``RuntimeError`` if the Portkey call failed before capturing
+        anything (see ``fail``).
         """
-        self._armed_request.pop(correlation, None)
-        self._captured.pop(correlation, None)
-        self._armed_response.pop(correlation, None)
+        pending = self._pending[correlation]
+        await asyncio.wait_for(pending.captured_event.wait(), timeout)
+        if pending.captured is None:
+            raise RuntimeError("Portkey call failed before capture")
+        return pending.captured
 
-    # -- handlers ----------------------------------------------------------
+    async def fail(self, correlation: str) -> None:
+        """Wake a ``wait_for_capture`` waiter without a captured request.
 
-    async def _on_request_capture(self, request: web.Request) -> web.Response:
+        The callout calls this when the Portkey call completes without
+        POSTing here, whether it raised or returned its own error response,
+        so the waiter reports the real cause immediately instead of sitting
+        out the capture timeout. A no-op once a capture has happened.
+        """
+        pending = self._pending.get(correlation)
+        if pending is None:
+            return
+        pending.captured_event.set()
+
+    async def provide_response(self, correlation: str, body: bytes) -> None:
+        """Supply the provider's native response, unparking the connection."""
+        pending = self._pending.get(correlation)
+        if pending is None:
+            return
+        pending.response = body
+        pending.response_event.set()
+
+    async def disarm(self, correlation: str) -> None:
+        """Drop state for ``correlation`` and release any parked connection.
+
+        Called by the callout on error paths so abandoned correlations do not
+        accumulate, and so a parked handler does not wait out the full park
+        timeout when the callout already knows no response is coming.
+
+        Dropping the entry here also covers the case where Portkey never
+        called at all, so no handler will ever run to clean it up. A handler
+        that is parked holds its own reference to the state, so removing it
+        from the map does not disturb it.
+        """
+        pending = self._pending.pop(correlation, None)
+        if pending is None:
+            return
+        # Leave response as None so the parked handler returns an error.
+        pending.response_event.set()
+
+    # -- handler -----------------------------------------------------------
+
+    async def _on_capture(self, request: web.Request) -> web.Response:
         corr = request.headers.get(CORRELATION_HEADER)
-        if corr is None or corr not in self._armed_request:
+        pending = self._pending.get(corr) if corr else None
+        if corr is None or pending is None:
             return web.Response(status=400, text="missing/unknown correlation")
-        provider = self._armed_request.pop(corr)
-        body = await request.read()
-        self._captured[corr] = CapturedRequest(
+
+        pending.captured = CapturedRequest(
             path=request.path_qs,
             headers={k.lower(): v for k, v in request.headers.items()},
-            body=body,
+            body=await request.read(),
         )
-        return web.Response(
-            status=200,
-            body=build_stub_response(provider),
-            content_type="application/json",
-        )
+        pending.captured_event.set()
 
-    async def _on_response_replay(self, request: web.Request) -> web.Response:
-        corr = request.headers.get(CORRELATION_HEADER)
-        if corr is None or corr not in self._armed_response:
-            return web.Response(status=400, text="missing/unknown correlation")
-        body = self._armed_response.pop(corr)
-        return web.Response(
-            status=200, body=body, content_type="application/json")
+        # Park: hold the connection open until the ext_proc response phase
+        # supplies the provider's native response. From Portkey's side this
+        # looks like a provider that is taking its time to answer. The
+        # ``finally`` pop is the single cleanup point for every exit,
+        # including cancellation (server shutdown mid-park, or deployments
+        # that enable aiohttp handler cancellation on client disconnect).
+        try:
+            try:
+                await asyncio.wait_for(pending.response_event.wait(),
+                                       self._park_timeout)
+            except asyncio.TimeoutError:
+                return web.Response(
+                    status=504, text="timed out awaiting provider response")
+
+            body = pending.response
+            if body is None:
+                return web.Response(status=502, text="no provider response")
+            return web.Response(
+                status=200, body=body, content_type="application/json")
+        finally:
+            self._pending.pop(corr, None)

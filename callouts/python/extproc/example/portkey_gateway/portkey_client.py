@@ -14,19 +14,16 @@
 
 """Async HTTP client for the Portkey gateway sidecar.
 
-A single ``translate`` method drives both phases of the loopback. Portkey
-does the same round-trip both times: translate the OpenAI body to provider
-format, POST to ``custom_host``, translate the response back to OpenAI,
-return it. Which loopback endpoint we point ``custom_host`` at decides
-what the caller does with the result.
+One ``translate`` call covers both ext_proc phases. Portkey translates the
+OpenAI body to provider format, POSTs it to ``custom_host`` (the capture
+server), and blocks there until the capture server writes a response. The
+callout reads the translated request as soon as it is captured, and only
+supplies the response later, once the provider has answered through the LB.
+The call therefore stays open across the request and response phases, and
+resolves with Portkey's OpenAI-shaped translation of the real response.
 
-* **Request phase**: ``custom_host = http://127.0.0.1:9999`` (capture
-  server). We discard the response Portkey returns (the translated stub)
-  and use the bytes the capture endpoint recorded instead.
-
-* **Response phase**: ``custom_host = http://127.0.0.1:9998`` (replay
-  server). The replay endpoint serves the LB-captured provider bytes;
-  Portkey translates them back to OpenAI and returns that to us.
+Because a single call spans the whole upstream round-trip, ``timeout`` must
+exceed the LB backend timeout (``timeout_sec`` in deploy/terraform/main.tf).
 
 We force ``stream=false`` on the round-trip: we only need translated bytes
 from Portkey, not a streamed response.
@@ -46,7 +43,7 @@ _FORWARD_HEADER = "x-portkey-forward-headers"
 
 class PortkeyClient:
     def __init__(self, base_url: str = "http://127.0.0.1:8787",
-                 timeout: float = 30.0) -> None:
+                 timeout: float = 300.0) -> None:
         self._client = httpx.AsyncClient(base_url=base_url, timeout=timeout)
 
     async def close(self) -> None:
@@ -63,7 +60,7 @@ class PortkeyClient:
         extra_headers: dict[str, str],
     ) -> httpx.Response:
         """POST the OpenAI body to Portkey with ``custom_host`` pointing at
-        the appropriate loopback endpoint for the current phase."""
+        the capture server. Resolves once the capture server unparks."""
         headers = {
             "content-type": "application/json",
             "authorization": f"Bearer {api_key}",

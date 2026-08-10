@@ -18,14 +18,20 @@
 * Sends it to the Portkey sidecar (``localhost:8787``) with
   ``x-portkey-custom-host: http://localhost:9999`` and the provider API key.
 * Portkey translates OpenAI -> provider format and POSTs to ``:9999``, where
-  the callout's capture server records the translated bytes/headers/path.
+  the callout's capture server records the translated bytes/headers/path and
+  then *parks* the connection without answering.
 * The callout returns the captured provider-native bytes to the LB as ext_proc
   mutations; the LB forwards to the provider Internet NEG selected by the URL
   map's ``header_matches: x-model-id`` (prefix match on the provider segment).
-* On the response, the LB delivers the provider-native response back; the
-  callout arms ``:9998`` with those bytes, calls Portkey again with
-  ``x-portkey-custom-host: http://localhost:9998``, and returns Portkey's
-  OpenAI-shaped translation to the LB.
+* On the response, the LB delivers the provider-native response back. The
+  callout hands those bytes to the capture server, which writes them on the
+  parked connection. Portkey translates them and the original call resolves
+  with the OpenAI-shaped response.
+
+A single Portkey call therefore spans both ext_proc phases. Portkey sees one
+ordinary request/response exchange on one connection, so the callout makes no
+assumptions about whether Portkey keeps state between a request and its
+response, and no stub response bodies are needed.
 
 Routing model: the LB's URL map picks the provider backend from the
 ``x-model-id`` header *before* this callout fires.
@@ -51,6 +57,7 @@ import logging
 import os
 import threading
 import uuid
+from concurrent.futures import Future
 from dataclasses import dataclass, field
 from typing import Any, NamedTuple
 
@@ -226,6 +233,17 @@ _BROWSER_HEADERS = (
 )
 
 
+# How long to wait for Portkey to POST the translated request to the capture
+# server. This is a localhost round-trip through Portkey's transformer, so it
+# is fast; a miss means the sidecar is unhealthy.
+_CAPTURE_TIMEOUT = 30.0
+
+# How long to wait for the parked Portkey call to resolve once the provider's
+# response has been supplied. Only the final translation remains at that
+# point, so this is also a localhost operation.
+_TRANSLATE_TIMEOUT = 30.0
+
+
 @dataclass
 class _StreamState:
     is_llm: bool = False
@@ -234,6 +252,9 @@ class _StreamState:
     request_body: dict[str, Any] = field(default_factory=dict)
     # Response-body chunks accumulated across STREAMED ext_proc messages.
     response_chunks: list[bytes] = field(default_factory=list)
+    # The in-flight Portkey call, started in the request phase and resolved in
+    # the response phase once the parked connection is answered.
+    portkey_call: Future | None = None
 
 
 def _state(context: ServicerContext) -> _StreamState:
@@ -254,10 +275,7 @@ class PortkeyGatewayCallout(callout_server.CalloutServer):
         self.portkey_url = os.getenv(
             "PORTKEY_BASE_URL", "http://127.0.0.1:8787")
 
-        self._capture_request_port = int(
-            os.getenv("CAPTURE_REQUEST_PORT", "9999"))
-        self._capture_response_port = int(
-            os.getenv("CAPTURE_RESPONSE_PORT", "9998"))
+        self._capture_port = int(os.getenv("CAPTURE_PORT", "9999"))
 
         # The capture server and Portkey client are spun up lazily on a worker
         # thread because the gRPC server runs on its own thread pool and we
@@ -277,9 +295,7 @@ class PortkeyGatewayCallout(callout_server.CalloutServer):
             asyncio.set_event_loop(loop)
             self._loop = loop
             self._capture = capture_server.CaptureServer(
-                request_port=self._capture_request_port,
-                response_port=self._capture_response_port,
-            )
+                port=self._capture_port)
             self._client = portkey_client.PortkeyClient(
                 base_url=self.portkey_url)
             loop.run_until_complete(self._capture.start())
@@ -298,13 +314,30 @@ class PortkeyGatewayCallout(callout_server.CalloutServer):
         if self._capture is None or self._client is None:
             raise RuntimeError("async components missing after loop start")
 
-    def _run_async(self, coro):
+    def _run_async(self, coro, timeout: float = 30.0):
         # self._loop is guaranteed non-None once __init__ returns.
         future = asyncio.run_coroutine_threadsafe(
             coro, self._loop)  # type: ignore[arg-type]
         # Timeout so a hung sidecar surfaces as concurrent.futures.TimeoutError
         # rather than hanging the gRPC thread indefinitely.
-        return future.result(timeout=30)
+        return future.result(timeout=timeout)
+
+    def _abandon_portkey_call(self, state: _StreamState) -> None:
+        """Release capture state and drop the in-flight Portkey call.
+
+        Unparking first lets the parked handler return immediately instead of
+        waiting out the full park timeout; the Portkey coroutine then finishes
+        on its own, so the cancel is only a backstop.
+        """
+        if self._capture is not None:
+            try:
+                self._run_async(self._capture.disarm(state.correlation))
+            except Exception:
+                logging.exception("failed to disarm capture state (corr=%s)",
+                                  state.correlation)
+        if state.portkey_call is not None:
+            state.portkey_call.cancel()
+            state.portkey_call = None
 
     # ---------------- ext_proc phases ----------------
 
@@ -396,31 +429,61 @@ class PortkeyGatewayCallout(callout_server.CalloutServer):
 
         if self._capture is None or self._client is None:
             raise RuntimeError("async components not initialized")
-        self._capture.arm_request(state.correlation, provider)
-        custom_host = f"http://127.0.0.1:{self._capture.request_port}"
-        try:
-            self._run_async(self._client.translate(
+        self._run_async(self._capture.arm(state.correlation))
+        custom_host = f"http://127.0.0.1:{self._capture.port}"
+        # Start the Portkey call without waiting for it to finish. It blocks
+        # inside the capture server on the parked connection until the
+        # response phase supplies the provider's answer.
+        state.portkey_call = asyncio.run_coroutine_threadsafe(
+            self._client.translate(
                 openai_body=state.request_body,
                 provider=spec.portkey_id,
                 api_key=api_key,
                 custom_host=custom_host,
                 correlation=state.correlation,
                 extra_headers=extra_headers,
-            ))
-        except Exception:
-            logging.exception("Portkey request-translation call failed")
-            self._capture.disarm(state.correlation)
-            return callout_tools.header_immediate_response(
-                StatusCode.BadGateway)
+            ),
+            self._loop,  # type: ignore[arg-type]
+        )
+        # If the call completes before Portkey POSTed anything (it raised, or
+        # Portkey answered with its own error response), no capture is coming:
+        # wake the waiter immediately rather than letting it sit out the
+        # capture timeout. In the normal flow the call resolves long after
+        # capture, where this wake is a harmless no-op.
+        correlation = state.correlation
+
+        def _wake_when_done(fut: Future) -> None:
+            if not fut.cancelled():
+                asyncio.run_coroutine_threadsafe(
+                    self._capture.fail(correlation),  # type: ignore[union-attr]
+                    self._loop)  # type: ignore[arg-type]
+
+        state.portkey_call.add_done_callback(_wake_when_done)
 
         try:
-            captured = self._capture.take_captured_request(state.correlation)
-        except KeyError:
-            logging.error(
-                "Portkey did not POST to capture server (corr=%s)",
-                state.correlation,
-            )
-            self._capture.disarm(state.correlation)
+            captured = self._run_async(
+                self._capture.wait_for_capture(
+                    state.correlation, _CAPTURE_TIMEOUT),
+                timeout=_CAPTURE_TIMEOUT + 5)
+        except Exception:
+            # Surface the real cause: the Portkey call's own failure or error
+            # response if it finished, otherwise the capture timeout.
+            call = state.portkey_call
+            if call.done() and not call.cancelled() and call.exception():
+                logging.error(
+                    "Portkey request-translation call failed (corr=%s): %s",
+                    state.correlation, call.exception())
+            elif call.done() and not call.cancelled():
+                portkey_resp = call.result()
+                logging.error(
+                    "Portkey answered %s without calling the capture server "
+                    "(corr=%s): %s", portkey_resp.status_code,
+                    state.correlation, portkey_resp.text[:500])
+            else:
+                logging.exception(
+                    "Portkey did not POST to capture server (corr=%s)",
+                    state.correlation)
+            self._abandon_portkey_call(state)
             return callout_tools.header_immediate_response(
                 StatusCode.BadGateway)
 
@@ -533,8 +596,6 @@ class PortkeyGatewayCallout(callout_server.CalloutServer):
                 logging.exception(
                     "gzip-magic detected but decompress failed (corr=%s)",
                     state.correlation)
-        spec = PROVIDERS[state.provider]
-
         # On any failure below the body passes through untranslated. Earlier
         # chunks were cleared from the egress, so the pass-through response
         # must carry the full reassembled body, not just the final chunk.
@@ -543,33 +604,28 @@ class PortkeyGatewayCallout(callout_server.CalloutServer):
             resp.response.body_mutation.body = provider_response
             return resp
 
-        try:
-            api_key, extra_headers = self._auth_for(state.provider)
-        except Exception:
-            logging.exception("auth setup failed on response phase")
-            # Pass body through on auth failure. We can't safely synthesize
-            # an ImmediateResponse here without crashing the framework's
-            # response_body wrapper.
-            return passthrough()
-
         if self._capture is None or self._client is None:
             raise RuntimeError("async components not initialized")
 
-        self._capture.arm_response(state.correlation, provider_response)
-        custom_host = f"http://127.0.0.1:{self._capture.response_port}"
+        if state.portkey_call is None:
+            logging.error(
+                "no in-flight Portkey call for this response (corr=%s)",
+                state.correlation)
+            return passthrough()
+
+        # Unpark the connection Portkey has held since the request phase by
+        # writing the provider's response onto it. No second Portkey call and
+        # no auth are needed here: the original call is still open and
+        # resolves with the translated response.
+        self._run_async(self._capture.provide_response(
+            state.correlation, provider_response))
         try:
-            portkey_resp = self._run_async(self._client.translate(
-                openai_body=state.request_body,
-                provider=spec.portkey_id,
-                api_key=api_key,
-                custom_host=custom_host,
-                correlation=state.correlation,
-                extra_headers=extra_headers,
-            ))
+            portkey_resp = state.portkey_call.result(
+                timeout=_TRANSLATE_TIMEOUT)
         except Exception:
-            logging.exception("Portkey response-translation call failed; "
+            logging.exception("Portkey response translation failed; "
                               "passing provider body through unchanged")
-            self._capture.disarm(state.correlation)
+            self._abandon_portkey_call(state)
             return passthrough()
 
         if portkey_resp.status_code != 200:
@@ -577,7 +633,6 @@ class PortkeyGatewayCallout(callout_server.CalloutServer):
                 "Portkey response translation status %s; passing provider "
                 "body through unchanged. Portkey error body: %s",
                 portkey_resp.status_code, portkey_resp.text[:500])
-            self._capture.disarm(state.correlation)
             return passthrough()
 
         new_body = portkey_resp.content
