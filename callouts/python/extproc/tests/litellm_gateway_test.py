@@ -25,18 +25,30 @@ import json
 import os
 from unittest.mock import patch
 
+import fakeredis
+import fakeredis.aioredis
 import pytest
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+    InMemorySpanExporter,
+)
 
 from envoy.config.core.v3.base_pb2 import HeaderMap, HeaderValue
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 
+from extproc.example.litellm_gateway import gateway_config
+from extproc.example.litellm_gateway import quota
+from extproc.example.litellm_gateway import seed_keys
+from extproc.example.litellm_gateway import routing
+from extproc.example.litellm_gateway import telemetry
 from extproc.example.litellm_gateway.service_callout_example import (
     HEADER_LITELLM_MODEL,
     HEADER_LITELLM_PROVIDER,
     HEADER_LITELLM_ROUTED,
     HEADER_LITELLM_STREAMING,
     LiteLLMGatewayCallout,
-    ProviderRequest,
+    _ProviderRequest,
     _StreamState,
     _extract_sse_data,
     _state,
@@ -90,10 +102,10 @@ def svc():
                 callout._callout_server.stop()
 
 
-# A canned ProviderRequest matching what `_build_provider_request` would
+# A canned _ProviderRequest matching what `_build_provider_request` would
 # return for a Vertex Gemini call. Used to patch out the GCP-credential
 # dependent path (ADC token mint).
-_VERTEX_PROVIDER_REQUEST = ProviderRequest(
+_VERTEX_PROVIDER_REQUEST = _ProviderRequest(
     api_base_url=(
         "https://us-central1-aiplatform.googleapis.com/v1/projects/test-project"
         "/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent"
@@ -103,6 +115,23 @@ _VERTEX_PROVIDER_REQUEST = ProviderRequest(
     provider="vertex_ai",
     model="gemini-2.5-flash",
 )
+
+
+@pytest.fixture
+def span_exporter(svc):
+    """An in-memory OTel exporter, wired onto the callout under test.
+
+    Nothing is installed globally. The save/restore is here only because
+    `svc` is module-scoped and therefore shared with the next test, not
+    because the tracer lives in module state.
+    """
+    exp = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exp))
+    previous = svc.telemetry
+    svc.telemetry = telemetry.Telemetry.from_provider(provider)
+    yield exp
+    svc.telemetry = previous
 
 
 # ---------------------------------------------------------------------------
@@ -186,6 +215,22 @@ class TestVertexGeminiBody:
 # ---------------------------------------------------------------------------
 
 class TestOnRequestHeaders:
+    def test_header_names_are_matched_case_insensitively(self, svc):
+        # HTTP header names are case-insensitive, and `Authorization` is the
+        # conventional spelling. Matching only the lowercased form would
+        # drop the virtual key, which then reads as an unauthenticated
+        # request rather than an over-budget one.
+        ctx = _Ctx()
+        svc.on_request_headers(_http_headers({
+            ":path": "/v1/chat/completions",
+            ":method": "POST",
+            "Authorization": "Bearer vk-mixed",
+            "X-Model-Id": "anthropic/claude-haiku-4-5",
+        }), ctx)
+        state = _state(ctx)
+        assert state.api_key == "vk-mixed"
+        assert state.model_id_header == "anthropic/claude-haiku-4-5"
+
     def test_non_llm_path_returns_none(self, svc):
         ctx = _Ctx()
         assert svc.on_request_headers(
@@ -218,10 +263,142 @@ class TestOnRequestHeaders:
             _http_headers({":path": "/v1/embeddings", ":method": "POST"}), ctx)
         assert _state(ctx).is_llm is True
 
+    def test_disable_callbacks_header_skips_span(self, svc, span_exporter):
+        # LiteLLM's x-litellm-disable-callbacks (a comma list); the span is
+        # skipped only when the list contains "otel".
+        ctx = _Ctx()
+        svc.on_request_headers(
+            _http_headers({
+                ":path": "/v1/chat/completions",
+                ":method": "POST",
+                "x-litellm-disable-callbacks": "prometheus, otel",
+            }), ctx)
+        assert _state(ctx).span is None
+
+        # Drive the request all the way through a response so an errant span
+        # created elsewhere in the flow would still show up in the exporter.
+        body = json.dumps({
+            "model": "vertex_ai/gemini-2.5-flash",
+            "messages": [{"role": "user", "content": "hi"}],
+        }).encode()
+        with patch.object(
+                svc, "_build_provider_request",
+                return_value=_VERTEX_PROVIDER_REQUEST):
+            svc.on_request_body(_body(body), ctx)
+        resp = {"usage": {
+            "prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}}
+        with patch.object(
+                svc, "_transform_response_to_openai", return_value=resp):
+            svc.on_response_body(
+                _body(json.dumps(resp).encode(), end_of_stream=True), ctx)
+
+        assert not span_exporter.get_finished_spans()
+
+    def test_disable_callbacks_without_otel_still_spans(
+            self, svc, span_exporter):
+        # Sanity check for the comma-list parsing: a disable list that does
+        # not name "otel" must not suppress the span.
+        ctx = _Ctx()
+        svc.on_request_headers(
+            _http_headers({
+                ":path": "/v1/chat/completions",
+                ":method": "POST",
+                "x-litellm-disable-callbacks": "prometheus",
+            }), ctx)
+        assert _state(ctx).span is not None
+
 
 # ---------------------------------------------------------------------------
 # on_request_body
 # ---------------------------------------------------------------------------
+
+class TestClientKeyNotForwarded:
+    """A5: the caller's virtual key must never reach the provider."""
+
+    def _run(self, svc, provider_headers):
+        pr = _ProviderRequest(
+            api_base_url="https://api.anthropic.com/v1/messages",
+            headers=provider_headers, body={"x": 1},
+            provider="anthropic", model="claude-haiku-4-5")
+        ctx = _Ctx()
+        svc.on_request_headers(_http_headers({
+            ":path": "/v1/chat/completions", ":method": "POST",
+            "authorization": "Bearer vk-secret"}), ctx)
+        with patch.object(svc, "_build_provider_request", return_value=pr):
+            result = svc.on_request_body(_body(json.dumps({
+                "model": "anthropic/claude-haiku-4-5",
+                "messages": [{"role": "user", "content": "hi"}]}).encode()),
+                ctx)
+        return result
+
+    def test_key_stripped_when_provider_sets_no_auth_header(self, svc):
+        # Anthropic authenticates with x-api-key and emits no Authorization,
+        # so nothing would overwrite the caller's key on the way upstream.
+        result = self._run(svc, {"x-api-key": "sk-provider"})
+        removed = [h.lower()
+                   for h in result.response.header_mutation.remove_headers]
+        assert "authorization" in removed
+        assert _set_headers(result).get("authorization") is None
+
+    def test_provider_auth_replaces_the_key_when_present(self, svc):
+        # Vertex emits its own Authorization; the rewrite overwrites the
+        # caller's key, so removing the header too would strip the
+        # credential the provider needs.
+        result = self._run(svc, {"Authorization": "Bearer adc-token"})
+        removed = [h.lower()
+                   for h in result.response.header_mutation.remove_headers]
+        assert "authorization" not in removed
+        assert _set_headers(result)["authorization"] == "Bearer adc-token"
+
+
+class TestRequestParameterAllowlist:
+    """A2: the request body is attacker-controlled and reaches LiteLLM's
+    endpoint selection, so only known OpenAI parameters may pass."""
+
+    def _optional_params(self, svc, body):
+        seen = {}
+
+        def capture(config, provider, model_name, messages, optional_params,
+                    *a, **k):
+            seen.update(optional_params)
+            raise RuntimeError("stop after capture")
+
+        with patch.object(svc, "_transform_request_body", side_effect=capture):
+            try:
+                svc._build_provider_request(body["model"], body)
+            except Exception:
+                pass
+        return seen
+
+    def test_supported_parameters_pass_through(self, svc):
+        seen = self._optional_params(svc, {
+            "model": "anthropic/claude-haiku-4-5",
+            "messages": [{"role": "user", "content": "hi"}],
+            "temperature": 0.5, "max_tokens": 64, "stream": False,
+            "top_k": 40,
+        })
+        assert seen.get("temperature") == 0.5
+        assert seen.get("max_tokens") == 64
+        # top_k has a Vertex mapping (top_k -> topK); the allowlist used to
+        # drop it, leaving that mapping unreachable.
+        assert seen.get("top_k") == 40
+
+    def test_smuggled_config_parameters_are_dropped(self, svc):
+        # api_base and custom_llm_provider are LiteLLM configuration, not
+        # request parameters: honoring them from the body would let a caller
+        # redirect the upstream call or override the credential.
+        seen = self._optional_params(svc, {
+            "model": "anthropic/claude-haiku-4-5",
+            "messages": [{"role": "user", "content": "hi"}],
+            "api_base": "https://attacker.example.com",
+            "custom_llm_provider": "openai",
+            "api_key": "sk-attacker",
+            "vertex_project": "someone-elses-project",
+        })
+        for smuggled in ("api_base", "custom_llm_provider", "api_key",
+                         "vertex_project"):
+            assert smuggled not in seen, f"{smuggled} reached the transform"
+
 
 class TestOnRequestBody:
     def test_not_llm_returns_none(self, svc):
@@ -351,6 +528,98 @@ class TestOnRequestBody:
         text = msg["content"] if isinstance(msg["content"], str) else msg["content"][0]["text"]
         assert text == "hi"
 
+    @staticmethod
+    def _enable_routing(svc):
+        """Turn the routing feature flag on (any non-empty table)."""
+        svc.router = routing.Router(gateway_config.RoutingSettings(
+            model_group_alias={"fast": "vertex_ai/gemini-2.5-flash"},
+            tag_rules={}, weighted_groups={}, shuffle_groups={}))
+
+    def test_header_model_overrides_body_model(self, svc):
+        # With routing enabled, the LB already routed on an x-model-id the
+        # route extension may have rewritten, so when it disagrees with the
+        # body's model the header wins: it names the model the backend was
+        # actually chosen for.
+        self._enable_routing(svc)
+        try:
+            ctx = _Ctx()
+            svc.on_request_headers(
+                _http_headers({
+                    ":path": "/v1/chat/completions",
+                    ":method": "POST",
+                    "x-model-id": "anthropic/claude-haiku-4-5",
+                }), ctx)
+            body = json.dumps({
+                "model": "vertex_ai/gemini-2.5-flash",
+                "messages": [{"role": "user", "content": "hi"}],
+            }).encode()
+            result = svc.on_request_body(_body(body), ctx)
+            assert isinstance(result, service_pb2.BodyResponse)
+            hdrs = _set_headers(result)
+            assert hdrs[":authority"] == "api.anthropic.com"
+            assert hdrs[HEADER_LITELLM_MODEL] == "claude-haiku-4-5"
+        finally:
+            svc.router = routing.Router()
+
+    def test_flag_off_keeps_body_model(self, svc):
+        # Routing disabled (the default): the header never overrides the
+        # body model, preserving the original gateway behavior exactly.
+        assert svc.router.enabled() is False
+        ctx = _Ctx()
+        svc.on_request_headers(
+            _http_headers({
+                ":path": "/v1/chat/completions",
+                ":method": "POST",
+                "x-model-id": "anthropic/claude-haiku-4-5",
+            }), ctx)
+        body = json.dumps({
+            "model": "vertex_ai/gemini-2.5-flash",
+            "messages": [{"role": "user", "content": "hi"}],
+        }).encode()
+        with patch.object(
+                svc, "_build_provider_request",
+                return_value=_VERTEX_PROVIDER_REQUEST) as mock_build:
+            svc.on_request_body(_body(body), ctx)
+        args, _ = mock_build.call_args
+        assert args[0] == "vertex_ai/gemini-2.5-flash"
+        assert args[1]["model"] == "vertex_ai/gemini-2.5-flash"
+
+    def test_alias_header_does_not_override(self, svc):
+        # Even with routing enabled, "cheap" is a routing alias (resolved by
+        # the route extension before this callout runs), not a LiteLLM model
+        # id: it has no known provider prefix, so it must not override the
+        # body model.
+        self._enable_routing(svc)
+        try:
+            ctx = _Ctx()
+            svc.on_request_headers(
+                _http_headers({
+                    ":path": "/v1/chat/completions",
+                    ":method": "POST",
+                    "x-model-id": "cheap",
+                }), ctx)
+            body = json.dumps({
+                "model": "vertex_ai/gemini-2.5-flash",
+                "messages": [{"role": "user", "content": "hi"}],
+            }).encode()
+            with patch.object(
+                    svc, "_build_provider_request",
+                    return_value=_VERTEX_PROVIDER_REQUEST) as mock_build:
+                result = svc.on_request_body(_body(body), ctx)
+            hdrs = _set_headers(result)
+            assert hdrs[HEADER_LITELLM_PROVIDER] == "vertex_ai"
+            assert hdrs[HEADER_LITELLM_MODEL] == "gemini-2.5-flash"
+
+            # The alias "cheap" must never reach the transform: the guard
+            # has to leave the body model in place both as the positional
+            # arg and inside req_map, or this assertion catches the
+            # regression.
+            args, _ = mock_build.call_args
+            assert args[0] == "vertex_ai/gemini-2.5-flash"
+            assert args[1]["model"] == "vertex_ai/gemini-2.5-flash"
+        finally:
+            svc.router = routing.Router()
+
 
 # ---------------------------------------------------------------------------
 # on_response_headers
@@ -366,8 +635,277 @@ class TestOnResponseHeaders:
     def test_llm_removes_content_length(self, svc):
         ctx = _Ctx()
         _state(ctx).is_llm = True
-        result = svc.on_response_headers(_http_headers({"content-length": "1234"}), ctx)
-        assert "content-length" in result.response.header_mutation.remove_headers
+        result = svc.on_response_headers(
+            _http_headers({"content-length": "1234"}), ctx)
+        removed = result.response.header_mutation.remove_headers
+        assert "content-length" in removed
+
+    def test_response_headers_include_call_id_and_usage(self, svc):
+        # Seed a fakeredis-backed quota key (as the quota wiring tests do),
+        # run the request-headers and request-body legs to populate state
+        # (call_id, api_key) and record some spend, then check the
+        # response-headers leg surfaces both the call id and the quota
+        # usage headers while still removing content-length.
+        server = fakeredis.FakeServer()
+        client = fakeredis.FakeRedis(
+            decode_responses=True, server=server)
+        svc.quota = quota.Quota(fakeredis.aioredis.FakeRedis(
+            decode_responses=True, server=server))
+        try:
+            seed_keys.seed(client, [{
+                "key": "vk1", "token_budget": 1000,
+                "budget_duration": 30 * 86400}])
+            ctx = _Ctx()
+            svc.on_request_headers(
+                _http_headers({
+                    ":path": "/v1/chat/completions",
+                    ":method": "POST",
+                    "authorization": "Bearer vk1",
+                }), ctx)
+            body = json.dumps({
+                "model": "anthropic/claude-haiku-4-5",
+                "messages": [{"role": "user", "content": "hi"}],
+                "max_tokens": 16,
+            }).encode()
+            svc.on_request_body(_body(body), ctx)
+            # Quota is async; the handlers drive it through the shared
+            # loop bridge until the SDK is async.
+            svc._async.run(svc.quota.record(
+                "vk1", "anthropic/claude-haiku-4-5", 50))
+
+            result = svc.on_response_headers(
+                _http_headers({"content-length": "1234"}), ctx)
+
+            removed = result.response.header_mutation.remove_headers
+            assert "content-length" in removed
+            hdrs = _set_headers(result)
+            assert hdrs["x-litellm-call-id"] == _state(ctx).call_id
+            assert hdrs["x-litellm-key-spend"] == "50"
+        finally:
+            svc.quota = quota.Quota()
+
+
+# ---------------------------------------------------------------------------
+# Upstream status propagation: the telemetry span must reflect the real
+# provider response status, not a hardcoded 200.
+# ---------------------------------------------------------------------------
+
+class TestUpstreamStatusInSpan:
+    def test_error_status_propagates_to_span(self, svc, span_exporter):
+        ctx = _Ctx()
+        svc.on_request_headers(
+            _http_headers({
+                ":path": "/v1/chat/completions",
+                ":method": "POST",
+            }), ctx)
+        body = json.dumps({
+            "model": "vertex_ai/gemini-2.5-flash",
+            "messages": [{"role": "user", "content": "hi"}],
+        }).encode()
+        with patch.object(
+                svc, "_build_provider_request",
+                return_value=_VERTEX_PROVIDER_REQUEST):
+            svc.on_request_body(_body(body), ctx)
+        svc.on_response_headers(_http_headers({":status": "429"}), ctx)
+        resp = {"usage": {
+            "prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}}
+        with patch.object(
+                svc, "_transform_response_to_openai", return_value=resp):
+            svc.on_response_body(
+                _body(json.dumps(resp).encode(), end_of_stream=True), ctx)
+        spans = span_exporter.get_finished_spans()
+        assert len(spans) == 1
+        assert spans[0].attributes["http.response.status_code"] == 429
+
+
+# ---------------------------------------------------------------------------
+# Quota model-id wiring: check() metering must match record() bookkeeping.
+# ---------------------------------------------------------------------------
+
+class TestQuotaModelIdWiring:
+    def test_check_and_record_share_full_model_id(self, svc):
+        # Regression test: quota.check() on the request leg metered
+        # model_max_budget against the full LiteLLM model id (post
+        # header-override), while quota.record() on the response leg used
+        # to write the provider-stripped id (state.model). That meant
+        # record() never wrote the counter check() read, so per-model
+        # budgets were silently never enforced. state.quota_model fixes
+        # this by carrying the same full id through both legs.
+        server = fakeredis.FakeServer()
+        client = fakeredis.FakeRedis(
+            decode_responses=True, server=server)
+        svc.quota = quota.Quota(fakeredis.aioredis.FakeRedis(
+            decode_responses=True, server=server))
+        try:
+            full_model = "anthropic/claude-haiku-4-5"
+            seed_keys.seed(client, [{
+                "key": "vk1",
+                "model_max_budget": {
+                    full_model: {"budget_limit": 20, "time_period": 86400},
+                },
+            }])
+
+            def _drive():
+                ctx = _Ctx()
+                svc.on_request_headers(_http_headers({
+                    ":path": "/v1/chat/completions",
+                    ":method": "POST",
+                    "authorization": "Bearer vk1",
+                }), ctx)
+                body = json.dumps({
+                    "model": full_model,
+                    "messages": [{"role": "user", "content": "hi"}],
+                    "max_tokens": 16,
+                }).encode()
+                return ctx, svc.on_request_body(_body(body), ctx)
+
+            ctx, result = _drive()
+            assert isinstance(result, service_pb2.BodyResponse)
+
+            resp = {"usage": {
+                "prompt_tokens": 10, "completion_tokens": 15,
+                "total_tokens": 25}}
+            with patch.object(
+                    svc, "_transform_response_to_openai", return_value=resp):
+                svc.on_response_body(
+                    _body(json.dumps(resp).encode(), end_of_stream=True),
+                    ctx)
+
+            window = quota._window_id(86400)
+            kh = quota.key_hash("vk1")
+            per_model_key = f"spend:{kh}:{full_model}:{window}"
+            assert int(client.get(per_model_key) or 0) == 25
+
+            # Spend (25) now exceeds budget_limit (20); the next request for
+            # the same model is rejected with 402 before it reaches LiteLLM.
+            ctx2, result2 = _drive()
+            assert isinstance(result2, service_pb2.ImmediateResponse)
+            assert result2.status.code == 402
+        finally:
+            svc.quota = quota.Quota()
+
+
+# ---------------------------------------------------------------------------
+# Streaming usage capture: token totals surfaced on a streamed chunk.
+# ---------------------------------------------------------------------------
+
+class TestStreamingUsageCapture:
+    def test_message_delta_usage_merged_and_recorded(self, svc):
+        # Anthropic surfaces usage on the final `message_delta` SSE event.
+        # _handle_streaming_chunk must merge it into state.usage so the
+        # end_of_stream leg in on_response_body can meter it via
+        # quota.record(), same as a buffered response.
+        server = fakeredis.FakeServer()
+        client = fakeredis.FakeRedis(
+            decode_responses=True, server=server)
+        svc.quota = quota.Quota(fakeredis.aioredis.FakeRedis(
+            decode_responses=True, server=server))
+        try:
+            seed_keys.seed(client, [{
+                "key": "vk1", "token_budget": 1000,
+                "budget_duration": 30 * 86400}])
+            ctx = _Ctx()
+            state = _state(ctx)
+            state.is_llm = True
+            state.is_streaming = True
+            state.provider = "anthropic"
+            state.model = "claude-haiku-4-5"
+            state.quota_model = "anthropic/claude-haiku-4-5"
+            state.api_key = "vk1"
+            state.request_body = {
+                "messages": [{"role": "user", "content": "hi"}]}
+
+            event = json.dumps({
+                "type": "message_delta",
+                "delta": {"stop_reason": "end_turn", "stop_sequence": None},
+                "usage": {"input_tokens": 10, "output_tokens": 5},
+            }).encode()
+            svc.on_response_body(
+                _body(b"data: " + event + b"\n\n", end_of_stream=False), ctx)
+            assert state.usage.get("total_tokens") == 15
+
+            svc.on_response_body(_body(b"", end_of_stream=True), ctx)
+
+            window = quota._window_id(30 * 86400)
+            kh = quota.key_hash("vk1")
+            spend = int(client.get(f"spend:{kh}:{window}") or 0)
+            assert spend == 15
+        finally:
+            svc.quota = quota.Quota()
+
+    def test_split_usage_across_events_not_clobbered(self, svc):
+        # Real Anthropic streams split usage across two events: an early
+        # `message_start` carries the real prompt_tokens count, and the
+        # closing `message_delta` carries only output_tokens, so LiteLLM
+        # fills prompt_tokens with a 0 placeholder on that later event. A
+        # naive overwrite-merge would let that placeholder replace the real
+        # prompt count (10 -> 0), undercounting spend as 5 instead of 15.
+        server = fakeredis.FakeServer()
+        client = fakeredis.FakeRedis(
+            decode_responses=True, server=server)
+        svc.quota = quota.Quota(fakeredis.aioredis.FakeRedis(
+            decode_responses=True, server=server))
+        try:
+            seed_keys.seed(client, [{
+                "key": "vk1", "token_budget": 1000,
+                "budget_duration": 30 * 86400}])
+            ctx = _Ctx()
+            state = _state(ctx)
+            state.is_llm = True
+            state.is_streaming = True
+            state.provider = "anthropic"
+            state.model = "claude-haiku-4-5"
+            state.quota_model = "anthropic/claude-haiku-4-5"
+            state.api_key = "vk1"
+            state.request_body = {
+                "messages": [{"role": "user", "content": "hi"}]}
+
+            # message_start: prompt_tokens=10, completion_tokens=1,
+            # total_tokens=11.
+            message_start = json.dumps({
+                "type": "message_start",
+                "message": {
+                    "id": "msg_1",
+                    "type": "message",
+                    "role": "assistant",
+                    "model": "claude-haiku-4-5",
+                    "content": [],
+                    "stop_reason": None,
+                    "stop_sequence": None,
+                    "usage": {"input_tokens": 10, "output_tokens": 1},
+                },
+            }).encode()
+            svc.on_response_body(
+                _body(b"data: " + message_start + b"\n\n",
+                      end_of_stream=False),
+                ctx)
+            assert state.usage.get("prompt_tokens") == 10
+            assert state.usage.get("total_tokens") == 11
+
+            # message_delta: no input_tokens key, so LiteLLM defaults
+            # prompt_tokens to 0; completion_tokens=5, total_tokens=5.
+            message_delta = json.dumps({
+                "type": "message_delta",
+                "delta": {"stop_reason": "end_turn", "stop_sequence": None},
+                "usage": {"output_tokens": 5},
+            }).encode()
+            svc.on_response_body(
+                _body(b"data: " + message_delta + b"\n\n",
+                      end_of_stream=False),
+                ctx)
+            # The real prompt_tokens count must survive the zero placeholder.
+            assert state.usage.get("prompt_tokens") == 10
+            assert state.usage.get("completion_tokens") == 5
+            assert state.usage.get("total_tokens") == 15
+
+            svc.on_response_body(_body(b"", end_of_stream=True), ctx)
+
+            window = quota._window_id(30 * 86400)
+            kh = quota.key_hash("vk1")
+            spend = int(client.get(f"spend:{kh}:{window}") or 0)
+            assert spend == 15
+        finally:
+            svc.quota = quota.Quota()
 
 
 # ---------------------------------------------------------------------------
