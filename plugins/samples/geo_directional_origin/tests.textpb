@@ -1,8 +1,12 @@
+# Copyright 2026 Google LLC
+# Licensed under the Apache License, Version 2.0
+
+# Test: Inject x-country-code header when client region is US.
 test {
   name: "SetHeaderForUS"
   benchmark: false
   properties {
-    path: "request.client_region"
+    path: "source.client_region"
     value: "US"
   }
   request_headers {
@@ -17,11 +21,12 @@ test {
   }
 }
 
+# Test: Inject x-country-code header when client region is Germany (DE).
 test {
   name: "SetHeaderForGermany"
   benchmark: false
   properties {
-    path: "request.client_region"
+    path: "source.client_region"
     value: "DE"
   }
   request_headers {
@@ -36,11 +41,12 @@ test {
   }
 }
 
+# Test: Inject x-country-code header when client region is Japan (JP).
 test {
   name: "SetHeaderForJapan"
   benchmark: false
   properties {
-    path: "request.client_region"
+    path: "source.client_region"
     value: "JP"
   }
   request_headers {
@@ -55,11 +61,12 @@ test {
   }
 }
 
+# Test: Inject x-country-code header when client region is Brazil (BR).
 test {
   name: "SetHeaderForBrazil"
   benchmark: false
   properties {
-    path: "request.client_region"
+    path: "source.client_region"
     value: "BR"
   }
   request_headers {
@@ -74,6 +81,7 @@ test {
   }
 }
 
+# Test: No geo information available → header should not be added.
 test {
   name: "NoGeoInformationAvailable"
   benchmark: false
@@ -89,11 +97,12 @@ test {
   }
 }
 
+# Test: Empty country code, header should be removed (not set).
 test {
   name: "EmptyCountryCode"
   benchmark: false
   properties {
-    path: "request.client_region"
+    path: "source.client_region"
     value: ""
   }
   request_headers {
@@ -108,11 +117,12 @@ test {
   }
 }
 
+# Test: Inject x-country-code header when client region is South Africa (ZA).
 test {
   name: "SetHeaderForSouthAfrica"
   benchmark: false
   properties {
-    path: "request.client_region"
+    path: "source.client_region"
     value: "ZA"
   }
   request_headers {
@@ -127,11 +137,12 @@ test {
   }
 }
 
+# Test: Spoofed x-country-code header should be removed and replaced with the correct value.
 test {
   name: "SecuritySpoofedHeaderRemoved"
   benchmark: false
   properties {
-    path: "request.client_region"
+    path: "source.client_region"
     value: "GB"
   }
   request_headers {
@@ -147,11 +158,12 @@ test {
   }
 }
 
+# Test: Benchmark test.
 test {
   name: "BenchmarkGeoRouting"
   benchmark: true
   properties {
-    path: "request.client_region"
+    path: "source.client_region"
     value: "GB"
   }
   request_headers {
