@@ -184,9 +184,9 @@ http_archive(
     url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/" + PROXY_WASM_CPP_HOST_COMMIT + ".tar.gz",
 )
 
-PROXY_WASM_CPP_SDK_COMMIT = "7465dee8b2953beebff99f6dc3720ad0c79bab99"  # 2025-03-04
+PROXY_WASM_CPP_SDK_COMMIT = "19c45f4df062e383a16bc3ac59c62f1948467866"  # 2026-08-28
 
-PROXY_WASM_CPP_SDK_SHA256 = "26c4c0f9f645de7e789dc92f113d7352ee54ac43bb93ae3a8a22945f1ce71590"
+PROXY_WASM_CPP_SDK_SHA256 = "75686cfdcd9f520c111dc89cfeff0a754378ef68ea88ccd2244d424636e16321"
 
 http_archive(
     name = "proxy_wasm_cpp_sdk",
@@ -285,3 +285,45 @@ go_rules_dependencies()
 go_register_toolchains(version = "1.24rc1")
 
 gazelle_dependencies()
+
+# --- LUA DEPENDENCIES ---
+
+http_archive(
+    name = "lua",
+    build_file_content = """
+cc_library(
+    name = "lua",
+    srcs = glob(
+        ["src/*.c", "src/*.h"],
+        exclude = ["src/lua.c", "src/luac.c"],
+    ),
+    hdrs = [
+        "src/lauxlib.h",
+        "src/lua.h",
+        "src/lua.hpp",
+        "src/luaconf.h",
+        "src/lualib.h",
+    ],
+    includes = ["src"],
+    visibility = ["//visibility:public"],
+)
+""",
+    sha256 = "b9e2e4aad6789b3b63a056d442f7b39f0ecfca3ae0f1fc0ae4e9614401b69f4b",
+    strip_prefix = "lua-5.2.4",
+    urls = ["https://www.lua.org/ftp/lua-5.2.4.tar.gz"],
+)
+
+http_archive(
+    name = "luabridge3",
+    build_file_content = """
+cc_library(
+    name = "luabridge3",
+    hdrs = glob(["Source/LuaBridge/**/*.h"]),
+    strip_include_prefix = "Source",
+    visibility = ["//visibility:public"],
+)
+""",
+    sha256 = "0c15204d5ca2eefa760aa2a8b6543e6ec47231723ee9ed2819c9c9a9cb319e69",
+    strip_prefix = "LuaBridge3-3.0-rc12",
+    urls = ["https://github.com/kunitoki/LuaBridge3/archive/refs/tags/3.0-rc12.tar.gz"],
+)
