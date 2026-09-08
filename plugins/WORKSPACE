@@ -13,6 +13,7 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 http_archive(
     name = "com_google_absl",
     integrity = "sha256-FpL3fRc5us8/lDNxiLeFg88JurfkINLcbFYFpPhnhaE=",
+    repo_mapping = {"@googletest": "@com_google_googletest"},
     strip_prefix = "abseil-cpp-20250814.1",
     urls = ["https://github.com/abseil/abseil-cpp/releases/download/20250814.1/abseil-cpp-20250814.1.tar.gz"],
 )
