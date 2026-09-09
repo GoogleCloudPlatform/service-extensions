@@ -38,7 +38,7 @@
 #include "absl/time/time.h"
 #include "proxy_wasm_intrinsics.h"
 
-namespace sample::lua {
+namespace proxy_wasm_lua {
 namespace {
 bool GetBoolValue(const std::initializer_list<std::string_view>& path) {
   bool out = false;
@@ -882,4 +882,4 @@ absl::StatusOr<StatsScope> Handle::GetStats() {
   return absl::UnimplementedError("unimplemented");
 }
 
-}  // namespace sample::lua
+}  // namespace proxy_wasm_lua

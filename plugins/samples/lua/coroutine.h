@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef NET_TURING_WASM_LUA_COROUTINE_H_
-#define NET_TURING_WASM_LUA_COROUTINE_H_
+#pragma once
 
 #include <cstddef>
 #include <cstdint>
@@ -29,7 +28,7 @@ extern "C" {
 #include "lualib.h"
 }
 
-namespace sample::lua {
+namespace proxy_wasm_lua {
 
 enum class LuaStreamCoroutineMode { kRequest, kResponse };
 
@@ -124,5 +123,4 @@ class LuaStreamCoroutine final : public StreamStateInterface {
   bool stream_ended_ = false;
 };
 
-}  // namespace sample::lua
-#endif  // NET_TURING_WASM_LUA_COROUTINE_H_
+}  // namespace proxy_wasm_lua
