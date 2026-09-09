@@ -39,7 +39,7 @@ extern "C" {
 #include "absl/types/span.h"
 #include "LuaBridge/LuaBridge.h"
 
-namespace sample::lua {
+namespace proxy_wasm_lua {
 
 namespace {
 
@@ -310,4 +310,4 @@ absl::StatusOr<ExecutionState> LuaState::Thread::ExecuteFunction(
   return ExecuteFunctionImpl(this, func_name, arg);
 }
 
-}  // namespace sample::lua
+}  // namespace proxy_wasm_lua

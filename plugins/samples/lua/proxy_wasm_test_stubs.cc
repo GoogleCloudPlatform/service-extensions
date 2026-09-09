@@ -21,14 +21,14 @@
 #include "proxy_wasm_intrinsics.h"
 
 namespace {
-sample::lua::MockProxyWasmAbi* absl_nullable current_mock_proxy_wasm_abi =
+proxy_wasm_lua::MockProxyWasmAbi* absl_nullable current_mock_proxy_wasm_abi =
     nullptr;
 }
 
-namespace sample::lua {
+namespace proxy_wasm_lua {
 MockProxyWasmAbi::MockProxyWasmAbi() { current_mock_proxy_wasm_abi = this; }
 MockProxyWasmAbi::~MockProxyWasmAbi() { current_mock_proxy_wasm_abi = nullptr; }
-}  // namespace sample::lua
+}  // namespace proxy_wasm_lua
 
 extern "C" {
 WasmResult proxy_log(LogLevel level, const char* logMessage,
