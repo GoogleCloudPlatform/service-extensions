@@ -60,7 +60,7 @@ extern "C" {
 #include "lualib.h"
 }
 
-namespace sample::lua {
+namespace proxy_wasm_lua {
 namespace {
 
 using ::testing::HasSubstr;
@@ -590,9 +590,9 @@ TEST(LuaStateTest, ValidatesStatusIsCorrectlyInterceptedAndWrapped) {
           [](const absl::Status& s) { return std::string(s.message()); })
       .endClass();
 
-  sample::lua::RegisterStatusOr<std::string>(*state, "StatusOr_string");
-  sample::lua::RegisterStatusOr<int*>(*state, "StatusOr_int_ptr");
-  sample::lua::RegisterStatusOr<int>(*state, "StatusOr_int");
+  proxy_wasm_lua::RegisterStatusOr<std::string>(*state, "StatusOr_string");
+  proxy_wasm_lua::RegisterStatusOr<int*>(*state, "StatusOr_int_ptr");
+  proxy_wasm_lua::RegisterStatusOr<int>(*state, "StatusOr_int");
 
   luabridge::getGlobalNamespace(state->state())
       .beginClass<FakeStatusTest>("FakeStatusTest")
@@ -611,7 +611,7 @@ TEST(LuaStateTest, ValidatesStatusIsCorrectlyInterceptedAndWrapped) {
   (void)luabridge::push(state->state(), &fake_status);
   lua_setglobal(state->state(), "fake_status_object");
 
-  EXPECT_OK(state->ExecuteString(sample::lua::kStatusUnwrapperFunctionShim));
+  EXPECT_OK(state->ExecuteString(proxy_wasm_lua::kStatusUnwrapperFunctionShim));
 
   {
     ScopedGlobalFunction scoped_raw(
@@ -659,4 +659,4 @@ TEST(LuaStateTest, ValidatesStatusIsCorrectlyInterceptedAndWrapped) {
 }
 
 }  // namespace
-}  // namespace sample::lua
+}  // namespace proxy_wasm_lua

@@ -44,7 +44,7 @@ extern "C" {
 #include "lualib.h"
 }
 
-namespace sample::lua {
+namespace proxy_wasm_lua {
 
 namespace {
 
@@ -469,4 +469,4 @@ absl::Status RegisterEnvoyApi(LuaState& state) {
   return absl::OkStatus();
 }
 
-}  // namespace sample::lua
+}  // namespace proxy_wasm_lua
