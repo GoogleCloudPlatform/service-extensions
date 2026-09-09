@@ -23,35 +23,21 @@
 #include <string>
 
 #include "proxy_wasm_test_stubs.h"
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
-
-#ifndef LOCAL_MACROS
-#define LOCAL_MACROS
-#define EXPECT_OK(expr) EXPECT_TRUE(GetStatus((expr)).ok())
-#define ASSERT_OK(expr) ASSERT_TRUE(GetStatus((expr)).ok())
-
-template <typename T> absl::Status GetStatus(const absl::StatusOr<T>& v) { return v.status(); }
-template <typename T> absl::Status GetStatus(const T& v) { return v; } 
-inline absl::Status GetStatus(const absl::Status& v) { return v; }
-
-#define CONCAT_INNER(a, b) a ## b
-#define CONCAT(a, b) CONCAT_INNER(a, b)
-#define ASSERT_OK_AND_ASSIGN(lhs, rexpr) \
-    auto CONCAT(_res_, __LINE__) = (rexpr); \
-    ASSERT_TRUE(GetStatus(CONCAT(_res_, __LINE__)).ok()) << GetStatus(CONCAT(_res_, __LINE__)).message(); \
-    lhs = std::move(*CONCAT(_res_, __LINE__))
-#endif
-
+#include "test_macros.h"
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "include/proxy-wasm/pairs_util.h"
 #include "proxy_wasm_common.h"
 #include "proxy_wasm_enums.h"
 
 namespace proxy_wasm_lua {
 namespace {
+
+using ::absl_testing::IsOkAndHolds;
+using ::absl_testing::StatusIs;
 
 using ::testing::_;
 using ::testing::AllOf;
@@ -164,7 +150,8 @@ TEST_P(HeaderTest, GetHeaderExisting) {
   EXPECT_CALL(mock_abi_, proxy_get_header_map_value(GetParam(), _, _, _, _))
       .With(Args<1, 2>(WasmStrEq("foo")))
       .WillOnce(SetWasmString(std::string_view("bar")));
-  { auto _s = header_.Get("foo"); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::optional<std::string>("bar")); };
+  EXPECT_THAT(header_.Get("foo"),
+              IsOkAndHolds(std::optional<std::string>("bar")));
 }
 
 TEST_P(HeaderTest, GetHeaderMissing) {
@@ -176,14 +163,15 @@ TEST_P(HeaderTest, GetHeaderMissing) {
         *value_size = 0;
         return WasmResult::NotFound;
       });
-  { auto _s = header_.Get("foo"); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::nullopt); };
+  EXPECT_THAT(header_.Get("foo"), IsOkAndHolds(std::nullopt));
 }
 
 TEST_P(HeaderTest, GetHeaderCaseInsensitive) {
   EXPECT_CALL(mock_abi_, proxy_get_header_map_value(GetParam(), _, _, _, _))
       .With(Args<1, 2>(WasmStrEq("FOO")))
       .WillOnce(SetWasmString(std::string_view("bar")));
-  { auto _s = header_.Get("FOO"); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::optional<std::string>("bar")); };
+  EXPECT_THAT(header_.Get("FOO"),
+              IsOkAndHolds(std::optional<std::string>("bar")));
 }
 
 TEST_P(HeaderTest, GetHeaderMultipleValuesJoinNatively) {
@@ -195,7 +183,9 @@ TEST_P(HeaderTest, GetHeaderMultipleValuesJoinNatively) {
         *value_size = 22;
         return WasmResult::Ok;
       });
-  { auto _s = header_.Get("Set-Cookie"); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::optional<std::string>("cookie_1=a, cookie_2=b")); };
+  EXPECT_THAT(
+      header_.Get("Set-Cookie"),
+      IsOkAndHolds(std::optional<std::string>("cookie_1=a, cookie_2=b")));
 }
 
 TEST_P(HeaderTest, GetHeaderEmptyValue) {
@@ -207,7 +197,8 @@ TEST_P(HeaderTest, GetHeaderEmptyValue) {
         *value_size = 0;
         return WasmResult::Ok;
       });
-  { auto _s = header_.Get("empty-header"); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::optional<std::string>("")); };
+  EXPECT_THAT(header_.Get("empty-header"),
+              IsOkAndHolds(std::optional<std::string>("")));
 }
 
 TEST_P(HeaderTest, GetHeaderInternalFailure) {
@@ -216,7 +207,7 @@ TEST_P(HeaderTest, GetHeaderInternalFailure) {
       .WillOnce([](WasmHeaderMapType, const char*, size_t,
                    const char** value_ptr,
                    size_t* value_size) { return WasmResult::InternalFailure; });
-  { auto _s = header_.Get("broken-header"); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::nullopt); };
+  EXPECT_THAT(header_.Get("broken-header"), IsOkAndHolds(std::nullopt));
 }
 
 TEST_P(HeaderTest, RemoveHeaderCaseInsensitive) {
@@ -237,19 +228,20 @@ TEST_P(HeaderTest, ReplaceHeaderCaseInsensitive) {
 TEST_P(HeaderTest, AddHeaderReturnsErrorOnInternalFailure) {
   EXPECT_CALL(mock_abi_, proxy_add_header_map_value(GetParam(), _, _, _, _))
       .WillOnce(Return(WasmResult::InternalFailure));
-  { auto _s = header_.Add("foo", "bar"); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(header_.Add("foo", "bar"), StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_P(HeaderTest, RemoveHeaderIgnoresBadArgument) {
   EXPECT_CALL(mock_abi_, proxy_remove_header_map_value(GetParam(), _, _))
       .WillOnce(Return(WasmResult::BadArgument));
-  { auto _s = header_.Remove("foo"); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(header_.Remove("foo"), StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_P(HeaderTest, ReplaceHeaderReturnsErrorOnInternalFailure) {
   EXPECT_CALL(mock_abi_, proxy_replace_header_map_value(GetParam(), _, _, _, _))
       .WillOnce(Return(WasmResult::InternalFailure));
-  { auto _s = header_.Replace("foo", "bar"); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(header_.Replace("foo", "bar"),
+              StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_P(HeaderTest, GetPairsDecodesEmbeddedNullBytes) {
@@ -264,7 +256,8 @@ TEST_P(HeaderTest, GetPairsDecodesEmbeddedNullBytes) {
   EXPECT_CALL(mock_abi_, proxy_get_header_map_pairs(GetParam(), _, _))
       .WillOnce(SetWasmPairs(buffer));
 
-  { auto _s = header_.GetPairs(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ElementsAre(Pair(key_with_null, value_with_null))); };
+  EXPECT_THAT(header_.GetPairs(),
+              IsOkAndHolds(ElementsAre(Pair(key_with_null, value_with_null))));
 }
 
 TEST_P(HeaderTest, GetPairsPreservesMultipleEntriesForSameKey) {
@@ -280,21 +273,22 @@ TEST_P(HeaderTest, GetPairsPreservesMultipleEntriesForSameKey) {
   EXPECT_CALL(mock_abi_, proxy_get_header_map_pairs(GetParam(), _, _))
       .WillOnce(SetWasmPairs(buffer));
 
-  { auto _s = header_.GetPairs(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ElementsAre(Pair("Set-Cookie", "cookie_1=a"),
+  EXPECT_THAT(header_.GetPairs(),
+              IsOkAndHolds(ElementsAre(Pair("Set-Cookie", "cookie_1=a"),
                                        Pair("Set-Cookie", "cookie_2=b"),
-                                       Pair("Custom-Header", "value1"))); };
+                                       Pair("Custom-Header", "value1"))));
 }
 
 TEST_P(HeaderTest, GetPairsInternalFailureReturnsError) {
   EXPECT_CALL(mock_abi_, proxy_get_header_map_pairs(GetParam(), _, _))
       .WillOnce(Return(WasmResult::InternalFailure));
-  { auto _s = header_.GetPairs(); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(header_.GetPairs(), StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_P(HeaderTest, GetPairsNotFoundReturnsEmpty) {
   EXPECT_CALL(mock_abi_, proxy_get_header_map_pairs(GetParam(), _, _))
       .WillOnce(Return(WasmResult::NotFound));
-  { auto _s = header_.GetPairs(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, IsEmpty()); };
+  EXPECT_THAT(header_.GetPairs(), IsOkAndHolds(IsEmpty()));
 }
 
 TEST_P(HeaderTest, GetPairsHandlesEmptyStrings) {
@@ -310,8 +304,9 @@ TEST_P(HeaderTest, GetPairsHandlesEmptyStrings) {
   EXPECT_CALL(mock_abi_, proxy_get_header_map_pairs(GetParam(), _, _))
       .WillOnce(SetWasmPairs(buffer));
 
-  { auto _s = header_.GetPairs(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ElementsAre(Pair("Empty-Value", ""),
-                                       Pair("", "Empty-Key"), Pair("", ""))); };
+  EXPECT_THAT(header_.GetPairs(),
+              IsOkAndHolds(ElementsAre(Pair("Empty-Value", ""),
+                                       Pair("", "Empty-Key"), Pair("", ""))));
 }
 
 TEST_P(HeaderTest, GetPairsPreservesDuplicateKeysWithDifferentCasing) {
@@ -326,8 +321,9 @@ TEST_P(HeaderTest, GetPairsPreservesDuplicateKeysWithDifferentCasing) {
   EXPECT_CALL(mock_abi_, proxy_get_header_map_pairs(GetParam(), _, _))
       .WillOnce(SetWasmPairs(buffer));
 
-  { auto _s = header_.GetPairs(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ElementsAre(Pair("X-Header", "Value1"),
-                                       Pair("x-header", "Value2"))); };
+  EXPECT_THAT(header_.GetPairs(),
+              IsOkAndHolds(ElementsAre(Pair("X-Header", "Value1"),
+                                       Pair("x-header", "Value2"))));
 }
 
 TEST_P(HeaderTest, AddHeaderEmbeddedNulls) {
@@ -371,19 +367,21 @@ TEST_P(HeaderTest, GetHeaderEmbeddedNulls) {
       .With(Args<1, 2>(WasmStrEq(key_with_null)))
       .WillOnce(SetWasmString(std::string_view("baz")));
 
-  { auto _s = header_.Get(key_with_null); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::optional<std::string>("baz")); };
+  EXPECT_THAT(header_.Get(key_with_null),
+              IsOkAndHolds(std::optional<std::string>("baz")));
 }
 
 TEST_P(HeaderTest, RemoveHeaderIgnoresNotFound) {
   EXPECT_CALL(mock_abi_, proxy_remove_header_map_value(GetParam(), _, _))
       .WillOnce(Return(WasmResult::NotFound));
-  { auto _s = header_.Remove("foo"); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(header_.Remove("foo"), StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_P(HeaderTest, ReplaceHeaderIgnoresNotFound) {
   EXPECT_CALL(mock_abi_, proxy_replace_header_map_value(GetParam(), _, _, _, _))
       .WillOnce(Return(WasmResult::NotFound));
-  { auto _s = header_.Replace("foo", "bar"); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(header_.Replace("foo", "bar"),
+              StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_P(HeaderTest, GetPairsHandlesEmptyMapCorrectly) {
@@ -394,7 +392,7 @@ TEST_P(HeaderTest, GetPairsHandlesEmptyMapCorrectly) {
         return WasmResult::Ok;
       });
 
-  { auto _s = header_.GetPairs(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, IsEmpty()); };
+  EXPECT_THAT(header_.GetPairs(), IsOkAndHolds(IsEmpty()));
 }
 
 TEST_P(HeaderTest, GetHeaderOkWithNullptr) {
@@ -406,7 +404,7 @@ TEST_P(HeaderTest, GetHeaderOkWithNullptr) {
         return WasmResult::Ok;
       });
 
-  { auto _s = header_.Get("foo"); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::nullopt); };
+  EXPECT_THAT(header_.Get("foo"), IsOkAndHolds(std::nullopt));
 }
 
 TEST_P(HeaderTest, GetAtIndexAndGetNumValues) {
@@ -423,39 +421,47 @@ TEST_P(HeaderTest, GetAtIndexAndGetNumValues) {
   EXPECT_CALL(mock_abi_, proxy_get_header_map_pairs(GetParam(), _, _))
       .WillRepeatedly(SetWasmPairs(buffer));
 
-  { auto _s = header_.GetNumValues("foo"); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, 2); };
-  { auto _s = header_.GetNumValues("FOO"); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, 2); };
-  { auto _s = header_.GetNumValues("bar"); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, 1); };
-  { auto _s = header_.GetNumValues("baz"); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, 0); };
-  { auto _s = header_.GetNumValues(""); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, 1); };
+  EXPECT_THAT(header_.GetNumValues("foo"), IsOkAndHolds(2));
+  EXPECT_THAT(header_.GetNumValues("FOO"), IsOkAndHolds(2));
+  EXPECT_THAT(header_.GetNumValues("bar"), IsOkAndHolds(1));
+  EXPECT_THAT(header_.GetNumValues("baz"), IsOkAndHolds(0));
+  EXPECT_THAT(header_.GetNumValues(""), IsOkAndHolds(1));
 
-  { auto _s = header_.GetAtIndex("foo", 0); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::optional<std::string>("val1")); };
+  EXPECT_THAT(header_.GetAtIndex("foo", 0),
+              IsOkAndHolds(std::optional<std::string>("val1")));
 
-  { auto _s = header_.GetAtIndex("FOO", 0); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::optional<std::string>("val1")); };
+  EXPECT_THAT(header_.GetAtIndex("FOO", 0),
+              IsOkAndHolds(std::optional<std::string>("val1")));
 
-  { auto _s = header_.GetAtIndex("foo", 1); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::optional<std::string>("val3")); };
+  EXPECT_THAT(header_.GetAtIndex("foo", 1),
+              IsOkAndHolds(std::optional<std::string>("val3")));
 
-  { auto _s = header_.GetAtIndex("FOO", 1); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::optional<std::string>("val3")); };
+  EXPECT_THAT(header_.GetAtIndex("FOO", 1),
+              IsOkAndHolds(std::optional<std::string>("val3")));
 
-  { auto _s = header_.GetAtIndex("foo", 2); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::nullopt); };
+  EXPECT_THAT(header_.GetAtIndex("foo", 2), IsOkAndHolds(std::nullopt));
 
-  { auto _s = header_.GetAtIndex("foo", -1); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInvalidArgument); };  // or what status?
+  EXPECT_THAT(header_.GetAtIndex("foo", -1),
+              StatusIs(absl::StatusCode::kInvalidArgument));  // or what status?
 
-  { auto _s = header_.GetAtIndex("baz", 0); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::nullopt); };
+  EXPECT_THAT(header_.GetAtIndex("baz", 0), IsOkAndHolds(std::nullopt));
 
-  { auto _s = header_.GetAtIndex("", 0); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::optional<std::string>("empty_key_val")); };
+  EXPECT_THAT(header_.GetAtIndex("", 0),
+              IsOkAndHolds(std::optional<std::string>("empty_key_val")));
 }
 
 TEST_P(HeaderTest, GetNumValuesInternalFailureReturnsError) {
   EXPECT_CALL(mock_abi_, proxy_get_header_map_pairs(GetParam(), _, _))
       .WillOnce(Return(WasmResult::InternalFailure));
-  { auto _s = header_.GetNumValues("foo"); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(header_.GetNumValues("foo"),
+              StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_P(HeaderTest, GetAtIndexInternalFailureReturnsError) {
   EXPECT_CALL(mock_abi_, proxy_get_header_map_pairs(GetParam(), _, _))
       .WillOnce(Return(WasmResult::InternalFailure));
-  { auto _s = header_.GetAtIndex("foo", 0); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(header_.GetAtIndex("foo", 0),
+              StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_P(HeaderTest, AddHeaderEmptyValue) {
@@ -489,7 +495,7 @@ TEST_F(SslConnectionTest, PeerCertificatePresentedReturnsTrue) {
   EXPECT_CALL(mock_abi_, proxy_get_property(_, _, _, _))
       .WillRepeatedly(SetWasmProperty(
           std::string(reinterpret_cast<const char*>(&"\x01"), 1)));
-  { auto _s = ssl_connection_.PeerCertificatePresented(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, true); };
+  EXPECT_THAT(ssl_connection_.PeerCertificatePresented(), IsOkAndHolds(true));
 }
 
 TEST_F(SslConnectionTest, PeerCertificatePresentedReturnsTrue8Byte) {
@@ -497,20 +503,20 @@ TEST_F(SslConnectionTest, PeerCertificatePresentedReturnsTrue8Byte) {
   EXPECT_CALL(mock_abi_, proxy_get_property(_, _, _, _))
       .WillRepeatedly(
           SetWasmProperty(std::string(reinterpret_cast<const char*>(&val), 8)));
-  { auto _s = ssl_connection_.PeerCertificatePresented(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, true); };
+  EXPECT_THAT(ssl_connection_.PeerCertificatePresented(), IsOkAndHolds(true));
 }
 
 TEST_F(SslConnectionTest, PeerCertificatePresentedReturnsFalseWhenNotFound) {
   EXPECT_CALL(mock_abi_, proxy_get_property(_, _, _, _))
       .WillRepeatedly(Return(WasmResult::NotFound));
-  { auto _s = ssl_connection_.PeerCertificatePresented(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, false); };
+  EXPECT_THAT(ssl_connection_.PeerCertificatePresented(), IsOkAndHolds(false));
 }
 
 TEST_F(SslConnectionTest, PeerCertificatePresentedReturnsFalse1Byte) {
   EXPECT_CALL(mock_abi_, proxy_get_property(_, _, _, _))
       .WillRepeatedly(SetWasmProperty(
           std::string(reinterpret_cast<const char*>(&"\x00"), 1)));
-  { auto _s = ssl_connection_.PeerCertificatePresented(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, false); };
+  EXPECT_THAT(ssl_connection_.PeerCertificatePresented(), IsOkAndHolds(false));
 }
 
 TEST_F(SslConnectionTest, PeerCertificatePresentedReturnsFalse8Byte) {
@@ -518,7 +524,7 @@ TEST_F(SslConnectionTest, PeerCertificatePresentedReturnsFalse8Byte) {
   EXPECT_CALL(mock_abi_, proxy_get_property(_, _, _, _))
       .WillRepeatedly(
           SetWasmProperty(std::string(reinterpret_cast<const char*>(&val), 8)));
-  { auto _s = ssl_connection_.PeerCertificatePresented(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, false); };
+  EXPECT_THAT(ssl_connection_.PeerCertificatePresented(), IsOkAndHolds(false));
 }
 
 TEST_F(SslConnectionTest,
@@ -543,8 +549,9 @@ TEST_F(SslConnectionTest,
         return WasmResult::Ok;
       });
 
-  { auto _s = ssl_connection_.GetUrlEncodedPemEncodedPeerCertificateChain(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, AllOf(Not(IsEmpty()), HasSubstr("leafA"),
-                                 HasSubstr("chainB"), HasSubstr("chainC"))); };
+  EXPECT_THAT(ssl_connection_.GetUrlEncodedPemEncodedPeerCertificateChain(),
+              IsOkAndHolds(AllOf(Not(IsEmpty()), HasSubstr("leafA"),
+                                 HasSubstr("chainB"), HasSubstr("chainC"))));
 }
 
 TEST_F(SslConnectionTest,
@@ -569,8 +576,9 @@ TEST_F(SslConnectionTest,
         return WasmResult::Ok;
       });
 
-  { auto _s = ssl_connection_.GetUrlEncodedPemEncodedPeerCertificateChain(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, AllOf(Not(IsEmpty()), HasSubstr("leafA"),
-                                 Not(HasSubstr(",")))); };
+  EXPECT_THAT(ssl_connection_.GetUrlEncodedPemEncodedPeerCertificateChain(),
+              IsOkAndHolds(AllOf(Not(IsEmpty()), HasSubstr("leafA"),
+                                 Not(HasSubstr(",")))));
 }
 
 TEST_F(SslConnectionTest, PeerCertificatePresentedReturnsTrueFallback) {
@@ -594,7 +602,7 @@ TEST_F(SslConnectionTest, PeerCertificatePresentedReturnsTrueFallback) {
         return WasmResult::Ok;
       });
 
-  { auto _s = ssl_connection_.PeerCertificatePresented(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, true); };
+  EXPECT_THAT(ssl_connection_.PeerCertificatePresented(), IsOkAndHolds(true));
 }
 
 TEST_F(SslConnectionTest, PeerCertificatePresentedReturnsFalseFallback) {
@@ -617,7 +625,7 @@ TEST_F(SslConnectionTest, PeerCertificatePresentedReturnsFalseFallback) {
         return WasmResult::Ok;
       });
 
-  { auto _s = ssl_connection_.PeerCertificatePresented(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, false); };
+  EXPECT_THAT(ssl_connection_.PeerCertificatePresented(), IsOkAndHolds(false));
 }
 
 TEST_F(SslConnectionTest, PeerCertificateValidatedReturnsTrueFallback) {
@@ -641,7 +649,7 @@ TEST_F(SslConnectionTest, PeerCertificateValidatedReturnsTrueFallback) {
         return WasmResult::Ok;
       });
 
-  { auto _s = ssl_connection_.PeerCertificateValidated(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, true); };
+  EXPECT_THAT(ssl_connection_.PeerCertificateValidated(), IsOkAndHolds(true));
 }
 
 TEST_F(SslConnectionTest, PeerCertificateValidatedReturnsFalseFallback) {
@@ -664,7 +672,7 @@ TEST_F(SslConnectionTest, PeerCertificateValidatedReturnsFalseFallback) {
         return WasmResult::Ok;
       });
 
-  { auto _s = ssl_connection_.PeerCertificateValidated(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, false); };
+  EXPECT_THAT(ssl_connection_.PeerCertificateValidated(), IsOkAndHolds(false));
 }
 
 TEST_F(SslConnectionTest, GetUriSanPeerCertificateFallback) {
@@ -690,8 +698,9 @@ TEST_F(SslConnectionTest, GetUriSanPeerCertificateFallback) {
         return WasmResult::Ok;
       });
 
-  { auto _s = ssl_connection_.GetUriSanPeerCertificate(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ElementsAre("example.com", "test.org",
-                                       "spiffe://example.com/foo")); };
+  EXPECT_THAT(ssl_connection_.GetUriSanPeerCertificate(),
+              IsOkAndHolds(ElementsAre("example.com", "test.org",
+                                       "spiffe://example.com/foo")));
 }
 
 TEST_F(SslConnectionTest, GetDnsSansPeerCertificateFallback) {
@@ -715,7 +724,8 @@ TEST_F(SslConnectionTest, GetDnsSansPeerCertificateFallback) {
         return WasmResult::Ok;
       });
 
-  { auto _s = ssl_connection_.GetDnsSansPeerCertificate(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ElementsAre("example.com", "test.org")); };
+  EXPECT_THAT(ssl_connection_.GetDnsSansPeerCertificate(),
+              IsOkAndHolds(ElementsAre("example.com", "test.org")));
 }
 
 TEST_F(SslConnectionTest,
@@ -738,7 +748,8 @@ TEST_F(SslConnectionTest,
         return WasmResult::Ok;
       });
 
-  { auto _s = ssl_connection_.GetUriSanPeerCertificate(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ElementsAre("spiffe://standard.com")); };
+  EXPECT_THAT(ssl_connection_.GetUriSanPeerCertificate(),
+              IsOkAndHolds(ElementsAre("spiffe://standard.com")));
 }
 
 TEST_F(SslConnectionTest,
@@ -761,7 +772,8 @@ TEST_F(SslConnectionTest,
         return WasmResult::Ok;
       });
 
-  { auto _s = ssl_connection_.GetDnsSansPeerCertificate(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ElementsAre("standard.example.com")); };
+  EXPECT_THAT(ssl_connection_.GetDnsSansPeerCertificate(),
+              IsOkAndHolds(ElementsAre("standard.example.com")));
 }
 
 TEST_F(SslConnectionTest, GetValidFromPeerCertificateParsesRfc3339) {
@@ -784,7 +796,8 @@ TEST_F(SslConnectionTest, GetValidFromPeerCertificateParsesRfc3339) {
         return WasmResult::Ok;
       });
 
-  { auto _s = ssl_connection_.GetValidFromPeerCertificate(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, 1672531200); };
+  EXPECT_THAT(ssl_connection_.GetValidFromPeerCertificate(),
+              IsOkAndHolds(1672531200));
 }
 
 TEST_F(SslConnectionTest,
@@ -807,7 +820,7 @@ TEST_F(SslConnectionTest,
         return WasmResult::Ok;
       });
 
-  { auto _s = ssl_connection_.GetValidFromPeerCertificate(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, 0); };
+  EXPECT_THAT(ssl_connection_.GetValidFromPeerCertificate(), IsOkAndHolds(0));
 }
 
 TEST_F(SslConnectionTest, GetUrlEncodedPemEncodedPeerCertificateStripsColons) {
@@ -829,7 +842,9 @@ TEST_F(SslConnectionTest, GetUrlEncodedPemEncodedPeerCertificateStripsColons) {
         return WasmResult::Ok;
       });
 
-  { auto _s = ssl_connection_.GetUrlEncodedPemEncodedPeerCertificate(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, AllOf(HasSubstr("bGVhZjo%3D"), Not(HasSubstr("%3A")))); };
+  EXPECT_THAT(
+      ssl_connection_.GetUrlEncodedPemEncodedPeerCertificate(),
+      IsOkAndHolds(AllOf(HasSubstr("bGVhZjo%3D"), Not(HasSubstr("%3A")))));
 }
 
 class BufferTest : public Test {
@@ -845,7 +860,7 @@ TEST_F(BufferTest, GetLengthReturnsCorrectSize) {
       .WillOnce(
           DoAll(SetArgPointee<1>(initial_body_size), Return(WasmResult::Ok)));
 
-  { auto _s = buffer_.GetLength(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, 123); };
+  EXPECT_THAT(buffer_.GetLength(), IsOkAndHolds(123));
 }
 
 TEST_F(BufferTest, GetBytesReturnsData) {
@@ -853,7 +868,8 @@ TEST_F(BufferTest, GetBytesReturnsData) {
                                                 5, 10, _, _))
       .WillOnce(SetWasmBufferBytes("hello world"));
 
-  { auto _s = buffer_.GetBytes(5, 10); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::string("hello world")); };
+  EXPECT_THAT(buffer_.GetBytes(5, 10),
+              IsOkAndHolds(std::string("hello world")));
 }
 
 TEST_F(BufferTest, GetBytesHandlesHostReturningFewerBytes) {
@@ -861,7 +877,7 @@ TEST_F(BufferTest, GetBytesHandlesHostReturningFewerBytes) {
                                                 2, 10, _, _))
       .WillOnce(SetWasmBufferBytes("abc"));
 
-  { auto _s = buffer_.GetBytes(2, 10); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::string("abc")); };
+  EXPECT_THAT(buffer_.GetBytes(2, 10), IsOkAndHolds(std::string("abc")));
 }
 
 TEST_F(BufferTest, SetBytesUpdatesBuffer) {
@@ -903,7 +919,7 @@ TEST_F(BufferTest, SetBytesReturnsErrorOnSetFailure) {
                                                 0, 5, _, 2))
       .WillOnce(Return(WasmResult::InternalFailure));
 
-  { auto _s = buffer_.SetBytes("12"); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(buffer_.SetBytes("12"), StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_F(BufferTest, GetLengthReturnsZeroOnFailure) {
@@ -911,7 +927,7 @@ TEST_F(BufferTest, GetLengthReturnsZeroOnFailure) {
               proxy_get_buffer_status(WasmBufferType::HttpRequestBody, _, _))
       .WillOnce(Return(WasmResult::InternalFailure));
 
-  { auto _s = buffer_.GetLength(); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(buffer_.GetLength(), StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_F(BufferTest, GetBytesReturnsEmptyOnFailure) {
@@ -919,7 +935,7 @@ TEST_F(BufferTest, GetBytesReturnsEmptyOnFailure) {
                                                 0, 10, _, _))
       .WillOnce(Return(WasmResult::InternalFailure));
 
-  { auto _s = buffer_.GetBytes(0, 10); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(buffer_.GetBytes(0, 10), StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_F(BufferTest, GetBytesReturnsEmptyOnNullptr) {
@@ -927,7 +943,7 @@ TEST_F(BufferTest, GetBytesReturnsEmptyOnNullptr) {
                                                 0, 10, _, _))
       .WillOnce(SetWasmBufferBytes(""));
 
-  { auto _s = buffer_.GetBytes(0, 10); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::string("")); };
+  EXPECT_THAT(buffer_.GetBytes(0, 10), IsOkAndHolds(std::string("")));
 }
 
 TEST_F(BufferTest, SetBytesDoesNotCallSetOnGetLengthFailure) {
@@ -936,7 +952,8 @@ TEST_F(BufferTest, SetBytesDoesNotCallSetOnGetLengthFailure) {
       .WillOnce(Return(WasmResult::InternalFailure));
   EXPECT_CALL(mock_abi_, proxy_set_buffer_bytes(_, _, _, _, _)).Times(0);
 
-  { auto _s = buffer_.SetBytes("new data"); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(buffer_.SetBytes("new data"),
+              StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_F(BufferTest, GetBytesWithZeroLengthReturnsEmpty) {
@@ -944,7 +961,7 @@ TEST_F(BufferTest, GetBytesWithZeroLengthReturnsEmpty) {
                                                 0, 0, _, _))
       .WillOnce(SetWasmBufferBytes(""));
 
-  { auto _s = buffer_.GetBytes(0, 0); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::string("")); };
+  EXPECT_THAT(buffer_.GetBytes(0, 0), IsOkAndHolds(std::string("")));
 }
 
 TEST_F(BufferTest, GetBytesAtBufferLengthReturnsEmpty) {
@@ -953,7 +970,7 @@ TEST_F(BufferTest, GetBytesAtBufferLengthReturnsEmpty) {
                                                 length, 0, _, _))
       .WillOnce(SetWasmBufferBytes(""));
 
-  { auto _s = buffer_.GetBytes(length, 0); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::string("")); };
+  EXPECT_THAT(buffer_.GetBytes(length, 0), IsOkAndHolds(std::string("")));
 }
 
 TEST_F(BufferTest, SetBytesOnEmptyBufferHandlesRangeZeroZero) {
@@ -1006,7 +1023,7 @@ TEST_F(CounterTest, AddRejectsNegativeAmounts) {
           WasmHasSubstr("Failed to add to counter: amount cannot be negative")))
       .Times(0);
 
-  { auto _s = counter.Add(-1); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInvalidArgument); };
+  EXPECT_THAT(counter.Add(-1), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST_F(CounterTest, GetValueReturnsCorrectValue) {
@@ -1014,7 +1031,7 @@ TEST_F(CounterTest, GetValueReturnsCorrectValue) {
 
   EXPECT_CALL(mock_abi_, proxy_get_metric(101, _))
       .WillOnce(DoAll(SetArgPointee<1>(42), Return(WasmResult::Ok)));
-  { auto _s = counter.GetValue(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, 42); };
+  EXPECT_THAT(counter.GetValue(), IsOkAndHolds(42));
 }
 
 TEST_F(CounterTest, GetValueReturnsMaxUint64Correctly) {
@@ -1023,7 +1040,8 @@ TEST_F(CounterTest, GetValueReturnsMaxUint64Correctly) {
   EXPECT_CALL(mock_abi_, proxy_get_metric(101, _))
       .WillOnce(DoAll(SetArgPointee<1>(std::numeric_limits<uint64_t>::max()),
                       Return(WasmResult::Ok)));
-  { auto _s = counter.GetValue(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::numeric_limits<uint64_t>::max()); };
+  EXPECT_THAT(counter.GetValue(),
+              IsOkAndHolds(std::numeric_limits<uint64_t>::max()));
 }
 
 TEST_F(CounterTest, IncLogsErrorWhenIncrementFails) {
@@ -1036,7 +1054,7 @@ TEST_F(CounterTest, IncLogsErrorWhenIncrementFails) {
           WasmHasSubstr("Failed to increment counter: InternalFailure")))
       .Times(0);
 
-  { auto _s = counter.Inc(); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(counter.Inc(), StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_F(CounterTest, AddLogsErrorWhenIncrementFails) {
@@ -1049,7 +1067,7 @@ TEST_F(CounterTest, AddLogsErrorWhenIncrementFails) {
           WasmHasSubstr("Failed to add to counter: InternalFailure")))
       .Times(0);
 
-  { auto _s = counter.Add(5); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(counter.Add(5), StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_F(CounterTest, GetValueLogsErrorAndReturnsZeroWhenGetFails) {
@@ -1062,7 +1080,7 @@ TEST_F(CounterTest, GetValueLogsErrorAndReturnsZeroWhenGetFails) {
           WasmHasSubstr("Failed to get counter value: InternalFailure")))
       .Times(0);
 
-  { auto _s = counter.GetValue(); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(counter.GetValue(), StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_F(CounterTest, GetValueLogsErrorAndReturnsZeroWhenNotFound) {
@@ -1074,7 +1092,7 @@ TEST_F(CounterTest, GetValueLogsErrorAndReturnsZeroWhenNotFound) {
       .With(Args<1, 2>(WasmHasSubstr("Failed to get counter value: NotFound")))
       .Times(0);
 
-  { auto _s = counter.GetValue(); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(counter.GetValue(), StatusIs(absl::StatusCode::kInternal));
 }
 
 class GaugeTest : public ::testing::Test {
@@ -1121,7 +1139,7 @@ TEST_F(GaugeTest, GetValueReturnsCorrectValue) {
   Gauge gauge(102);
   EXPECT_CALL(mock_abi_, proxy_get_metric(102, _))
       .WillOnce(DoAll(SetArgPointee<1>(42), Return(WasmResult::Ok)));
-  { auto _s = gauge.GetValue(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, 42); };
+  EXPECT_THAT(gauge.GetValue(), IsOkAndHolds(42));
 }
 
 TEST_F(GaugeTest, GetValueWithLargeBitPatternSurfacesCorrectly) {
@@ -1129,7 +1147,7 @@ TEST_F(GaugeTest, GetValueWithLargeBitPatternSurfacesCorrectly) {
   EXPECT_CALL(mock_abi_, proxy_get_metric(102, _))
       .WillOnce(
           DoAll(SetArgPointee<1>(0xFFFFFFFFFFFFFFFF), Return(WasmResult::Ok)));
-  { auto _s = gauge.GetValue(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, 0xFFFFFFFFFFFFFFFF); };
+  EXPECT_THAT(gauge.GetValue(), IsOkAndHolds(0xFFFFFFFFFFFFFFFF));
 }
 
 TEST_F(GaugeTest, SetRejectsNegativeValue) {
@@ -1139,7 +1157,7 @@ TEST_F(GaugeTest, SetRejectsNegativeValue) {
       .With(Args<1, 2>(
           WasmHasSubstr("Failed to set gauge: value cannot be negative")))
       .Times(0);
-  { auto _s = gauge.Set(-1); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInvalidArgument); };
+  EXPECT_THAT(gauge.Set(-1), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST_F(GaugeTest, SubRejectsNegativeAmount) {
@@ -1149,7 +1167,7 @@ TEST_F(GaugeTest, SubRejectsNegativeAmount) {
       .With(Args<1, 2>(WasmHasSubstr(
           "Failed to subtract from gauge: amount cannot be negative")))
       .Times(0);
-  { auto _s = gauge.Sub(-1); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInvalidArgument); };
+  EXPECT_THAT(gauge.Sub(-1), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST_F(GaugeTest, AddRejectsNegativeAmount) {
@@ -1159,7 +1177,7 @@ TEST_F(GaugeTest, AddRejectsNegativeAmount) {
       .With(Args<1, 2>(
           WasmHasSubstr("Failed to add to gauge: amount cannot be negative")))
       .Times(0);
-  { auto _s = gauge.Add(-1); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInvalidArgument); };
+  EXPECT_THAT(gauge.Add(-1), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST_F(GaugeTest, AddHandlesZeroCorrectly) {
@@ -1184,7 +1202,7 @@ TEST_F(GaugeTest, LogsErrorWhenIncrementFails) {
       .With(Args<1, 2>(
           WasmHasSubstr("Failed to increment gauge: InternalFailure")))
       .Times(0);
-  { auto _s = gauge.Inc(); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(gauge.Inc(), StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_F(GaugeTest, LogsErrorWhenDecrementFails) {
@@ -1195,7 +1213,7 @@ TEST_F(GaugeTest, LogsErrorWhenDecrementFails) {
       .With(Args<1, 2>(
           WasmHasSubstr("Failed to decrement gauge: InternalFailure")))
       .Times(0);
-  { auto _s = gauge.Dec(); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(gauge.Dec(), StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_F(GaugeTest, LogsErrorWhenAddFails) {
@@ -1206,7 +1224,7 @@ TEST_F(GaugeTest, LogsErrorWhenAddFails) {
       .With(
           Args<1, 2>(WasmHasSubstr("Failed to add to gauge: InternalFailure")))
       .Times(0);
-  { auto _s = gauge.Add(5); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(gauge.Add(5), StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_F(GaugeTest, LogsErrorWhenSubFails) {
@@ -1217,7 +1235,7 @@ TEST_F(GaugeTest, LogsErrorWhenSubFails) {
       .With(Args<1, 2>(
           WasmHasSubstr("Failed to subtract from gauge: InternalFailure")))
       .Times(0);
-  { auto _s = gauge.Sub(5); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(gauge.Sub(5), StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_F(GaugeTest, LogsErrorWhenSetFails) {
@@ -1227,7 +1245,7 @@ TEST_F(GaugeTest, LogsErrorWhenSetFails) {
   EXPECT_CALL(mock_abi_, proxy_log(LogLevel::error, _, _))
       .With(Args<1, 2>(WasmHasSubstr("Failed to set gauge: InternalFailure")))
       .Times(0);
-  { auto _s = gauge.Set(42); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(gauge.Set(42), StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_F(GaugeTest, LogsErrorAndReturnsZeroWhenGetFails) {
@@ -1237,7 +1255,7 @@ TEST_F(GaugeTest, LogsErrorAndReturnsZeroWhenGetFails) {
   EXPECT_CALL(mock_abi_, proxy_log(LogLevel::error, _, _))
       .With(Args<1, 2>(WasmHasSubstr("Failed to get gauge: InternalFailure")))
       .Times(0);
-  { auto _s = gauge.GetValue(); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(gauge.GetValue(), StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_F(GaugeTest, LogsErrorAndReturnsZeroWhenNotFound) {
@@ -1247,7 +1265,7 @@ TEST_F(GaugeTest, LogsErrorAndReturnsZeroWhenNotFound) {
   EXPECT_CALL(mock_abi_, proxy_log(LogLevel::error, _, _))
       .With(Args<1, 2>(WasmHasSubstr("Failed to get gauge: NotFound")))
       .Times(0);
-  { auto _s = gauge.GetValue(); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(gauge.GetValue(), StatusIs(absl::StatusCode::kInternal));
 }
 
 class HistogramTest : public ::testing::Test {
@@ -1302,7 +1320,7 @@ TEST_F(HistogramTest, LogsErrorWhenRecordFails) {
       .With(Args<1, 2>(
           WasmHasSubstr("Failed to record histogram: InternalFailure")))
       .Times(0);
-  { auto _s = histogram.RecordValue(42); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(histogram.RecordValue(42), StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_F(HistogramTest, LogsErrorWhenRecordFailsWithBadArgument) {
@@ -1313,7 +1331,7 @@ TEST_F(HistogramTest, LogsErrorWhenRecordFailsWithBadArgument) {
       .With(
           Args<1, 2>(WasmHasSubstr("Failed to record histogram: BadArgument")))
       .Times(0);
-  { auto _s = histogram.RecordValue(42); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(histogram.RecordValue(42), StatusIs(absl::StatusCode::kInternal));
 }
 
 class HandleTest : public Test {
@@ -1333,7 +1351,8 @@ TEST_F(HandleTest, GetTrailersForRequest) {
       .With(Args<1, 2>(WasmStrEq("foo")))
       .WillOnce(SetWasmString(std::string_view("bar")));
 
-  { auto _s = trailers.Get("foo"); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::optional<std::string>("bar")); };
+  EXPECT_THAT(trailers.Get("foo"),
+              IsOkAndHolds(std::optional<std::string>("bar")));
 }
 
 TEST_F(HandleTest, GetTrailersForResponse) {
@@ -1347,7 +1366,8 @@ TEST_F(HandleTest, GetTrailersForResponse) {
       .With(Args<1, 2>(WasmStrEq("foo")))
       .WillOnce(SetWasmString(std::string_view("bar")));
 
-  { auto _s = trailers.Get("foo"); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::optional<std::string>("bar")); };
+  EXPECT_THAT(trailers.Get("foo"),
+              IsOkAndHolds(std::optional<std::string>("bar")));
 }
 
 TEST_F(HandleTest, GetHeadersForRequest) {
@@ -1361,7 +1381,8 @@ TEST_F(HandleTest, GetHeadersForRequest) {
       .With(Args<1, 2>(WasmStrEq("foo")))
       .WillOnce(SetWasmString(std::string_view("bar")));
 
-  { auto _s = headers.Get("foo"); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::optional<std::string>("bar")); };
+  EXPECT_THAT(headers.Get("foo"),
+              IsOkAndHolds(std::optional<std::string>("bar")));
 }
 
 TEST_F(HandleTest, GetHeadersForResponse) {
@@ -1375,7 +1396,8 @@ TEST_F(HandleTest, GetHeadersForResponse) {
       .With(Args<1, 2>(WasmStrEq("foo")))
       .WillOnce(SetWasmString(std::string_view("bar")));
 
-  { auto _s = headers.Get("foo"); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, std::optional<std::string>("bar")); };
+  EXPECT_THAT(headers.Get("foo"),
+              IsOkAndHolds(std::optional<std::string>("bar")));
 }
 
 TEST_F(HandleTest, GetTrailersMutationsAllowedWhenHeadersPassedOn) {
@@ -1422,9 +1444,10 @@ TEST_F(HandleTest, GetHeadersMutationsBlockedWhenHeadersPassedOn) {
       .Times(0);
   EXPECT_CALL(mock_abi_, proxy_remove_header_map_value(_, _, _)).Times(0);
 
-  { auto _s = headers.Add("foo", "bar"); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
-  { auto _s = headers.Replace("foo", "baz"); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
-  { auto _s = headers.Remove("foo"); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kInternal); };
+  EXPECT_THAT(headers.Add("foo", "bar"), StatusIs(absl::StatusCode::kInternal));
+  EXPECT_THAT(headers.Replace("foo", "baz"),
+              StatusIs(absl::StatusCode::kInternal));
+  EXPECT_THAT(headers.Remove("foo"), StatusIs(absl::StatusCode::kInternal));
 }
 
 }  // namespace
