@@ -1,0 +1,46 @@
+# Copyright 2026 Google LLC.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Copy this file to terraform.tfvars and fill in your values.
+
+project_id = "your-gcp-project-id"
+region     = "us-central1"
+
+# Container image. Build and push using cloudbuild.yaml.
+callout_image = "us-central1-docker.pkg.dev/your-project/prompt-amender/callout:latest"
+
+# callout_service_account = "prompt-amender-sa@your-project.iam.gserviceaccount.com"
+
+fail_open = true
+
+# Default: rules.yaml lives in a GCS bucket Terraform creates and seeds
+# from rules.example.yaml. Update it later with:
+#   gsutil cp my-rules.yaml gs://your-project-prompt-amender-rules/rules.yaml
+config_source = "gcs"
+
+# Alternative: source rules from a Git repo instead.
+# config_source = "git"
+# git_repo_url  = "https://github.com/my-org/prompt-amender-rules.git"
+# git_branch    = "main"
+
+# Set this to actually export prompt_amender_* metrics and the
+# prompt_amender.amend span (e.g. to an OpenTelemetry Collector, or a
+# Cloud Monitoring/Trace-compatible OTLP ingestion endpoint). Left unset,
+# the callout's OTEL calls stay harmless no-ops.
+# otel_exporter_otlp_endpoint = "https://otel-collector.example.com:4317"
+
+# Keep true. Only set false to locally smoke-test rule matching without a
+# real Agent Gateway in front of this demo load balancer -- see the
+# README's "Identity headers must come from a trusted gateway" section.
+# strip_client_spiffe_id = true
