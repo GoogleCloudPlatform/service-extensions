@@ -48,6 +48,7 @@ using ::testing::HasSubstr;
 using ::testing::IsEmpty;
 using ::testing::NiceMock;
 using ::testing::Not;
+using ::testing::Optional;
 using ::testing::Pair;
 using ::testing::Return;
 using ::testing::SetArgPointee;
@@ -150,8 +151,7 @@ TEST_P(HeaderTest, GetHeaderExisting) {
   EXPECT_CALL(mock_abi_, proxy_get_header_map_value(GetParam(), _, _, _, _))
       .With(Args<1, 2>(WasmStrEq("foo")))
       .WillOnce(SetWasmString(std::string_view("bar")));
-  EXPECT_THAT(header_.Get("foo"),
-              IsOkAndHolds(std::optional<std::string>("bar")));
+  EXPECT_THAT(header_.Get("foo"), IsOkAndHolds(Optional(std::string("bar"))));
 }
 
 TEST_P(HeaderTest, GetHeaderMissing) {
@@ -170,8 +170,7 @@ TEST_P(HeaderTest, GetHeaderCaseInsensitive) {
   EXPECT_CALL(mock_abi_, proxy_get_header_map_value(GetParam(), _, _, _, _))
       .With(Args<1, 2>(WasmStrEq("FOO")))
       .WillOnce(SetWasmString(std::string_view("bar")));
-  EXPECT_THAT(header_.Get("FOO"),
-              IsOkAndHolds(std::optional<std::string>("bar")));
+  EXPECT_THAT(header_.Get("FOO"), IsOkAndHolds(Optional(std::string("bar"))));
 }
 
 TEST_P(HeaderTest, GetHeaderMultipleValuesJoinNatively) {
@@ -183,9 +182,8 @@ TEST_P(HeaderTest, GetHeaderMultipleValuesJoinNatively) {
         *value_size = 22;
         return WasmResult::Ok;
       });
-  EXPECT_THAT(
-      header_.Get("Set-Cookie"),
-      IsOkAndHolds(std::optional<std::string>("cookie_1=a, cookie_2=b")));
+  EXPECT_THAT(header_.Get("Set-Cookie"),
+              IsOkAndHolds(Optional(std::string("cookie_1=a, cookie_2=b"))));
 }
 
 TEST_P(HeaderTest, GetHeaderEmptyValue) {
@@ -198,7 +196,7 @@ TEST_P(HeaderTest, GetHeaderEmptyValue) {
         return WasmResult::Ok;
       });
   EXPECT_THAT(header_.Get("empty-header"),
-              IsOkAndHolds(std::optional<std::string>("")));
+              IsOkAndHolds(Optional(std::string(""))));
 }
 
 TEST_P(HeaderTest, GetHeaderInternalFailure) {
@@ -368,7 +366,7 @@ TEST_P(HeaderTest, GetHeaderEmbeddedNulls) {
       .WillOnce(SetWasmString(std::string_view("baz")));
 
   EXPECT_THAT(header_.Get(key_with_null),
-              IsOkAndHolds(std::optional<std::string>("baz")));
+              IsOkAndHolds(Optional(std::string("baz"))));
 }
 
 TEST_P(HeaderTest, RemoveHeaderIgnoresNotFound) {
@@ -428,16 +426,16 @@ TEST_P(HeaderTest, GetAtIndexAndGetNumValues) {
   EXPECT_THAT(header_.GetNumValues(""), IsOkAndHolds(1));
 
   EXPECT_THAT(header_.GetAtIndex("foo", 0),
-              IsOkAndHolds(std::optional<std::string>("val1")));
+              IsOkAndHolds(Optional(std::string("val1"))));
 
   EXPECT_THAT(header_.GetAtIndex("FOO", 0),
-              IsOkAndHolds(std::optional<std::string>("val1")));
+              IsOkAndHolds(Optional(std::string("val1"))));
 
   EXPECT_THAT(header_.GetAtIndex("foo", 1),
-              IsOkAndHolds(std::optional<std::string>("val3")));
+              IsOkAndHolds(Optional(std::string("val3"))));
 
   EXPECT_THAT(header_.GetAtIndex("FOO", 1),
-              IsOkAndHolds(std::optional<std::string>("val3")));
+              IsOkAndHolds(Optional(std::string("val3"))));
 
   EXPECT_THAT(header_.GetAtIndex("foo", 2), IsOkAndHolds(std::nullopt));
 
@@ -447,7 +445,7 @@ TEST_P(HeaderTest, GetAtIndexAndGetNumValues) {
   EXPECT_THAT(header_.GetAtIndex("baz", 0), IsOkAndHolds(std::nullopt));
 
   EXPECT_THAT(header_.GetAtIndex("", 0),
-              IsOkAndHolds(std::optional<std::string>("empty_key_val")));
+              IsOkAndHolds(Optional(std::string("empty_key_val"))));
 }
 
 TEST_P(HeaderTest, GetNumValuesInternalFailureReturnsError) {
@@ -1351,8 +1349,7 @@ TEST_F(HandleTest, GetTrailersForRequest) {
       .With(Args<1, 2>(WasmStrEq("foo")))
       .WillOnce(SetWasmString(std::string_view("bar")));
 
-  EXPECT_THAT(trailers.Get("foo"),
-              IsOkAndHolds(std::optional<std::string>("bar")));
+  EXPECT_THAT(trailers.Get("foo"), IsOkAndHolds(Optional(std::string("bar"))));
 }
 
 TEST_F(HandleTest, GetTrailersForResponse) {
@@ -1366,8 +1363,7 @@ TEST_F(HandleTest, GetTrailersForResponse) {
       .With(Args<1, 2>(WasmStrEq("foo")))
       .WillOnce(SetWasmString(std::string_view("bar")));
 
-  EXPECT_THAT(trailers.Get("foo"),
-              IsOkAndHolds(std::optional<std::string>("bar")));
+  EXPECT_THAT(trailers.Get("foo"), IsOkAndHolds(Optional(std::string("bar"))));
 }
 
 TEST_F(HandleTest, GetHeadersForRequest) {
@@ -1381,8 +1377,7 @@ TEST_F(HandleTest, GetHeadersForRequest) {
       .With(Args<1, 2>(WasmStrEq("foo")))
       .WillOnce(SetWasmString(std::string_view("bar")));
 
-  EXPECT_THAT(headers.Get("foo"),
-              IsOkAndHolds(std::optional<std::string>("bar")));
+  EXPECT_THAT(headers.Get("foo"), IsOkAndHolds(Optional(std::string("bar"))));
 }
 
 TEST_F(HandleTest, GetHeadersForResponse) {
@@ -1396,8 +1391,7 @@ TEST_F(HandleTest, GetHeadersForResponse) {
       .With(Args<1, 2>(WasmStrEq("foo")))
       .WillOnce(SetWasmString(std::string_view("bar")));
 
-  EXPECT_THAT(headers.Get("foo"),
-              IsOkAndHolds(std::optional<std::string>("bar")));
+  EXPECT_THAT(headers.Get("foo"), IsOkAndHolds(Optional(std::string("bar"))));
 }
 
 TEST_F(HandleTest, GetTrailersMutationsAllowedWhenHeadersPassedOn) {

@@ -69,16 +69,15 @@ TEST(LuaStateTest, CreateFailsOnLibraryInitializationError) {
 
   EXPECT_THAT(LuaState::Create(bad_libs),
               StatusIs(absl::StatusCode::kInternal,
-                       ::testing::HasSubstr("Simulated library init failure")));
+                       HasSubstr("Simulated library init failure")));
 }
 
 TEST(LuaStateTest, CreateFailsIfRequiredLibsMissingForSandbox) {
   std::vector<luaL_Reg> libs = {{"", luaopen_base}};
 
-  EXPECT_THAT(
-      LuaState::Create(libs),
-      StatusIs(absl::StatusCode::kInternal,
-               ::testing::HasSubstr("attempt to index global 'string'")));
+  EXPECT_THAT(LuaState::Create(libs),
+              StatusIs(absl::StatusCode::kInternal,
+                       HasSubstr("attempt to index global 'string'")));
 }
 
 TEST(LuaStateTest, ExecuteStringSucceedsOnValidLua) {
@@ -91,27 +90,26 @@ TEST(LuaStateTest, ExecuteStringFailsOnSyntaxError) {
   ASSERT_OK_AND_ASSIGN(std::unique_ptr<LuaState> state, LuaState::Create());
 
   EXPECT_THAT(state->ExecuteString("local x = 1 +"),
-              StatusIs(absl::StatusCode::kInternal,
-                       ::testing::HasSubstr("unexpected")));
+              StatusIs(absl::StatusCode::kInternal, HasSubstr("unexpected")));
 }
 
 TEST(LuaStateTest, ExecuteStringFailsOnRuntimeError) {
   ASSERT_OK_AND_ASSIGN(std::unique_ptr<LuaState> state, LuaState::Create());
 
-  EXPECT_THAT(state->ExecuteString("error('Custom runtime error')"),
-              StatusIs(absl::StatusCode::kInternal,
-                       ::testing::HasSubstr("Custom runtime error")));
+  EXPECT_THAT(
+      state->ExecuteString("error('Custom runtime error')"),
+      StatusIs(absl::StatusCode::kInternal, HasSubstr("Custom runtime error")));
 }
 
 TEST(LuaStateTest, ExecuteStringSafelyHandlesNonStringErrors) {
   ASSERT_OK_AND_ASSIGN(std::unique_ptr<LuaState> state, LuaState::Create());
 
-  EXPECT_THAT(state->ExecuteString("error({})"),
-              StatusIs(absl::StatusCode::kInternal,
-                       ::testing::HasSubstr("Unknown Lua error")));
-  EXPECT_THAT(state->ExecuteString("error(nil)"),
-              StatusIs(absl::StatusCode::kInternal,
-                       ::testing::HasSubstr("Unknown Lua error")));
+  EXPECT_THAT(
+      state->ExecuteString("error({})"),
+      StatusIs(absl::StatusCode::kInternal, HasSubstr("Unknown Lua error")));
+  EXPECT_THAT(
+      state->ExecuteString("error(nil)"),
+      StatusIs(absl::StatusCode::kInternal, HasSubstr("Unknown Lua error")));
 }
 
 TEST(LuaStateTest, ExecuteStringDisallowsBytecode) {
@@ -119,16 +117,13 @@ TEST(LuaStateTest, ExecuteStringDisallowsBytecode) {
 
   EXPECT_THAT(state->ExecuteString("\033Lua"),
               StatusIs(absl::StatusCode::kInvalidArgument,
-                       ::testing::HasSubstr(
-                           "Precompiled lua bytecode is not supported")));
+                       HasSubstr("Precompiled lua bytecode is not supported")));
   EXPECT_THAT(state->ExecuteString("\033"),
               StatusIs(absl::StatusCode::kInvalidArgument,
-                       ::testing::HasSubstr(
-                           "Precompiled lua bytecode is not supported")));
+                       HasSubstr("Precompiled lua bytecode is not supported")));
   EXPECT_THAT(state->ExecuteString("\033somethingelse"),
               StatusIs(absl::StatusCode::kInvalidArgument,
-                       ::testing::HasSubstr(
-                           "Precompiled lua bytecode is not supported")));
+                       HasSubstr("Precompiled lua bytecode is not supported")));
 }
 
 TEST(LuaStateTest, ExecuteStringSucceedsOnEmptyString) {
@@ -314,9 +309,9 @@ TEST(SandboxingTest, StringRepUnderLimitOk) {
 TEST(SandboxingTest, StringRepOverLimitFails) {
   ASSERT_OK_AND_ASSIGN(std::unique_ptr<LuaState> state, LuaState::Create());
 
-  EXPECT_THAT(state->ExecuteString("local s = string.rep('a', 65537)"),
-              StatusIs(absl::StatusCode::kInternal,
-                       ::testing::HasSubstr("size limit exceeded")));
+  EXPECT_THAT(
+      state->ExecuteString("local s = string.rep('a', 65537)"),
+      StatusIs(absl::StatusCode::kInternal, HasSubstr("size limit exceeded")));
 }
 
 TEST(SandboxingTest, StringRepWithLongerStringUnderLimitOk) {
@@ -328,9 +323,9 @@ TEST(SandboxingTest, StringRepWithLongerStringUnderLimitOk) {
 TEST(SandboxingTest, StringRepWithLongerStringOverLimitFails) {
   ASSERT_OK_AND_ASSIGN(std::unique_ptr<LuaState> state, LuaState::Create());
 
-  EXPECT_THAT(state->ExecuteString("local s = string.rep('aaaa', 16385)"),
-              StatusIs(absl::StatusCode::kInternal,
-                       ::testing::HasSubstr("size limit exceeded")));
+  EXPECT_THAT(
+      state->ExecuteString("local s = string.rep('aaaa', 16385)"),
+      StatusIs(absl::StatusCode::kInternal, HasSubstr("size limit exceeded")));
 }
 
 TEST(SandboxingTest, StringRepHandlesNegativeAndZero) {
@@ -389,8 +384,7 @@ TEST(LuaThreadTest, ResumePropagatesErrors) {
   ASSERT_OK(
       state->ExecuteString("function test_err() error('thread err') end"));
   EXPECT_THAT(thread->ExecuteFunction("test_err"),
-              StatusIs(absl::StatusCode::kInternal,
-                       ::testing::HasSubstr("thread err")));
+              StatusIs(absl::StatusCode::kInternal, HasSubstr("thread err")));
 }
 
 TEST(LuaThreadTest, ResumeWithArgumentsSucceeds) {
@@ -413,7 +407,7 @@ TEST(LuaThreadTest, ResumeFinishedThreadReturnsError) {
               IsOkAndHolds(ExecutionState::kExited));
   EXPECT_THAT(thread->ExecuteFunction("test_empty"),
               StatusIs(absl::StatusCode::kFailedPrecondition,
-                       ::testing::HasSubstr("cannot execute on dead thread")));
+                       HasSubstr("cannot execute on dead thread")));
 }
 
 TEST(LuaThreadTest, ResumeErroredThreadReturnsError) {
@@ -423,12 +417,11 @@ TEST(LuaThreadTest, ResumeErroredThreadReturnsError) {
   ASSERT_OK(state->ExecuteString(
       "function test_err_first() error('first error') end"));
   EXPECT_THAT(thread->ExecuteFunction("test_err_first"),
-              StatusIs(absl::StatusCode::kInternal,
-                       ::testing::HasSubstr("first error")));
+              StatusIs(absl::StatusCode::kInternal, HasSubstr("first error")));
 
   EXPECT_THAT(thread->Resume(/*n_arg=*/0),
               StatusIs(absl::StatusCode::kFailedPrecondition,
-                       ::testing::HasSubstr("cannot resume dead thread")));
+                       HasSubstr("cannot resume dead thread")));
 }
 
 TEST(LuaThreadTest, ExecuteFunctionSucceedsWithNoArgs) {
@@ -478,9 +471,9 @@ TEST(LuaThreadTest, ExecuteFunctionFailsIfFunctionNotFound) {
   ASSERT_OK_AND_ASSIGN(std::unique_ptr<LuaState::Thread> thread,
                        state->NewThread());
 
-  EXPECT_THAT(thread->ExecuteFunction("does_not_exist"),
-              StatusIs(absl::StatusCode::kNotFound,
-                       ::testing::HasSubstr("could not find")));
+  EXPECT_THAT(
+      thread->ExecuteFunction("does_not_exist"),
+      StatusIs(absl::StatusCode::kNotFound, HasSubstr("could not find")));
 }
 
 TEST(LuaThreadTest, ExecuteFunctionFailsOnRuntimeError) {
@@ -491,9 +484,9 @@ TEST(LuaThreadTest, ExecuteFunctionFailsOnRuntimeError) {
   ASSERT_OK(state->ExecuteString(
       "function broken_func() error('execution failed') end"));
 
-  EXPECT_THAT(thread->ExecuteFunction("broken_func"),
-              StatusIs(absl::StatusCode::kInternal,
-                       ::testing::HasSubstr("execution failed")));
+  EXPECT_THAT(
+      thread->ExecuteFunction("broken_func"),
+      StatusIs(absl::StatusCode::kInternal, HasSubstr("execution failed")));
 }
 
 TEST(LuaThreadTest, ExecuteFunctionWithHandle) {
@@ -528,13 +521,11 @@ TEST(LuaThreadTest, ResumeFailsIfNotEnoughArgsOnStack) {
 
   EXPECT_THAT(thread->Resume(/*n_arg=*/1),
               StatusIs(absl::StatusCode::kInvalidArgument,
-                       ::testing::HasSubstr(
-                           "not enough arguments on stack to resume")));
+                       HasSubstr("not enough arguments on stack to resume")));
 
   EXPECT_THAT(thread->Resume(/*n_arg=*/-1),
               StatusIs(absl::StatusCode::kInvalidArgument,
-                       ::testing::HasSubstr(
-                           "not enough arguments on stack to resume")));
+                       HasSubstr("not enough arguments on stack to resume")));
 }
 
 TEST(LuaThreadTest, ResumeSucceedsWithExactArgsOnStack) {
@@ -583,10 +574,9 @@ TEST(LuaThreadTest, ExecuteFunctionFailsWhenThreadIsYielded) {
   EXPECT_THAT(thread->ExecuteFunction("test5"),
               IsOkAndHolds(ExecutionState::kYielded));
 
-  EXPECT_THAT(
-      thread->ExecuteFunction("some_func"),
-      StatusIs(absl::StatusCode::kFailedPrecondition,
-               ::testing::HasSubstr("cannot execute on yielded thread")));
+  EXPECT_THAT(thread->ExecuteFunction("some_func"),
+              StatusIs(absl::StatusCode::kFailedPrecondition,
+                       HasSubstr("cannot execute on yielded thread")));
 }
 
 TEST(LuaThreadTest, ExecuteFunctionFailsWhenThreadIsFinished) {
@@ -600,7 +590,7 @@ TEST(LuaThreadTest, ExecuteFunctionFailsWhenThreadIsFinished) {
 
   EXPECT_THAT(thread->ExecuteFunction("some_func"),
               StatusIs(absl::StatusCode::kFailedPrecondition,
-                       ::testing::HasSubstr("cannot execute on dead thread")));
+                       HasSubstr("cannot execute on dead thread")));
 }
 
 TEST(LuaThreadTest, ExecuteFunctionFailsIfNotAFunction) {
@@ -610,9 +600,9 @@ TEST(LuaThreadTest, ExecuteFunctionFailsIfNotAFunction) {
 
   ASSERT_OK(state->ExecuteString("not_a_func = 42"));
 
-  EXPECT_THAT(thread->ExecuteFunction("not_a_func"),
-              StatusIs(absl::StatusCode::kNotFound,
-                       ::testing::HasSubstr("could not find")));
+  EXPECT_THAT(
+      thread->ExecuteFunction("not_a_func"),
+      StatusIs(absl::StatusCode::kNotFound, HasSubstr("could not find")));
 }
 
 struct FakeStatusTest {
