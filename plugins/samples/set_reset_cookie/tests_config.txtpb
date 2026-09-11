@@ -1,0 +1,21 @@
+cookies {
+  name: "session_id"
+  value: "abc123"
+  path: "/"
+  http_only: true
+  operation: SET
+}
+cookies {
+  name: "old_cookie"
+  operation: DELETE
+}
+cookies {
+  name: "tracking_id"
+  value: "new_value"
+  path: "/"
+  domain: ".example.com"
+  max_age: 3600
+  http_only: true
+  secure: true
+  operation: OVERWRITE
+}
