@@ -268,24 +268,24 @@
   <h1>Source code for callouts.python.extproc.service.callout_server</h1><div class="highlight"><pre>
 <span></span><span class="c1"># Copyright 2024 Google LLC.</span>
 <span class="c1">#</span>
-<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
 <span class="c1"># you may not use this file except in compliance with the License.</span>
 <span class="c1"># You may obtain a copy of the License at</span>
 <span class="c1">#</span>
 <span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
 <span class="c1">#</span>
 <span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
-<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
 <span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
 <span class="c1"># See the License for the specific language governing permissions and</span>
 <span class="c1"># limitations under the License.</span>
-<span class="sd">&quot;&quot;&quot;SDK for service callout servers.</span>
+<span class="sd">"""SDK for service callout servers.</span>
 
 <span class="sd">Provides a customizeable, out of the box, service callout server.</span>
 <span class="sd">Takes in service callouts and performs header and body transformations.</span>
 <span class="sd">Bundled with an optional health check server.</span>
 <span class="sd">Can be set up to use ssl certificates.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">concurrent</span><span class="w"> </span><span class="kn">import</span> <span class="n">futures</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">http.server</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseHTTPRequestHandler</span>
@@ -312,26 +312,26 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_addr_to_str</span><span class="p">(</span><span class="n">address</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;Take in an address tuple and returns a formated ip string.</span>
+<span class="w">  </span><span class="sd">"""Take in an address tuple and returns a formated ip string.</span>
 
 <span class="sd">  Args:</span>
 <span class="sd">      address: Address to transform.</span>
 
 <span class="sd">  Returns:</span>
-<span class="sd">      str: f&#39;{address[0]}:{address[1]}&#39;</span>
-<span class="sd">  &quot;&quot;&quot;</span>
-  <span class="k">return</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">address</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s1">:</span><span class="si">{</span><span class="n">address</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s1">&#39;</span>
+<span class="sd">      str: f'{address[0]}:{address[1]}'</span>
+<span class="sd">  """</span>
+  <span class="k">return</span> <span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="n">address</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s1">:</span><span class="si">{</span><span class="n">address</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s1">'</span>
 
 
 <div class="viewcode-block" id="HealthCheckService">
 <a class="viewcode-back" href="../../../../../extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.HealthCheckService">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">HealthCheckService</span><span class="p">(</span><span class="n">BaseHTTPRequestHandler</span><span class="p">):</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;Server for responding to health check pings.&quot;&quot;&quot;</span>
+<span class="w">  </span><span class="sd">"""Server for responding to health check pings."""</span>
 
 <div class="viewcode-block" id="HealthCheckService.do_GET">
 <a class="viewcode-back" href="../../../../../extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.HealthCheckService.do_GET">[docs]</a>
   <span class="k">def</span><span class="w"> </span><span class="nf">do_GET</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns an empty page with 200 status code.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Returns an empty page with 200 status code."""</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">send_response</span><span class="p">(</span><span class="mi">200</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">end_headers</span><span class="p">()</span></div>
 </div>
@@ -341,7 +341,7 @@
 <div class="viewcode-block" id="CalloutServer">
 <a class="viewcode-back" href="../../../../../extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">CalloutServer</span><span class="p">:</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;Server wrapper for managing callout servers and processing callouts.</span>
+<span class="w">  </span><span class="sd">"""Server wrapper for managing callout servers and processing callouts.</span>
 
 <span class="sd">  Attributes:</span>
 <span class="sd">    secure_address: Address that the main secure (TLS) server will attempt to connect to,</span>
@@ -354,7 +354,7 @@
 <span class="sd">    plaintext_address: The non-authenticated address to listen to,</span>
 <span class="sd">      defaults to default_ip:8080.</span>
 <span class="sd">    disable_plaintext: If true, disables the plaintext address of the server.</span>
-<span class="sd">    default_ip: If left None, defaults to &#39;0.0.0.0&#39;.</span>
+<span class="sd">    default_ip: If left None, defaults to '0.0.0.0'.</span>
 <span class="sd">    cert_chain: PEM Certificate chain used to authenticate secure connections,</span>
 <span class="sd">      required for secure servers.</span>
 <span class="sd">    cert_chain_path: Relative file path to the cert_chain.</span>
@@ -362,7 +362,7 @@
 <span class="sd">    private_key_path: Relative file path pointing to a file containing private_key data.</span>
 <span class="sd">    server_thread_count: Threads allocated to the main grpc service.</span>
 <span class="sd">    disable_tls: If True, disables the secure (TLS) server. Defaults to False.</span>
-<span class="sd">  &quot;&quot;&quot;</span>
+<span class="sd">  """</span>
 
   <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
@@ -375,16 +375,16 @@
     <span class="n">disable_tls</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">default_ip</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">cert_chain</span><span class="p">:</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">cert_chain_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s1">&#39;./extproc/ssl_creds/chain.pem&#39;</span><span class="p">,</span>
+    <span class="n">cert_chain_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s1">'./extproc/ssl_creds/chain.pem'</span><span class="p">,</span>
     <span class="n">private_key</span><span class="p">:</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">private_key_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;./extproc/ssl_creds/privatekey.pem&#39;</span><span class="p">,</span>
+    <span class="n">private_key_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'./extproc/ssl_creds/privatekey.pem'</span><span class="p">,</span>
     <span class="n">server_thread_count</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
   <span class="p">):</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_setup</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_shutdown</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_health_check_server</span><span class="p">:</span> <span class="n">HTTPServer</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-    <span class="n">default_ip</span> <span class="o">=</span> <span class="n">default_ip</span> <span class="ow">or</span> <span class="s1">&#39;0.0.0.0&#39;</span>
+    <span class="n">default_ip</span> <span class="o">=</span> <span class="n">default_ip</span> <span class="ow">or</span> <span class="s1">'0.0.0.0'</span>
 
     <span class="bp">self</span><span class="o">.</span><span class="n">secure_address</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">secure_address</span> <span class="ow">or</span> <span class="p">(</span><span class="n">default_ip</span><span class="p">,</span> <span class="mi">443</span><span class="p">)</span>
 
@@ -400,23 +400,23 @@
 
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">disable_tls</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">plaintext_address</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
       <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-          <span class="s1">&#39;At least one of secure (TLS) or plaintext listeners must be enabled.&#39;</span><span class="p">)</span>
+          <span class="s1">'At least one of secure (TLS) or plaintext listeners must be enabled.'</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_read_cert_file</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
       <span class="k">if</span> <span class="n">path</span><span class="p">:</span>
-        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Attempting to read cert/key file at: &#39;</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Attempting to read cert/key file at: '</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">'"</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
-          <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+          <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s1">'rb'</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
             <span class="n">content</span> <span class="o">=</span> <span class="n">file</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
             <span class="k">if</span> <span class="n">content</span><span class="p">:</span>
-              <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Successfully read &#39;</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span>
+              <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Successfully read '</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">'."</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
-              <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;File at &#39;</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&#39; is empty.&quot;</span><span class="p">)</span>
+              <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">"File at '</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">' is empty."</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">content</span>
         <span class="k">except</span> <span class="ne">FileNotFoundError</span><span class="p">:</span>
-          <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;File not found at &#39;</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span>
+          <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">"File not found at '</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">'."</span><span class="p">)</span>
         <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-          <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to read &#39;</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+          <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Failed to read '</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">': </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
       <span class="k">return</span> <span class="kc">None</span>
 
     <span class="bp">self</span><span class="o">.</span><span class="n">server_thread_count</span> <span class="o">=</span> <span class="n">server_thread_count</span>
@@ -428,19 +428,19 @@
     <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">disable_tls</span><span class="p">:</span>
       <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">private_key</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="s1">&#39;TLS is enabled but private key is not provided. &#39;</span>
-            <span class="s1">&#39;Please provide private_key or private_key_path.&#39;</span><span class="p">)</span>
+            <span class="s1">'TLS is enabled but private key is not provided. '</span>
+            <span class="s1">'Please provide private_key or private_key_path.'</span><span class="p">)</span>
       <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">cert_chain</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="s1">&#39;TLS is enabled but certificate chain is not provided. &#39;</span>
-            <span class="s1">&#39;Please provide cert_chain or cert_chain_path.&#39;</span><span class="p">)</span>
+            <span class="s1">'TLS is enabled but certificate chain is not provided. '</span>
+            <span class="s1">'Please provide cert_chain or cert_chain_path.'</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">secure_health_check</span><span class="p">:</span>
       <span class="k">if</span> <span class="ow">not</span> <span class="n">private_key_path</span><span class="p">:</span>
-        <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Secure health check requires a private_key_path.&quot;</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">"Secure health check requires a private_key_path."</span><span class="p">)</span>
         <span class="k">return</span>
       <span class="k">if</span> <span class="ow">not</span> <span class="n">cert_chain_path</span><span class="p">:</span>
-        <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Secure health check requires a cert_chain_path.&quot;</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">"Secure health check requires a cert_chain_path."</span><span class="p">)</span>
         <span class="k">return</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">health_check_ssl_context</span> <span class="o">=</span> <span class="n">ssl</span><span class="o">.</span><span class="n">SSLContext</span><span class="p">(</span><span class="n">ssl</span><span class="o">.</span><span class="n">PROTOCOL_TLS_SERVER</span><span class="p">)</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">health_check_ssl_context</span><span class="o">.</span><span class="n">load_cert_chain</span><span class="p">(</span><span class="n">certfile</span><span class="o">=</span><span class="n">cert_chain_path</span><span class="p">,</span>
@@ -451,13 +451,13 @@
 <div class="viewcode-block" id="CalloutServer.run">
 <a class="viewcode-back" href="../../../../../extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.run">[docs]</a>
   <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Start all requested servers and listen for new connections; blocking.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Start all requested servers and listen for new connections; blocking."""</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_start_servers</span><span class="p">()</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_setup</span> <span class="o">=</span> <span class="kc">True</span>
     <span class="k">try</span><span class="p">:</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">_loop_server</span><span class="p">()</span>
     <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
-      <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Server interrupted&#39;</span><span class="p">)</span>
+      <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">'Server interrupted'</span><span class="p">)</span>
     <span class="k">finally</span><span class="p">:</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">_stop_servers</span><span class="p">()</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span> <span class="o">=</span> <span class="kc">True</span></div>
@@ -466,18 +466,18 @@
 <div class="viewcode-block" id="CalloutServer._start_servers">
 <a class="viewcode-back" href="../../../../../extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer._start_servers">[docs]</a>
   <span class="k">def</span><span class="w"> </span><span class="nf">_start_servers</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Start the requested servers.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Start the requested servers."""</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">health_check_address</span><span class="p">:</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">_health_check_server</span> <span class="o">=</span> <span class="n">HTTPServer</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">health_check_address</span><span class="p">,</span>
                                              <span class="n">HealthCheckService</span><span class="p">)</span>
-      <span class="n">protocol</span> <span class="o">=</span> <span class="s1">&#39;HTTP&#39;</span>
+      <span class="n">protocol</span> <span class="o">=</span> <span class="s1">'HTTP'</span>
       <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">secure_health_check</span><span class="p">:</span>
-        <span class="n">protocol</span> <span class="o">=</span> <span class="s1">&#39;HTTPS&#39;</span>
+        <span class="n">protocol</span> <span class="o">=</span> <span class="s1">'HTTPS'</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_health_check_server</span><span class="o">.</span><span class="n">socket</span> <span class="o">=</span> <span class="p">(</span>
           <span class="bp">self</span><span class="o">.</span><span class="n">health_check_ssl_context</span><span class="o">.</span><span class="n">wrap_socket</span><span class="p">(</span>
             <span class="n">sock</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_health_check_server</span><span class="o">.</span><span class="n">socket</span><span class="p">,))</span>
 
-      <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%s</span><span class="s1"> health check server bound to </span><span class="si">%s</span><span class="s1">.&#39;</span><span class="p">,</span> <span class="n">protocol</span><span class="p">,</span>
+      <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">'</span><span class="si">%s</span><span class="s1"> health check server bound to </span><span class="si">%s</span><span class="s1">.'</span><span class="p">,</span> <span class="n">protocol</span><span class="p">,</span>
                    <span class="n">_addr_to_str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">health_check_address</span><span class="p">))</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_callout_server</span><span class="o">.</span><span class="n">start</span><span class="p">()</span></div>
 
@@ -485,11 +485,11 @@
 <div class="viewcode-block" id="CalloutServer._stop_servers">
 <a class="viewcode-back" href="../../../../../extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer._stop_servers">[docs]</a>
   <span class="k">def</span><span class="w"> </span><span class="nf">_stop_servers</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Close the sockets of all servers, and trigger shutdowns.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Close the sockets of all servers, and trigger shutdowns."""</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_health_check_server</span><span class="p">:</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">_health_check_server</span><span class="o">.</span><span class="n">server_close</span><span class="p">()</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">_health_check_server</span><span class="o">.</span><span class="n">shutdown</span><span class="p">()</span>
-      <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Health check server stopped.&#39;</span><span class="p">)</span>
+      <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">'Health check server stopped.'</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_callout_server</span><span class="p">:</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">_callout_server</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span></div>
@@ -498,12 +498,12 @@
 <div class="viewcode-block" id="CalloutServer._loop_server">
 <a class="viewcode-back" href="../../../../../extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer._loop_server">[docs]</a>
   <span class="k">def</span><span class="w"> </span><span class="nf">_loop_server</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Loop server forever, calling shutdown will cause the server to stop.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Loop server forever, calling shutdown will cause the server to stop."""</span>
 
     <span class="c1"># We chose the main serving thread based on what server configuration</span>
     <span class="c1"># was requested. Defaults to the health check thread.</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_health_check_server</span><span class="p">:</span>
-      <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Health check server started.&quot;</span><span class="p">)</span>
+      <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"Health check server started."</span><span class="p">)</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">_health_check_server</span><span class="o">.</span><span class="n">serve_forever</span><span class="p">()</span>
     <span class="k">else</span><span class="p">:</span>
       <span class="c1"># If the only server requested is a grpc callout server, we wait on the grpc server.</span>
@@ -513,7 +513,7 @@
 <div class="viewcode-block" id="CalloutServer.shutdown">
 <a class="viewcode-back" href="../../../../../extproc/service/callout_server.html#callouts.python.extproc.service.callout_server.CalloutServer.shutdown">[docs]</a>
   <span class="k">def</span><span class="w"> </span><span class="nf">shutdown</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Tell the server to shutdown, ending all serving threads.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Tell the server to shutdown, ending all serving threads."""</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_health_check_server</span><span class="p">:</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">_health_check_server</span><span class="o">.</span><span class="n">shutdown</span><span class="p">()</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_callout_server</span><span class="p">:</span>
@@ -527,7 +527,7 @@
       <span class="n">callout</span><span class="p">:</span> <span class="n">ProcessingRequest</span><span class="p">,</span>
       <span class="n">context</span><span class="p">:</span> <span class="n">ServicerContext</span><span class="p">,</span>
   <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProcessingResponse</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Process incomming callouts.</span>
+<span class="w">    </span><span class="sd">"""Process incomming callouts.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        callout: The incomming callout.</span>
@@ -535,8 +535,8 @@
 
 <span class="sd">    Yields:</span>
 <span class="sd">        ProcessingResponse: A response for the incoming callout.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="n">callout</span><span class="o">.</span><span class="n">HasField</span><span class="p">(</span><span class="s1">&#39;request_headers&#39;</span><span class="p">):</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">callout</span><span class="o">.</span><span class="n">HasField</span><span class="p">(</span><span class="s1">'request_headers'</span><span class="p">):</span>
       <span class="k">match</span> <span class="bp">self</span><span class="o">.</span><span class="n">on_request_headers</span><span class="p">(</span><span class="n">callout</span><span class="o">.</span><span class="n">request_headers</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
         <span class="k">case</span> <span class="n">ProcessingResponse</span><span class="p">()</span> <span class="k">as</span> <span class="n">processing_response</span><span class="p">:</span>
           <span class="k">return</span> <span class="n">processing_response</span>
@@ -545,19 +545,19 @@
         <span class="k">case</span> <span class="n">HeadersResponse</span><span class="p">()</span> <span class="o">|</span> <span class="kc">None</span> <span class="k">as</span> <span class="n">header_response</span><span class="p">:</span>
           <span class="k">return</span> <span class="n">ProcessingResponse</span><span class="p">(</span><span class="n">request_headers</span><span class="o">=</span><span class="n">header_response</span><span class="p">)</span>
         <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
-          <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;MALFORMED CALLOUT </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">callout</span><span class="p">)</span>
-    <span class="k">elif</span> <span class="n">callout</span><span class="o">.</span><span class="n">HasField</span><span class="p">(</span><span class="s1">&#39;response_headers&#39;</span><span class="p">):</span>
+          <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">"MALFORMED CALLOUT </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">callout</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">callout</span><span class="o">.</span><span class="n">HasField</span><span class="p">(</span><span class="s1">'response_headers'</span><span class="p">):</span>
       <span class="k">return</span> <span class="n">ProcessingResponse</span><span class="p">(</span><span class="n">response_headers</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">on_response_headers</span><span class="p">(</span>
           <span class="n">callout</span><span class="o">.</span><span class="n">response_headers</span><span class="p">,</span> <span class="n">context</span><span class="p">))</span>
-    <span class="k">elif</span> <span class="n">callout</span><span class="o">.</span><span class="n">HasField</span><span class="p">(</span><span class="s1">&#39;request_body&#39;</span><span class="p">):</span>
+    <span class="k">elif</span> <span class="n">callout</span><span class="o">.</span><span class="n">HasField</span><span class="p">(</span><span class="s1">'request_body'</span><span class="p">):</span>
       <span class="k">match</span> <span class="bp">self</span><span class="o">.</span><span class="n">on_request_body</span><span class="p">(</span><span class="n">callout</span><span class="o">.</span><span class="n">request_body</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
         <span class="k">case</span> <span class="n">ImmediateResponse</span><span class="p">()</span> <span class="k">as</span> <span class="n">immediate_body</span><span class="p">:</span>
           <span class="k">return</span> <span class="n">ProcessingResponse</span><span class="p">(</span><span class="n">immediate_response</span><span class="o">=</span><span class="n">immediate_body</span><span class="p">)</span>
         <span class="k">case</span> <span class="n">BodyResponse</span><span class="p">()</span> <span class="o">|</span> <span class="kc">None</span> <span class="k">as</span> <span class="n">body_response</span><span class="p">:</span>
           <span class="k">return</span> <span class="n">ProcessingResponse</span><span class="p">(</span><span class="n">request_body</span><span class="o">=</span><span class="n">body_response</span><span class="p">)</span>
         <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
-          <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;MALFORMED CALLOUT </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">callout</span><span class="p">)</span>
-    <span class="k">elif</span> <span class="n">callout</span><span class="o">.</span><span class="n">HasField</span><span class="p">(</span><span class="s1">&#39;response_body&#39;</span><span class="p">):</span>
+          <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">"MALFORMED CALLOUT </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">callout</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">callout</span><span class="o">.</span><span class="n">HasField</span><span class="p">(</span><span class="s1">'response_body'</span><span class="p">):</span>
       <span class="k">return</span> <span class="n">ProcessingResponse</span><span class="p">(</span>
           <span class="n">response_body</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">on_response_body</span><span class="p">(</span><span class="n">callout</span><span class="o">.</span><span class="n">response_body</span><span class="p">,</span> <span class="n">context</span><span class="p">))</span>
     <span class="k">return</span> <span class="n">ProcessingResponse</span><span class="p">()</span></div>
@@ -570,7 +570,7 @@
       <span class="n">headers</span><span class="p">:</span> <span class="n">HttpHeaders</span><span class="p">,</span>  <span class="c1"># pylint: disable=unused-argument</span>
       <span class="n">context</span><span class="p">:</span> <span class="n">ServicerContext</span>  <span class="c1"># pylint: disable=unused-argument</span>
   <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="n">HeadersResponse</span><span class="p">,</span> <span class="n">ImmediateResponse</span><span class="p">,</span> <span class="n">ProcessingResponse</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Process incoming request headers.</span>
+<span class="w">    </span><span class="sd">"""Process incoming request headers.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">      headers: Request headers to process.</span>
@@ -578,7 +578,7 @@
 
 <span class="sd">    Returns:</span>
 <span class="sd">      Optional header modification object or a complete response.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="kc">None</span></div>
 
 
@@ -589,7 +589,7 @@
       <span class="n">headers</span><span class="p">:</span> <span class="n">HttpHeaders</span><span class="p">,</span>  <span class="c1"># pylint: disable=unused-argument</span>
       <span class="n">context</span><span class="p">:</span> <span class="n">ServicerContext</span>  <span class="c1"># pylint: disable=unused-argument</span>
   <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="n">HeadersResponse</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Process incoming response headers.</span>
+<span class="w">    </span><span class="sd">"""Process incoming response headers.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">      headers: Response headers to process.</span>
@@ -597,7 +597,7 @@
 
 <span class="sd">    Returns:</span>
 <span class="sd">      Optional header modification object.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="kc">None</span></div>
 
 
@@ -608,7 +608,7 @@
       <span class="n">body</span><span class="p">:</span> <span class="n">HttpBody</span><span class="p">,</span>  <span class="c1"># pylint: disable=unused-argument</span>
       <span class="n">context</span><span class="p">:</span> <span class="n">ServicerContext</span>  <span class="c1"># pylint: disable=unused-argument</span>
   <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="n">BodyResponse</span><span class="p">,</span> <span class="n">ImmediateResponse</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Process an incoming request body.</span>
+<span class="w">    </span><span class="sd">"""Process an incoming request body.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">      headers: Request body to process.</span>
@@ -616,7 +616,7 @@
 
 <span class="sd">    Returns:</span>
 <span class="sd">      Optional body modification object.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="kc">None</span></div>
 
 
@@ -627,7 +627,7 @@
       <span class="n">body</span><span class="p">:</span> <span class="n">HttpBody</span><span class="p">,</span>  <span class="c1"># pylint: disable=unused-argument</span>
       <span class="n">context</span><span class="p">:</span> <span class="n">ServicerContext</span>  <span class="c1"># pylint: disable=unused-argument</span>
   <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="n">BodyResponse</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Process an incoming response body.</span>
+<span class="w">    </span><span class="sd">"""Process an incoming response body.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">      headers: Response body to process.</span>
@@ -635,7 +635,7 @@
 
 <span class="sd">    Returns:</span>
 <span class="sd">      Optional body modification object.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="kc">None</span></div>
 </div>
 
@@ -644,30 +644,30 @@
 <div class="viewcode-block" id="_GRPCCalloutService">
 <a class="viewcode-back" href="../../../../../extproc/service/callout_server.html#callouts.python.extproc.service.callout_server._GRPCCalloutService">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">_GRPCCalloutService</span><span class="p">(</span><span class="n">ExternalProcessorServicer</span><span class="p">):</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;GRPC based Callout server implementation.&quot;&quot;&quot;</span>
+<span class="w">  </span><span class="sd">"""GRPC based Callout server implementation."""</span>
 
   <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">processor</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_processor</span> <span class="o">=</span> <span class="n">processor</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_server</span> <span class="o">=</span> <span class="n">grpc</span><span class="o">.</span><span class="n">server</span><span class="p">(</span>
         <span class="n">futures</span><span class="o">.</span><span class="n">ThreadPoolExecutor</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="n">processor</span><span class="o">.</span><span class="n">server_thread_count</span><span class="p">))</span>
     <span class="n">add_ExternalProcessorServicer_to_server</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_server</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_start_msg</span> <span class="o">=</span> <span class="s1">&#39;GRPC callout server started&#39;</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_start_msg</span> <span class="o">=</span> <span class="s1">'GRPC callout server started'</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">processor</span><span class="o">.</span><span class="n">disable_tls</span><span class="p">:</span>
       <span class="n">server_credentials</span> <span class="o">=</span> <span class="n">grpc</span><span class="o">.</span><span class="n">ssl_server_credentials</span><span class="p">(</span>
         <span class="n">private_key_certificate_chain_pairs</span><span class="o">=</span><span class="p">[(</span><span class="n">processor</span><span class="o">.</span><span class="n">private_key</span><span class="p">,</span>
                                               <span class="n">processor</span><span class="o">.</span><span class="n">cert_chain</span><span class="p">)])</span>
       <span class="n">address_str</span> <span class="o">=</span> <span class="n">_addr_to_str</span><span class="p">(</span><span class="n">processor</span><span class="o">.</span><span class="n">secure_address</span><span class="p">)</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">_server</span><span class="o">.</span><span class="n">add_secure_port</span><span class="p">(</span><span class="n">address_str</span><span class="p">,</span> <span class="n">server_credentials</span><span class="p">)</span>
-      <span class="bp">self</span><span class="o">.</span><span class="n">_start_msg</span> <span class="o">+=</span> <span class="sa">f</span><span class="s1">&#39;, listening on </span><span class="si">{</span><span class="n">address_str</span><span class="si">}</span><span class="s1"> (secure)&#39;</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">_start_msg</span> <span class="o">+=</span> <span class="sa">f</span><span class="s1">', listening on </span><span class="si">{</span><span class="n">address_str</span><span class="si">}</span><span class="s1"> (secure)'</span>
     <span class="k">if</span> <span class="n">processor</span><span class="o">.</span><span class="n">plaintext_address</span><span class="p">:</span>
       <span class="n">plaintext_address_str</span> <span class="o">=</span> <span class="n">_addr_to_str</span><span class="p">(</span><span class="n">processor</span><span class="o">.</span><span class="n">plaintext_address</span><span class="p">)</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">_server</span><span class="o">.</span><span class="n">add_insecure_port</span><span class="p">(</span><span class="n">plaintext_address_str</span><span class="p">)</span>
-      <span class="bp">self</span><span class="o">.</span><span class="n">_start_msg</span> <span class="o">+=</span> <span class="sa">f</span><span class="s1">&#39;, listening on </span><span class="si">{</span><span class="n">plaintext_address_str</span><span class="si">}</span><span class="s1"> (plaintext)&#39;</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">_start_msg</span> <span class="o">+=</span> <span class="sa">f</span><span class="s1">', listening on </span><span class="si">{</span><span class="n">plaintext_address_str</span><span class="si">}</span><span class="s1"> (plaintext)'</span>
 
   <span class="k">def</span><span class="w"> </span><span class="nf">stop</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_server</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="n">grace</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_server</span><span class="o">.</span><span class="n">wait_for_termination</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
-    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;GRPC server stopped.&#39;</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">'GRPC server stopped.'</span><span class="p">)</span>
 
   <span class="k">def</span><span class="w"> </span><span class="nf">loop</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_server</span><span class="o">.</span><span class="n">wait_for_termination</span><span class="p">()</span>
@@ -683,7 +683,7 @@
       <span class="n">callout_iterator</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">ProcessingRequest</span><span class="p">],</span>
       <span class="n">context</span><span class="p">:</span> <span class="n">ServicerContext</span><span class="p">,</span>
   <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">ProcessingResponse</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Process the client callout.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Process the client callout."""</span>
     <span class="k">for</span> <span class="n">callout</span> <span class="ow">in</span> <span class="n">callout_iterator</span><span class="p">:</span>
       <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">_processor</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">callout</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span></div>
 </div>

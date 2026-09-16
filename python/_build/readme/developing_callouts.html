@@ -285,7 +285,7 @@
 </pre></div>
 </div>
 <p>Just from importing the server class we can make the server run by creating a new instance and calling the blocking function <code class="docutils literal notranslate"><span class="pre">run</span></code>:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">'__main__'</span><span class="p">:</span>
     <span class="n">CalloutServer</span><span class="p">()</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
 </pre></div>
 </div>
@@ -335,7 +335,7 @@
 <div><p>With the callout from before, we can add the <code class="docutils literal notranslate"><span class="pre">foo:bar</span></code> header mutation on incoming <code class="docutils literal notranslate"><span class="pre">response_headers</span></code> callouts:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">BasicCalloutServer</span><span class="p">(</span><span class="n">CalloutServer</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">on_response_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">headers</span><span class="p">:</span> <span class="n">HttpHeaders</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">ServicerContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HeadersResponse</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">add_header_mutation</span><span class="p">(</span><span class="n">add</span><span class="o">=</span><span class="p">[(</span><span class="s1">&#39;foo&#39;</span><span class="p">,</span> <span class="s1">&#39;bar&#39;</span><span class="p">)])</span>
+        <span class="k">return</span> <span class="n">add_header_mutation</span><span class="p">(</span><span class="n">add</span><span class="o">=</span><span class="p">[(</span><span class="s1">'foo'</span><span class="p">,</span> <span class="s1">'bar'</span><span class="p">)])</span>
 </pre></div>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">add_header_mutation</span></code> also has parameters for removing (<cite>remove</cite>) and cache clearing (<cite>clear_route_cache</cite>). See <a class="reference internal" href="../extproc/service/callout_tools.html#callout-tools"><span class="std std-ref">CalloutTools</span></a> .</p>
@@ -346,7 +346,7 @@
 <div><p>The callout server uses the <code class="docutils literal notranslate"><span class="pre">logging</span></code> module. By default, this means that nothing is logged to the terminal on standard use. We recommend setting the logging level to <code class="docutils literal notranslate"><span class="pre">INFO</span></code> so that normal server operation is visible.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 
-<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">'__main__'</span><span class="p">:</span>
     <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
     <span class="n">BasicCalloutServer</span><span class="p">()</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
 </pre></div>
@@ -364,9 +364,9 @@
 
 <span class="k">class</span><span class="w"> </span><span class="nc">BasicCalloutServer</span><span class="p">(</span><span class="n">CalloutServer</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">on_response_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">headers</span><span class="p">:</span> <span class="n">HttpHeaders</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">ServicerContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HeadersResponse</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">add_header_mutation</span><span class="p">(</span><span class="n">add</span><span class="o">=</span><span class="p">[(</span><span class="s1">&#39;foo&#39;</span><span class="p">,</span> <span class="s1">&#39;bar&#39;</span><span class="p">)])</span>
+        <span class="k">return</span> <span class="n">add_header_mutation</span><span class="p">(</span><span class="n">add</span><span class="o">=</span><span class="p">[(</span><span class="s1">'foo'</span><span class="p">,</span> <span class="s1">'bar'</span><span class="p">)])</span>
 
-<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">'__main__'</span><span class="p">:</span>
     <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
     <span class="n">BasicCalloutServer</span><span class="p">()</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
 </pre></div>

@@ -268,14 +268,14 @@
   <h1>Source code for callouts.python.extproc.example.jwt_auth.service_callout_example</h1><div class="highlight"><pre>
 <span></span><span class="c1"># Copyright 2024 Google LLC.</span>
 <span class="c1">#</span>
-<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
 <span class="c1"># you may not use this file except in compliance with the License.</span>
 <span class="c1"># You may obtain a copy of the License at</span>
 <span class="c1">#</span>
 <span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
 <span class="c1">#</span>
 <span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
-<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
 <span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
 <span class="c1"># See the License for the specific language governing permissions and</span>
 <span class="c1"># limitations under the License.</span>
@@ -302,9 +302,9 @@
   <span class="n">request_headers</span><span class="p">:</span> <span class="n">service_pb2</span><span class="o">.</span><span class="n">HttpHeaders</span><span class="p">,</span>
 
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">  </span><span class="sd">"""</span>
 <span class="sd">  Extracts the JWT token from the request headers, specifically looking for</span>
-<span class="sd">  the &#39;Authorization&#39; header and parsing out the token part.</span>
+<span class="sd">  the 'Authorization' header and parsing out the token part.</span>
 
 <span class="sd">  Args:</span>
 <span class="sd">      request_headers (service_pb2.HttpHeaders): The HTTP headers received in the request.</span>
@@ -315,17 +315,17 @@
 <span class="sd">  Example:</span>
 <span class="sd">      Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6...</span>
 <span class="sd">      -&gt; Returns: eyJhbGciOiJIUzI1NiIsInR5cCI6...</span>
-<span class="sd">  &quot;&quot;&quot;</span>
+<span class="sd">  """</span>
 
   <span class="n">decoded_headers</span> <span class="o">=</span> <span class="p">(</span>
-    <span class="n">header</span><span class="o">.</span><span class="n">raw_value</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">header</span><span class="o">.</span><span class="n">value</span>
+    <span class="n">header</span><span class="o">.</span><span class="n">raw_value</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">'utf-8'</span><span class="p">)</span> <span class="ow">or</span> <span class="n">header</span><span class="o">.</span><span class="n">value</span>
     <span class="k">for</span> <span class="n">header</span> <span class="ow">in</span> <span class="n">request_headers</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">headers</span>
-    <span class="k">if</span> <span class="n">header</span><span class="o">.</span><span class="n">key</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;authorization&#39;</span>
+    <span class="k">if</span> <span class="n">header</span><span class="o">.</span><span class="n">key</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">'authorization'</span>
   <span class="p">)</span>
   <span class="n">result</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">decoded_headers</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
   <span class="k">if</span> <span class="n">result</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
     <span class="k">return</span> <span class="n">result</span>
-  <span class="k">return</span> <span class="n">result</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span></div>
+  <span class="k">return</span> <span class="n">result</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">' '</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span></div>
 
 
 
@@ -337,7 +337,7 @@
   <span class="n">algorithm</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
   <span class="n">context</span><span class="p">:</span> <span class="n">ServicerContext</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">  </span><span class="sd">"""</span>
 <span class="sd">  Validates the JWT token extracted from the request headers using a specified</span>
 <span class="sd">  public key and algorithm. If valid, returns the decoded JWT payload; otherwise,</span>
 <span class="sd">  logs an error and returns None.</span>
@@ -346,7 +346,7 @@
 <span class="sd">      key (bytes): The public key used for token validation.</span>
 <span class="sd">      request_headers (service_pb2.HttpHeaders): The HTTP headers received in the request,</span>
 <span class="sd">                                                used to extract the JWT token.</span>
-<span class="sd">      algorithm (str): The algorithm with which the JWT was signed (e.g., &#39;RS256&#39;).</span>
+<span class="sd">      algorithm (str): The algorithm with which the JWT was signed (e.g., 'RS256').</span>
 <span class="sd">      context: RPC context of the incoming callout.</span>
 
 <span class="sd">  Returns:</span>
@@ -358,15 +358,15 @@
 
 <span class="sd">  Example:</span>
 <span class="sd">      Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6...</span>
-<span class="sd">      -&gt; Returns: {&#39;sub&#39;: &#39;1234567890&#39;, &#39;name&#39;: &#39;John Doe&#39;, &#39;iat&#39;: 1712173461, &#39;exp&#39;: 2075658261}</span>
-<span class="sd">  &quot;&quot;&quot;</span>
+<span class="sd">      -&gt; Returns: {'sub': '1234567890', 'name': 'John Doe', 'iat': 1712173461, 'exp': 2075658261}</span>
+<span class="sd">  """</span>
   <span class="n">jwt_token</span> <span class="o">=</span> <span class="n">extract_jwt_token</span><span class="p">(</span><span class="n">request_headers</span><span class="p">)</span>
   <span class="k">if</span> <span class="n">jwt_token</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="n">callout_tools</span><span class="o">.</span><span class="n">deny_callout</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="s1">&#39;No Authorization token found.&#39;</span><span class="p">)</span>
+    <span class="n">callout_tools</span><span class="o">.</span><span class="n">deny_callout</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="s1">'No Authorization token found.'</span><span class="p">)</span>
     <span class="k">return</span> <span class="kc">None</span>
   <span class="k">try</span><span class="p">:</span>
     <span class="n">decoded</span> <span class="o">=</span> <span class="n">jwt</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">jwt_token</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">algorithms</span><span class="o">=</span><span class="p">[</span><span class="n">algorithm</span><span class="p">])</span>
-    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Approved - Decoded Values: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">decoded</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">'Approved - Decoded Values: </span><span class="si">%s</span><span class="s1">'</span><span class="p">,</span> <span class="n">decoded</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">decoded</span>
   <span class="k">except</span> <span class="n">InvalidTokenError</span><span class="p">:</span>
     <span class="k">return</span> <span class="kc">None</span></div>
@@ -376,24 +376,24 @@
 <div class="viewcode-block" id="CalloutServerExample">
 <a class="viewcode-back" href="../../../../../../extproc/jwt_auth/service_callout_example.html#callouts.python.extproc.example.jwt_auth.service_callout_example.CalloutServerExample">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">CalloutServerExample</span><span class="p">(</span><span class="n">callout_server</span><span class="o">.</span><span class="n">CalloutServer</span><span class="p">):</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;Example callout server.</span>
+<span class="w">  </span><span class="sd">"""Example callout server.</span>
 
 <span class="sd">  For request header callouts we provide a mutation to add multiple headers</span>
-<span class="sd">  based on the decoded fields for example &#39;{decoded-name: John Doe}&#39;, and to</span>
+<span class="sd">  based on the decoded fields for example '{decoded-name: John Doe}', and to</span>
 <span class="sd">  clear the route cache if the JWT Authorization is valid.</span>
 <span class="sd">  A valid token example value can be found below.</span>
 
 <span class="sd">  Valid Token for RS256:</span>
 <span class="sd">  eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTcxMjE3MzQ2MSwiZXhwIjoyMDc1NjU4MjYxfQ.Vv-Lwn1z8BbVBGm-T1EKxv6T3XKCeRlvRrRmdu8USFdZUoSBK_aThzwzM2T8hlpReYsX9YFdJ3hMfq6OZTfHvfPLXvAt7iSKa03ZoPQzU8bRGzYy8xrb0ZQfrejGfHS5iHukzA8vtI2UAJ_9wFQiY5_VGHOBv9116efslbg-_gItJ2avJb0A0yr5uUwmE336rYEwgm4DzzfnTqPt8kcJwkONUsjEH__mePrva1qDT4qtfTPQpGa35TW8n9yZqse3h1w3xyxUfJd3BlDmoz6pQp2CvZkhdQpkWA1bnwpdqSDC7bHk4tYX6K5Q19na-2ff7gkmHZHJr0G9e_vAhQiE5w</span>
 
-<span class="sd">  &quot;&quot;&quot;</span>
+<span class="sd">  """</span>
 
   <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_load_public_key</span><span class="p">(</span><span class="s1">&#39;./extproc/ssl_creds/publickey.pem&#39;</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_load_public_key</span><span class="p">(</span><span class="s1">'./extproc/ssl_creds/publickey.pem'</span><span class="p">)</span>
 
   <span class="k">def</span><span class="w"> </span><span class="nf">_load_public_key</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">key_file</span><span class="p">:</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s1">'rb'</span><span class="p">)</span> <span class="k">as</span> <span class="n">key_file</span><span class="p">:</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">public_key</span> <span class="o">=</span> <span class="n">key_file</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
 
 <div class="viewcode-block" id="CalloutServerExample.on_request_headers">
@@ -401,31 +401,31 @@
   <span class="k">def</span><span class="w"> </span><span class="nf">on_request_headers</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">headers</span><span class="p">:</span> <span class="n">service_pb2</span><span class="o">.</span><span class="n">HttpHeaders</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">ServicerContext</span>
   <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">service_pb2</span><span class="o">.</span><span class="n">HeadersResponse</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Deny token if validation fails and return an error message.</span>
+<span class="w">    </span><span class="sd">"""Deny token if validation fails and return an error message.</span>
 <span class="sd">    See :py:meth:`callouts.python.extproc.service.callout_tools.deny_request` for more information.</span>
 
 <span class="sd">    If the token is valid, apply a header mutation.</span>
 <span class="sd">    See :py:meth:`callouts.python.extproc.service.callout_tools.add_header_mutation` for more information.</span>
 
 <span class="sd">    See base method: :py:meth:`callouts.python.extproc.service.callout_server.CalloutServer.on_request_headers`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">headers</span><span class="p">)</span>
-    <span class="n">decoded</span> <span class="o">=</span> <span class="n">validate_jwt_token</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">public_key</span><span class="p">,</span> <span class="n">headers</span><span class="p">,</span> <span class="s1">&#39;RS256&#39;</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+    <span class="n">decoded</span> <span class="o">=</span> <span class="n">validate_jwt_token</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">public_key</span><span class="p">,</span> <span class="n">headers</span><span class="p">,</span> <span class="s1">'RS256'</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">decoded</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
       <span class="n">decoded_items</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="p">(</span><span class="s1">&#39;decoded-&#39;</span> <span class="o">+</span> <span class="n">key</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">))</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">decoded</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="p">(</span><span class="s1">'decoded-'</span> <span class="o">+</span> <span class="n">key</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">))</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">decoded</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
       <span class="p">]</span>
       <span class="k">return</span> <span class="n">callout_tools</span><span class="o">.</span><span class="n">add_header_mutation</span><span class="p">(</span>
         <span class="n">add</span><span class="o">=</span><span class="n">decoded_items</span><span class="p">,</span> <span class="n">clear_route_cache</span><span class="o">=</span><span class="kc">True</span>
       <span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-      <span class="n">callout_tools</span><span class="o">.</span><span class="n">deny_callout</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="s1">&#39;Authorization token is invalid.&#39;</span><span class="p">)</span></div>
+      <span class="n">callout_tools</span><span class="o">.</span><span class="n">deny_callout</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="s1">'Authorization token is invalid.'</span><span class="p">)</span></div>
 </div>
 
 
 
-<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">'__main__'</span><span class="p">:</span>
   <span class="c1"># Useful command line args.</span>
   <span class="n">args</span> <span class="o">=</span> <span class="n">command_line_tools</span><span class="o">.</span><span class="n">add_command_line_args</span><span class="p">()</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
   <span class="c1"># Set the logging debug level.</span>

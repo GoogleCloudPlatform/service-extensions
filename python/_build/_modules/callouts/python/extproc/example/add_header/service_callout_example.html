@@ -268,14 +268,14 @@
   <h1>Source code for callouts.python.extproc.example.add_header.service_callout_example</h1><div class="highlight"><pre>
 <span></span><span class="c1"># Copyright 2024 Google LLC.</span>
 <span class="c1">#</span>
-<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
 <span class="c1"># you may not use this file except in compliance with the License.</span>
 <span class="c1"># You may obtain a copy of the License at</span>
 <span class="c1">#</span>
 <span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
 <span class="c1">#</span>
 <span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
-<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
 <span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
 <span class="c1"># See the License for the specific language governing permissions and</span>
 <span class="c1"># limitations under the License.</span>
@@ -290,20 +290,20 @@
 <div class="viewcode-block" id="CalloutServerExample">
 <a class="viewcode-back" href="../../../../../../extproc/add_header/service_callout_example.html#callouts.python.extproc.example.add_header.service_callout_example.CalloutServerExample">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">CalloutServerExample</span><span class="p">(</span><span class="n">callout_server</span><span class="o">.</span><span class="n">CalloutServer</span><span class="p">):</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;Example callout server.</span>
+<span class="w">  </span><span class="sd">"""Example callout server.</span>
 
 <span class="sd">  For request header callouts we provide a mutation to add a header</span>
-<span class="sd">  &#39;{header-request: request}&#39;, remove a header &#39;foo&#39;, and to clear the</span>
+<span class="sd">  '{header-request: request}', remove a header 'foo', and to clear the</span>
 <span class="sd">  route cache. On response header callouts, we respond with a mutation to add</span>
-<span class="sd">  the header &#39;{header-response: response}&#39;.</span>
-<span class="sd">  &quot;&quot;&quot;</span>
+<span class="sd">  the header '{header-response: response}'.</span>
+<span class="sd">  """</span>
 
 <div class="viewcode-block" id="CalloutServerExample.on_request_headers">
 <a class="viewcode-back" href="../../../../../../extproc/add_header/service_callout_example.html#callouts.python.extproc.example.add_header.service_callout_example.CalloutServerExample.on_request_headers">[docs]</a>
   <span class="k">def</span><span class="w"> </span><span class="nf">on_request_headers</span><span class="p">(</span>
       <span class="bp">self</span><span class="p">,</span> <span class="n">headers</span><span class="p">:</span> <span class="n">service_pb2</span><span class="o">.</span><span class="n">HttpHeaders</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">ServicerContext</span>
   <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">service_pb2</span><span class="o">.</span><span class="n">HeadersResponse</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Custom processor on request headers.</span>
+<span class="w">    </span><span class="sd">"""Custom processor on request headers.</span>
 <span class="sd">    </span>
 <span class="sd">    Args:</span>
 <span class="sd">      headers (service_pb2.HttpHeaders): The HTTP headers received in the request.</span>
@@ -312,9 +312,9 @@
 <span class="sd">    Returns:</span>
 <span class="sd">      service_pb2.HeadersResponse: The response containing the mutations to be applied</span>
 <span class="sd">      to the request headers.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="n">callout_tools</span><span class="o">.</span><span class="n">add_header_mutation</span><span class="p">(</span>
-      <span class="n">add</span><span class="o">=</span><span class="p">[(</span><span class="s1">&#39;header-request&#39;</span><span class="p">,</span> <span class="s1">&#39;request&#39;</span><span class="p">)],</span>
+      <span class="n">add</span><span class="o">=</span><span class="p">[(</span><span class="s1">'header-request'</span><span class="p">,</span> <span class="s1">'request'</span><span class="p">)],</span>
       <span class="n">clear_route_cache</span><span class="o">=</span><span class="kc">True</span>
     <span class="p">)</span></div>
 
@@ -324,7 +324,7 @@
   <span class="k">def</span><span class="w"> </span><span class="nf">on_response_headers</span><span class="p">(</span>
       <span class="bp">self</span><span class="p">,</span> <span class="n">headers</span><span class="p">:</span> <span class="n">service_pb2</span><span class="o">.</span><span class="n">HttpHeaders</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">ServicerContext</span>
   <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">service_pb2</span><span class="o">.</span><span class="n">HeadersResponse</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Custom processor on response headers.</span>
+<span class="w">    </span><span class="sd">"""Custom processor on response headers.</span>
 <span class="sd">    </span>
 <span class="sd">    Args:</span>
 <span class="sd">      headers (service_pb2.HttpHeaders): The HTTP headers received in the response.</span>
@@ -333,16 +333,16 @@
 <span class="sd">    Returns:</span>
 <span class="sd">      service_pb2.HeadersResponse: The response containing the mutations to be applied</span>
 <span class="sd">      to the response headers.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="n">callout_tools</span><span class="o">.</span><span class="n">add_header_mutation</span><span class="p">(</span>
-      <span class="n">add</span><span class="o">=</span><span class="p">[(</span><span class="s1">&#39;header-response&#39;</span><span class="p">,</span> <span class="s1">&#39;response&#39;</span><span class="p">)],</span>
-      <span class="n">remove</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;foo&#39;</span><span class="p">]</span>
+      <span class="n">add</span><span class="o">=</span><span class="p">[(</span><span class="s1">'header-response'</span><span class="p">,</span> <span class="s1">'response'</span><span class="p">)],</span>
+      <span class="n">remove</span><span class="o">=</span><span class="p">[</span><span class="s1">'foo'</span><span class="p">]</span>
     <span class="p">)</span></div>
 </div>
 
 
 
-<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">'__main__'</span><span class="p">:</span>
   <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
   <span class="c1"># Run the gRPC service</span>
   <span class="n">CalloutServerExample</span><span class="p">()</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>

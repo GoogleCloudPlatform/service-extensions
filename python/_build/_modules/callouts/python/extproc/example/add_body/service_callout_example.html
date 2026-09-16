@@ -268,14 +268,14 @@
   <h1>Source code for callouts.python.extproc.example.add_body.service_callout_example</h1><div class="highlight"><pre>
 <span></span><span class="c1"># Copyright 2024 Google LLC.</span>
 <span class="c1">#</span>
-<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
 <span class="c1"># you may not use this file except in compliance with the License.</span>
 <span class="c1"># You may obtain a copy of the License at</span>
 <span class="c1">#</span>
 <span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
 <span class="c1">#</span>
 <span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
-<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
 <span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
 <span class="c1"># See the License for the specific language governing permissions and</span>
 <span class="c1"># limitations under the License.</span>
@@ -290,19 +290,19 @@
 <div class="viewcode-block" id="CalloutServerExample">
 <a class="viewcode-back" href="../../../../../../extproc/add_body/service_callout_example.html#callouts.python.extproc.example.add_body.service_callout_example.CalloutServerExample">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">CalloutServerExample</span><span class="p">(</span><span class="n">callout_server</span><span class="o">.</span><span class="n">CalloutServer</span><span class="p">):</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;Example callout server showing how to add text to a callout body.</span>
+<span class="w">  </span><span class="sd">"""Example callout server showing how to add text to a callout body.</span>
 
-<span class="sd">  For request body callouts we return a mutation to append &#39;-added-body&#39; to</span>
+<span class="sd">  For request body callouts we return a mutation to append '-added-body' to</span>
 <span class="sd">  the body. For response body callouts we send a mutation to replace the body</span>
-<span class="sd">  with &#39;new-body&#39;.</span>
-<span class="sd">  &quot;&quot;&quot;</span>
+<span class="sd">  with 'new-body'.</span>
+<span class="sd">  """</span>
 
 <div class="viewcode-block" id="CalloutServerExample.on_request_body">
 <a class="viewcode-back" href="../../../../../../extproc/add_body/service_callout_example.html#callouts.python.extproc.example.add_body.service_callout_example.CalloutServerExample.on_request_body">[docs]</a>
   <span class="k">def</span><span class="w"> </span><span class="nf">on_request_body</span><span class="p">(</span>
       <span class="bp">self</span><span class="p">,</span> <span class="n">body</span><span class="p">:</span> <span class="n">service_pb2</span><span class="o">.</span><span class="n">HttpBody</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">ServicerContext</span>
   <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">service_pb2</span><span class="o">.</span><span class="n">BodyResponse</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Custom processor on the request body.</span>
+<span class="w">    </span><span class="sd">"""Custom processor on the request body.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">      body (service_pb2.BodyResponse): The HTTP body received in the request.</span>
@@ -311,9 +311,9 @@
 <span class="sd">    Returns:</span>
 <span class="sd">      service_pb2.BodyResponse: The response containing the mutations to be applied</span>
 <span class="sd">      to the request body.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="n">callout_tools</span><span class="o">.</span><span class="n">add_body_mutation</span><span class="p">(</span>
-        <span class="n">body</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;-added-request-body&#39;</span><span class="p">)</span></div>
+        <span class="n">body</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">'utf-8'</span><span class="p">)</span> <span class="o">+</span> <span class="s1">'-added-request-body'</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="CalloutServerExample.on_response_body">
@@ -321,7 +321,7 @@
   <span class="k">def</span><span class="w"> </span><span class="nf">on_response_body</span><span class="p">(</span>
       <span class="bp">self</span><span class="p">,</span> <span class="n">body</span><span class="p">:</span> <span class="n">service_pb2</span><span class="o">.</span><span class="n">HttpBody</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">ServicerContext</span>
   <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">service_pb2</span><span class="o">.</span><span class="n">BodyResponse</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Custom processor on the response body.</span>
+<span class="w">    </span><span class="sd">"""Custom processor on the response body.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">          body (service_pb2.BodyResponse): The HTTP body received in the response.</span>
@@ -330,13 +330,13 @@
 <span class="sd">        Returns:</span>
 <span class="sd">          service_pb2.BodyResponse: The response containing the mutations to be applied</span>
 <span class="sd">          to the response body.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="n">callout_tools</span><span class="o">.</span><span class="n">add_body_mutation</span><span class="p">(</span><span class="s1">&#39;new-body&#39;</span><span class="p">)</span></div>
+<span class="sd">        """</span>
+    <span class="k">return</span> <span class="n">callout_tools</span><span class="o">.</span><span class="n">add_body_mutation</span><span class="p">(</span><span class="s1">'new-body'</span><span class="p">)</span></div>
 </div>
 
 
 
-<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">'__main__'</span><span class="p">:</span>
   <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
   <span class="c1"># Run the gRPC service</span>
   <span class="n">CalloutServerExample</span><span class="p">()</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>

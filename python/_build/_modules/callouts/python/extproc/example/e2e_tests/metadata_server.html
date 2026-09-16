@@ -268,14 +268,14 @@
   <h1>Source code for callouts.python.extproc.example.e2e_tests.metadata_server</h1><div class="highlight"><pre>
 <span></span><span class="c1"># Copyright 2024 Google LLC.</span>
 <span class="c1">#</span>
-<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
 <span class="c1"># you may not use this file except in compliance with the License.</span>
 <span class="c1"># You may obtain a copy of the License at</span>
 <span class="c1">#</span>
 <span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
 <span class="c1">#</span>
 <span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
-<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
 <span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
 <span class="c1"># See the License for the specific language governing permissions and</span>
 <span class="c1"># limitations under the License.</span>
@@ -294,14 +294,14 @@
 <div class="viewcode-block" id="unpack_string">
 <a class="viewcode-back" href="../../../../../../extproc/e2e_tests/metadata_server.html#callouts.python.extproc.example.e2e_tests.metadata_server.unpack_string">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">unpack_string</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">any_pb2</span><span class="o">.</span><span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;Unpacks a string value from a protobuf Any object.</span>
+<span class="w">  </span><span class="sd">"""Unpacks a string value from a protobuf Any object.</span>
 
 <span class="sd">  Args:</span>
 <span class="sd">    value (google.protobuf.any_pb2.Any): The Any object containing the string value.</span>
 
 <span class="sd">  Returns:</span>
 <span class="sd">    str: The unpacked string value.</span>
-<span class="sd">  &quot;&quot;&quot;</span>
+<span class="sd">  """</span>
   <span class="n">unpacked_value</span> <span class="o">=</span> <span class="n">StringValue</span><span class="p">()</span>
   <span class="n">value</span><span class="o">.</span><span class="n">Unpack</span><span class="p">(</span><span class="n">unpacked_value</span><span class="p">)</span>
   <span class="k">return</span> <span class="n">unpacked_value</span><span class="o">.</span><span class="n">value</span></div>
@@ -311,48 +311,48 @@
 <div class="viewcode-block" id="check_metadata">
 <a class="viewcode-back" href="../../../../../../extproc/e2e_tests/metadata_server.html#callouts.python.extproc.example.e2e_tests.metadata_server.check_metadata">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">check_metadata</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">service_pb2</span><span class="o">.</span><span class="n">ProcessingRequest</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;Check if the request contains &#39;fr&#39; metadata.</span>
+<span class="w">  </span><span class="sd">"""Check if the request contains 'fr' metadata.</span>
 
 <span class="sd">  Args:</span>
 <span class="sd">    request (service_pb2.ProcessingRequest): The processing request to check.</span>
 
 <span class="sd">  Returns:</span>
-<span class="sd">    bool: True if the &#39;fr&#39; metadata is present and has a non-empty string value, False otherwise.</span>
-<span class="sd">  &quot;&quot;&quot;</span>
-  <span class="k">if</span> <span class="ow">not</span> <span class="n">request</span><span class="o">.</span><span class="n">HasField</span><span class="p">(</span><span class="s1">&#39;metadata_context&#39;</span><span class="p">):</span>
-    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;No metadata context.&#39;</span><span class="p">)</span>
+<span class="sd">    bool: True if the 'fr' metadata is present and has a non-empty string value, False otherwise.</span>
+<span class="sd">  """</span>
+  <span class="k">if</span> <span class="ow">not</span> <span class="n">request</span><span class="o">.</span><span class="n">HasField</span><span class="p">(</span><span class="s1">'metadata_context'</span><span class="p">):</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">'No metadata context.'</span><span class="p">)</span>
     <span class="k">return</span> <span class="kc">False</span>
 
   <span class="n">fr_data</span> <span class="o">=</span> <span class="kc">None</span>
   <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">feild_data</span> <span class="ow">in</span> <span class="n">request</span><span class="o">.</span><span class="n">metadata_context</span><span class="o">.</span><span class="n">filter_metadata</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-    <span class="k">if</span> <span class="s1">&#39;fr&#39;</span> <span class="ow">in</span> <span class="n">feild_data</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
-      <span class="n">fr_data</span> <span class="o">=</span> <span class="n">feild_data</span><span class="o">.</span><span class="n">fields</span><span class="p">[</span><span class="s1">&#39;fr&#39;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s1">'fr'</span> <span class="ow">in</span> <span class="n">feild_data</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+      <span class="n">fr_data</span> <span class="o">=</span> <span class="n">feild_data</span><span class="o">.</span><span class="n">fields</span><span class="p">[</span><span class="s1">'fr'</span><span class="p">]</span>
       <span class="k">break</span>
 
   <span class="k">if</span> <span class="n">fr_data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;No &quot;fr&quot; metadata.&#39;</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">'No "fr" metadata.'</span><span class="p">)</span>
     <span class="k">return</span> <span class="kc">False</span>
 
-  <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Contains &quot;fr&quot; key: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">fr_data</span><span class="p">)</span>
-  <span class="k">return</span> <span class="n">fr_data</span><span class="o">.</span><span class="n">HasField</span><span class="p">(</span><span class="s1">&#39;string_value&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">fr_data</span><span class="o">.</span><span class="n">string_value</span> <span class="o">!=</span> <span class="s1">&#39;&#39;</span></div>
+  <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">'Contains "fr" key: </span><span class="si">%s</span><span class="s1">'</span><span class="p">,</span> <span class="n">fr_data</span><span class="p">)</span>
+  <span class="k">return</span> <span class="n">fr_data</span><span class="o">.</span><span class="n">HasField</span><span class="p">(</span><span class="s1">'string_value'</span><span class="p">)</span> <span class="ow">and</span> <span class="n">fr_data</span><span class="o">.</span><span class="n">string_value</span> <span class="o">!=</span> <span class="s1">''</span></div>
 
 
 
-<span class="n">default_headers</span> <span class="o">=</span> <span class="p">[(</span><span class="s1">&#39;service-callout-response-intercept&#39;</span><span class="p">,</span> <span class="s1">&#39;intercepted&#39;</span><span class="p">),</span>
-                   <span class="p">(</span><span class="s1">&#39;x-used-deltas-gfe3&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;x-used-staging-gfe3&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">),</span>
-                   <span class="p">(</span><span class="s1">&#39;x-ext-proc&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)]</span>
+<span class="n">default_headers</span> <span class="o">=</span> <span class="p">[(</span><span class="s1">'service-callout-response-intercept'</span><span class="p">,</span> <span class="s1">'intercepted'</span><span class="p">),</span>
+                   <span class="p">(</span><span class="s1">'x-used-deltas-gfe3'</span><span class="p">,</span> <span class="s1">''</span><span class="p">),</span> <span class="p">(</span><span class="s1">'x-used-staging-gfe3'</span><span class="p">,</span> <span class="s1">''</span><span class="p">),</span>
+                   <span class="p">(</span><span class="s1">'x-ext-proc'</span><span class="p">,</span> <span class="s1">''</span><span class="p">)]</span>
 
 
 <div class="viewcode-block" id="CalloutServerExample">
 <a class="viewcode-back" href="../../../../../../extproc/e2e_tests/metadata_server.html#callouts.python.extproc.example.e2e_tests.metadata_server.CalloutServerExample">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">CalloutServerExample</span><span class="p">(</span><span class="n">callout_server</span><span class="o">.</span><span class="n">CalloutServer</span><span class="p">):</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;Example callout server for use in e2e metadata testing.&quot;&quot;&quot;</span>
+<span class="w">  </span><span class="sd">"""Example callout server for use in e2e metadata testing."""</span>
 
 <div class="viewcode-block" id="CalloutServerExample.process">
 <a class="viewcode-back" href="../../../../../../extproc/e2e_tests/metadata_server.html#callouts.python.extproc.example.e2e_tests.metadata_server.CalloutServerExample.process">[docs]</a>
   <span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n">ProcessingRequest</span><span class="p">,</span>
               <span class="n">context</span><span class="p">:</span> <span class="n">ServicerContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProcessingResponse</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Process the incoming request.</span>
+<span class="w">    </span><span class="sd">"""Process the incoming request.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">      request (ProcessingRequest): The processing request received.</span>
@@ -360,28 +360,28 @@
 
 <span class="sd">    Returns:</span>
 <span class="sd">      ProcessingResponse: The processing response to be sent back.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Received request </span><span class="si">%s</span><span class="s1">.&#39;</span><span class="p">,</span> <span class="n">request</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">HasField</span><span class="p">(</span><span class="s1">&#39;response_body&#39;</span><span class="p">):</span>
+<span class="sd">    """</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">'Received request </span><span class="si">%s</span><span class="s1">.'</span><span class="p">,</span> <span class="n">request</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">HasField</span><span class="p">(</span><span class="s1">'response_body'</span><span class="p">):</span>
       <span class="k">return</span> <span class="n">ProcessingResponse</span><span class="p">(</span>
-          <span class="n">response_body</span><span class="o">=</span><span class="n">callout_tools</span><span class="o">.</span><span class="n">add_body_mutation</span><span class="p">(</span><span class="s1">&#39;e2e-test&#39;</span><span class="p">))</span>
+          <span class="n">response_body</span><span class="o">=</span><span class="n">callout_tools</span><span class="o">.</span><span class="n">add_body_mutation</span><span class="p">(</span><span class="s1">'e2e-test'</span><span class="p">))</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">check_metadata</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
       <span class="k">return</span> <span class="n">ProcessingResponse</span><span class="p">(</span>
           <span class="n">response_headers</span><span class="o">=</span><span class="n">callout_tools</span><span class="o">.</span><span class="n">add_header_mutation</span><span class="p">(</span>
               <span class="n">default_headers</span><span class="p">),)</span>
     <span class="k">return</span> <span class="n">ProcessingResponse</span><span class="p">(</span>
         <span class="n">response_headers</span><span class="o">=</span><span class="n">callout_tools</span><span class="o">.</span><span class="n">add_header_mutation</span><span class="p">(</span>
-            <span class="n">add</span><span class="o">=</span><span class="p">[(</span><span class="s1">&#39;metadata&#39;</span><span class="p">,</span> <span class="s1">&#39;found&#39;</span><span class="p">)]</span> <span class="o">+</span> <span class="n">default_headers</span><span class="p">),)</span></div>
+            <span class="n">add</span><span class="o">=</span><span class="p">[(</span><span class="s1">'metadata'</span><span class="p">,</span> <span class="s1">'found'</span><span class="p">)]</span> <span class="o">+</span> <span class="n">default_headers</span><span class="p">),)</span></div>
 </div>
 
 
 
-<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">'__main__'</span><span class="p">:</span>
   <span class="c1"># Setup command line args.</span>
   <span class="n">args</span> <span class="o">=</span> <span class="n">command_line_tools</span><span class="o">.</span><span class="n">add_command_line_args</span><span class="p">()</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
   <span class="c1"># Set the debug level.</span>
   <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
-  <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Starting e2e_test server v7.&#39;</span><span class="p">)</span>
+  <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">'Starting e2e_test server v7.'</span><span class="p">)</span>
   <span class="c1"># Run the gRPC service.</span>
   <span class="n">CalloutServerExample</span><span class="p">(</span><span class="o">**</span><span class="nb">vars</span><span class="p">(</span><span class="n">args</span><span class="p">))</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
 </pre></div>

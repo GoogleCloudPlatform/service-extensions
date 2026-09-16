@@ -268,14 +268,14 @@
   <h1>Source code for callouts.python.extproc.example.e2e_tests.observability_server</h1><div class="highlight"><pre>
 <span></span><span class="c1"># Copyright 2024 Google LLC.</span>
 <span class="c1">#</span>
-<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
 <span class="c1"># you may not use this file except in compliance with the License.</span>
 <span class="c1"># You may obtain a copy of the License at</span>
 <span class="c1">#</span>
 <span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
 <span class="c1">#</span>
 <span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
-<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
 <span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
 <span class="c1"># See the License for the specific language governing permissions and</span>
 <span class="c1"># limitations under the License.</span>
@@ -294,10 +294,10 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 
 <span class="n">counters</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s1">&#39;request_header_count&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
-    <span class="s1">&#39;request_body_count&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
-    <span class="s1">&#39;response_header_count&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
-    <span class="s1">&#39;response_body_count&#39;</span><span class="p">:</span> <span class="mi">0</span>
+    <span class="s1">'request_header_count'</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="s1">'request_body_count'</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="s1">'response_header_count'</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="s1">'response_body_count'</span><span class="p">:</span> <span class="mi">0</span>
 <span class="p">}</span>
 
 <span class="n">lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
@@ -306,16 +306,16 @@
 <div class="viewcode-block" id="ObservabilityServerExample">
 <a class="viewcode-back" href="../../../../../../extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">ObservabilityServerExample</span><span class="p">(</span><span class="n">callout_server</span><span class="o">.</span><span class="n">CalloutServer</span><span class="p">):</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;Example observability callout server for use in e2e testing.</span>
+<span class="w">  </span><span class="sd">"""Example observability callout server for use in e2e testing.</span>
 
-<span class="sd">    Doesn&#39;t perform any mutations to the request or the response.</span>
+<span class="sd">    Doesn't perform any mutations to the request or the response.</span>
 <span class="sd">    Logs callouts to a pollable server interface.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
   <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
     <span class="c1"># Use the plaintext port for debugging info.</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">counter_http_server</span> <span class="o">=</span> <span class="n">HTTPServer</span><span class="p">((</span><span class="s1">&#39;0.0.0.0&#39;</span><span class="p">,</span> <span class="mi">8080</span><span class="p">),</span> <span class="n">RequestHandler</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">counter_http_server</span> <span class="o">=</span> <span class="n">HTTPServer</span><span class="p">((</span><span class="s1">'0.0.0.0'</span><span class="p">,</span> <span class="mi">8080</span><span class="p">),</span> <span class="n">RequestHandler</span><span class="p">)</span>
     <span class="n">counter_http_server_thread</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span>
         <span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">counter_http_server</span><span class="o">.</span><span class="n">serve_forever</span><span class="p">)</span>
     <span class="n">counter_http_server_thread</span><span class="o">.</span><span class="n">daemon</span> <span class="o">=</span> <span class="kc">True</span>
@@ -333,10 +333,10 @@
 <a class="viewcode-back" href="../../../../../../extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample.on_request_headers">[docs]</a>
   <span class="k">def</span><span class="w"> </span><span class="nf">on_request_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">headers</span><span class="p">:</span> <span class="n">service_pb2</span><span class="o">.</span><span class="n">HttpHeaders</span><span class="p">,</span>
                          <span class="n">context</span><span class="p">:</span> <span class="n">ServicerContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HeadersResponse</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Custom processor on request headers.&quot;&quot;&quot;</span>
-    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;on_request_headers </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">headers</span><span class="p">)</span>
+<span class="w">    </span><span class="sd">"""Custom processor on request headers."""</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">'on_request_headers </span><span class="si">%s</span><span class="s1">'</span><span class="p">,</span> <span class="n">headers</span><span class="p">)</span>
     <span class="k">with</span> <span class="n">lock</span><span class="p">:</span>
-      <span class="n">counters</span><span class="p">[</span><span class="s1">&#39;request_header_count&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+      <span class="n">counters</span><span class="p">[</span><span class="s1">'request_header_count'</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
     <span class="k">return</span> <span class="n">HeadersResponse</span><span class="p">()</span></div>
 
 
@@ -344,11 +344,11 @@
 <a class="viewcode-back" href="../../../../../../extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample.on_request_body">[docs]</a>
   <span class="k">def</span><span class="w"> </span><span class="nf">on_request_body</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">body</span><span class="p">:</span> <span class="n">service_pb2</span><span class="o">.</span><span class="n">HttpBody</span><span class="p">,</span>
                       <span class="n">context</span><span class="p">:</span> <span class="n">ServicerContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BodyResponse</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Custom processor on the request body.&quot;&quot;&quot;</span>
-    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;on_request_body </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">body</span><span class="p">)</span>
+<span class="w">    </span><span class="sd">"""Custom processor on the request body."""</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">'on_request_body </span><span class="si">%s</span><span class="s1">'</span><span class="p">,</span> <span class="n">body</span><span class="p">)</span>
     <span class="k">with</span> <span class="n">lock</span><span class="p">:</span>
       <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">body</span><span class="o">.</span><span class="n">end_of_stream</span> <span class="ow">or</span> <span class="n">body</span><span class="o">.</span><span class="n">body</span><span class="p">):</span>
-        <span class="n">counters</span><span class="p">[</span><span class="s1">&#39;request_body_count&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">counters</span><span class="p">[</span><span class="s1">'request_body_count'</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
     <span class="k">return</span> <span class="n">BodyResponse</span><span class="p">()</span></div>
 
 
@@ -356,9 +356,9 @@
 <a class="viewcode-back" href="../../../../../../extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample.on_response_headers">[docs]</a>
   <span class="k">def</span><span class="w"> </span><span class="nf">on_response_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">headers</span><span class="p">:</span> <span class="n">HttpHeaders</span><span class="p">,</span>
                           <span class="n">context</span><span class="p">:</span> <span class="n">ServicerContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span> <span class="o">|</span> <span class="n">Any</span><span class="p">:</span>
-    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;on_response_headers </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">headers</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">'on_response_headers </span><span class="si">%s</span><span class="s1">'</span><span class="p">,</span> <span class="n">headers</span><span class="p">)</span>
     <span class="k">with</span> <span class="n">lock</span><span class="p">:</span>
-      <span class="n">counters</span><span class="p">[</span><span class="s1">&#39;response_header_count&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+      <span class="n">counters</span><span class="p">[</span><span class="s1">'response_header_count'</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
     <span class="k">return</span> <span class="n">HeadersResponse</span><span class="p">()</span></div>
 
 
@@ -366,11 +366,11 @@
 <a class="viewcode-back" href="../../../../../../extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.ObservabilityServerExample.on_response_body">[docs]</a>
   <span class="k">def</span><span class="w"> </span><span class="nf">on_response_body</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">body</span><span class="p">:</span> <span class="n">service_pb2</span><span class="o">.</span><span class="n">HttpBody</span><span class="p">,</span>
                        <span class="n">context</span><span class="p">:</span> <span class="n">ServicerContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BodyResponse</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Custom processor on the response body.&quot;&quot;&quot;</span>
-    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;on_response_body </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">body</span><span class="p">)</span>
+<span class="w">    </span><span class="sd">"""Custom processor on the response body."""</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">'on_response_body </span><span class="si">%s</span><span class="s1">'</span><span class="p">,</span> <span class="n">body</span><span class="p">)</span>
     <span class="k">with</span> <span class="n">lock</span><span class="p">:</span>
       <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">body</span><span class="o">.</span><span class="n">end_of_stream</span> <span class="ow">or</span> <span class="n">body</span><span class="o">.</span><span class="n">body</span><span class="p">):</span>
-        <span class="n">counters</span><span class="p">[</span><span class="s1">&#39;response_body_count&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">counters</span><span class="p">[</span><span class="s1">'response_body_count'</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
     <span class="k">return</span> <span class="n">BodyResponse</span><span class="p">()</span></div>
 </div>
 
@@ -383,28 +383,28 @@
 <div class="viewcode-block" id="RequestHandler.do_GET">
 <a class="viewcode-back" href="../../../../../../extproc/e2e_tests/observability_server.html#callouts.python.extproc.example.e2e_tests.observability_server.RequestHandler.do_GET">[docs]</a>
   <span class="k">def</span><span class="w"> </span><span class="nf">do_GET</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span> <span class="o">==</span> <span class="s1">&#39;/counters&#39;</span><span class="p">:</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span> <span class="o">==</span> <span class="s1">'/counters'</span><span class="p">:</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">send_response</span><span class="p">(</span><span class="mi">200</span><span class="p">)</span>
-      <span class="bp">self</span><span class="o">.</span><span class="n">send_header</span><span class="p">(</span><span class="s1">&#39;Content-type&#39;</span><span class="p">,</span> <span class="s1">&#39;application/json&#39;</span><span class="p">)</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">send_header</span><span class="p">(</span><span class="s1">'Content-type'</span><span class="p">,</span> <span class="s1">'application/json'</span><span class="p">)</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">end_headers</span><span class="p">()</span>
       <span class="k">with</span> <span class="n">lock</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">wfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">counters</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span>
     <span class="k">else</span><span class="p">:</span>
-      <span class="bp">self</span><span class="o">.</span><span class="n">send_error</span><span class="p">(</span><span class="mi">404</span><span class="p">,</span> <span class="s2">&quot;Not Found&quot;</span><span class="p">)</span></div>
+      <span class="bp">self</span><span class="o">.</span><span class="n">send_error</span><span class="p">(</span><span class="mi">404</span><span class="p">,</span> <span class="s2">"Not Found"</span><span class="p">)</span></div>
 </div>
 
 
 
-<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">'__main__'</span><span class="p">:</span>
   <span class="c1"># Setup command line args.</span>
   <span class="n">args</span> <span class="o">=</span> <span class="n">command_line_tools</span><span class="o">.</span><span class="n">add_command_line_args</span><span class="p">()</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
   <span class="c1"># Set the debug level.</span>
   <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
-  <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Starting observability test server.&#39;</span><span class="p">)</span>
+  <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">'Starting observability test server.'</span><span class="p">)</span>
   <span class="c1"># Run the gRPC service.</span>
   <span class="n">params</span> <span class="o">=</span> <span class="nb">vars</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
   <span class="c1"># We are using the default plaintext address to provide observability data.</span>
-  <span class="n">params</span><span class="p">[</span><span class="s1">&#39;disable_plaintext&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+  <span class="n">params</span><span class="p">[</span><span class="s1">'disable_plaintext'</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
   <span class="n">ObservabilityServerExample</span><span class="p">(</span><span class="o">**</span><span class="n">params</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
 </pre></div>
 

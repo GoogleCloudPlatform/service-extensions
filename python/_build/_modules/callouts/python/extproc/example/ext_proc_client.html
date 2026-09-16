@@ -268,14 +268,14 @@
   <h1>Source code for callouts.python.extproc.example.ext_proc_client</h1><div class="highlight"><pre>
 <span></span><span class="c1"># Copyright 2024 Google LLC.</span>
 <span class="c1">#</span>
-<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
 <span class="c1"># you may not use this file except in compliance with the License.</span>
 <span class="c1"># You may obtain a copy of the License at</span>
 <span class="c1">#</span>
 <span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
 <span class="c1">#</span>
 <span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
-<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
 <span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
 <span class="c1"># See the License for the specific language governing permissions and</span>
 <span class="c1"># limitations under the License.</span>
@@ -301,7 +301,7 @@
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">grpc</span><span class="o">.</span><span class="n">Channel</span><span class="p">:</span>
   <span class="n">addr_str</span> <span class="o">=</span> <span class="n">_addr_to_str</span><span class="p">(</span><span class="n">address</span><span class="p">)</span>
   <span class="k">if</span> <span class="n">key</span><span class="p">:</span>
-    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="s1">'rb'</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
       <span class="n">creds</span> <span class="o">=</span> <span class="n">grpc</span><span class="o">.</span><span class="n">ssl_channel_credentials</span><span class="p">(</span><span class="n">file</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
       <span class="k">return</span> <span class="n">grpc</span><span class="o">.</span><span class="n">secure_channel</span><span class="p">(</span><span class="n">addr_str</span><span class="p">,</span> <span class="n">creds</span><span class="p">)</span>
   <span class="k">else</span><span class="p">:</span>
@@ -313,7 +313,7 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">make_json_request</span><span class="p">(</span>
   <span class="n">json_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">address</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">ProcessingResponse</span><span class="p">]:</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;Make requests to a callout service with ProcessingRequest json data.</span>
+<span class="w">  </span><span class="sd">"""Make requests to a callout service with ProcessingRequest json data.</span>
 
 <span class="sd">  Args:</span>
 <span class="sd">    json_list: A list of json strings representing ProcessingRequest data.</span>
@@ -322,7 +322,7 @@
 
 <span class="sd">  Returns:</span>
 <span class="sd">    An iterator containing each response.</span>
-<span class="sd">  &quot;&quot;&quot;</span>
+<span class="sd">  """</span>
   <span class="n">callouts</span> <span class="o">=</span> <span class="p">[</span><span class="n">Parse</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">ProcessingRequest</span><span class="p">())</span> <span class="k">for</span> <span class="n">data</span> <span class="ow">in</span> <span class="n">json_list</span><span class="p">]</span>
   <span class="k">with</span> <span class="n">_make_channel</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span> <span class="k">as</span> <span class="n">channel</span><span class="p">:</span>
     <span class="n">stub</span> <span class="o">=</span> <span class="n">ExternalProcessorStub</span><span class="p">(</span><span class="n">channel</span><span class="p">)</span>
@@ -332,39 +332,39 @@
 
 
 
-<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">'__main__'</span><span class="p">:</span>
   <span class="c1"># Set the debug level.</span>
   <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
-  <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Starting json testing server v1.&#39;</span><span class="p">)</span>
+  <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">'Starting json testing server v1.'</span><span class="p">)</span>
   <span class="c1"># Setup command line args.</span>
   <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">()</span>
   <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
-    <span class="s1">&#39;address&#39;</span><span class="p">,</span>
+    <span class="s1">'address'</span><span class="p">,</span>
     <span class="nb">type</span><span class="o">=</span><span class="n">_addr</span><span class="p">,</span>
-    <span class="n">help</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;Address of the callout server in the format ip:port.&#39;</span><span class="p">),</span>
+    <span class="n">help</span><span class="o">=</span><span class="p">(</span><span class="s1">'Address of the callout server in the format ip:port.'</span><span class="p">),</span>
   <span class="p">)</span>
   <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
-    <span class="s1">&#39;--cert&#39;</span><span class="p">,</span>
+    <span class="s1">'--cert'</span><span class="p">,</span>
     <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
     <span class="n">help</span><span class="o">=</span><span class="p">(</span>
-      <span class="s1">&#39;Local path to a chain or root PEM authenication certificate.&#39;</span>
-      <span class="s1">&#39; If specified, attemps to establish a secure connection to the callout&#39;</span>
-      <span class="s1">&#39; server using the certificate.&#39;</span>
+      <span class="s1">'Local path to a chain or root PEM authenication certificate.'</span>
+      <span class="s1">' If specified, attemps to establish a secure connection to the callout'</span>
+      <span class="s1">' server using the certificate.'</span>
     <span class="p">),</span>
   <span class="p">)</span>
   <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
-    <span class="s1">&#39;-d&#39;</span><span class="p">,</span>
-    <span class="s1">&#39;--data&#39;</span><span class="p">,</span>
+    <span class="s1">'-d'</span><span class="p">,</span>
+    <span class="s1">'--data'</span><span class="p">,</span>
     <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
     <span class="n">help</span><span class="o">=</span><span class="p">(</span>
-      <span class="s1">&#39;ProcessingRequest data in json format. Also accepts a list of json&#39;</span>
-      <span class="s1">&#39; objects to preform multiple callouts.&#39;</span>
+      <span class="s1">'ProcessingRequest data in json format. Also accepts a list of json'</span>
+      <span class="s1">' objects to preform multiple callouts.'</span>
     <span class="p">),</span>
-    <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;*&#39;</span><span class="p">,</span>
+    <span class="n">nargs</span><span class="o">=</span><span class="s1">'*'</span><span class="p">,</span>
   <span class="p">)</span>
   <span class="n">parser</span><span class="o">.</span><span class="n">description</span> <span class="o">=</span> <span class="p">(</span>
-    <span class="s1">&#39;Sends ProcessingRequest data to a callout server and&#39;</span>
-    <span class="s1">&#39;prints out the responses.&#39;</span>
+    <span class="s1">'Sends ProcessingRequest data to a callout server and'</span>
+    <span class="s1">'prints out the responses.'</span>
   <span class="p">)</span>
   <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
   <span class="c1"># Preform callouts and collect the responses.</span>

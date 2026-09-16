@@ -268,14 +268,14 @@
   <h1>Source code for callouts.python.extproc.example.set_cookie.service_callout_example</h1><div class="highlight"><pre>
 <span></span><span class="c1"># Copyright 2024 Google LLC.</span>
 <span class="c1">#</span>
-<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
 <span class="c1"># you may not use this file except in compliance with the License.</span>
 <span class="c1"># You may obtain a copy of the License at</span>
 <span class="c1">#</span>
 <span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
 <span class="c1">#</span>
 <span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
-<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
 <span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
 <span class="c1"># See the License for the specific language governing permissions and</span>
 <span class="c1"># limitations under the License.</span>
@@ -290,42 +290,42 @@
 <div class="viewcode-block" id="validate_header">
 <a class="viewcode-back" href="../../../../../../extproc/set_cookie/service_callout_example.html#callouts.python.extproc.example.set_cookie.service_callout_example.validate_header">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">validate_header</span><span class="p">(</span><span class="n">http_headers</span><span class="p">:</span> <span class="n">service_pb2</span><span class="o">.</span><span class="n">HttpHeaders</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;Validate if the incomming headers contain the &#39;cookie-check&#39; header.</span>
+<span class="w">  </span><span class="sd">"""Validate if the incomming headers contain the 'cookie-check' header.</span>
 
-<span class="sd">  This function checks if the &#39;cookie-check&#39; header is present in the</span>
+<span class="sd">  This function checks if the 'cookie-check' header is present in the</span>
 <span class="sd">  headers and returns its raw value if found.</span>
 
 <span class="sd">  Args:</span>
 <span class="sd">      http_headers (service_pb2.HttpHeaders): Incomming http headers to check.</span>
 
 <span class="sd">  Returns:</span>
-<span class="sd">      str or None: The raw value of the &#39;cookie-check&#39; header if found, otherwise None.</span>
-<span class="sd">  &quot;&quot;&quot;</span>
+<span class="sd">      str or None: The raw value of the 'cookie-check' header if found, otherwise None.</span>
+<span class="sd">  """</span>
   <span class="k">return</span> <span class="nb">next</span><span class="p">((</span><span class="n">header</span><span class="o">.</span><span class="n">raw_value</span>
                    <span class="k">for</span> <span class="n">header</span> <span class="ow">in</span> <span class="n">http_headers</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">headers</span>
-                   <span class="k">if</span> <span class="n">header</span><span class="o">.</span><span class="n">key</span> <span class="o">==</span> <span class="s1">&#39;cookie-check&#39;</span><span class="p">),</span> <span class="kc">None</span><span class="p">)</span></div>
+                   <span class="k">if</span> <span class="n">header</span><span class="o">.</span><span class="n">key</span> <span class="o">==</span> <span class="s1">'cookie-check'</span><span class="p">),</span> <span class="kc">None</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="CalloutServerExample">
 <a class="viewcode-back" href="../../../../../../extproc/set_cookie/service_callout_example.html#callouts.python.extproc.example.set_cookie.service_callout_example.CalloutServerExample">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">CalloutServerExample</span><span class="p">(</span><span class="n">callout_server</span><span class="o">.</span><span class="n">CalloutServer</span><span class="p">):</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;Example Set Cookie / Callout server.</span>
+<span class="w">  </span><span class="sd">"""Example Set Cookie / Callout server.</span>
 
 <span class="sd">  For response header callouts we set a cookie providing a mutation to add</span>
-<span class="sd">  a header &#39;{Set-Cookie: cookie}&#39;. This cookie is only set for callouts from</span>
-<span class="sd">  certain clients, based on the presence of the &#39;cookie-check&#39; header key.</span>
+<span class="sd">  a header '{Set-Cookie: cookie}'. This cookie is only set for callouts from</span>
+<span class="sd">  certain clients, based on the presence of the 'cookie-check' header key.</span>
 
 <span class="sd">  Usage:</span>
 <span class="sd">    To use this example callout server, instantiate the CalloutServerExample</span>
 <span class="sd">    class and run the gRPC service.</span>
-<span class="sd">  &quot;&quot;&quot;</span>
+<span class="sd">  """</span>
 
 <div class="viewcode-block" id="CalloutServerExample.on_response_headers">
 <a class="viewcode-back" href="../../../../../../extproc/set_cookie/service_callout_example.html#callouts.python.extproc.example.set_cookie.service_callout_example.CalloutServerExample.on_response_headers">[docs]</a>
   <span class="k">def</span><span class="w"> </span><span class="nf">on_response_headers</span><span class="p">(</span>
       <span class="bp">self</span><span class="p">,</span> <span class="n">headers</span><span class="p">:</span> <span class="n">service_pb2</span><span class="o">.</span><span class="n">HttpHeaders</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">ServicerContext</span>
   <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">service_pb2</span><span class="o">.</span><span class="n">HeadersResponse</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Custom processor on response headers.</span>
+<span class="w">    </span><span class="sd">"""Custom processor on response headers.</span>
 
 <span class="sd">    This method should set cookie on http response for a particular client callout.</span>
 
@@ -336,16 +336,16 @@
 <span class="sd">    Returns:</span>
 <span class="sd">      service_pb2.HeadersResponse: The response containing the mutations to be applied</span>
 <span class="sd">      to the response headers.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">validate_header</span><span class="p">(</span><span class="n">headers</span><span class="p">):</span>
       <span class="k">return</span> <span class="n">callout_tools</span><span class="o">.</span><span class="n">add_header_mutation</span><span class="p">(</span>
-        <span class="n">add</span><span class="o">=</span><span class="p">[(</span><span class="s1">&#39;Set-Cookie&#39;</span><span class="p">,</span> <span class="s1">&#39;your_cookie_name=cookie_value; Max-Age=3600; Path=/&#39;</span><span class="p">)]</span>
+        <span class="n">add</span><span class="o">=</span><span class="p">[(</span><span class="s1">'Set-Cookie'</span><span class="p">,</span> <span class="s1">'your_cookie_name=cookie_value; Max-Age=3600; Path=/'</span><span class="p">)]</span>
       <span class="p">)</span></div>
 </div>
 
 
 
-<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">'__main__'</span><span class="p">:</span>
   <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
   <span class="c1"># Run the gRPC service</span>
   <span class="n">CalloutServerExample</span><span class="p">()</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>

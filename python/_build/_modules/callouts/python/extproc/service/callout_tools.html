@@ -268,18 +268,18 @@
   <h1>Source code for callouts.python.extproc.service.callout_tools</h1><div class="highlight"><pre>
 <span></span><span class="c1"># Copyright 2024 Google LLC.</span>
 <span class="c1">#</span>
-<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
 <span class="c1"># you may not use this file except in compliance with the License.</span>
 <span class="c1"># You may obtain a copy of the License at</span>
 <span class="c1">#</span>
 <span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
 <span class="c1">#</span>
 <span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
-<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
 <span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
 <span class="c1"># See the License for the specific language governing permissions and</span>
 <span class="c1"># limitations under the License.</span>
-<span class="sd">&quot;&quot;&quot;Library of commonly used methods within a callout server.&quot;&quot;&quot;</span>
+<span class="sd">"""Library of commonly used methods within a callout server."""</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">typing</span>
@@ -297,7 +297,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">google.protobuf.struct_pb2</span><span class="w"> </span><span class="kn">import</span> <span class="n">Struct</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">grpc</span>
 
-<span class="n">_DYNAMIC_FORWARDING_METADATA_NAMESPACE</span> <span class="o">=</span> <span class="s2">&quot;com.google.envoy.dynamic_forwarding.selected_endpoints&quot;</span>
+<span class="n">_DYNAMIC_FORWARDING_METADATA_NAMESPACE</span> <span class="o">=</span> <span class="s2">"com.google.envoy.dynamic_forwarding.selected_endpoints"</span>
 
 
 <div class="viewcode-block" id="add_header_mutation">
@@ -308,7 +308,7 @@
     <span class="n">clear_route_cache</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">append_action</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">HeaderValueOption</span><span class="o">.</span><span class="n">HeaderAppendAction</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HeadersResponse</span><span class="p">:</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;Generate a HeadersResponse mutation for incoming callouts.</span>
+<span class="w">  </span><span class="sd">"""Generate a HeadersResponse mutation for incoming callouts.</span>
 
 <span class="sd">  Args:</span>
 <span class="sd">    add: A list of tuples representing headers to add or replace.</span>
@@ -318,12 +318,12 @@
 <span class="sd">    append_action: Supported actions types for header append action.</span>
 <span class="sd">  Returns:</span>
 <span class="sd">    HeadersResponse: A configured header mutation response with the specified modifications.</span>
-<span class="sd">  &quot;&quot;&quot;</span>
+<span class="sd">  """</span>
   <span class="n">header_mutation</span> <span class="o">=</span> <span class="n">HeadersResponse</span><span class="p">()</span>
   <span class="k">if</span> <span class="n">add</span><span class="p">:</span>
     <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">add</span><span class="p">:</span>
       <span class="n">header_value_option</span> <span class="o">=</span> <span class="n">HeaderValueOption</span><span class="p">(</span>
-          <span class="n">header</span><span class="o">=</span><span class="n">HeaderValue</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">k</span><span class="p">,</span> <span class="n">raw_value</span><span class="o">=</span><span class="nb">bytes</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="s1">&#39;utf-8&#39;</span><span class="p">)))</span>
+          <span class="n">header</span><span class="o">=</span><span class="n">HeaderValue</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">k</span><span class="p">,</span> <span class="n">raw_value</span><span class="o">=</span><span class="nb">bytes</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="s1">'utf-8'</span><span class="p">)))</span>
       <span class="k">if</span> <span class="n">append_action</span><span class="p">:</span>
         <span class="n">header_value_option</span><span class="o">.</span><span class="n">append_action</span> <span class="o">=</span> <span class="n">append_action</span>
       <span class="n">header_mutation</span><span class="o">.</span><span class="n">response</span><span class="o">.</span><span class="n">header_mutation</span><span class="o">.</span><span class="n">set_headers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
@@ -343,10 +343,10 @@
     <span class="n">clear_body</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">clear_route_cache</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BodyResponse</span><span class="p">:</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;Generate a BodyResponse for incoming callouts.</span>
+<span class="w">  </span><span class="sd">"""Generate a BodyResponse for incoming callouts.</span>
 
 <span class="sd">    body and clear_body are mutually exclusive, if body is set, clear_body will be ignored.</span>
-<span class="sd">    If both body and clear_body are left as default, the incoming callout&#39;s body will not be modified.</span>
+<span class="sd">    If both body and clear_body are left as default, the incoming callout's body will not be modified.</span>
 
 <span class="sd">  Args:</span>
 <span class="sd">    body: Body text to replace the current body of the incomming callout.</span>
@@ -356,12 +356,12 @@
 
 <span class="sd">  Returns:</span>
 <span class="sd">    BodyResponse: A configured body mutation response with the specified modifications.</span>
-<span class="sd">  &quot;&quot;&quot;</span>
+<span class="sd">  """</span>
   <span class="n">body_mutation</span> <span class="o">=</span> <span class="n">BodyResponse</span><span class="p">()</span>
   <span class="k">if</span> <span class="n">body</span><span class="p">:</span>
-    <span class="n">body_mutation</span><span class="o">.</span><span class="n">response</span><span class="o">.</span><span class="n">body_mutation</span><span class="o">.</span><span class="n">body</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+    <span class="n">body_mutation</span><span class="o">.</span><span class="n">response</span><span class="o">.</span><span class="n">body_mutation</span><span class="o">.</span><span class="n">body</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="s1">'utf-8'</span><span class="p">)</span>
     <span class="k">if</span> <span class="p">(</span><span class="n">clear_body</span><span class="p">):</span>
-      <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;body and clear_body are mutually exclusive.&quot;</span><span class="p">)</span>
+      <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">"body and clear_body are mutually exclusive."</span><span class="p">)</span>
   <span class="k">else</span><span class="p">:</span>
     <span class="n">body_mutation</span><span class="o">.</span><span class="n">response</span><span class="o">.</span><span class="n">body_mutation</span><span class="o">.</span><span class="n">clear_body</span> <span class="o">=</span> <span class="n">clear_body</span>
   <span class="k">if</span> <span class="n">clear_route_cache</span><span class="p">:</span>
@@ -375,7 +375,7 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">headers_contain</span><span class="p">(</span>
   <span class="n">http_headers</span><span class="p">:</span> <span class="n">HttpHeaders</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;Check the headers for a matching key value pair.</span>
+<span class="w">  </span><span class="sd">"""Check the headers for a matching key value pair.</span>
 
 <span class="sd">  If no value is specified, only checks for the presence of the header key.</span>
 
@@ -385,7 +385,7 @@
 <span class="sd">    value: Header value to compare.</span>
 <span class="sd">  Returns:</span>
 <span class="sd">    True if http_headers contains a match, false otherwise.</span>
-<span class="sd">  &quot;&quot;&quot;</span>
+<span class="sd">  """</span>
   <span class="k">for</span> <span class="n">header</span> <span class="ow">in</span> <span class="n">http_headers</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">headers</span><span class="p">:</span>
     <span class="k">if</span> <span class="n">header</span><span class="o">.</span><span class="n">key</span> <span class="o">==</span> <span class="n">key</span> <span class="ow">and</span> <span class="p">(</span><span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">header</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="n">value</span><span class="p">):</span>
       <span class="k">return</span> <span class="kc">True</span>
@@ -396,31 +396,31 @@
 <div class="viewcode-block" id="body_contains">
 <a class="viewcode-back" href="../../../../../extproc/service/callout_tools.html#callouts.python.extproc.service.callout_tools.body_contains">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">body_contains</span><span class="p">(</span><span class="n">http_body</span><span class="p">:</span> <span class="n">HttpBody</span><span class="p">,</span> <span class="n">body</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;Check the body for the presence of a substring.</span>
+<span class="w">  </span><span class="sd">"""Check the body for the presence of a substring.</span>
 
 <span class="sd">  Args:</span>
 <span class="sd">    body: Body substring to look for.</span>
 <span class="sd">  Returns:</span>
 <span class="sd">    True if http_body contains expected_body, false otherwise.</span>
-<span class="sd">  &quot;&quot;&quot;</span>
-  <span class="k">return</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">http_body</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span></div>
+<span class="sd">  """</span>
+  <span class="k">return</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">http_body</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">'utf-8'</span><span class="p">)</span></div>
 
 
 
 <div class="viewcode-block" id="deny_callout">
 <a class="viewcode-back" href="../../../../../extproc/service/callout_tools.html#callouts.python.extproc.service.callout_tools.deny_callout">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">deny_callout</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;Denies a gRPC callout, optionally logging a custom message.</span>
+<span class="w">  </span><span class="sd">"""Denies a gRPC callout, optionally logging a custom message.</span>
 
 <span class="sd">  Args:</span>
 <span class="sd">      context (grpc.ServicerContext): The gRPC service context.</span>
 <span class="sd">      msg (str, optional): Custom message to log before denying the callout.</span>
-<span class="sd">        Also logged to warning. If no message is specified, defaults to &quot;Callout DENIED.&quot;.</span>
+<span class="sd">        Also logged to warning. If no message is specified, defaults to "Callout DENIED.".</span>
 
 <span class="sd">  Raises:</span>
 <span class="sd">      grpc.StatusCode.PERMISSION_DENIED: Always raised to deny the callout.</span>
-<span class="sd">  &quot;&quot;&quot;</span>
-  <span class="n">msg</span> <span class="o">=</span> <span class="n">msg</span> <span class="ow">or</span> <span class="s1">&#39;Callout DENIED.&#39;</span>
+<span class="sd">  """</span>
+  <span class="n">msg</span> <span class="o">=</span> <span class="n">msg</span> <span class="ow">or</span> <span class="s1">'Callout DENIED.'</span>
   <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
   <span class="n">context</span><span class="o">.</span><span class="n">abort</span><span class="p">(</span><span class="n">grpc</span><span class="o">.</span><span class="n">StatusCode</span><span class="o">.</span><span class="n">PERMISSION_DENIED</span><span class="p">,</span> <span class="n">msg</span><span class="p">)</span></div>
 
@@ -433,7 +433,7 @@
     <span class="n">headers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">append_action</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">HeaderValueOption</span><span class="o">.</span><span class="n">HeaderAppendAction</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ImmediateResponse</span><span class="p">:</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;Creates an immediate HTTP response with specific headers and status code.</span>
+<span class="w">  </span><span class="sd">"""Creates an immediate HTTP response with specific headers and status code.</span>
 
 <span class="sd">  Args:</span>
 <span class="sd">      code (StatusCode): The HTTP status code to return.</span>
@@ -442,7 +442,7 @@
 
 <span class="sd">  Returns:</span>
 <span class="sd">      ImmediateResponse: Configured immediate response with the specified headers and status code.</span>
-<span class="sd">  &quot;&quot;&quot;</span>
+<span class="sd">  """</span>
   <span class="n">immediate_response</span> <span class="o">=</span> <span class="n">ImmediateResponse</span><span class="p">()</span>
   <span class="n">immediate_response</span><span class="o">.</span><span class="n">status</span><span class="o">.</span><span class="n">code</span> <span class="o">=</span> <span class="n">code</span>
 
@@ -450,7 +450,7 @@
     <span class="n">header_mutation</span> <span class="o">=</span> <span class="n">HeaderMutation</span><span class="p">()</span>
     <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">headers</span><span class="p">:</span>
       <span class="n">header_value_option</span> <span class="o">=</span> <span class="n">HeaderValueOption</span><span class="p">(</span>
-          <span class="n">header</span><span class="o">=</span><span class="n">HeaderValue</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">k</span><span class="p">,</span> <span class="n">raw_value</span><span class="o">=</span><span class="nb">bytes</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="s1">&#39;utf-8&#39;</span><span class="p">)))</span>
+          <span class="n">header</span><span class="o">=</span><span class="n">HeaderValue</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">k</span><span class="p">,</span> <span class="n">raw_value</span><span class="o">=</span><span class="nb">bytes</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="s1">'utf-8'</span><span class="p">)))</span>
       <span class="k">if</span> <span class="n">append_action</span><span class="p">:</span>
         <span class="n">header_value_option</span><span class="o">.</span><span class="n">append_action</span> <span class="o">=</span> <span class="n">append_action</span>
       <span class="n">header_mutation</span><span class="o">.</span><span class="n">set_headers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">header_value_option</span><span class="p">)</span>
@@ -466,7 +466,7 @@
     <span class="n">ip_address</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">port_number</span><span class="p">:</span> <span class="nb">int</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Struct</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Creates a Struct which can be used as dynamic_metadata in</span>
+<span class="w">    </span><span class="sd">"""Creates a Struct which can be used as dynamic_metadata in</span>
 <span class="sd">       ProcessingResponse. Returned struct has a key required by Dynamic</span>
 <span class="sd">       Forwarding functionality.</span>
 
@@ -477,11 +477,11 @@
 <span class="sd">  Returns:</span>
 <span class="sd">      Struct: Configured Struct with the expected key and format with provided</span>
 <span class="sd">      ip and port.</span>
-<span class="sd">  &quot;&quot;&quot;</span>
-    <span class="n">formated_endpoint</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1">:</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">ip_address</span><span class="p">,</span> <span class="n">port_number</span><span class="p">)</span>
+<span class="sd">  """</span>
+    <span class="n">formated_endpoint</span> <span class="o">=</span> <span class="s1">'</span><span class="si">%s</span><span class="s1">:</span><span class="si">%d</span><span class="s1">'</span> <span class="o">%</span> <span class="p">(</span><span class="n">ip_address</span><span class="p">,</span> <span class="n">port_number</span><span class="p">)</span>
     <span class="n">dynamic_forwarding_struct</span> <span class="o">=</span> <span class="n">Struct</span><span class="p">()</span>
     <span class="n">dynamic_forwarding_struct</span><span class="o">.</span><span class="n">get_or_create_struct</span><span class="p">(</span><span class="n">_DYNAMIC_FORWARDING_METADATA_NAMESPACE</span><span class="p">)[</span>
-      <span class="s1">&#39;primary&#39;</span>
+      <span class="s1">'primary'</span>
     <span class="p">]</span> <span class="o">=</span> <span class="n">formated_endpoint</span>
     <span class="k">return</span> <span class="n">dynamic_forwarding_struct</span></div>
 
