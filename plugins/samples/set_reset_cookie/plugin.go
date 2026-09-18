@@ -23,6 +23,8 @@ import (
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm"
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm/types"
 	"google.golang.org/protobuf/encoding/prototext"
+
+	cookiepb "github.com/GoogleCloudPlatform/service-extensions/plugins/samples/set_reset_cookie/cookieconfig"
 )
 
 func main() {}
@@ -37,7 +39,7 @@ type vmContext struct {
 
 type pluginContext struct {
 	types.DefaultPluginContext
-	cookieConfigs []*CookieConfig
+	cookieConfigs []*cookiepb.CookieConfig
 }
 
 type httpContext struct {
@@ -68,7 +70,7 @@ func (ctx *pluginContext) OnPluginStart(pluginConfigurationSize int) types.OnPlu
 	}
 
 	// Parse text-format protobuf configuration.
-	var managerConfig CookieManagerConfig
+	var managerConfig cookiepb.CookieManagerConfig
 	if err := prototext.Unmarshal(config, &managerConfig); err != nil {
 		proxywasm.LogErrorf("Failed to parse cookie manager configuration: %v", err)
 		return types.OnPluginStartStatusFailed
@@ -109,16 +111,14 @@ func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) t
 	// Process DELETE operations: remove matching cookies from the request.
 	modified := false
 	for _, config := range ctx.pluginCtx.cookieConfigs {
-		if config.GetOperation() != CookieOperation_DELETE {
+		if config.GetOperation() != cookiepb.CookieOperation_DELETE {
 			continue
 		}
-		for i, cookie := range requestCookies {
-			if cookie[0] == config.GetName() {
-				requestCookies = append(requestCookies[:i], requestCookies[i+1:]...)
-				modified = true
-				proxywasm.LogInfof("Marking cookie for deletion before CDN cache: %s", config.GetName())
-				break
-			}
+		var removed int
+		requestCookies, removed = removeCookies(requestCookies, config.GetName())
+		if removed > 0 {
+			modified = true
+			proxywasm.LogInfof("Marking cookie for deletion before CDN cache: %s", config.GetName())
 		}
 	}
 
@@ -151,9 +151,9 @@ func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) 
 
 	for _, config := range ctx.pluginCtx.cookieConfigs {
 		switch config.GetOperation() {
-		case CookieOperation_SET, CookieOperation_COOKIE_OPERATION_UNSPECIFIED:
+		case cookiepb.CookieOperation_SET, cookiepb.CookieOperation_COOKIE_OPERATION_UNSPECIFIED:
 			addSetCookieHeader(config)
-		case CookieOperation_OVERWRITE:
+		case cookiepb.CookieOperation_OVERWRITE:
 			overwriteCookie(config)
 		}
 	}
@@ -169,7 +169,8 @@ func parseRequestCookies() [][2]string {
 	}
 
 	var cookies [][2]string
-	for _, pair := range strings.Split(cookieHeader, "; ") {
+	for _, pair := range strings.Split(cookieHeader, ";") {
+		pair = strings.TrimSpace(pair)
 		idx := strings.Index(pair, "=")
 		if idx > 0 {
 			cookies = append(cookies, [2]string{pair[:idx], pair[idx+1:]})
@@ -178,7 +179,24 @@ func parseRequestCookies() [][2]string {
 	return cookies
 }
 
-func effectivePath(config *CookieConfig) string {
+// removeCookies drops every cookie with the given name. A client may send
+// several cookies sharing a name (for example, set under different paths or
+// domains), so all of them are removed. Returns the remaining cookies and the
+// number removed.
+func removeCookies(cookies [][2]string, name string) ([][2]string, int) {
+	kept := cookies[:0]
+	removed := 0
+	for _, cookie := range cookies {
+		if cookie[0] == name {
+			removed++
+			continue
+		}
+		kept = append(kept, cookie)
+	}
+	return kept, removed
+}
+
+func effectivePath(config *cookiepb.CookieConfig) string {
 	if p := config.GetPath(); p != "" {
 		return p
 	}
@@ -186,7 +204,7 @@ func effectivePath(config *CookieConfig) string {
 }
 
 // buildSetCookieValue constructs a Set-Cookie header value from config attributes.
-func buildSetCookieValue(config *CookieConfig) string {
+func buildSetCookieValue(config *cookiepb.CookieConfig) string {
 	var b strings.Builder
 	b.WriteString(config.GetName())
 	b.WriteString("=")
@@ -214,7 +232,7 @@ func buildSetCookieValue(config *CookieConfig) string {
 }
 
 // addSetCookieHeader adds a new Set-Cookie response header.
-func addSetCookieHeader(config *CookieConfig) {
+func addSetCookieHeader(config *cookiepb.CookieConfig) {
 	if err := proxywasm.AddHttpResponseHeader("Set-Cookie", buildSetCookieValue(config)); err != nil {
 		proxywasm.LogErrorf("failed to add Set-Cookie header: %v", err)
 		return
@@ -228,7 +246,7 @@ func addSetCookieHeader(config *CookieConfig) {
 
 // overwriteCookie replaces an existing Set-Cookie header for the target cookie
 // name while preserving other Set-Cookie headers.
-func overwriteCookie(config *CookieConfig) {
+func overwriteCookie(config *cookiepb.CookieConfig) {
 	existing, getErr := proxywasm.GetHttpResponseHeader("Set-Cookie")
 	if err := proxywasm.RemoveHttpResponseHeader("Set-Cookie"); err != nil {
 		proxywasm.LogErrorf("failed to remove Set-Cookie header: %v", err)
