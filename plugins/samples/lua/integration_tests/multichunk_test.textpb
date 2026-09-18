@@ -1,0 +1,22 @@
+env {
+  log_path: "/dev/stdout"
+}
+
+test {
+  name: "MultiChunkRequestBodyTest"
+  request_headers {
+    input {
+      content: "GET / HTTP/1.1\r\n\r\n"
+    }
+  }
+  num_chunks: 3
+  request_body {
+    input {
+      content: "Chunk 1Chunk 2Chunk 3"
+    }
+    result {
+      log { regex: ".*processed all chunks: Chunk 1Chunk 2Chunk 3.*" }
+      log { regex: ".*successfully finished iterating bodyChunks over multiple chunks, total: 3.*" }
+    }
+  }
+}

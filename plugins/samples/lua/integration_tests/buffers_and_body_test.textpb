@@ -1,0 +1,40 @@
+env { log_path: "/dev/stdout" }
+test {
+  name: "OnRequestAndResponseTest"
+  properties {
+    path: "connection.tls_version"
+    value: "TLSv1.2"
+  }
+}
+test {
+  name: "OnRequestBodyTest"
+  request_headers {
+    input {
+      content: "GET / HTTP/1.1\r\n\r\n"
+    }
+  }
+  request_body {
+    input {
+      content: "Hello "
+    }
+    result {
+      log { regex: ".*read request body 'Hello '.*" }
+    }
+  }
+}
+test {
+  name: "OnResponseBodyTest"
+  response_headers {
+    input {
+      content: "HTTP/1.1 200 OK\r\n\r\n"
+    }
+  }
+  response_body {
+    input {
+      content: "World"
+    }
+    result {
+      log { regex: ".*read response body 'World'.*" }
+    }
+  }
+}
