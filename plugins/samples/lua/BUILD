@@ -107,6 +107,16 @@ cc_library(
 )
 
 cc_library(
+    name = "test_macros",
+    testonly = True,
+    hdrs = ["test_macros.h"],
+    deps = [
+        "@com_google_absl//absl/status:status_matchers",
+        "@com_google_googletest//:gtest",
+    ],
+)
+
+cc_library(
     name = "proxy_wasm_test_stubs",
     testonly = True,
     srcs = ["proxy_wasm_test_stubs.cc"],
@@ -130,6 +140,7 @@ cc_test(
         ":coroutine",
         ":lua_state",
         ":proxy_wasm_test_stubs",
+        ":test_macros",
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
@@ -148,6 +159,7 @@ cc_test(
         ":envoy_lua_api",
         ":lua_state",
         ":proxy_wasm_test_stubs",
+        ":test_macros",
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/functional:any_invocable",
         "@com_google_absl//absl/status",
@@ -166,6 +178,7 @@ cc_test(
     deps = [
         ":envoy_lua_api",
         ":proxy_wasm_test_stubs",
+        ":test_macros",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/status",
