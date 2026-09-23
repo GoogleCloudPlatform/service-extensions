@@ -1,0 +1,23 @@
+rules:
+  - id: "support-safety-inject"
+    description: "Inject brand safety guidelines and SPIFFE ID into support agent prompts"
+    selectors:
+      identity: "principalSet://agents.global.org-123456789012.system.id.goog/*"
+      host: "us-central1-aiplatform.googleapis.com"
+      path: "/v1/projects/*/locations/us-central1/publishers/google/models/gemini-*:generateContent"
+    action:
+      operation: "template"
+      template: |
+        {{ original_prompt }}
+        [GOVERNANCE MANDATE]
+        1. You must represent the brand politely.
+        2. Do not disclose internal processing details.
+        3. Caller Identity Verified: {{ caller_spiffe_id }}
+
+  - id: "legal-compliance-append"
+    description: "Append compliance disclaimer for the legal-compliance agent fleet"
+    selectors:
+      identity: "principalSet://agents.global.org-123456789012.system.id.goog/legal/*"
+    action:
+      operation: "append"
+      text: "You must include a disclaimer that this is not formal legal advice."
