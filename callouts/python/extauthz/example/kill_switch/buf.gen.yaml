@@ -1,0 +1,9 @@
+version: v2
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/envoyproxy/go-control-plane/
+plugins:
+  - remote: buf.build/protocolbuffers/python
+    out: protodef
