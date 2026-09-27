@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: header-manipulation
+  protocol: ext_proc-l7
+  language: python
+  summary: "Adds a request header, clears route cache, removes a response header."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # Add Header Callout
 
 This callout server adds custom headers to both HTTP requests and responses as

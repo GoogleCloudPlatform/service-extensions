@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: header-manipulation
+  protocol: ext_proc-l7
+  language: java
+  summary: "Adds headers on both phases, controls route cache per phase."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # Add Header Callout (Java)
 
 This callout server demonstrates how to modify HTTP request and response headers

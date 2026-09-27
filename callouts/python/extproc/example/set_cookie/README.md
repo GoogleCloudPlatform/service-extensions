@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: cookie-management
+  protocol: ext_proc-l7
+  language: python
+  summary: "Conditionally injects Set-Cookie when a check header is present."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # Set Cookie Callout
 
 This callout server conditionally sets a cookie on HTTP responses based on the

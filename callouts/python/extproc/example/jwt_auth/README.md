@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: auth
+  protocol: ext_proc-l7
+  language: python
+  summary: "Validates RS256 bearer tokens, forwards decoded claims as headers."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # JWT Validation Callout
 
 This callout server validates a JWT (JSON Web Token) from incoming HTTP request

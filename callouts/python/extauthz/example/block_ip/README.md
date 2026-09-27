@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: auth
+  protocol: ext_authz
+  language: python
+  summary: "Denies requests from a blocklisted source IP."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # Block IP
 
 An `ext_authz` external authorization server implementing IP-based access control. Unlike the `ext_proc` examples elsewhere in this repo, this server is called through Envoy's authorization API (`Check`), not the processing API — it makes a single allow/deny decision per request rather than mutating headers or bodies across multiple phases.

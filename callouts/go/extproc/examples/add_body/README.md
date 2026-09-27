@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: body-manipulation
+  protocol: ext_proc-l7
+  language: go
+  summary: "Replaces request and response bodies with fixed values."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # Add Body Callout (Go)
 
 This callout server demonstrates how to modify HTTP request and response bodies

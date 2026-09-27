@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: header-manipulation
+  protocol: ext_proc-l7
+  language: python
+  summary: "Overwrites or adds headers via OVERWRITE_IF_EXISTS_OR_ADD."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # Update Header Callout
 
 This callout server updates existing HTTP headers (or adds them if missing) for

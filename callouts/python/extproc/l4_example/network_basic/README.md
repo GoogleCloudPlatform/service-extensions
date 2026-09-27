@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: network-l4
+  protocol: ext_proc-l4
+  language: python
+  summary: "Baseline TCP-layer callout -- inspects a raw connection."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # Network Basic
 
 A baseline `ext_proc` **L4 (TCP)** callout server. Unlike every other example in [`../../example/`](../../example/), this one processes raw connection data below the HTTP layer, rather than HTTP headers and bodies — it's the network-layer counterpart to the L7 [`basic`](../../example/basic/) reference.

@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: header-manipulation
+  protocol: ext_proc-l7
+  language: python
+  summary: "Detects device type from :authority, injects a client-device header."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # Normalize Header Callout
 
 This callout server normalizes incoming HTTP requests by deriving and injecting
