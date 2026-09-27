@@ -82,5 +82,5 @@ a dedicated test file.
 ## Available Languages
 
 - [x] [Python](.) (this directory)
-- [x] [Go](../../../../go/extproc/examples/normalize_header/)
-- [x] [Java](../../../../java/service-callout/src/main/java/example/NormalizeHeader.java)
+- [ ] Go (not yet available)
+- [ ] Java (not yet available)

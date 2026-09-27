@@ -83,4 +83,4 @@ a dedicated test file.
 
 - [x] [Python](.) (this directory)
 - [x] [Go](../../../../go/extproc/examples/dynamic_forwarding/)
-- [x] [Java](../../../../java/service-callout/src/main/java/example/DynamicForwarding.java)
+- [ ] Java (not yet available)

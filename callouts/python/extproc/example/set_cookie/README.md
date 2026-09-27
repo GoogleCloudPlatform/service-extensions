@@ -80,5 +80,5 @@ a dedicated test file.
 ## Available Languages
 
 - [x] [Python](.) (this directory)
-- [x] [Go](../../../../go/extproc/examples/set_cookie/)
-- [x] [Java](../../../../java/service-callout/src/main/java/example/SetCookie.java)
+- [ ] Go (not yet available)
+- [ ] Java (not yet available)

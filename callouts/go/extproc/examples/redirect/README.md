@@ -75,4 +75,4 @@ go test ./extproc/examples/redirect/...
 
 - [x] [Python](.) (this directory)
 - [x] [Go](../../../../go/extproc/examples/redirect/)
-- [x] [Java](../../../../java/service-callout/src/main/java/example/Redirect.java)
+- [x] [Java](../../../../java/service-callout/src/main/java/example/Redirect/Redirect.java)

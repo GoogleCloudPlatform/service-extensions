@@ -69,4 +69,4 @@ rather than having a dedicated test file.
 
 - [x] [Python](.) (this directory)
 - [x] [Go](../../../../go/extproc/examples/add_header/)
-- [x] [Java](../../../../java/service-callout/src/main/java/example/AddHeader.java)
+- [x] [Java](../../../../java/service-callout/src/main/java/example/AddHeader/AddHeader.java)

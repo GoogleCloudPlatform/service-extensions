@@ -81,5 +81,5 @@ a dedicated test file.
 ## Available Languages
 
 - [x] [Python](.) (this directory)
-- [x] [Go](../../../../go/extproc/examples/update_header/)
-- [x] [Java](../../../../java/service-callout/src/main/java/example/UpdateHeader.java)
+- [ ] Go (not yet available)
+- [ ] Java (not yet available)

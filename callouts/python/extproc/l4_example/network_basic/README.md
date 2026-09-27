@@ -36,4 +36,4 @@ Command-line options (address, port, TLS, etc.) are available via `--help`; see 
 
 ## Additional Details
 
-This example extends [`NetworkCalloutServer`](../../service/network_callout_server.py), the L4 counterpart to the HTTP-focused `CalloutServer` used by every example under [`../../example/`](../../example/). See [`../../README.md`](../../README.md) for the L4 quick-start, including how the network `ext_proc` proto is generated with `buf`.
+This example extends [`NetworkCalloutServer`](../../service/network_callout_server.py), the L4 counterpart to the HTTP-focused `CalloutServer` used by every example under [`../../example/`](../../example/). See [`../../../README.md`](../../../README.md) for the L4 quick-start, including how the network `ext_proc` proto is generated with `buf`.
