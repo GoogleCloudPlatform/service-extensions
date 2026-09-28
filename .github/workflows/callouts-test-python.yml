@@ -1,18 +1,16 @@
-# This workflow will install Python dependencies, run tests and lint with a single version of Python
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
-
-name: Callouts test Python SDK - ExtProc
+name: Callouts test Python
 
 on:
+  workflow_dispatch:  # allow manual runs
   push:
     branches: [ "main" ]
     paths:
-    - 'callouts/python/extproc/**'
-    - 'docs/python/**'
+      - callouts/python/**
+      - docs/python/**
   pull_request:
     branches: [ "main" ]
     paths:
-    - 'callouts/python/extproc/**'
+      - callouts/python/**
 
 # Default permissions are read only.
 permissions: read-all
@@ -42,8 +40,17 @@ jobs:
     - name: Generate protodefs
       working-directory: ./callouts/python
       run: |
-        buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api --path envoy/service/ext_proc/v3/external_processor.proto --include-imports
+        buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api \
+          --path envoy/service/ext_proc/v3/external_processor.proto \
+          --path envoy/service/auth/v3/external_auth.proto \
+          --include-imports
         python -m pip install ./protodef
+    - name: Test with pytest
+      working-directory: ./callouts/python
+      run: |
+        pytest extproc/tests/ -v
+        pytest extauthz/tests/ -v
+    # Publish docs
     - name: Install sphinx dependencies
       run: |
         pip install sphinx sphinx_rtd_theme myst_parser
@@ -60,7 +67,3 @@ jobs:
         destination_dir: python/_build
         keep_files: false
         force_orphan: false
-    - name: Test with pytest
-      working-directory: ./callouts/python
-      run: |
-        pytest extproc/tests/ -v

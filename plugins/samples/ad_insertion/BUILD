@@ -1,0 +1,29 @@
+load("//:plugins.bzl", "proxy_wasm_plugin_cpp", "proxy_wasm_plugin_rust", "proxy_wasm_tests")
+
+licenses(["notice"])  # Apache 2
+
+proxy_wasm_plugin_rust(
+    name = "plugin_rust.wasm",
+    srcs = ["plugin.rs"],
+    deps = [
+        "//bazel/cargo/remote:proxy-wasm",
+    ],
+)
+
+proxy_wasm_plugin_cpp(
+    name = "plugin_cpp.wasm",
+    srcs = ["plugin.cc"],
+    deps = [
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+proxy_wasm_tests(
+    name = "tests",
+    config = ":tests.config",
+    plugins = [
+        ":plugin_rust.wasm",
+        ":plugin_cpp.wasm",
+    ],
+    tests = ":tests.textpb",
+)
