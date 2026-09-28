@@ -176,7 +176,11 @@ Support will grow over time. The current feature set includes:
     *   on_delete
 *   Stream context HTTP callbacks (host -> wasm)
     *   on_request_headers
+    *   on_request_body
+    *   on_request_trailers
     *   on_response_headers
+    *   on_response_body
+    *   on_response_trailers
 *   Stream context HTTP hostcalls (wasm -> host)
     *   send_local_response
     *   get_header_map_value, add_header_map_value, replace_header_map_value,
