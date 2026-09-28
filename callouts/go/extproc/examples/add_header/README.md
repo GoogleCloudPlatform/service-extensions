@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: header-manipulation
+  protocol: ext_proc-l7
+  language: go
+  summary: "Injects request and response headers in a single pass."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # Add Header Callout (Go)
 
 This callout server demonstrates how to modify HTTP request and response headers

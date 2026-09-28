@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: header-manipulation
+  protocol: ext_proc-l7
+  language: python
+  summary: "Adds a request header, clears route cache, removes a response header."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # Add Header Callout
 
 This callout server adds custom headers to both HTTP requests and responses as
@@ -60,4 +69,4 @@ rather than having a dedicated test file.
 
 - [x] [Python](.) (this directory)
 - [x] [Go](../../../../go/extproc/examples/add_header/)
-- [x] [Java](../../../../java/service-callout/src/main/java/example/AddHeader.java)
+- [x] [Java](../../../../java/service-callout/src/main/java/example/AddHeader/AddHeader.java)

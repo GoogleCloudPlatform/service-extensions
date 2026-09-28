@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: auth
+  protocol: ext_proc-l7
+  language: python
+  summary: "Validates RS256 bearer tokens, forwards decoded claims as headers."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # JWT Validation Callout
 
 This callout server validates a JWT (JSON Web Token) from incoming HTTP request
@@ -42,7 +51,7 @@ or **propagation of identity claims** to downstream services.
 
 ```bash
 cd callouts/python
-python -m extproc.example.jwt_validation.service_callout_example
+python -m extproc.example.jwt_auth.service_callout_example
 ```
 
 ---
@@ -73,5 +82,5 @@ a dedicated test file.
 ## Available Languages
 
 - [x] [Python](.) (this directory)
-- [x] [Go](../../../../go/extproc/examples/jwt_validation/)
-- [x] [Java](../../../../java/service-callout/src/main/java/example/JwtValidation.java)
+- [x] [Go](../../../../go/extproc/examples/jwt_auth/)
+- [x] [Java](../../../../java/service-callout/src/main/java/example/JwtAuth/JwtAuth.java)

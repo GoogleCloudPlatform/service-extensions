@@ -14,42 +14,50 @@ Each sample directory contains:
 
 | Sample | Description |
 |--------|-------------|
-| [add_body](samples/add_body/) | Appends `"-added-request-body"` to the request body and replaces the response body with `"new-body"` |
+| [add_body](add_body/) | Appends `"-added-request-body"` to the request body and replaces the response body with `"new-body"` |
+| [add_custom_response](add_custom_response/) | Replaces the response with a custom status, headers, and body |
 
 ### Header Manipulation
 
 | Sample | Description |
 |--------|-------------|
-| [add_header](samples/add_header/) | Adds `header-request: request` to requests (clears route cache) and `header-response: response` to responses (removes `foo`) |
-| [update_header](samples/update_header/) | Overwrites or adds `header-request` and `header-response` using the `OVERWRITE_IF_EXISTS_OR_ADD` append action |
-| [normalize_header](samples/normalize_header/) | Detects device type from `:authority` and injects `client-device-type: mobile/tablet/desktop` |
+| [add_header](add_header/) | Adds `header-request: request` to requests (clears route cache) and `header-response: response` to responses (removes `foo`) |
+| [update_header](update_header/) | Overwrites or adds `header-request` and `header-response` using the `OVERWRITE_IF_EXISTS_OR_ADD` append action |
+| [normalize_header](normalize_header/) | Detects device type from `:authority` and injects `client-device-type: mobile/tablet/desktop` |
 
 ### Routing & Traffic Management
 
 | Sample | Description |
 |--------|-------------|
-| [dynamic_forwarding](samples/dynamic_forwarding/) | Routes requests to a backend IP from the `ip-to-return` header; validates against a known address list with fallback to `10.1.10.4` |
-| [redirect](samples/redirect/) | Returns an unconditional `301 Moved Permanently` to `http://service-extensions.com/redirect` |
+| [dynamic_forwarding](dynamic_forwarding/) | Routes requests to a backend IP from the `ip-to-return` header; validates against a known address list with fallback to `10.1.10.4` |
+| [redirect](redirect/) | Returns an unconditional `301 Moved Permanently` to `http://service-extensions.com/redirect` |
 
 ### Authentication & Authorization
 
 | Sample | Description |
 |--------|-------------|
-| [jwt_auth](samples/jwt_auth/) | Validates RS256 JWT Bearer tokens against an RSA public key; forwards decoded claims as `decoded-<claim>` headers |
-| [cloud_log](samples/cloud_log/) | Enforces `header-check` and `body-check` sentinel values; logs authorization decisions to Google Cloud Logging |
+| [jwt_auth](jwt_auth/) | Validates RS256 JWT Bearer tokens against an RSA public key; forwards decoded claims as `decoded-<claim>` headers |
+| [cloud_log](cloud_log/) | Enforces `header-check` and `body-check` sentinel values; logs authorization decisions to Google Cloud Logging |
+
+> Looking for `ext_authz`-based authorization instead of `ext_proc`? See [`../../extauthz/`](../../extauthz/).
 
 ### Cookie Management
 
 | Sample | Description |
 |--------|-------------|
-| [set_cookie](samples/set_cookie/) | Conditionally injects `Set-Cookie` into responses when the `cookie-check` header is present |
+| [set_cookie](set_cookie/) | Conditionally injects `Set-Cookie` into responses when the `cookie-check` header is present |
+
+### AI / LLM Gateway
+
+| Sample | Description |
+|--------|-------------|
+| [litellm_gateway](litellm_gateway/) | Full LLM gateway callout, including a Terraform deployment config under `deploy/` |
 
 ### Reference Implementations
 
 | Sample | Description |
 |--------|-------------|
-| [basic_callout_server](samples/basic_callout_server/) | Full four-phase reference with deny/mock/standard conditional logic across all HTTP processing phases |
-| [basic_callout_server_v2](samples/basic_callout_server_v2/) | Extended four-phase reference: rewrites `:authority` and `:path`, injects headers, replaces request body, clears response body; supports CLI arguments |
+| [basic](basic/) | Full four-phase reference covering all core callback types — a starting point for a new callout server |
 
 ## Build
 
@@ -63,13 +71,10 @@ pip install -r requirements.txt
 Start a specific sample server:
 ```bash
 # As a module
-python -m extproc.example.<sample_name>
-
-# Directly
-python <sample_name>.py
+python -m extproc.example.<sample_name>.service_callout_example
 
 # With CLI arguments (samples that support them)
-python <sample_name>.py --address 0.0.0.0 --port 8443
+python -m extproc.example.<sample_name>.service_callout_example --address 0.0.0.0 --port 8443
 ```
 
 ## Test

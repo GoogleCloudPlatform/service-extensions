@@ -14,40 +14,40 @@ Each sample directory contains:
 
 | Sample | Description |
 |--------|-------------|
-| [server](internal/server/) | Core gRPC server infrastructure: `CalloutServer`, `GRPCCalloutService`, `HandlerRegistry`, TLS, health check |
-| [utils](pkg/utils/) | Shared mutation helpers: header, body, immediate response, and dynamic forwarding metadata builders |
+| [server](../internal/server/) | Core gRPC server infrastructure: `CalloutServer`, `GRPCCalloutService`, `HandlerRegistry`, TLS, health check |
+| [utils](../pkg/utils/) | Shared mutation helpers: header, body, immediate response, and dynamic forwarding metadata builders |
+| [client](client/) | Self-contained gRPC test client for exercising an ext_proc server locally |
 
 ### Body Manipulation
 
 | Sample | Description |
 |--------|-------------|
-| [add_body](samples/add_body/) | Replaces request body with `"new-body-request"` and response body with `"new-body-response"` |
+| [add_body](add_body/) | Replaces request body with `"new-body-request"` and response body with `"new-body-response"` |
 
 ### Header Manipulation
 
 | Sample | Description |
 |--------|-------------|
-| [add_header](samples/add_header/) | Injects `header-request: Value-request` into requests and `header-response: Value-response` into responses |
+| [add_header](add_header/) | Injects `header-request: Value-request` into requests and `header-response: Value-response` into responses |
 
 ### Routing & Traffic Management
 
 | Sample | Description |
 |--------|-------------|
-| [dynamic_forwarding](samples/dynamic_forwarding/) | Routes requests to a backend IP extracted from the `ip-to-return` header, with a hardcoded fallback |
-| [redirect](samples/redirect/) | Returns an unconditional `301 Moved Permanently` to `http://service-extensions.com/redirect` |
+| [dynamic_forwarding](dynamic_forwarding/) | Routes requests to a backend IP extracted from the `ip-to-return` header, with a hardcoded fallback |
+| [redirect](redirect/) | Returns an unconditional `301 Moved Permanently` to `http://service-extensions.com/redirect` |
 
 ### Authentication & Authorization
 
 | Sample | Description |
 |--------|-------------|
-| [jwt_auth](samples/jwt_auth/) | Validates RSA-signed JWT Bearer tokens and forwards decoded claims as `decoded-<claim>` headers |
+| [jwt_auth](jwt_auth/) | Validates RSA-signed JWT Bearer tokens and forwards decoded claims as `decoded-<claim>` headers |
 
 ### Reference Implementations
 
 | Sample | Description |
 |--------|-------------|
-| [basic_callout_server](samples/basic_callout_server/) | Full four-phase reference implementation: injects headers and replaces bodies in all phases |
-| [grpc_client_server](samples/grpc_client_server/) | Self-contained gRPC client-server demo for testing ext_proc interactions locally |
+| [basic_callout_server](basic_callout_server/) | Full four-phase reference implementation: injects headers and replaces bodies in all phases |
 
 ## Build
 
@@ -58,7 +58,7 @@ go build ./callouts/go/extproc/...
 
 Build a specific sample:
 ```bash
-go build ./callouts/go/extproc/samples/<sample_name>/...
+go build ./callouts/go/extproc/examples/<sample_name>/...
 ```
 
 ## Test
@@ -70,10 +70,10 @@ go test ./callouts/go/extproc/...
 
 Run tests for a specific sample:
 ```bash
-go test ./callouts/go/extproc/samples/<sample_name>/...
+go test ./callouts/go/extproc/examples/<sample_name>/...
 
 # With verbose output
-go test -v ./callouts/go/extproc/samples/<sample_name>/...
+go test -v ./callouts/go/extproc/examples/<sample_name>/...
 ```
 
 ## Additional Resources

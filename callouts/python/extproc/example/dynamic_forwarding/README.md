@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: routing-traffic
+  protocol: ext_proc-l7
+  language: python
+  summary: "Routes to a backend IP from a request header, with a fallback."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # Dynamic Forwarding Callout
 
 This callout server dynamically selects a backend endpoint based on an incoming
@@ -74,4 +83,4 @@ a dedicated test file.
 
 - [x] [Python](.) (this directory)
 - [x] [Go](../../../../go/extproc/examples/dynamic_forwarding/)
-- [x] [Java](../../../../java/service-callout/src/main/java/example/DynamicForwarding.java)
+- [ ] Java (not yet available)
