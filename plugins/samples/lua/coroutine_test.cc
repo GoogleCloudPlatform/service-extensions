@@ -54,7 +54,7 @@ extern "C" {
 #include "lualib.h"
 }
 
-namespace sample::lua {
+namespace proxy_wasm_lua {
 namespace {
 
 using ::testing::_;
@@ -1149,4 +1149,4 @@ TEST(LuaStreamCoroutineTest,
   { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
 }
 }  // namespace
-}  // namespace sample::lua
+}  // namespace proxy_wasm_lua
