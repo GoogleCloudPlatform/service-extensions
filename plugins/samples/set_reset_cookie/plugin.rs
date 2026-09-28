@@ -15,7 +15,6 @@
 // [START serviceextensions_plugin_set_reset_cookie]
 use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
-use std::collections::HashMap;
 
 // Include the generated protobuf code
 include!(concat!(env!("OUT_DIR"), "/cookie_config.rs"));
@@ -35,9 +34,9 @@ struct CookieManagerRootContext {
 impl Context for CookieManagerRootContext {}
 
 impl RootContext for CookieManagerRootContext {
-    fn on_configure(&mut self, _plugin_configuration_size: usize) -> bool {
+    fn on_configure(&mut self, plugin_configuration_size: usize) -> bool {
         // Handle empty configuration
-        if _plugin_configuration_size == 0 {
+        if plugin_configuration_size == 0 {
             log::warn!("Empty configuration provided, no cookies will be managed");
             return true; // Empty config is valid, just does nothing
         }
@@ -50,7 +49,7 @@ impl RootContext for CookieManagerRootContext {
             }
         };
 
-        let config_string = match String::from_utf8(config_data.clone()) {
+        let config_string = match String::from_utf8(config_data) {
             Ok(s) => s,
             Err(e) => {
                 log::error!("Configuration is not valid UTF-8: {}", e);
@@ -88,15 +87,14 @@ impl RootContext for CookieManagerRootContext {
                 continue;
             }
 
-            if cookie_config.operation() == CookieOperation::Set
-                || cookie_config.operation() == CookieOperation::Overwrite
+            if (cookie_config.operation() == CookieOperation::Set
+                || cookie_config.operation() == CookieOperation::Overwrite)
+                && cookie_config.value.is_empty()
             {
-                if cookie_config.value.is_empty() {
-                    log::warn!(
-                        "Cookie '{}' has SET/OVERWRITE operation but empty value",
-                        cookie_config.name
-                    );
-                }
+                log::warn!(
+                    "Cookie '{}' has SET/OVERWRITE operation but empty value",
+                    cookie_config.name
+                );
             }
 
             log::debug!(
@@ -121,8 +119,7 @@ impl RootContext for CookieManagerRootContext {
     fn create_http_context(&self, _context_id: u32) -> Option<Box<dyn HttpContext>> {
         Some(Box::new(CookieManagerHttpContext {
             cookie_configs: self.cookie_configs.clone(),
-            request_cookies: HashMap::new(),
-            cookies_to_delete: Vec::new(),
+            request_cookies: Vec::new(),
         }))
     }
 
@@ -133,8 +130,11 @@ impl RootContext for CookieManagerRootContext {
 
 struct CookieManagerHttpContext {
     cookie_configs: Vec<CookieConfig>,
-    request_cookies: HashMap<String, String>,
-    cookies_to_delete: Vec<String>,
+    // Ordered list of (name, value) pairs. A Vec (rather than a map) is used
+    // because a Cookie header may legally contain several cookies with the
+    // same name, and because it preserves the original order when the header
+    // is rebuilt.
+    request_cookies: Vec<(String, String)>,
 }
 
 impl Context for CookieManagerHttpContext {}
@@ -159,14 +159,21 @@ impl HttpContext for CookieManagerHttpContext {
 }
 
 impl CookieManagerHttpContext {
-    // Parse cookies from the Cookie header
+    // Parse cookies from the Cookie header. Tolerates any amount of whitespace
+    // around the ';' separators and keeps duplicate names.
     fn parse_request_cookies(&mut self) {
+        self.request_cookies.clear();
+
         if let Some(cookie_header) = self.get_http_request_header("Cookie") {
-            for cookie_pair in cookie_header.split("; ") {
-                let parts: Vec<&str> = cookie_pair.splitn(2, '=').collect();
-                if parts.len() == 2 {
-                    self.request_cookies
-                        .insert(parts[0].to_string(), parts[1].to_string());
+            for pair in cookie_header.split(';') {
+                let pair = pair.trim();
+                if let Some(eq_pos) = pair.find('=') {
+                    let name = pair[..eq_pos].trim();
+                    let value = pair[eq_pos + 1..].trim();
+                    if !name.is_empty() {
+                        self.request_cookies
+                            .push((name.to_string(), value.to_string()));
+                    }
                 }
             }
         }
@@ -174,38 +181,45 @@ impl CookieManagerHttpContext {
 
     // Process cookie deletions before CDN cache
     fn process_cookie_deletions(&mut self) {
+        let mut names_to_delete: Vec<String> = Vec::new();
+
         for config in &self.cookie_configs {
-            if config.operation() == CookieOperation::Delete {
-                if self.request_cookies.contains_key(&config.name) {
-                    self.cookies_to_delete.push(config.name.clone());
-                    log::info!(
-                        "Marking cookie for deletion before CDN cache: {}",
-                        config.name
-                    );
+            if config.operation() == CookieOperation::Delete
+                && self.request_cookies.iter().any(|(n, _)| n == &config.name)
+            {
+                if !names_to_delete.contains(&config.name) {
+                    names_to_delete.push(config.name.clone());
                 }
+                log::info!(
+                    "Marking cookie for deletion before CDN cache: {}",
+                    config.name
+                );
             }
         }
 
-        // Remove deleted cookies from request
-        if !self.cookies_to_delete.is_empty() {
-            self.rebuild_cookie_header();
+        if names_to_delete.is_empty() {
+            return;
         }
+
+        // Remove every cookie whose name matches, however many there are
+        self.request_cookies
+            .retain(|(name, _)| !names_to_delete.contains(name));
+
+        self.rebuild_cookie_header();
     }
 
-    // Rebuild Cookie header without deleted cookies
+    // Rebuild Cookie header from the remaining cookies (original order kept)
     fn rebuild_cookie_header(&self) {
-        let mut remaining_cookies = Vec::new();
-
-        for (name, value) in &self.request_cookies {
-            if !self.cookies_to_delete.contains(name) {
-                remaining_cookies.push(format!("{}={}", name, value));
-            }
-        }
-
-        if remaining_cookies.is_empty() {
+        if self.request_cookies.is_empty() {
             self.set_http_request_header("Cookie", None);
         } else {
-            self.set_http_request_header("Cookie", Some(&remaining_cookies.join("; ")));
+            let header = self
+                .request_cookies
+                .iter()
+                .map(|(name, value)| format!("{}={}", name, value))
+                .collect::<Vec<_>>()
+                .join("; ");
+            self.set_http_request_header("Cookie", Some(&header));
         }
     }
 
@@ -232,7 +246,7 @@ impl CookieManagerHttpContext {
             cookie_value.push_str(&format!("; Domain={}", config.domain));
         }
 
-        // Add Max-Age for persistent cookies (session if -1)
+        // Add Max-Age for persistent cookies (session cookie otherwise)
         if config.max_age > 0 {
             cookie_value.push_str(&format!("; Max-Age={}", config.max_age));
         }
@@ -252,23 +266,51 @@ impl CookieManagerHttpContext {
 
         self.add_http_response_header("Set-Cookie", &cookie_value);
 
-        let log_type = if config.max_age == -1 {
-            "session"
-        } else {
+        let log_type = if config.max_age > 0 {
             "persistent"
+        } else {
+            "session"
         };
-        log::info!(
-            "Setting {} cookie: {}={}",
-            log_type,
-            config.name,
-            config.value
-        );
+        // Cookie values are intentionally not logged (may be sensitive)
+        log::info!("Setting {} cookie: {}", log_type, config.name);
+    }
+
+    // Remove only the existing Set-Cookie headers for this cookie name,
+    // leaving Set-Cookie headers for other cookies untouched.
+    fn remove_existing_set_cookie(&self, name: &str) {
+        let headers = self.get_http_response_headers();
+
+        let is_set_cookie = |key: &str| key.eq_ignore_ascii_case("set-cookie");
+        let matches_name = |value: &str| {
+            value
+                .split(';')
+                .next()
+                .and_then(|nv| nv.find('=').map(|eq| nv[..eq].trim() == name))
+                .unwrap_or(false)
+        };
+
+        // Nothing to do if no Set-Cookie header targets this cookie
+        if !headers
+            .iter()
+            .any(|(k, v)| is_set_cookie(k) && matches_name(v))
+        {
+            return;
+        }
+
+        // Header maps can't remove a single value, so clear all Set-Cookie
+        // headers and re-add the ones that don't target this cookie.
+        self.set_http_response_header("Set-Cookie", None);
+        for (k, v) in headers.iter() {
+            if is_set_cookie(k) && !matches_name(v) {
+                self.add_http_response_header("Set-Cookie", v);
+            }
+        }
     }
 
     // Overwrite or remove existing Set-Cookie headers
     fn overwrite_cookie(&self, config: &CookieConfig) {
-        // Remove all existing Set-Cookie headers for this cookie
-        self.set_http_response_header("Set-Cookie", None);
+        // Remove existing Set-Cookie headers for this cookie only
+        self.remove_existing_set_cookie(&config.name);
 
         // If value is not empty, set the new cookie
         if !config.value.is_empty() {

@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package serviceextensions.cookie_manager;
 
-// Cookie operation types
+// Cookie operation types.
 enum CookieOperation {
   COOKIE_OPERATION_UNSPECIFIED = 0;
   SET = 1;
@@ -24,20 +24,20 @@ enum CookieOperation {
   OVERWRITE = 3;
 }
 
-// Cookie configuration based on Apache log format
+// Configuration for a single cookie operation.
 message CookieConfig {
   string name = 1;
   string value = 2;
   string domain = 3;
-  string path = 4 [default = "/"];
-  int32 max_age = 5 [default = -1];  // -1 for session cookie, >0 for persistent
+  string path = 4;
+  int32 max_age = 5;
   bool secure = 6;
-  bool http_only = 7 [default = true];
+  bool http_only = 7;
   bool same_site_strict = 8;
-  CookieOperation operation = 9 [default = SET];
+  CookieOperation operation = 9;
 }
 
-// Configuration message containing multiple cookie configurations
+// Top-level configuration containing multiple cookie definitions.
 message CookieManagerConfig {
   repeated CookieConfig cookies = 1;
 }
