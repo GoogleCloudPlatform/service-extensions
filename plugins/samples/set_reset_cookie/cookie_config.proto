@@ -17,7 +17,6 @@ syntax = "proto3";
 package serviceextensions.cookie_manager;
 
 // Cookie operation types.
-
 enum CookieOperation {
   COOKIE_OPERATION_UNSPECIFIED = 0;
   SET = 1;
@@ -30,7 +29,6 @@ message CookieConfig {
   string name = 1;
   string value = 2;
   string domain = 3;
-
   string path = 4;
   int32 max_age = 5;
   bool secure = 6;
@@ -40,7 +38,6 @@ message CookieConfig {
 }
 
 // Top-level configuration containing multiple cookie definitions.
->>>>>>> origin
 message CookieManagerConfig {
   repeated CookieConfig cookies = 1;
 }
