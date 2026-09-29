@@ -1,8 +1,22 @@
+# Copyright 2026 Google LLC.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 terraform {
   required_providers {
     google = {
       source  = "hashicorp/google"
-      version = "~> 5.0"
+      version = ">= 7.7.0"
     }
   }
 }
@@ -16,17 +30,47 @@ provider "google" {
 # CORE LOGIC: EXT_PROC SERVICE (CLOUD RUN)
 # -----------------------------------------------------------------------------
 
+# Dedicated identity for the callout server, so that access to the client
+# secret is granted to this service only.
+resource "google_service_account" "ext_proc" {
+  account_id   = "token-exchange-ext-proc"
+  display_name = "Token exchange callout server"
+}
+
+# The OAuth client secret is read from Secret Manager at container start. The
+# secret is created outside of Terraform (see the README), so its value is
+# never written to the Terraform state or to the Cloud Run configuration.
+resource "google_secret_manager_secret_iam_member" "ext_proc_secret_access" {
+  count     = var.outbound_client_secret_id != "" ? 1 : 0
+  secret_id = var.outbound_client_secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.ext_proc.email}"
+}
+
 resource "google_cloud_run_v2_service" "ext_proc_service" {
   name     = "token-exchange-ext-proc"
   location = var.region
-  ingress  = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+  # The backend trusts the headers that the callout server sets, so a client
+  # able to reach either service directly could forge them. Only the load
+  # balancer may call the services, and the default run.app URI is switched
+  # off, so there is no address to reach them on besides the load balancer.
+  ingress              = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+  default_uri_disabled = true
+  # Lets `terraform destroy` remove the example.
+  deletion_protection = false
 
   template {
+    service_account = google_service_account.ext_proc.email
+
     containers {
       image = var.image_uri
       ports {
         container_port = 8080
         name           = "h2c"
+      }
+      env {
+        name  = "TOKEN_EXCHANGE_FAIL_CLOSED"
+        value = tostring(var.fail_closed)
       }
       env {
         name  = "TOKEN_EXCHANGE_MODE"
@@ -52,12 +96,22 @@ resource "google_cloud_run_v2_service" "ext_proc_service" {
         name  = "OUTBOUND_CLIENT_ID"
         value = var.outbound_client_id
       }
-      env {
-        name  = "OUTBOUND_CLIENT_SECRET"
-        value = var.outbound_client_secret
+      dynamic "env" {
+        for_each = var.outbound_client_secret_id != "" ? [1] : []
+        content {
+          name = "OUTBOUND_CLIENT_SECRET"
+          value_source {
+            secret_key_ref {
+              secret  = var.outbound_client_secret_id
+              version = var.outbound_client_secret_version
+            }
+          }
+        }
       }
     }
   }
+
+  depends_on = [google_secret_manager_secret_iam_member.ext_proc_secret_access]
 }
 
 resource "google_compute_region_network_endpoint_group" "ext_proc_neg" {
@@ -99,11 +153,13 @@ resource "google_network_services_lb_traffic_extension" "token_exchange_ext" {
     }
 
     extensions {
-      name             = "ext-proc-authz"
-      authority        = "ext-proc-authz.google.com"
-      service          = google_compute_backend_service.ext_proc_backend.self_link
-      timeout          = "10s"
-      fail_open        = true
+      name      = "ext-proc-authz"
+      authority = "ext-proc-authz.google.com"
+      service   = google_compute_backend_service.ext_proc_backend.self_link
+      timeout   = "10s"
+      # Whether requests are let through when the callout server itself is
+      # unreachable or times out.
+      fail_open        = !var.fail_closed
       supported_events = ["REQUEST_HEADERS"]
     }
   }
@@ -114,14 +170,16 @@ resource "google_network_services_lb_traffic_extension" "token_exchange_ext" {
 # -----------------------------------------------------------------------------
 
 resource "google_cloud_run_v2_service" "echo_backend" {
-  name     = "token-exchange-echo-backend"
-  location = var.region
-  ingress  = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+  name                 = "token-exchange-echo-backend"
+  location             = var.region
+  ingress              = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+  default_uri_disabled = true
+  deletion_protection  = false
   template {
     containers {
-      image = "mccutchen/go-httpbin:v2.23.1"
-      ports { 
-        container_port = 8080 
+      image = "mccutchen/go-httpbin:2.23.1"
+      ports {
+        container_port = 8080
       }
     }
   }
@@ -170,6 +228,19 @@ resource "google_compute_global_forwarding_rule" "verification_forwarding_rule" 
 # -----------------------------------------------------------------------------
 # IAM POLICIES: CLOUD RUN INVOKER ACCESS
 # -----------------------------------------------------------------------------
+#
+# Service Extensions calls the callout server without an identity token, so
+# there is no principal for IAM to match and the invoker role cannot be scoped
+# more narrowly. The callouts documentation requires it: a Cloud Run callout
+# backend "must allow unauthenticated access". Without this binding every
+# request fails, because Cloud Run rejects the unauthenticated callout.
+#
+# Network controls restrict access instead. Both services only accept traffic
+# from load balancers (INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER) and have
+# their default run.app URI disabled, so there is no public path to them.
+#
+# For real-world usage, review whether unauthenticated invocation is allowed
+# by your organization policy, and keep these network restrictions in place.
 
 resource "google_cloud_run_v2_service_iam_member" "ext_proc_public" {
   project  = google_cloud_run_v2_service.ext_proc_service.project
