@@ -19,4 +19,5 @@ COPY ./extproc/example/token_exchange ./extproc/example/token_exchange
 RUN pip install --no-cache-dir -r ./extproc/example/token_exchange/additional-requirements.txt
 
 EXPOSE 8080
-ENTRYPOINT ["python3", "-u", "-m", "extproc.example.token_exchange.run"]
+ENTRYPOINT ["python3", "-u", "-m", "extproc.example.token_exchange.service_callout_example"]
+CMD ["--disable_tls", "--plaintext_address", "0.0.0.0:8080"]
