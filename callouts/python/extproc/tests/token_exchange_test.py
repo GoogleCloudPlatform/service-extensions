@@ -32,7 +32,11 @@ import pytest
 from envoy.config.core.v3.base_pb2 import HeaderMap, HeaderValue
 from envoy.service.ext_proc.v3 import external_processor_pb2 as service_pb2
 
-from extproc.example.token_exchange.token_exchange_callout import TokenExchangeCallout
+from envoy.type.v3.http_status_pb2 import StatusCode
+
+from extproc.example.token_exchange.service_callout_example import (
+    CalloutServerExample,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -70,6 +74,11 @@ def _mutated_headers(response: service_pb2.ProcessingResponse) -> dict:
     }
 
 
+def _removed_headers(response: service_pb2.ProcessingResponse) -> list:
+    return list(
+        response.request_headers.response.header_mutation.remove_headers)
+
+
 def _mock_http_response(access_token: str, expires_in: int | None = 3600) -> MagicMock:
     mock = MagicMock()
     body = {"access_token": access_token}
@@ -101,26 +110,39 @@ _OUTBOUND_ENVS = {
 }
 
 
+def _make_service(envs: dict):
+    with patch.dict(os.environ, envs):
+        return CalloutServerExample(
+            disable_tls=True, plaintext_address=("0.0.0.0", 0))
+
+
+def _serve(envs: dict):
+    callout = _make_service(envs)
+    try:
+        yield callout
+    finally:
+        if callout._callout_server is not None:
+            callout._callout_server.stop()
+
+
 @pytest.fixture(scope="module")
 def svc_inbound():
-    with patch.dict(os.environ, _INBOUND_ENVS):
-        callout = TokenExchangeCallout(disable_tls=True, plaintext_address=("0.0.0.0", 0))
-        try:
-            yield callout
-        finally:
-            if callout._callout_server is not None:
-                callout._callout_server.stop()
+    yield from _serve(_INBOUND_ENVS)
+
+
+@pytest.fixture(scope="module")
+def svc_inbound_fail_closed():
+    yield from _serve({**_INBOUND_ENVS, "TOKEN_EXCHANGE_FAIL_CLOSED": "true"})
 
 
 @pytest.fixture(scope="module")
 def svc_outbound():
-    with patch.dict(os.environ, _OUTBOUND_ENVS):
-        callout = TokenExchangeCallout(disable_tls=True, plaintext_address=("0.0.0.0", 0))
-        try:
-            yield callout
-        finally:
-            if callout._callout_server is not None:
-                callout._callout_server.stop()
+    yield from _serve(_OUTBOUND_ENVS)
+
+
+@pytest.fixture(scope="module")
+def svc_outbound_fail_closed():
+    yield from _serve({**_OUTBOUND_ENVS, "TOKEN_EXCHANGE_FAIL_CLOSED": "true"})
 
 
 # ---------------------------------------------------------------------------
@@ -130,16 +152,19 @@ def svc_outbound():
 class TestPassThrough:
     def test_no_auth_header(self, svc_inbound):
         result = svc_inbound.process(_make_callout({":path": "/api"}), _Ctx())
+        assert not result.HasField("immediate_response")
         assert not _mutated_headers(result)
 
     def test_non_bearer_scheme(self, svc_inbound):
         result = svc_inbound.process(
             _make_callout({"authorization": "Basic dXNlcjpwYXNz"}), _Ctx())
+        assert not result.HasField("immediate_response")
         assert not _mutated_headers(result)
 
     def test_bearer_without_token(self, svc_inbound):
         result = svc_inbound.process(
             _make_callout({"authorization": "Bearer"}), _Ctx())
+        assert not result.HasField("immediate_response")
         assert not _mutated_headers(result)
 
 
@@ -150,14 +175,14 @@ class TestPassThrough:
 class TestInboundExchange:
     def test_authorization_header_replaced(self, svc_inbound):
         svc_inbound.cache.clear()
-        with patch("requests.post", return_value=_mock_http_response("google-token")):
+        with patch("requests.Session.post", return_value=_mock_http_response("google-token")):
             result = svc_inbound.process(
                 _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
         assert _mutated_headers(result)["authorization"] == "Bearer google-token"
 
     def test_sts_called_with_json_camelcase_payload(self, svc_inbound):
         svc_inbound.cache.clear()
-        with patch("requests.post", return_value=_mock_http_response("t")) as mock_post:
+        with patch("requests.Session.post", return_value=_mock_http_response("t")) as mock_post:
             svc_inbound.process(
                 _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
         _, kwargs = mock_post.call_args
@@ -167,9 +192,18 @@ class TestInboundExchange:
         assert kwargs["json"]["subjectToken"] == _SAMPLE_JWT
         assert kwargs["json"]["subjectTokenType"] == "urn:ietf:params:oauth:token-type:jwt"
 
+    def test_sts_payload_requests_a_scope(self, svc_inbound):
+        svc_inbound.cache.clear()
+        with patch("requests.Session.post", return_value=_mock_http_response("t")) as mock_post:
+            svc_inbound.process(
+                _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
+        # Google STS answers 400 "Scope(s) must be provided." without it.
+        assert mock_post.call_args[1]["json"]["scope"] == (
+            "https://www.googleapis.com/auth/cloud-platform")
+
     def test_sts_audience_contains_wif_identifiers(self, svc_inbound):
         svc_inbound.cache.clear()
-        with patch("requests.post", return_value=_mock_http_response("t")) as mock_post:
+        with patch("requests.Session.post", return_value=_mock_http_response("t")) as mock_post:
             svc_inbound.process(
                 _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
         audience = mock_post.call_args[1]["json"]["audience"]
@@ -179,41 +213,41 @@ class TestInboundExchange:
 
     def test_audit_email_header(self, svc_inbound):
         svc_inbound.cache.clear()
-        with patch("requests.post", return_value=_mock_http_response("t")):
+        with patch("requests.Session.post", return_value=_mock_http_response("t")):
             result = svc_inbound.process(
                 _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
         assert _mutated_headers(result)["x-goog-authenticated-user-email"] == "user@example.com"
 
     def test_audit_user_id_header(self, svc_inbound):
         svc_inbound.cache.clear()
-        with patch("requests.post", return_value=_mock_http_response("t")):
+        with patch("requests.Session.post", return_value=_mock_http_response("t")):
             result = svc_inbound.process(
                 _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
         assert _mutated_headers(result)["x-goog-authenticated-user-id"] == "user-123"
 
     def test_audit_groups_header_comma_separated(self, svc_inbound):
         svc_inbound.cache.clear()
-        with patch("requests.post", return_value=_mock_http_response("t")):
+        with patch("requests.Session.post", return_value=_mock_http_response("t")):
             result = svc_inbound.process(
                 _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
         assert _mutated_headers(result)["x-original-user-groups"] == "eng,admin"
 
     def test_cache_hit_skips_sts_call(self, svc_inbound):
         svc_inbound.cache.clear()
-        with patch("requests.post", return_value=_mock_http_response("t")) as mock_post:
+        with patch("requests.Session.post", return_value=_mock_http_response("t")) as mock_post:
             svc_inbound.process(
                 _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
             assert mock_post.call_count == 1
             svc_inbound.process(
                 _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
-            assert mock_post.call_count == 1  # cache HIT — no second call
+            assert mock_post.call_count == 1  # cache HIT: no second call
 
     def test_cache_hit_returns_first_token(self, svc_inbound):
         svc_inbound.cache.clear()
-        with patch("requests.post", return_value=_mock_http_response("first-token")):
+        with patch("requests.Session.post", return_value=_mock_http_response("first-token")):
             svc_inbound.process(
                 _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
-        with patch("requests.post", return_value=_mock_http_response("second-token")):
+        with patch("requests.Session.post", return_value=_mock_http_response("second-token")):
             result = svc_inbound.process(
                 _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
         assert _mutated_headers(result)["authorization"] == "Bearer first-token"
@@ -222,7 +256,7 @@ class TestInboundExchange:
         svc_inbound.cache.clear()
         cache_key = hashlib.sha256(_SAMPLE_JWT.encode()).hexdigest()
         svc_inbound.cache[cache_key] = ("stale-token", int(time.time()) - 1)
-        with patch("requests.post", return_value=_mock_http_response("fresh-token")) as mock_post:
+        with patch("requests.Session.post", return_value=_mock_http_response("fresh-token")) as mock_post:
             result = svc_inbound.process(
                 _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
         assert mock_post.call_count == 1
@@ -236,14 +270,14 @@ class TestInboundExchange:
 class TestOutboundExchange:
     def test_authorization_header_replaced(self, svc_outbound):
         svc_outbound.cache.clear()
-        with patch("requests.post", return_value=_mock_http_response("outbound-token")):
+        with patch("requests.Session.post", return_value=_mock_http_response("outbound-token")):
             result = svc_outbound.process(
                 _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
         assert _mutated_headers(result)["authorization"] == "Bearer outbound-token"
 
     def test_idp_called_with_form_encoded_snake_case_payload(self, svc_outbound):
         svc_outbound.cache.clear()
-        with patch("requests.post", return_value=_mock_http_response("t")) as mock_post:
+        with patch("requests.Session.post", return_value=_mock_http_response("t")) as mock_post:
             svc_outbound.process(
                 _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
         _, kwargs = mock_post.call_args
@@ -255,7 +289,7 @@ class TestOutboundExchange:
 
     def test_no_audit_headers_in_outbound_mode(self, svc_outbound):
         svc_outbound.cache.clear()
-        with patch("requests.post", return_value=_mock_http_response("t")):
+        with patch("requests.Session.post", return_value=_mock_http_response("t")):
             result = svc_outbound.process(
                 _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
         hdrs = _mutated_headers(result)
@@ -265,7 +299,7 @@ class TestOutboundExchange:
 
     def test_missing_expires_in_skips_caching(self, svc_outbound):
         svc_outbound.cache.clear()
-        with patch("requests.post", return_value=_mock_http_response("t", expires_in=None)) as mock_post:
+        with patch("requests.Session.post", return_value=_mock_http_response("t", expires_in=None)) as mock_post:
             svc_outbound.process(
                 _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
             svc_outbound.process(
@@ -282,26 +316,160 @@ class TestFailOpen:
         svc_inbound.cache.clear()
         mock = MagicMock()
         mock.raise_for_status.side_effect = Exception("STS 500")
-        with patch("requests.post", return_value=mock):
+        with patch("requests.Session.post", return_value=mock):
             result = svc_inbound.process(
                 _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
+        assert not result.HasField("immediate_response")
         assert not _mutated_headers(result)
 
     def test_idp_http_error_passes_request_through(self, svc_outbound):
         svc_outbound.cache.clear()
         mock = MagicMock()
         mock.raise_for_status.side_effect = Exception("IdP 503")
-        with patch("requests.post", return_value=mock):
+        with patch("requests.Session.post", return_value=mock):
             result = svc_outbound.process(
                 _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
+        assert not result.HasField("immediate_response")
         assert not _mutated_headers(result)
 
     def test_network_error_passes_request_through(self, svc_inbound):
         svc_inbound.cache.clear()
-        with patch("requests.post", side_effect=ConnectionError("timeout")):
+        with patch("requests.Session.post", side_effect=ConnectionError("timeout")):
             result = svc_inbound.process(
                 _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
+        assert not result.HasField("immediate_response")
         assert not _mutated_headers(result)
+
+
+# ---------------------------------------------------------------------------
+# Fail-closed: requests that were not exchanged are rejected
+# ---------------------------------------------------------------------------
+
+class TestFailClosed:
+    def test_exchange_error_returns_403(self, svc_inbound_fail_closed):
+        svc_inbound_fail_closed.cache.clear()
+        mock = MagicMock()
+        mock.raise_for_status.side_effect = Exception("STS 500")
+        with patch("requests.Session.post", return_value=mock):
+            result = svc_inbound_fail_closed.process(
+                _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}),
+                _Ctx())
+        assert result.HasField("immediate_response")
+        assert result.immediate_response.status.code == StatusCode.Forbidden
+
+    def test_no_auth_header_returns_401(self, svc_inbound_fail_closed):
+        result = svc_inbound_fail_closed.process(
+            _make_callout({":path": "/api"}), _Ctx())
+        assert result.HasField("immediate_response")
+        assert result.immediate_response.status.code == StatusCode.Unauthorized
+
+    def test_non_bearer_scheme_returns_401(self, svc_inbound_fail_closed):
+        result = svc_inbound_fail_closed.process(
+            _make_callout({"authorization": "Basic dXNlcjpwYXNz"}), _Ctx())
+        assert result.HasField("immediate_response")
+        assert result.immediate_response.status.code == StatusCode.Unauthorized
+
+    def test_outbound_exchange_error_returns_403(self, svc_outbound_fail_closed):
+        svc_outbound_fail_closed.cache.clear()
+        mock = MagicMock()
+        mock.raise_for_status.side_effect = Exception("IdP 503")
+        with patch("requests.Session.post", return_value=mock):
+            result = svc_outbound_fail_closed.process(
+                _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}),
+                _Ctx())
+        assert result.HasField("immediate_response")
+        assert result.immediate_response.status.code == StatusCode.Forbidden
+
+    def test_successful_exchange_is_not_rejected(self, svc_inbound_fail_closed):
+        svc_inbound_fail_closed.cache.clear()
+        with patch("requests.Session.post",
+                   return_value=_mock_http_response("google-token")):
+            result = svc_inbound_fail_closed.process(
+                _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}),
+                _Ctx())
+        assert not result.HasField("immediate_response")
+        assert _mutated_headers(result)["authorization"] == "Bearer google-token"
+
+
+# ---------------------------------------------------------------------------
+# Identity headers: only present when backed by a claim of an exchanged token
+# ---------------------------------------------------------------------------
+
+_IDENTITY_HEADERS = [
+    "x-goog-authenticated-user-email",
+    "x-goog-authenticated-user-id",
+    "x-original-user-groups",
+]
+
+
+class TestIdentityHeaderStripping:
+    def test_headers_without_claim_are_removed(self, svc_inbound):
+        svc_inbound.cache.clear()
+        token = _make_jwt({"sub": "user-123"})
+        with patch("requests.Session.post",
+                   return_value=_mock_http_response("t")):
+            result = svc_inbound.process(_make_callout({
+                "authorization": f"Bearer {token}",
+                "x-goog-authenticated-user-email": "spoofed@example.com",
+                "x-original-user-groups": "admin",
+            }), _Ctx())
+        assert _mutated_headers(result)["x-goog-authenticated-user-id"] == "user-123"
+        assert sorted(_removed_headers(result)) == [
+            "x-goog-authenticated-user-email", "x-original-user-groups"]
+
+    def test_headers_with_claim_are_overwritten_not_removed(self, svc_inbound):
+        svc_inbound.cache.clear()
+        with patch("requests.Session.post",
+                   return_value=_mock_http_response("t")):
+            result = svc_inbound.process(_make_callout({
+                "authorization": f"Bearer {_SAMPLE_JWT}",
+                "x-goog-authenticated-user-email": "spoofed@example.com",
+            }), _Ctx())
+        assert _mutated_headers(result)[
+            "x-goog-authenticated-user-email"] == "user@example.com"
+        assert not _removed_headers(result)
+
+    def test_undecodable_token_removes_all(self, svc_inbound):
+        svc_inbound.cache.clear()
+        with patch("requests.Session.post",
+                   return_value=_mock_http_response("t")):
+            result = svc_inbound.process(
+                _make_callout({"authorization": "Bearer not-a-jwt"}), _Ctx())
+        assert sorted(_removed_headers(result)) == sorted(_IDENTITY_HEADERS)
+
+    def test_no_auth_header_removes_all(self, svc_inbound):
+        result = svc_inbound.process(_make_callout({
+            ":path": "/api",
+            "x-goog-authenticated-user-email": "spoofed@example.com",
+        }), _Ctx())
+        assert sorted(_removed_headers(result)) == sorted(_IDENTITY_HEADERS)
+
+    def test_fail_open_removes_all(self, svc_inbound):
+        svc_inbound.cache.clear()
+        with patch("requests.Session.post",
+                   side_effect=ConnectionError("timeout")):
+            result = svc_inbound.process(
+                _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}),
+                _Ctx())
+        assert sorted(_removed_headers(result)) == sorted(_IDENTITY_HEADERS)
+
+    def test_non_utf8_authorization_removes_all(self, svc_inbound):
+        callout = _make_callout({"x-original-user-groups": "admin"})
+        callout.request_headers.headers.headers.append(
+            HeaderValue(key="authorization", raw_value=b"Bearer \xff\xfe"))
+        with patch("requests.Session.post",
+                   side_effect=ConnectionError("rejected")):
+            result = svc_inbound.process(callout, _Ctx())
+        assert sorted(_removed_headers(result)) == sorted(_IDENTITY_HEADERS)
+
+    def test_outbound_mode_removes_nothing(self, svc_outbound):
+        svc_outbound.cache.clear()
+        with patch("requests.Session.post",
+                   return_value=_mock_http_response("t")):
+            result = svc_outbound.process(
+                _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}),
+                _Ctx())
+        assert not _removed_headers(result)
 
 
 # ---------------------------------------------------------------------------
@@ -316,7 +484,7 @@ class TestConfigValidation:
                 "WIF_PROVIDER_ID": "p",
                 "WIF_PROJECT_NUMBER": "123",
             }, clear=True):
-                TokenExchangeCallout(disable_tls=True, plaintext_address=("0.0.0.0", 0))
+                CalloutServerExample(disable_tls=True, plaintext_address=("0.0.0.0", 0))
 
     def test_inbound_missing_wif_provider_raises(self):
         with pytest.raises(ValueError, match="Missing inbound"):
@@ -325,11 +493,18 @@ class TestConfigValidation:
                 "WIF_POOL_ID": "pool",
                 "WIF_PROJECT_NUMBER": "123",
             }, clear=True):
-                TokenExchangeCallout(disable_tls=True, plaintext_address=("0.0.0.0", 0))
+                CalloutServerExample(disable_tls=True, plaintext_address=("0.0.0.0", 0))
+
+    def test_unknown_mode_raises(self):
+        with pytest.raises(ValueError, match="Unknown TOKEN_EXCHANGE_MODE"):
+            with patch.dict(os.environ, {
+                "TOKEN_EXCHANGE_MODE": "sideways",
+            }, clear=True):
+                CalloutServerExample(disable_tls=True, plaintext_address=("0.0.0.0", 0))
 
     def test_outbound_missing_token_url_raises(self):
         with pytest.raises(ValueError, match="Missing outbound"):
             with patch.dict(os.environ, {
                 "TOKEN_EXCHANGE_MODE": "outbound",
             }, clear=True):
-                TokenExchangeCallout(disable_tls=True, plaintext_address=("0.0.0.0", 0))
+                CalloutServerExample(disable_tls=True, plaintext_address=("0.0.0.0", 0))
