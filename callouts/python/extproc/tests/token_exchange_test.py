@@ -167,6 +167,17 @@ class TestPassThrough:
         assert not result.HasField("immediate_response")
         assert not _mutated_headers(result)
 
+    def test_token_in_header_value_field(self, svc_inbound):
+        # Envoy may send the header in `value` instead of `raw_value`.
+        svc_inbound.cache.clear()
+        callout = _make_callout({})
+        callout.request_headers.headers.headers.append(
+            HeaderValue(key="authorization", value=f"Bearer {_SAMPLE_JWT}"))
+        with patch("requests.Session.post",
+                   return_value=_mock_http_response("google-token")):
+            result = svc_inbound.process(callout, _Ctx())
+        assert _mutated_headers(result)["authorization"] == "Bearer google-token"
+
 
 # ---------------------------------------------------------------------------
 # Inbound: external JWT → Google access token via STS
@@ -242,6 +253,28 @@ class TestInboundExchange:
                 _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
             assert mock_post.call_count == 1  # cache HIT: no second call
 
+    def test_cache_accessed_under_lock(self, svc_inbound):
+        # TTLCache is not thread-safe and the server runs several threads.
+        svc_inbound.cache.clear()
+        locked_on = []
+        original_get = svc_inbound.cache.get
+        original_set = type(svc_inbound.cache).__setitem__
+
+        def guarded_get(*args, **kwargs):
+            locked_on.append(svc_inbound.cache_lock.locked())
+            return original_get(*args, **kwargs)
+
+        def guarded_set(cache, key, value):
+            locked_on.append(svc_inbound.cache_lock.locked())
+            original_set(cache, key, value)
+
+        with patch("requests.Session.post", return_value=_mock_http_response("t")), \
+             patch.object(svc_inbound.cache, "get", guarded_get), \
+             patch.object(type(svc_inbound.cache), "__setitem__", guarded_set):
+            svc_inbound.process(
+                _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
+        assert locked_on == [True, True]  # one read, one write, both locked
+
     def test_cache_hit_returns_first_token(self, svc_inbound):
         svc_inbound.cache.clear()
         with patch("requests.Session.post", return_value=_mock_http_response("first-token")):
@@ -296,6 +329,17 @@ class TestOutboundExchange:
         assert "x-goog-authenticated-user-email" not in hdrs
         assert "x-goog-authenticated-user-id" not in hdrs
         assert "x-original-user-groups" not in hdrs
+
+    def test_string_expires_in_is_cached(self, svc_outbound):
+        # Some identity providers return expires_in as a string.
+        svc_outbound.cache.clear()
+        with patch("requests.Session.post",
+                   return_value=_mock_http_response("t", expires_in="3600")) as mock_post:
+            for _ in range(2):
+                result = svc_outbound.process(
+                    _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
+        assert mock_post.call_count == 1  # second request served from the cache
+        assert _mutated_headers(result)["authorization"] == "Bearer t"
 
     def test_missing_expires_in_skips_caching(self, svc_outbound):
         svc_outbound.cache.clear()

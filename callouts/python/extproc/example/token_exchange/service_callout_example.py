@@ -15,6 +15,7 @@
 import hashlib
 import logging
 import os
+import threading
 import time
 from typing import Optional, Tuple, Union
 
@@ -75,6 +76,9 @@ class CalloutServerExample(callout_server.CalloutServer):
     self.fail_closed = os.environ.get(
         'TOKEN_EXCHANGE_FAIL_CLOSED', 'false').lower() in _TRUE_VALUES
     self.cache = TTLCache(maxsize=10000, ttl=3600)
+    # The base server handles callouts on several threads, and TTLCache is not
+    # thread-safe. The lock covers the cache accesses only, not the exchange.
+    self.cache_lock = threading.Lock()
     # Shared session, so that exchanges reuse pooled connections instead of
     # paying for a TLS handshake on every request.
     self.session = requests.Session()
@@ -130,7 +134,8 @@ class CalloutServerExample(callout_server.CalloutServer):
   def _get_exchanged_token(self, original_token: str) -> str:
     """Returns the exchanged token, from the cache when still valid."""
     cache_key = hashlib.sha256(original_token.encode('utf-8')).hexdigest()
-    cached = self.cache.get(cache_key)
+    with self.cache_lock:
+      cached = self.cache.get(cache_key)
     if cached:
       new_token, expiry_ts = cached
       # 60s safety margin before actual expiry.
@@ -145,7 +150,8 @@ class CalloutServerExample(callout_server.CalloutServer):
       new_token, expiry_ts = self._exchange_outbound(original_token)
 
     if expiry_ts:
-      self.cache[cache_key] = (new_token, expiry_ts)
+      with self.cache_lock:
+        self.cache[cache_key] = (new_token, expiry_ts)
     return new_token
 
   def _exchange_inbound(self, subject_token: str) -> Tuple[str, Optional[int]]:
@@ -170,7 +176,8 @@ class CalloutServerExample(callout_server.CalloutServer):
     resp.raise_for_status()
 
     body = resp.json()
-    return body['access_token'], int(time.time()) + body['expires_in']
+    expiry_ts = int(time.time()) + int(body['expires_in'])
+    return body['access_token'], expiry_ts
 
   def _exchange_outbound(self, subject_token: str) -> Tuple[str, Optional[int]]:
     data = {
@@ -189,7 +196,7 @@ class CalloutServerExample(callout_server.CalloutServer):
 
     body = resp.json()
     expires_in = body.get('expires_in')
-    expiry_ts = int(time.time()) + expires_in if expires_in else None
+    expiry_ts = int(time.time()) + int(expires_in) if expires_in else None
     return body['access_token'], expiry_ts
 
   def _not_exchanged(
@@ -233,9 +240,12 @@ def _extract_bearer_token(headers: service_pb2.HttpHeaders) -> Optional[str]:
   """Returns the token of an 'Authorization: Bearer <token>' header."""
   for header in headers.headers.headers:
     if header.key.lower() == 'authorization':
-      # A value that is not valid UTF-8 must not raise: the callout would fail
-      # before the identity headers are removed from the request.
-      parts = header.raw_value.decode('utf-8', errors='replace').split()
+      # Envoy sends either raw_value or value. A raw_value that is not valid
+      # UTF-8 must not raise: the callout would fail before the identity
+      # headers are removed from the request.
+      raw = (header.raw_value.decode('utf-8', errors='replace')
+             if header.raw_value else header.value)
+      parts = (raw or '').split()
       if len(parts) == 2 and parts[0].lower() == 'bearer':
         return parts[1]
       return None
