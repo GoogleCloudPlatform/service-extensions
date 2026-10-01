@@ -1,0 +1,13 @@
+# Copyright 2026 Google LLC.
+# Licensed under the Apache License, Version 2.0
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/token-exchange/token-exchange:latest'
+      - '-f'
+      - 'extproc/example/token_exchange/Dockerfile'
+      - '.'
+images:
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/token-exchange/token-exchange:latest'
