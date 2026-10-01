@@ -50,7 +50,7 @@ inline absl::Status GetStatus(const absl::Status& v) { return v; }
 #include "proxy_wasm_common.h"
 #include "proxy_wasm_enums.h"
 
-namespace sample::lua {
+namespace proxy_wasm_lua {
 namespace {
 
 using ::testing::_;
@@ -1428,4 +1428,4 @@ TEST_F(HandleTest, GetHeadersMutationsBlockedWhenHeadersPassedOn) {
 }
 
 }  // namespace
-}  // namespace sample::lua
+}  // namespace proxy_wasm_lua

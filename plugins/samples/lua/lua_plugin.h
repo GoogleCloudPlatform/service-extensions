@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef NET_TURING_WASM_LUA_LUA_PLUGIN_H_
-#define NET_TURING_WASM_LUA_LUA_PLUGIN_H_
+#pragma once
 
 #include <cstddef>
 #include <cstdint>
@@ -31,7 +30,7 @@ extern "C" {
 #include "lualib.h"
 }
 
-namespace sample::lua {
+namespace proxy_wasm_lua {
 
 class LuaHttpContext final : public Context {
  public:
@@ -87,5 +86,4 @@ class LuaRootContext final : public RootContext {
   friend class LuaHttpContext;
 };
 
-}  // namespace sample::lua
-#endif  // NET_TURING_WASM_LUA_LUA_PLUGIN_H_
+}  // namespace proxy_wasm_lua

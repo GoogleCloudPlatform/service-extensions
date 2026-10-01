@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef NET_TURING_WASM_LUA_ENVOY_LUA_API_H_
-#define NET_TURING_WASM_LUA_ENVOY_LUA_API_H_
+#pragma once
 
 // The C++ classes and Lua wrapper API surface defined in this file
 // (e.g., Handle, Header, StreamInfo) are designed to emulate Envoy's native
@@ -37,7 +36,7 @@
 #include "proxy_wasm_common.h"
 #include "proxy_wasm_enums.h"
 
-namespace sample::lua {
+namespace proxy_wasm_lua {
 
 class Logger {
  public:
@@ -445,5 +444,4 @@ class Handle {
   bool is_request_;
 };
 
-}  // namespace sample::lua
-#endif  // NET_TURING_WASM_LUA_ENVOY_LUA_API_H_
+}  // namespace proxy_wasm_lua

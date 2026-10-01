@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef NET_TURING_WASM_LUA_LUA_STATE_H_
-#define NET_TURING_WASM_LUA_LUA_STATE_H_
+#pragma once
 
 #include <memory>
 #include <string>
@@ -32,7 +31,7 @@ extern "C" {
 #include "lua.h"
 }
 
-namespace sample::lua {
+namespace proxy_wasm_lua {
 
 namespace internal {
 using LuaStatePtr =
@@ -161,6 +160,5 @@ class ScopedGlobalFunction {
   std::string name_;
 };
 
-}  // namespace sample::lua
+}  // namespace proxy_wasm_lua
 
-#endif  // NET_TURING_WASM_LUA_LUA_STATE_H_
