@@ -4,3 +4,5 @@ pyjwt[crypto]==2.13.0
 litellm==1.83.0
 httpx>=0.27,<1.0
 google-cloud-aiplatform>=1.50.0
+cachetools>=5.0.0
+requests>=2.25.0
