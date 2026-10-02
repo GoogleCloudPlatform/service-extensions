@@ -51,7 +51,7 @@ public class JwtAuthTest {
     @Before
     public void setUp() throws GeneralSecurityException, IOException {
         server = new JwtAuth.Builder()
-                .setPort(8443)
+                .setSecurePort(8443)
                 .setHealthCheckPort(8000)
                 .build();
 
