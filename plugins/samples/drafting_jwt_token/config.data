@@ -1,0 +1,43 @@
+{
+  "secret_key": "your-256-bit-secret-key-change-this-in-production",
+  "default_expiration_minutes": 60,
+  "data": {
+    "user-451": {
+      "plan": "pro",
+      "permissions": [
+        "read:data",
+        "write:data",
+        "delete:data"
+      ],
+      "roles": ["developer", "admin"]
+    },
+    "user-123": {
+      "plan": "free",
+      "permissions": [
+        "read:data"
+      ],
+      "roles": ["viewer"]
+    },
+    "user-789": {
+      "plan": "enterprise",
+      "permissions": [
+        "read:data",
+        "write:data",
+        "delete:data",
+        "admin:users",
+        "admin:billing"
+      ],
+      "roles": ["super_admin"]
+    },
+    "user-999": {
+      "plan": "pro",
+      "permissions": [
+        "read:data",
+        "write:data",
+        "read:reports",
+        "export:data"
+      ],
+      "roles": ["analyst", "developer"]
+    }
+  }
+}
