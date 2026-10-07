@@ -37,6 +37,7 @@ _GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange'
 _JWT_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:jwt'
 _ACCESS_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:access_token'
 
+_AGENT_USER_AUTH_HEADER = 'x-goog-agent-user-authorization'
 _EMAIL_HEADER = 'x-goog-authenticated-user-email'
 _USER_ID_HEADER = 'x-goog-authenticated-user-id'
 _GROUPS_HEADER = 'x-original-user-groups'
@@ -213,7 +214,8 @@ class CalloutServerExample(callout_server.CalloutServer):
       response.details = details
       return response
     if self.mode == 'inbound':
-      return callout_tools.add_header_mutation(remove=list(_IDENTITY_HEADERS))
+      return callout_tools.add_header_mutation(
+          remove=[*_IDENTITY_HEADERS, _AGENT_USER_AUTH_HEADER])
     return service_pb2.HeadersResponse()
 
   def _build_response(
@@ -223,6 +225,7 @@ class CalloutServerExample(callout_server.CalloutServer):
     remove = []
 
     if self.mode == 'inbound':
+      add.append((_AGENT_USER_AUTH_HEADER, f'Bearer {original_token}'))
       identity = _identity_headers(original_token)
       add.extend(identity.items())
       # Remove the identity headers that have no matching claim, so that
