@@ -24,12 +24,14 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
 import io.grpc.netty.NettyServerBuilder;
+import io.netty.channel.ChannelOption;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.security.GeneralSecurityException;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -54,7 +56,7 @@ public class ServiceCallout {
     private Server plaintextServer;
     private HttpServer healthCheckServer;
     private String ip;
-    private int port;
+    private int securePort;
     private int plaintextPort;
     private String healthCheckIp;
     private int healthCheckPort;
@@ -64,12 +66,22 @@ public class ServiceCallout {
     private String certPath;
     private byte[] certKey;
     private String certKeyPath;
-    private int serverThreadCount;
     private boolean enablePlainTextPort;
+    private boolean enableTls;
+
+    // gRPC/Netty tuning parameters
+    private int maxConcurrentCallsPerConnection;
+    private int flowControlWindow;
+    private int maxInboundMessageSize;
+    private long permitKeepAliveTimeSeconds;
+    private boolean permitKeepAliveWithoutCalls;
+
+    // Shared executor for virtual threads (managed lifecycle)
+    private ExecutorService grpcExecutor;
 
     protected ServiceCallout(Builder<?> builder) {
         this.ip = Optional.ofNullable(builder.ip).orElse("0.0.0.0");
-        this.port = Optional.ofNullable(builder.port).orElse(443);
+        this.securePort = Optional.ofNullable(builder.securePort).orElse(443); // Only used if enableTls is true
         this.plaintextPort = Optional.ofNullable(builder.plaintextPort).orElse(8080);
         this.healthCheckIp = Optional.ofNullable(builder.healthCheckIp).orElse("0.0.0.0");
         this.healthCheckPort = Optional.ofNullable(builder.healthCheckPort).orElse(80);
@@ -86,8 +98,15 @@ public class ServiceCallout {
         this.certKey = Optional.ofNullable(builder.certKey)
                 .orElseGet(() -> readFileToBytes(this.certKeyPath)); // Read using final path
 
-        this.serverThreadCount = Optional.ofNullable(builder.serverThreadCount).orElse(2);
         this.enablePlainTextPort = Optional.ofNullable(builder.enablePlainTextPort).orElse(true);
+        this.enableTls = Optional.ofNullable(builder.enableTls).orElse(false);
+
+        // gRPC/Netty tuning with safer defaults
+        this.maxConcurrentCallsPerConnection = Optional.ofNullable(builder.maxConcurrentCallsPerConnection).orElse(1000);
+        this.flowControlWindow = Optional.ofNullable(builder.flowControlWindow).orElse(1024 * 1024); // 1MB
+        this.maxInboundMessageSize = Optional.ofNullable(builder.maxInboundMessageSize).orElse(4 * 1024 * 1024); // 4MB
+        this.permitKeepAliveTimeSeconds = Optional.ofNullable(builder.permitKeepAliveTimeSeconds).orElse(60L); // 1 minute
+        this.permitKeepAliveWithoutCalls = Optional.ofNullable(builder.permitKeepAliveWithoutCalls).orElse(false); // Disabled by default
 
         // Initialize health check server if enabled
         if (!this.combinedHealthCheck) {
@@ -103,7 +122,7 @@ public class ServiceCallout {
     // Builder class using Generics
     public static class Builder<T extends Builder<T>> {
         private String ip;
-        private Integer port;
+        private Integer securePort;
         private Integer plaintextPort;
         private String healthCheckIp;
         private Integer healthCheckPort;
@@ -113,16 +132,23 @@ public class ServiceCallout {
         private String certPath;
         private byte[] certKey;
         private String certKeyPath;
-        private Integer serverThreadCount;
         private Boolean enablePlainTextPort;
+        private Boolean enableTls;
+
+        // gRPC/Netty tuning parameters
+        private Integer maxConcurrentCallsPerConnection;
+        private Integer flowControlWindow;
+        private Integer maxInboundMessageSize;
+        private Long permitKeepAliveTimeSeconds;
+        private Boolean permitKeepAliveWithoutCalls;
 
         public T setIp(String ip) {
             this.ip = ip;
             return self();
         }
 
-        public T setPort(Integer port) {
-            this.port = port;
+        public T setSecurePort(Integer securePort) {
+            this.securePort = securePort;
             return self();
         }
 
@@ -171,13 +197,38 @@ public class ServiceCallout {
             return self();
         }
 
-        public T setServerThreadCount(Integer serverThreadCount) {
-            this.serverThreadCount = serverThreadCount;
+        public T setEnablePlainTextPort(Boolean enablePlainTextPort) {
+            this.enablePlainTextPort = enablePlainTextPort;
             return self();
         }
 
-        public T setEnablePlainTextPort(Boolean enablePlainTextPort) {
-            this.enablePlainTextPort = enablePlainTextPort;
+        public T setEnableTls(Boolean enableTls) {
+            this.enableTls = enableTls;
+            return self();
+        }
+
+        public T setMaxConcurrentCallsPerConnection(Integer maxConcurrentCallsPerConnection) {
+            this.maxConcurrentCallsPerConnection = maxConcurrentCallsPerConnection;
+            return self();
+        }
+
+        public T setFlowControlWindow(Integer flowControlWindow) {
+            this.flowControlWindow = flowControlWindow;
+            return self();
+        }
+
+        public T setMaxInboundMessageSize(Integer maxInboundMessageSize) {
+            this.maxInboundMessageSize = maxInboundMessageSize;
+            return self();
+        }
+
+        public T setPermitKeepAliveTimeSeconds(Long permitKeepAliveTimeSeconds) {
+            this.permitKeepAliveTimeSeconds = permitKeepAliveTimeSeconds;
+            return self();
+        }
+
+        public T setPermitKeepAliveWithoutCalls(Boolean permitKeepAliveWithoutCalls) {
+            this.permitKeepAliveWithoutCalls = permitKeepAliveWithoutCalls;
             return self();
         }
 
@@ -212,37 +263,61 @@ public class ServiceCallout {
     public void start() throws IOException {
         ExternalProcessorImpl processor = new ExternalProcessorImpl();
 
-        if (cert != null && certKey != null) {
-            logger.info("Secure server starting...");
-
-            server = NettyServerBuilder.forPort(port)
-                    .sslContext(createSslContext(cert, certKey))
-                    .addService(processor)
-                    .executor(Executors.newFixedThreadPool(serverThreadCount)) // Configurable thread pool
-                    .build()
-                    .start();
-
-            logger.info("Secure Server started, listening on " + port);
-
+        // Create shared executor for virtual threads (managed lifecycle)
+        if (grpcExecutor != null) {
+            throw new IllegalStateException("Server already started");
         }
-        if (enablePlainTextPort) {
-            logger.info("Plaintext server starting...");
+        grpcExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
-            plaintextServer = ServerBuilder.forPort(plaintextPort)
-                    .addService(processor)
-                    .executor(Executors.newFixedThreadPool(serverThreadCount)) // Configurable thread pool
-                    .build()
-                    .start();
+        try {
+            if (enableTls && cert != null && certKey != null) {
+                logger.info("Secure server starting...");
 
-            logger.info("Plaintext Server started, listening on " + plaintextPort);
-        }
+                server = NettyServerBuilder.forPort(securePort)
+                        .sslContext(createSslContext(cert, certKey))
+                        .addService(processor)
+                        .executor(grpcExecutor)
+                        .maxConcurrentCallsPerConnection(maxConcurrentCallsPerConnection)
+                        .flowControlWindow(flowControlWindow)
+                        .maxInboundMessageSize(maxInboundMessageSize)
+                        .permitKeepAliveTime(permitKeepAliveTimeSeconds, TimeUnit.SECONDS)
+                        .permitKeepAliveWithoutCalls(permitKeepAliveWithoutCalls)
+                        .withChildOption(ChannelOption.SO_KEEPALIVE, true)
+                        .withChildOption(ChannelOption.TCP_NODELAY, true)
+                        .build()
+                        .start();
 
+                logger.info("Secure Server started, listening on " + securePort);
+            }
+            if (enablePlainTextPort) {
+                logger.info("Plaintext server starting...");
 
+                plaintextServer = NettyServerBuilder.forPort(plaintextPort)
+                        .addService(processor)
+                        .executor(grpcExecutor)
+                        .maxConcurrentCallsPerConnection(maxConcurrentCallsPerConnection)
+                        .flowControlWindow(flowControlWindow)
+                        .maxInboundMessageSize(maxInboundMessageSize)
+                        .permitKeepAliveTime(permitKeepAliveTimeSeconds, TimeUnit.SECONDS)
+                        .permitKeepAliveWithoutCalls(permitKeepAliveWithoutCalls)
+                        .withChildOption(ChannelOption.SO_KEEPALIVE, true)
+                        .withChildOption(ChannelOption.TCP_NODELAY, true)
+                        .build()
+                        .start();
 
-        // Start Health Check Server if enabled
-        if (!combinedHealthCheck) {
-            healthCheckServer.start();
-            logger.info("Health Check Server started, listening on " + healthCheckIp + ":" + healthCheckPort + " at path " + healthCheckPath);
+                logger.info("Plaintext Server started, listening on " + plaintextPort);
+            }
+
+            // Start Health Check Server if enabled
+            if (!combinedHealthCheck) {
+                healthCheckServer.start();
+                logger.info("Health Check Server started, listening on " + healthCheckIp + ":" + healthCheckPort + " at path " + healthCheckPath);
+            }
+        } catch (Exception e) {
+            // Clean up executor if startup fails to prevent thread leak
+            grpcExecutor.shutdownNow();
+            grpcExecutor = null;
+            throw e;
         }
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -269,6 +344,15 @@ public class ServiceCallout {
 
         if (plaintextServer != null) {
             plaintextServer.shutdown().awaitTermination(30, TimeUnit.SECONDS);
+        }
+
+        // Shut down the shared gRPC executor
+        if (grpcExecutor != null) {
+            grpcExecutor.shutdown();
+            if (!grpcExecutor.awaitTermination(30, TimeUnit.SECONDS)) {
+                grpcExecutor.shutdownNow();
+            }
+            logger.info("gRPC executor shut down.");
         }
 
         if (!combinedHealthCheck && healthCheckServer != null) {

@@ -3,7 +3,7 @@ test {
   request_headers {
     result {
       log { regex: ".*onRequestHeaders: hello from wasm" }
-      has_header { key: ":host" value: "service-extensions.com" }
+      has_header { key: ":authority" value: "service-extensions.com" }
       has_header { key: ":path" value: "/" }
     }
   }

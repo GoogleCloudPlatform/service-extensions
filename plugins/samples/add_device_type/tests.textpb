@@ -1,0 +1,92 @@
+# Test desktop user agent detection
+test {
+  name: "DetectDesktopUserAgent"
+  benchmark: false
+  request_headers {
+    input { header { key: "user-agent" value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" } }
+    result { has_header { key: "x-device-type" value: "desktop" } }
+  }
+}
+
+# Test iPhone detection
+test {
+  name: "DetectIPhoneUserAgent"
+  benchmark: false
+  request_headers {
+    input { header { key: "user-agent" value: "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1" } }
+    result { has_header { key: "x-device-type" value: "phone" } }
+  }
+}
+
+# Test iPad detection
+test {
+  name: "DetectIPadUserAgent"
+  benchmark: false
+  request_headers {
+    input { header { key: "user-agent" value: "Mozilla/5.0 (iPad; CPU OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1" } }
+    result { has_header { key: "x-device-type" value: "tablet" } }
+  }
+}
+
+# Test Android phone detection
+test {
+  name: "DetectAndroidPhoneUserAgent"
+  benchmark: false
+  request_headers {
+    input { header { key: "user-agent" value: "Mozilla/5.0 (Linux; Android 10; SM-G960U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36" } }
+    result { has_header { key: "x-device-type" value: "phone" } }
+  }
+}
+
+# Test Android tablet detection
+test {
+  name: "DetectAndroidTabletUserAgent"
+  benchmark: false
+  request_headers {
+    input { header { key: "user-agent" value: "Mozilla/5.0 (Linux; Android 10; SM-T510) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Safari/537.36" } }
+    result { has_header { key: "x-device-type" value: "tablet" } }
+  }
+}
+
+# Test bot detection
+test {
+  name: "DetectBotUserAgent"
+  benchmark: false
+  request_headers {
+    input { header { key: "user-agent" value: "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" } }
+    result { has_header { key: "x-device-type" value: "bot" } }
+  }
+}
+
+# Test missing User-Agent
+test {
+  name: "MissingUserAgent"
+  benchmark: false
+  request_headers {
+    input {}
+    result { has_header { key: "x-device-type" value: "other" } }
+  }
+}
+
+# Test case insensitivity
+test {
+  name: "CaseInsensitivity"
+  benchmark: false
+  request_headers {
+    input { header { key: "User-Agent" value: "MOZILLA/5.0 (IPHONE; CPU iPhone OS)" } }
+    result { has_header { key: "x-device-type" value: "phone" } }
+  }
+}
+
+# Test benchmark case for performance testing
+test {
+  name: "BenchmarkDetection"
+  benchmark: true
+  request_headers {
+    input { 
+      header { key: "user-agent" value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" } 
+      header { key: "host" value: "example.com" }
+    }
+    result { has_header { key: "x-device-type" value: "desktop" } }
+  }
+}

@@ -1,0 +1,76 @@
+env {
+  log_level: DEBUG
+  log_path: "/dev/stdout"
+}
+
+test {
+  name: "Invalid_HMAC_Format"
+  request_headers {
+    input {
+      header { key: ":path" value: "/api" }
+      header { key: ":method" value: "GET" }
+      header { key: "authorization" value: "HMAC invalid_timestamp" }
+    }
+    result {
+      immediate { http_status: 400 }
+    }
+  }
+}
+
+test {
+  name: "Missing_Authorization_Header"
+  request_headers {
+    input {
+      header { key: ":path" value: "/api" }
+      header { key: ":method" value: "GET" }
+    }
+    result {
+      immediate { http_status: 401 }
+    }
+  }
+}
+
+test {
+  name: "Invalid_HMAC_Value"
+  request_headers {
+    input {
+      header { key: ":path" value: "/api" }
+      header { key: ":method" value: "GET" }
+      # Timestamp válido (current_time - 150s)
+      header { key: "authorization" value: "HMAC 1717000000:invalid_hmac_value" }
+    }
+    result {
+      immediate { http_status: 403 }
+    }
+  }
+}
+
+test {
+  name: "Case_Insensitive_Scheme"
+  request_headers {
+    input {
+      header { key: ":path" value: "/api" }
+      header { key: ":method" value: "GET" }
+      # Timestamp válido (current_time - 150s)
+      header { key: "authorization" value: "hmac 1717000000:valid_hmac" }
+    }
+    result {
+      immediate { http_status: 403 }
+    }
+  }
+}
+
+test {
+  name: "Expired_Token"
+  request_headers {
+    input {
+      header { key: ":path" value: "/api" }
+      header { key: ":method" value: "GET" }
+      # Timestamp expirado (current_time - 301s)
+      header { key: "authorization" value: "HMAC 1710000000:hmac_value" }
+    }
+    result {
+      immediate { http_status: 403 }
+    }
+  }
+}
