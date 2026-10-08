@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,9 @@ class MyHttpContext : public Context {
   FilterHeadersStatus onResponseHeaders(uint32_t headers,
                                         bool end_of_stream) override {
     // Remove all Set-Cookie headers from the response
-    removeResponseHeader("Set-Cookie");
+    if (removeResponseHeader("Set-Cookie") != WasmResult::Ok) {
+      LOG_ERROR("Failed to remove Set-Cookie header");
+    }
     return FilterHeadersStatus::Continue;
   }
 };
