@@ -1,4 +1,4 @@
-# Copyright 2024 Google LLC.
+# Copyright 2025 Google LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,10 @@
 FROM bufbuild/buf as BUF
 RUN apk add git
 COPY ./buf.gen.yaml ./buf.gen.yaml
-RUN buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api --path envoy/service/ext_proc/v3/external_processor.proto --include-imports
+# L7 proto path: envoy/service/ext_proc/v3/external_processor.proto
+# L4 proto path: envoy/service/network_ext_proc/v3/network_external_processor.proto
+ARG proto_path="envoy/service/ext_proc/v3/external_processor.proto"
+RUN buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api --path $proto_path --include-imports
 
 # Build the callout service.
 FROM launcher.gcr.io/google/debian12 as service-callout-common-python

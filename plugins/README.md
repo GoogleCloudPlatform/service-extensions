@@ -54,12 +54,12 @@ C++ builds may require a specific toolchain: `--config=clang` or `--config=gcc`.
 
 # Testing and benchmarking
 
-1.  Write a plugin test file (text proto) to specify the plugin's functional
-    expectations ([example](samples/testing/tests.textpb)). Consult the plugin
-    tester [proto API](test/runner.proto) as needed.
-1.  Add `benchmark: true` to tests that exemplify common wasm operations
+1. Write a plugin test file to specify the plugin's functional expectations. 
+   This file can either be in text proto format ([example](samples/testing/tests.textpb)) or YAML ([example](samples/testing/tests.yaml)). 
+   Consult the plugin tester [proto API](test/runner.proto) as needed.
+2. Add `benchmark: true` to tests that exemplify common wasm operations
     ([example](samples/add_header/tests.textpb)).
-1.  Run + Test + Benchmark your wasm plugin as follows!
+3. Run + Test + Benchmark your wasm plugin as follows!
 
 ```bash
 docker run -it -v $(pwd):/mnt \
@@ -101,9 +101,10 @@ for your own plugin. Extend them to fit your particular use case.
     callbacks.
 *   [Hello World](samples/local_reply): Immediately response with "Hello World"
     upon request.
-*   [Add HTTP request & response headers](samples/add_header): Add a header on
-    both the client request and server response paths. Also check for existing
-    headers.
+*   [Add HTTP request headers](samples/add_request_header): Add a header on the
+    client request path.
+*   [Add HTTP response headers](samples/add_response_header): Add a header on
+    the server response path. Also check for existing headers.
 *   [Plugin config with a list of tokens to deny](samples/config_denylist): Deny
     a request whenever it contains a known bad token. Bad tokens are loaded at
     plugin initialization time from plugin configuration.
@@ -175,7 +176,11 @@ Support will grow over time. The current feature set includes:
     *   on_delete
 *   Stream context HTTP callbacks (host -> wasm)
     *   on_request_headers
+    *   on_request_body
+    *   on_request_trailers
     *   on_response_headers
+    *   on_response_body
+    *   on_response_trailers
 *   Stream context HTTP hostcalls (wasm -> host)
     *   send_local_response
     *   get_header_map_value, add_header_map_value, replace_header_map_value,
@@ -195,7 +200,7 @@ Support will grow over time. The current feature set includes:
 
 In support of unit testing, this repo contains an `HttpTest` fixture with a
 `TestWasm` host implementation and `TestHttpContext` stream handler. These
-minimal implementations loosely match GCP Service Extension execution
+minimal implementations loosely match the GCP Service Extension execution
 environment. The contexts implement the ABI / feature set described above
 (mainly HTTP headers and logging), but often in a simple way (behaviors may not
 match GCP exactly).
