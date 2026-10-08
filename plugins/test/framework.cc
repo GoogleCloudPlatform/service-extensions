@@ -19,11 +19,10 @@
 #include <utility>
 #include <vector>
 
-#include <boost/dll/runtime_symbol_info.hpp>
-
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
+#include "boost/dll/runtime_symbol_info.hpp"
 
 namespace service_extensions_samples {
 
@@ -86,6 +85,10 @@ proxy_wasm::WasmResult TestContext::log(uint32_t log_level,
 }
 ContextOptions& TestContext::options() const {
   return static_cast<TestWasm*>(wasm())->options();
+}
+
+void TestContext::error(std::string_view message) {
+  std::cerr << message << "\n";
 }
 
 proxy_wasm::BufferInterface* TestHttpContext::getBuffer(
@@ -221,7 +224,7 @@ TestHttpContext::Result TestHttpContext::SendRequestBody(std::string body,
   body_buffer_.setOwned(std::move(body));
   current_callback_ = TestHttpContext::CallbackType::RequestBody;
   result_.body_status = onRequestBody(body_buffer_.size(), end_of_stream);
-    result_.body = body_buffer_.release();
+  result_.body = body_buffer_.release();
   return std::move(result_);
 }
 
@@ -242,7 +245,7 @@ TestHttpContext::Result TestHttpContext::SendResponseHeaders(
 }
 
 TestHttpContext::Result TestHttpContext::SendResponseBody(std::string body,
-                                                         bool end_of_stream) {
+                                                          bool end_of_stream) {
   phase_logs_.clear();
   result_ = Result{};
   if (sent_local_response_) {
