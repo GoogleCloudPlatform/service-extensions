@@ -4,11 +4,12 @@ This plugin modifies HTTP response bodies to dynamically insert Google Ad Manage
 
 ## Implementation Notes
 
-- **Configuration parsing**: Loads a CSV-like text configuration at module initialization to define the GPT library URL and various ad slot configurations (slot path, size, relative marker, and placement).
+- **Configuration parsing**: Loads a CSV-like text configuration at plugin initialization to define the GPT library URL and various ad slot configurations (slot path, size, relative marker, and placement).
+- **Default configuration**: When no configuration payload is provided, the plugin falls back to built-in defaults that enable GPT library injection and define standard `header`, `content`, and `sidebar` ad placements.
 - **Infinite loop prevention**: Inspects the `:path` header to identify and skip ad requests (e.g., `/ads/`) to avoid injecting ads into ad script responses.
 - **Content type matching**: Checks the `Content-Type` response header to ensure manipulation only occurs on `text/html` payloads.
-- **Body buffering**: Returns `StopIterationAndBuffer` until the end of the stream to ensure the entire HTML document is available, avoiding issues with split HTML tags across chunks.
-- **Content-Length removal**: Safely removes the `Content-Length` response header because the overall size of the body increases upon ad insertion.
+- **Body buffering**: Buffers the response body until the end of the stream to ensure the entire HTML document is available, avoiding issues with split HTML tags across chunks.
+- **Content-Length removal**: Removes the `Content-Length` response header because the overall size of the body increases upon ad insertion.
 - **Single pass insertion**: Matches HTML markers and prepares all insertions, applying them from bottom to top to preserve accurate string positions.
 
 ## Configuration Parsing
@@ -85,6 +86,7 @@ Derived from [`tests.textpb`](tests.textpb):
 
 | Scenario | Description |
 |---|---|
+| **DefaultConfigFallback** | When no plugin configuration is provided, the plugin falls back to its built-in defaults: GPT library injection is enabled and the `header`, `content`, and `sidebar` ad slots are used. |
 | **CustomConfigAdInsertion** | Injects the GPT library and properly sizes and places GAM ad units relative to configured HTML markers. |
 | **NoAdInsertionWhenMarkersMissingWithCustomConfig** | Injects the GPT script but skips ad insertion if the configured markers are missing from the HTML body. |
 | **NoAdInsertionForNonHtml** | Ignores the response entirely if the `Content-Type` is not `text/html`. |
@@ -96,3 +98,5 @@ Derived from [`tests.textpb`](tests.textpb):
 
 - [x] [C++](plugin.cc)
 - [x] [Rust](plugin.rs)
+- [x] [Go](plugin.go)
+
