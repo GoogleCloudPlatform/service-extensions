@@ -14,9 +14,9 @@
 
 #include "lua_plugin.h"
 
-namespace sample::lua {
+namespace proxy_wasm_lua {
 
 static RegisterContextFactory register_CustomContexts(
     CONTEXT_FACTORY(LuaHttpContext), ROOT_FACTORY(LuaRootContext), "");
 
-}  // namespace sample::lua
+}  // namespace proxy_wasm_lua
