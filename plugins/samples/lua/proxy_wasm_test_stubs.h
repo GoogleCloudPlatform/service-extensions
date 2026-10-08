@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef NET_TURING_WASM_LUA_PROXY_WASM_TEST_STUBS_H_
-#define NET_TURING_WASM_LUA_PROXY_WASM_TEST_STUBS_H_
+#pragma once
 
 #include <cstddef>
 #include <cstdint>
@@ -26,7 +25,7 @@
 #include "absl/strings/match.h"
 #include "proxy_wasm_intrinsics.h"
 
-namespace sample::lua {
+namespace proxy_wasm_lua {
 
 class MockStreamState : public StreamStateInterface {
  public:
@@ -190,6 +189,5 @@ MATCHER_P(WasmHasSubstr, expected_substr, "") {
                            expected_substr);
 }
 
-}  // namespace sample::lua
+}  // namespace proxy_wasm_lua
 
-#endif  // NET_TURING_WASM_LUA_PROXY_WASM_TEST_STUBS_H_

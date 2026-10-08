@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef NET_TURING_WASM_LUA_ENVOY_LUA_API_REGISTRATION_H_
-#define NET_TURING_WASM_LUA_ENVOY_LUA_API_REGISTRATION_H_
+#pragma once
 
 #include "lua_state.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 
-namespace sample::lua {
+namespace proxy_wasm_lua {
 
 // Helper to register absl::StatusOr<T> types with LuaBridge. The unwrapper uses
 // this to identify and extract the inner value of a StatusOr object.
@@ -28,6 +27,5 @@ void RegisterStatusOr(LuaState& state, absl::string_view name);
 
 absl::Status RegisterEnvoyApi(LuaState& state);
 
-}  // namespace sample::lua
+}  // namespace proxy_wasm_lua
 
-#endif  // NET_TURING_WASM_LUA_ENVOY_LUA_API_REGISTRATION_H_
