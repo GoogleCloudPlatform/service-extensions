@@ -20,7 +20,7 @@
 #include "absl/strings/str_split.h"
 #include "proxy_wasm_intrinsics.h"
 #include "google/protobuf/text_format.h"
-#include "cookie_config.pb.h"
+#include "samples/set_reset_cookie/cookie_config.pb.h"
 #include <algorithm>
 #include <string>
 #include <utility>
