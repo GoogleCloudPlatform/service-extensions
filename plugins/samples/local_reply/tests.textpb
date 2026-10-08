@@ -1,0 +1,10 @@
+test {
+  name: "SendHelloWorldResponse"
+  request_headers {
+    result { 
+      immediate { http_status: 200 details: "" }
+      body { regex: "Hello World" }
+      has_header { key: "Content-Type" value: "text/plain" }      
+    }
+  }
+}

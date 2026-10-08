@@ -28,24 +28,14 @@ import (
 
 // Config holds the server configuration parameters.
 type Config struct {
-	Address              string
+	SecureAddress        string
 	InsecureAddress      string
 	HealthCheckAddress   string
 	CertFile             string
 	KeyFile              string
 	EnableInsecureServer bool
-}
-
-// loadConfig loads the server configuration from environment variables or uses defaults.
-func loadConfig() Config {
-	return Config{
-		Address:              "0.0.0.0:8443",
-		InsecureAddress:      "0.0.0.0:8181",
-		HealthCheckAddress:   "0.0.0.0:8000",
-		CertFile:             "extproc/ssl_creds/localhost.crt",
-		KeyFile:              "extproc/ssl_creds/localhost.key",
-		EnableInsecureServer: true,
-	}
+	// EnableTLS enables the secure gRPC server on the specified SecureAddress.
+	EnableTLS bool
 }
 
 // CalloutServer represents a server that handles callouts.
@@ -59,7 +49,8 @@ func NewCalloutServer(config Config) *CalloutServer {
 	var cert tls.Certificate
 	var err error
 
-	if config.CertFile != "" && config.KeyFile != "" {
+	// Only load TLS certificates if TLS is enabled
+	if config.EnableTLS && config.CertFile != "" && config.KeyFile != "" {
 		cert, err = tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
 		if err != nil {
 			log.Fatalf("Failed to load server certificate: %v", err)
@@ -74,7 +65,10 @@ func NewCalloutServer(config Config) *CalloutServer {
 
 // StartGRPC starts the gRPC server with the specified service.
 func (s *CalloutServer) StartGRPC(service extproc.ExternalProcessorServer) {
-	lis, err := net.Listen("tcp", s.Config.Address)
+	if !s.Config.EnableTLS {
+		return
+	}
+	lis, err := net.Listen("tcp", s.Config.SecureAddress)
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}

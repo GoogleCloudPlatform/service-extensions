@@ -3,7 +3,8 @@
 Recipes and code samples for
 [Google Cloud Service Extensions](https://cloud.google.com/service-extensions/docs/overview).
 
-Service Extensions offers two types of extensions:
+Service Extensions allow you to insert custom code inline in the networking data
+path. Service Extensions offers two types of extensions:
 
 *   **Plugin extensions**: extensions that let you insert custom code inline in
     the networking data path. You build these plugins by using
@@ -12,7 +13,8 @@ Service Extensions offers two types of extensions:
     Wasm modules on a Google-managed sandbox infrastructure similar to a
     serverless infrastructure.
 
-    Media CDN supports plugin extensions.
+    Plugin extensions are supported by both Cloud Application Load Balancers and
+    Media CDN.
 
     Example recipes are found in the [`plugins` subdirectory](plugins/).
 
@@ -23,10 +25,7 @@ Service Extensions offers two types of extensions:
     and Google Kubernetes Engine Pods on Google Cloud, multicloud, or
     on-premises environments.
 
-    Cloud Load Balancing Application Load Balancers support callout extensions.
-
-All Service Extensions allow you to insert custom code inline in the networking
-data path.
+    Callout extensions are supported by Cloud Application Load Balancers.
 
 # License
 
