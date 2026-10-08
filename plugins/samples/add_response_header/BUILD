@@ -31,3 +31,13 @@ proxy_wasm_tests(
     tests = ":tests.textpb",
 )
 
+proxy_wasm_tests(
+    name = "testsyaml",
+    plugins = [
+        ":plugin_rust.wasm",
+        ":plugin_cpp.wasm",
+        ":plugin_go.wasm",
+    ],
+    tests = ":tests.yaml",
+)
+

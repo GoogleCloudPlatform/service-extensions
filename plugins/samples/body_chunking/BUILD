@@ -19,3 +19,16 @@ proxy_wasm_tests(
     ],
     tests = ":tests.textpb",
 )
+
+proxy_wasm_tests(
+    name = "testsyaml",
+    data = [
+        ":expected_request_body.data",
+        ":request_body.data",
+        ":response_body.data",
+    ],
+    plugins = [
+        ":plugin_cpp.wasm",
+    ],
+    tests = ":tests.yaml",
+)
