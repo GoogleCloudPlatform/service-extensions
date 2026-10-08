@@ -1,0 +1,76 @@
+// Copyright 2024 Google LLC.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package main
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/add_body"
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/add_header"
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/basic_callout_server"
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/dynamic_forwarding"
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/jwt_auth"
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/examples/redirect"
+	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/internal/server"
+	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
+)
+
+// ExampleService defines the interface that all example services must implement.
+type ExampleService interface {
+	extproc.ExternalProcessorServer
+}
+
+func main() {
+	exampleType := os.Getenv("EXAMPLE_TYPE")
+
+	var customService ExampleService
+
+	switch exampleType {
+	case "redirect":
+		customService = redirect.NewExampleCalloutService()
+	case "add_header":
+		customService = add_header.NewExampleCalloutService()
+	case "add_body":
+		customService = add_body.NewExampleCalloutService()
+	case "basic_callout_server":
+		customService = basic_callout_server.NewExampleCalloutService()
+	case "jwt_auth":
+		customService = jwt_auth.NewExampleCalloutService()
+	case "dynamic_forwarding":
+		customService = dynamic_forwarding.NewExampleCalloutService()
+	default:
+		fmt.Println("Unknown EXAMPLE_TYPE. Please set it to a valid example")
+		return
+	}
+
+	config := server.Config{
+		SecureAddress:        "0.0.0.0:443",
+		InsecureAddress:      "0.0.0.0:8080",
+		HealthCheckAddress:   "0.0.0.0:80",
+		CertFile:             "extproc/ssl_creds/localhost.crt",
+		KeyFile:              "extproc/ssl_creds/localhost.key",
+		EnableTLS:            false,
+		EnableInsecureServer: true,
+	}
+
+	calloutServer := server.NewCalloutServer(config)
+	go calloutServer.StartGRPC(customService)
+	go calloutServer.StartInsecureGRPC(customService)
+	go calloutServer.StartHealthCheck()
+
+	// Block forever or handle signals as needed
+	select {}
+}

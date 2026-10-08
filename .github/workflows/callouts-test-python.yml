@@ -1,0 +1,69 @@
+name: Callouts test Python
+
+on:
+  workflow_dispatch:  # allow manual runs
+  push:
+    branches: [ "main" ]
+    paths:
+      - callouts/python/**
+      - docs/python/**
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - callouts/python/**
+
+# Default permissions are read only.
+permissions: read-all
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      # Workflow can publish documentation
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+    - uses: bufbuild/buf-setup-action@v1
+      with:
+        version: 1.32.2
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+    - name: Install dependencies
+      working-directory: ./callouts/python
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
+    - name: Generate protodefs
+      working-directory: ./callouts/python
+      run: |
+        buf -v generate https://github.com/envoyproxy/envoy.git#subdir=api \
+          --path envoy/service/ext_proc/v3/external_processor.proto \
+          --path envoy/service/auth/v3/external_auth.proto \
+          --include-imports
+        python -m pip install ./protodef
+    - name: Test with pytest
+      working-directory: ./callouts/python
+      run: |
+        pytest extproc/tests/ -v
+        pytest extauthz/tests/ -v
+    # Publish docs
+    - name: Install sphinx dependencies
+      run: |
+        pip install sphinx sphinx_rtd_theme myst_parser
+    - name: Sphinx build
+      run: |
+        sphinx-build -E docs/python docs/python/_build
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v4
+      if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      with:
+        publish_branch: gh-pages
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: docs/python/_build
+        destination_dir: python/_build
+        keep_files: false
+        force_orphan: false

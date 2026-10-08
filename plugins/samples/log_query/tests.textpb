@@ -1,0 +1,18 @@
+test {
+  name: "NoPath"
+  request_headers {}
+}
+test {
+  name: "NoToken"
+  request_headers {
+    input { header { key: ":path" value: "/foo?bar=baz&a=b" } }
+    result { log { regex: ".*token: <missing>" } }
+  }
+}
+test {
+  name: "LogToken"
+  request_headers {
+    input { header { key: ":path" value: "/foo?bar=baz&token=so%20special&a=b" } }
+    result { log { regex: ".*token: so special" } }
+  }
+}

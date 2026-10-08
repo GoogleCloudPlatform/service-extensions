@@ -2,5 +2,6 @@
 *                 @GoogleCloudPlatform/service-extensions-samples-owners @GoogleCloudPlatform/dee-infra
 
 # Sample Reviewers
-samples/          @GoogleCloudPlatform/service-extensions-samples-reviewers @upeeth
-README.md         @GoogleCloudPlatform/service-extensions-samples-reviewers @upeeth
+/callouts/        @GoogleCloudPlatform/service-extensions-samples-reviewers @upeeth
+/plugins/         @GoogleCloudPlatform/service-extensions-samples-reviewers @upeeth
+/README.md        @GoogleCloudPlatform/service-extensions-samples-reviewers @upeeth

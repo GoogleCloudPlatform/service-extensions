@@ -1,0 +1,30 @@
+# Given a 500 return code, expect change to 404
+test {
+  name: "With500StatusCodeChangeTo404"
+  response_headers {
+    input { header { key: ":status" value: "500" } }
+    result { 
+      has_header { key: ":status" value: "404" }
+    }
+  }
+}
+# Given a 502 return code, expect change to 404
+test {
+  name: "With502StatusCodeChangeTo404"
+  response_headers {
+    input { header { key: ":status" value: "502" } }
+    result { 
+      has_header { key: ":status" value: "404" }
+    }
+  }
+}
+# Given a 200 return code, expect no changes
+test {
+  name: "With200StatusCodeNothingChanges"
+  response_headers {
+    input { header { key: ":status" value: "200" } }
+    result { 
+      has_header { key: ":status" value: "200" }
+    }
+  }
+}

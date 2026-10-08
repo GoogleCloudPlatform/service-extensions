@@ -1,0 +1,23 @@
+env {
+  log_path: "/dev/stdout"
+}
+
+test {
+  name: "LuaBaseLibraryTest"
+  request_headers {
+    input {
+      content: "GET / HTTP/1.1\r\n\r\n"
+    }
+    result {
+      log { regex: ".*LUA_TEST base library loads and evaluates correct numbers: PASS.*" }
+      log { regex: ".*LUA_TEST table library validates operations: PASS.*" }
+      log { regex: ".*LUA_TEST string library formats and structures: PASS.*" }
+      log { regex: ".*LUA_TEST math library performs calculations: PASS.*" }
+      log { regex: ".*LUA_TEST blocked base functions panic properly: PASS.*" }
+      log { regex: ".*LUA_TEST io library functions are completely isolated: PASS.*" }
+      log { regex: ".*LUA_TEST os library functions are completely isolated: PASS.*" }
+      log { regex: ".*LUA_TEST complex iterations between modules evaluate: PASS.*" }
+      log { regex: ".*LUA_TEST string limits overflow panic properly: PASS.*" }
+    }
+  }
+}
