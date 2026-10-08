@@ -25,7 +25,7 @@ def proxy_wasm_plugin_rust(**kwargs):
         rustc_flags = [
             "-Copt-level=3",  # Optimize for binary speed
             "-Cstrip=debuginfo",  # Strip debug info, but leave symbols
-            "-Clto=yes",  # Link time optimization of the whole binary
+            "-Clinker-plugin-lto",  # Link time optimization of the whole binary
         ],
         **kwargs
     )
@@ -63,7 +63,8 @@ def proxy_wasm_tests(
         tests,
         plugins = [],
         data = [],
-        config = None):
+        config = None,
+        **kwargs):
     # Determine the appropriate flag based on file extension
     if tests.endswith((".yaml", ".yml")):
         test_flag = "--yaml=$(rootpath %s)" % tests
@@ -90,4 +91,6 @@ def proxy_wasm_tests(
             ],
             data = [tests, plugin] + ([config] if config else []) + data,
             deps = ["//test:runner_lib"],
+            linkstatic = 1,  # avoid ODR conflict with v8 transition (v8_lib_no_pointer_compression)
+            **kwargs
         )
