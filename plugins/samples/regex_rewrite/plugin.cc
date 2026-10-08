@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,13 +37,19 @@ class MyHttpContext : public Context {
 
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
-    auto path = getRequestHeader(":path");
-    if (path) {
-      std::string edit = path->toString();  // mutable copy
-      if (re2::RE2::Replace(&edit, *root_->path_match, "/\\1/")) {
-        replaceRequestHeader(":path", edit);
+    const auto path = getRequestHeader(":path");
+    if (!path) {
+      LOG_ERROR("Failed to get :path header");
+      return FilterHeadersStatus::Continue;
+    }
+
+    std::string edit = path->toString();  // mutable copy
+    if (re2::RE2::Replace(&edit, *root_->path_match, "/\\1/")) {
+      if (replaceRequestHeader(":path", edit) != WasmResult::Ok) {
+        LOG_ERROR("Failed to replace :path header");
       }
     }
+
     return FilterHeadersStatus::Continue;
   }
 
