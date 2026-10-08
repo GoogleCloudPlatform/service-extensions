@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef NET_TURING_WASM_LUA_ENVOY_LUA_API_SHIMS_H_
-#define NET_TURING_WASM_LUA_ENVOY_LUA_API_SHIMS_H_
+#pragma once
 
 #include "absl/strings/string_view.h"
 
-namespace sample::lua {
+namespace proxy_wasm_lua {
 
 constexpr absl::string_view kLua51CompatShims = R"lua(
   if table then
@@ -96,5 +95,4 @@ constexpr absl::string_view kStatusUnwrapperFunctionShim = R"lua(
   end
 )lua";
 
-}  // namespace sample::lua
-#endif  // NET_TURING_WASM_LUA_ENVOY_LUA_API_SHIMS_H_
+}  // namespace proxy_wasm_lua

@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef LUA_STATUS_MACROS_H_
-#define LUA_STATUS_MACROS_H_
+#pragma once
 
 #define RETURN_IF_ERROR(expr) \
   do { \
     auto _status = (expr); \
     if (!_status.ok()) return _status; \
   } while (0)
-
-#endif  // LUA_STATUS_MACROS_H_
