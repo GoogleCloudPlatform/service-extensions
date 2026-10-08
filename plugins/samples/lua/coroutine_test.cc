@@ -21,31 +21,14 @@
 
 #include "lua_state.h"
 #include "proxy_wasm_test_stubs.h"
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
-
-#ifndef LOCAL_MACROS
-#define LOCAL_MACROS
-#define EXPECT_OK(expr) EXPECT_TRUE(GetStatus((expr)).ok())
-#define ASSERT_OK(expr) ASSERT_TRUE(GetStatus((expr)).ok())
-
-template <typename T> absl::Status GetStatus(const absl::StatusOr<T>& v) { return v.status(); }
-template <typename T> absl::Status GetStatus(const T& v) { return v; } 
-inline absl::Status GetStatus(const absl::Status& v) { return v; }
-
-#define CONCAT_INNER(a, b) a ## b
-#define CONCAT(a, b) CONCAT_INNER(a, b)
-#define ASSERT_OK_AND_ASSIGN(lhs, rexpr) \
-    auto CONCAT(_res_, __LINE__) = (rexpr); \
-    ASSERT_TRUE(GetStatus(CONCAT(_res_, __LINE__)).ok()) << GetStatus(CONCAT(_res_, __LINE__)).message(); \
-    lhs = std::move(*CONCAT(_res_, __LINE__))
-#endif
-
-#include "absl/status/status.h"
-#include "absl/strings/string_view.h"
+#include "test_macros.h"
 #include "LuaBridge/detail/CFunctions.h"
 #include "LuaBridge/detail/LuaRef.h"
 #include "LuaBridge/detail/Result.h"
+#include "absl/status/status.h"
+#include "absl/strings/string_view.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "proxy_wasm_intrinsics.h"
 
 extern "C" {
@@ -56,6 +39,10 @@ extern "C" {
 
 namespace proxy_wasm_lua {
 namespace {
+
+using ::absl_testing::IsOk;
+using ::absl_testing::IsOkAndHolds;
+using ::absl_testing::StatusIs;
 
 using ::testing::_;
 using ::testing::DoAll;
@@ -73,7 +60,7 @@ TEST(CoroutineTest, StartCoroutineReturnsOk) {
   ASSERT_OK_AND_ASSIGN(std::unique_ptr<LuaState::Thread> thread,
                        lua_state->NewThread());
   LuaStreamCoroutine coroutine(*thread, LuaStreamCoroutineMode::kRequest);
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest, StartCoroutineWithRuntimeErrorReturnsNotOk) {
@@ -88,7 +75,7 @@ TEST(CoroutineTest, StartCoroutineWithRuntimeErrorReturnsNotOk) {
                        lua_state->NewThread());
   LuaStreamCoroutine coroutine(*thread, LuaStreamCoroutineMode::kRequest);
 
-  EXPECT_FALSE(GetStatus(coroutine.Start()).ok());
+  EXPECT_THAT(coroutine.Start(), Not(IsOk()));
   EXPECT_EQ(coroutine.GetState(), ExecutionState::kExited);
 }
 
@@ -111,7 +98,7 @@ TEST(CoroutineTest, StartCoroutineYieldsWhenBodyNotReceived) {
       return body
     end
   )lua"));
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForBody);
 }
@@ -137,7 +124,7 @@ TEST(CoroutineTest, ResumeCoroutineReturnsOkAndExits) {
   )lua"));
 
   EXPECT_OK(coroutine.Start());
-  { auto _s = coroutine.Resume(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.Resume(), IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest, ResumeExitedCoroutineReturnsFailedPrecondition) {
@@ -151,9 +138,10 @@ TEST(CoroutineTest, ResumeExitedCoroutineReturnsFailedPrecondition) {
                        lua_state->NewThread());
   LuaStreamCoroutine coroutine(*thread, LuaStreamCoroutineMode::kRequest);
 
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kExited));
 
-  { auto _s = coroutine.Resume(); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kFailedPrecondition); };
+  EXPECT_THAT(coroutine.Resume(),
+              StatusIs(absl::StatusCode::kFailedPrecondition));
 }
 
 TEST(CoroutineTest, ResumeErroredCoroutineReturnsFailedPrecondition) {
@@ -167,9 +155,10 @@ TEST(CoroutineTest, ResumeErroredCoroutineReturnsFailedPrecondition) {
                        lua_state->NewThread());
   LuaStreamCoroutine coroutine(*thread, LuaStreamCoroutineMode::kRequest);
 
-  EXPECT_FALSE(GetStatus(coroutine.Start()).ok());
+  EXPECT_THAT(coroutine.Start(), Not(IsOk()));
 
-  { auto _s = coroutine.Resume(); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kFailedPrecondition); };
+  EXPECT_THAT(coroutine.Resume(),
+              StatusIs(absl::StatusCode::kFailedPrecondition));
   EXPECT_EQ(coroutine.GetState(), ExecutionState::kExited);
 }
 
@@ -188,16 +177,16 @@ TEST(CoroutineTest, MultipleYieldResumeCyclesCompleteSuccessfully) {
       mock_yield()
     end
   )lua"));
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForHttp);
-  { auto _s = coroutine.Resume(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.Resume(), IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForHttp);
-  { auto _s = coroutine.Resume(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.Resume(), IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForHttp);
-  { auto _s = coroutine.Resume(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.Resume(), IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest, HandleHeadersWithEndOfStreamExitsCoroutine) {
@@ -220,9 +209,10 @@ TEST(CoroutineTest, HandleHeadersWithEndOfStreamExitsCoroutine) {
       end
     end
   )lua"));
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kYielded));
 
-  { auto _s = coroutine.HandleHeaders(5, true); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, true),
+              IsOkAndHolds(ExecutionState::kExited));
   EXPECT_TRUE(coroutine.IsStreamEnded());
 }
 
@@ -241,13 +231,13 @@ TEST(CoroutineTest, HandleHeadersWithHttpCallYieldsWaitForHttp) {
     end
   )lua"));
 
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_FALSE(coroutine.IsHeadersReceived());
   EXPECT_OK(coroutine.HandleHeaders(5, false));
   EXPECT_TRUE(coroutine.IsHeadersReceived());
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForHttp);
-  { auto _s = coroutine.Resume(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.Resume(), IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest, SequentialYieldsCompleteSuccessfully) {
@@ -267,13 +257,14 @@ TEST(CoroutineTest, SequentialYieldsCompleteSuccessfully) {
   )lua"));
 
   EXPECT_OK(coroutine.Start());
-  { auto _s = coroutine.HandleHeaders(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, false),
+              IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForHttp);
-  { auto _s = coroutine.Resume(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.Resume(), IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForHttp);
-  { auto _s = coroutine.Resume(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.Resume(), IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest, LuaScriptErrorTransitionsCoroutineToExited) {
@@ -289,7 +280,8 @@ TEST(CoroutineTest, LuaScriptErrorTransitionsCoroutineToExited) {
   LuaStreamCoroutine coroutine(*thread_ptr, LuaStreamCoroutineMode::kRequest);
 
   EXPECT_FALSE(coroutine.Start().ok());
-  { auto _s = coroutine.HandleHeaders(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, false),
+              IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest, HandleHeadersWithoutYieldCompletesExecution) {
@@ -304,7 +296,8 @@ TEST(CoroutineTest, HandleHeadersWithoutYieldCompletesExecution) {
   LuaStreamCoroutine coroutine(*thread_ptr, LuaStreamCoroutineMode::kRequest);
 
   EXPECT_OK(coroutine.Start());
-  { auto _s = coroutine.HandleHeaders(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, false),
+              IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest, TryResumeSelfInsideLuaReturnsFailedPrecondition) {
@@ -330,7 +323,7 @@ TEST(CoroutineTest, TryResumeSelfInsideLuaReturnsFailedPrecondition) {
       return try_resume_self()
     end
   )lua"));
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest, HandleHeadersOnAlreadyEndedStreamDoesNotChangeState) {
@@ -344,9 +337,11 @@ TEST(CoroutineTest, HandleHeadersOnAlreadyEndedStreamDoesNotChangeState) {
 
   LuaStreamCoroutine coroutine(*thread_ptr, LuaStreamCoroutineMode::kRequest);
 
-  { auto _s = coroutine.HandleHeaders(5, true); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, true),
+              IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_TRUE(coroutine.IsStreamEnded());
-  { auto _s = coroutine.HandleHeaders(5, true); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, true),
+              IsOkAndHolds(ExecutionState::kYielded));
 }
 
 TEST(CoroutineTest, HandleHeadersInResponseModeExitsCoroutine) {
@@ -362,7 +357,8 @@ TEST(CoroutineTest, HandleHeadersInResponseModeExitsCoroutine) {
   LuaStreamCoroutine coroutine(*thread_ptr, LuaStreamCoroutineMode::kResponse);
 
   EXPECT_OK(coroutine.Start());
-  { auto _s = coroutine.HandleHeaders(5, true); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, true),
+              IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest, LuaScriptErrorAfterYieldTransitionsCoroutineToExited) {
@@ -382,7 +378,8 @@ TEST(CoroutineTest, LuaScriptErrorAfterYieldTransitionsCoroutineToExited) {
   )lua"));
 
   EXPECT_OK(coroutine.Start());
-  { auto _s = coroutine.HandleHeaders(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, false),
+              IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForHttp);
 
@@ -417,7 +414,7 @@ TEST(CoroutineTest, HandleHeadersWithTrailersEndOfStreamExitsCoroutine) {
   )lua"));
 
   EXPECT_OK(coroutine.HandleHeaders(5, true));
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest, HandleHeadersYieldsWaitForBody) {
@@ -442,7 +439,8 @@ TEST(CoroutineTest, HandleHeadersYieldsWaitForBody) {
   )lua"));
 
   EXPECT_OK(coroutine.Start());
-  { auto _s = coroutine.HandleHeaders(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, false),
+              IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForBody);
 }
@@ -474,7 +472,8 @@ TEST(CoroutineTest, HandleHeadersYieldsWaitForTrailers) {
   )lua"));
 
   EXPECT_OK(coroutine.Start());
-  { auto _s = coroutine.HandleHeaders(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, false),
+              IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForTrailers);
 }
@@ -496,16 +495,18 @@ TEST(
     end
   )lua"));
 
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForBodyChunks);
 
-  { auto _s = coroutine.HandleHeaders(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, false),
+              IsOkAndHolds(ExecutionState::kYielded));
 
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForBodyChunks);
 
-  { auto _s = coroutine.HandleTrailers(5); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.HandleTrailers(5),
+              IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest,
@@ -531,19 +532,22 @@ TEST(CoroutineTest,
     end
   )lua"));
 
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForBodyChunks);
 
-  { auto _s = coroutine.HandleBody(50, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.HandleBody(50, false),
+              IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForBodyChunks);
 
-  { auto _s = coroutine.HandleBody(100, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.HandleBody(100, false),
+              IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForBodyChunks);
 
-  { auto _s = coroutine.HandleBody(25, true); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.HandleBody(25, true),
+              IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest, HandleBodyExitsCoroutineIfBodyChunksLoopTerminatesEarly) {
@@ -564,15 +568,17 @@ TEST(CoroutineTest, HandleBodyExitsCoroutineIfBodyChunksLoopTerminatesEarly) {
     end
   )lua"));
 
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForBodyChunks);
 
-  { auto _s = coroutine.HandleBody(50, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.HandleBody(50, false),
+              IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForBodyChunks);
 
-  { auto _s = coroutine.HandleBody(100, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.HandleBody(100, false),
+              IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest, HandleBodyGracefullyProcessesZeroLengthChunks) {
@@ -597,10 +603,11 @@ TEST(CoroutineTest, HandleBodyGracefullyProcessesZeroLengthChunks) {
     end
   )lua"));
 
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForBodyChunks);
-  { auto _s = coroutine.HandleBody(0, true); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.HandleBody(0, true),
+              IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(
@@ -626,23 +633,27 @@ TEST(
     end
   )lua"));
 
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForBodyChunks);
 
-  { auto _s = coroutine.HandleHeaders(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, false),
+              IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForBodyChunks);
 
-  { auto _s = coroutine.HandleBody(50, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.HandleBody(50, false),
+              IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForBodyChunks);
 
-  { auto _s = coroutine.HandleBody(40, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.HandleBody(40, false),
+              IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForBodyChunks);
 
-  { auto _s = coroutine.HandleTrailers(5); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.HandleTrailers(5),
+              IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest, StartAlreadyStartedCoroutineReturnsFailedPrecondition) {
@@ -662,9 +673,10 @@ TEST(CoroutineTest, StartAlreadyStartedCoroutineReturnsFailedPrecondition) {
     end
   )lua"));
 
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kYielded));
 
-  { auto _s = coroutine.Start(); EXPECT_EQ(GetStatus(_s).code(), absl::StatusCode::kFailedPrecondition); };
+  EXPECT_THAT(coroutine.Start(),
+              StatusIs(absl::StatusCode::kFailedPrecondition));
 }
 
 TEST(CoroutineTest, HandleStreamMethodsOnErroredCoroutineReturnsOk) {
@@ -681,9 +693,12 @@ TEST(CoroutineTest, HandleStreamMethodsOnErroredCoroutineReturnsOk) {
   EXPECT_FALSE(coroutine.Start().ok());
 
   EXPECT_EQ(coroutine.GetState(), ExecutionState::kExited);
-  { auto _s = coroutine.HandleHeaders(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
-  { auto _s = coroutine.HandleBody(100, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
-  { auto _s = coroutine.HandleTrailers(5); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, false),
+              IsOkAndHolds(ExecutionState::kExited));
+  EXPECT_THAT(coroutine.HandleBody(100, false),
+              IsOkAndHolds(ExecutionState::kExited));
+  EXPECT_THAT(coroutine.HandleTrailers(5),
+              IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest, HandleStreamMethodsOnExitedCoroutineReturnsOk) {
@@ -695,10 +710,13 @@ TEST(CoroutineTest, HandleStreamMethodsOnExitedCoroutineReturnsOk) {
     end
   )lua"));
   LuaStreamCoroutine coroutine(*thread_ptr, LuaStreamCoroutineMode::kRequest);
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
-  { auto _s = coroutine.HandleHeaders(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
-  { auto _s = coroutine.HandleBody(100, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
-  { auto _s = coroutine.HandleTrailers(5); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kExited));
+  EXPECT_THAT(coroutine.HandleHeaders(5, false),
+              IsOkAndHolds(ExecutionState::kExited));
+  EXPECT_THAT(coroutine.HandleBody(100, false),
+              IsOkAndHolds(ExecutionState::kExited));
+  EXPECT_THAT(coroutine.HandleTrailers(5),
+              IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest, HandleHeadersSetsStreamEndedToTrue) {
@@ -708,7 +726,8 @@ TEST(CoroutineTest, HandleHeadersSetsStreamEndedToTrue) {
   LuaStreamCoroutine coroutine(*thread, LuaStreamCoroutineMode::kRequest);
 
   EXPECT_FALSE(coroutine.IsStreamEnded());
-  { auto _s = coroutine.HandleHeaders(5, true); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, true),
+              IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_TRUE(coroutine.IsStreamEnded());
 }
 
@@ -719,8 +738,10 @@ TEST(CoroutineTest, HandleBodySetsStreamEndedToTrue) {
   LuaStreamCoroutine coroutine(*thread, LuaStreamCoroutineMode::kRequest);
 
   EXPECT_FALSE(coroutine.IsStreamEnded());
-  { auto _s = coroutine.HandleHeaders(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
-  { auto _s = coroutine.HandleBody(100, true); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, false),
+              IsOkAndHolds(ExecutionState::kYielded));
+  EXPECT_THAT(coroutine.HandleBody(100, true),
+              IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_TRUE(coroutine.IsStreamEnded());
 }
 
@@ -732,8 +753,10 @@ TEST(CoroutineTest, HandleTrailersSetsStreamEndedToTrue) {
   LuaStreamCoroutine coroutine(*thread, LuaStreamCoroutineMode::kRequest);
 
   EXPECT_FALSE(coroutine.IsStreamEnded());
-  { auto _s = coroutine.HandleHeaders(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
-  { auto _s = coroutine.HandleTrailers(5); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, false),
+              IsOkAndHolds(ExecutionState::kYielded));
+  EXPECT_THAT(coroutine.HandleTrailers(5),
+              IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_TRUE(coroutine.IsStreamEnded());
 }
 
@@ -749,7 +772,7 @@ TEST(CoroutineTest, ImmediateEndOfStreamExitsWithoutYielding) {
       return "completed"
     end
   )lua"));
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest,
@@ -768,13 +791,14 @@ TEST(CoroutineTest,
     end
   )lua"));
 
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_FALSE(coroutine.IsHeadersReceived());
   EXPECT_FALSE(coroutine.IsStreamEnded());
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForHttp);
 
-  { auto _s = coroutine.HandleHeaders(5, true); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, true),
+              IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetState(), ExecutionState::kYielded);
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForHttp);
@@ -782,7 +806,7 @@ TEST(CoroutineTest,
   EXPECT_TRUE(coroutine.IsHeadersReceived());
   EXPECT_TRUE(coroutine.IsStreamEnded());
 
-  { auto _s = coroutine.Resume(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.Resume(), IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest, HandleBodyWhileYieldedForHttpMaintainsYieldState) {
@@ -800,22 +824,24 @@ TEST(CoroutineTest, HandleBodyWhileYieldedForHttpMaintainsYieldState) {
     end
   )lua"));
 
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_OK(coroutine.HandleHeaders(5, false));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForHttp);
 
-  { auto _s = coroutine.HandleBody(100, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.HandleBody(100, false),
+              IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetState(), ExecutionState::kYielded);
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForHttp);
 
   EXPECT_FALSE(coroutine.IsBodyReceived());
 
-  { auto _s = coroutine.HandleBody(0, true); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.HandleBody(0, true),
+              IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_TRUE(coroutine.IsBodyReceived());
 
-  { auto _s = coroutine.Resume(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.Resume(), IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest, BufferSetBytesInvokesProxySetBufferBytes) {
@@ -847,8 +873,10 @@ TEST(CoroutineTest, BufferSetBytesInvokesProxySetBufferBytes) {
 
   ASSERT_OK_AND_ASSIGN(ExecutionState state, coroutine.Start());
   EXPECT_EQ(state, ExecutionState::kYielded);
-  { auto _s = coroutine.HandleHeaders(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
-  { auto _s = coroutine.HandleBody(initial_body_size, true); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, false),
+              IsOkAndHolds(ExecutionState::kYielded));
+  EXPECT_THAT(coroutine.HandleBody(initial_body_size, true),
+              IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest, BufferAndHandleLogInfoInvokesProxyLog) {
@@ -876,8 +904,10 @@ TEST(CoroutineTest, BufferAndHandleLogInfoInvokesProxyLog) {
 
   ASSERT_OK_AND_ASSIGN(ExecutionState state, coroutine.Start());
   EXPECT_EQ(state, ExecutionState::kYielded);
-  { auto _s = coroutine.HandleHeaders(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
-  { auto _s = coroutine.HandleBody(5, true); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, false),
+              IsOkAndHolds(ExecutionState::kYielded));
+  EXPECT_THAT(coroutine.HandleBody(5, true),
+              IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest, BufferGetBytesInvokesProxyGetBufferBytes) {
@@ -908,8 +938,10 @@ TEST(CoroutineTest, BufferGetBytesInvokesProxyGetBufferBytes) {
 
   ASSERT_OK_AND_ASSIGN(ExecutionState state, coroutine.Start());
   EXPECT_EQ(state, ExecutionState::kYielded);
-  { auto _s = coroutine.HandleHeaders(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
-  { auto _s = coroutine.HandleBody(5, true); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, false),
+              IsOkAndHolds(ExecutionState::kYielded));
+  EXPECT_THAT(coroutine.HandleBody(5, true),
+              IsOkAndHolds(ExecutionState::kExited));
 
   luabridge::LuaRef global_result =
       luabridge::getGlobal(lua_state->state(), "global_result");
@@ -942,13 +974,15 @@ TEST(CoroutineTest, HandleTrailersCompletesOutOfOrderYieldsWithoutDeadlock) {
     end
   )lua"));
 
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForTrailers);
 
-  { auto _s = coroutine.HandleHeaders(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, false),
+              IsOkAndHolds(ExecutionState::kYielded));
 
-  { auto _s = coroutine.HandleTrailers(5); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.HandleTrailers(5),
+              IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(CoroutineTest, RunToCompletionSafelyTerminatesBodyChunksIterator) {
@@ -974,13 +1008,16 @@ TEST(CoroutineTest, RunToCompletionSafelyTerminatesBodyChunksIterator) {
     end
   )lua"));
 
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kYielded));
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForBodyChunks);
 
-  { auto _s = coroutine.HandleBody(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
-  { auto _s = coroutine.HandleBody(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
-  { auto _s = coroutine.HandleBody(5, true); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.HandleBody(5, false),
+              IsOkAndHolds(ExecutionState::kYielded));
+  EXPECT_THAT(coroutine.HandleBody(5, false),
+              IsOkAndHolds(ExecutionState::kYielded));
+  EXPECT_THAT(coroutine.HandleBody(5, true),
+              IsOkAndHolds(ExecutionState::kExited));
 
   luabridge::LuaRef global_count =
       luabridge::getGlobal(state->state(), "global_count");
@@ -1031,9 +1068,12 @@ TEST(CoroutineTest, NativeAccessorsYieldForDataAndProvideExpectedValues) {
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForTrailers);
 
-  { auto _s = coroutine.HandleHeaders(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
-  { auto _s = coroutine.HandleBody(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
-  { auto _s = coroutine.HandleTrailers(5); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, false),
+              IsOkAndHolds(ExecutionState::kYielded));
+  EXPECT_THAT(coroutine.HandleBody(5, false),
+              IsOkAndHolds(ExecutionState::kYielded));
+  EXPECT_THAT(coroutine.HandleTrailers(5),
+              IsOkAndHolds(ExecutionState::kExited));
 
   luabridge::LuaRef global_status =
       luabridge::getGlobal(lua_state->state(), "global_status");
@@ -1063,7 +1103,8 @@ TEST(CoroutineTest, HandleHeadersWithEndStreamYieldsCorrectly) {
   EXPECT_EQ(coroutine.GetYieldReason(),
             LuaStreamCoroutine::YieldReason::kWaitForTrailers);
 
-  { auto _s = coroutine.HandleHeaders(5, true); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, true),
+              IsOkAndHolds(ExecutionState::kExited));
 
   luabridge::LuaRef global_status =
       luabridge::getGlobal(lua_state->state(), "global_status");
@@ -1090,9 +1131,11 @@ TEST(CoroutineTest,
     end
   )lua"));
 
-  { auto _s = coroutine.HandleHeaders(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
-  { auto _s = coroutine.HandleBody(100, true); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, false),
+              IsOkAndHolds(ExecutionState::kYielded));
+  EXPECT_THAT(coroutine.HandleBody(100, true),
+              IsOkAndHolds(ExecutionState::kYielded));
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(LuaStreamCoroutineTest,
@@ -1118,11 +1161,15 @@ TEST(LuaStreamCoroutineTest,
     end
   )lua"));
 
-  { auto _s = coroutine.HandleHeaders(5, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
-  { auto _s = coroutine.HandleBody(100, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
-  { auto _s = coroutine.HandleBody(50, false); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
-  { auto _s = coroutine.HandleBody(20, true); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, false),
+              IsOkAndHolds(ExecutionState::kYielded));
+  EXPECT_THAT(coroutine.HandleBody(100, false),
+              IsOkAndHolds(ExecutionState::kYielded));
+  EXPECT_THAT(coroutine.HandleBody(50, false),
+              IsOkAndHolds(ExecutionState::kYielded));
+  EXPECT_THAT(coroutine.HandleBody(20, true),
+              IsOkAndHolds(ExecutionState::kYielded));
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kExited));
 }
 
 TEST(LuaStreamCoroutineTest,
@@ -1145,8 +1192,9 @@ TEST(LuaStreamCoroutineTest,
     end
   )lua"));
 
-  { auto _s = coroutine.HandleHeaders(5, true); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kYielded); };
-  { auto _s = coroutine.Start(); EXPECT_TRUE(GetStatus(_s).ok()); EXPECT_THAT(*_s, ExecutionState::kExited); };
+  EXPECT_THAT(coroutine.HandleHeaders(5, true),
+              IsOkAndHolds(ExecutionState::kYielded));
+  EXPECT_THAT(coroutine.Start(), IsOkAndHolds(ExecutionState::kExited));
 }
 }  // namespace
 }  // namespace proxy_wasm_lua
