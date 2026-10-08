@@ -16,6 +16,11 @@ go_proto_library(
     proto = ":cookie_config_proto",
 )
 
+cc_proto_library(
+    name = "cookie_config_cc_proto",
+    deps = [":cookie_config_proto"],
+)
+
 proxy_wasm_plugin_go(
     name = "plugin_go.wasm",
     srcs = ["plugin.go"],
