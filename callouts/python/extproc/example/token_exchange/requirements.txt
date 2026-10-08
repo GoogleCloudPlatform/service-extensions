@@ -1,0 +1,6 @@
+grpcio==1.62.2
+protobuf==5.29.6
+google-auth>=2.0.0
+cachetools>=5.0.0
+PyJWT>=2.0.0
+requests>=2.25.0
