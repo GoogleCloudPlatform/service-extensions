@@ -1,0 +1,33 @@
+# Copyright 2026 Google LLC.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+project_id     = "my-gcp-project"
+project_number = "123456789012"
+region         = "us-central1"
+image_uri      = "us-central1-docker.pkg.dev/my-gcp-project/token-exchange/token-exchange:latest"
+
+# INBOUND or OUTBOUND.
+token_exchange_mode = "INBOUND"
+
+# Inbound setup
+wif_pool_id     = "azure-ad-pool"
+wif_provider_id = "azure-ad-provider"
+
+# Reject requests whose token could not be exchanged.
+# fail_closed = true
+
+# Outbound setup: set token_exchange_mode = "OUTBOUND" above and uncomment:
+# outbound_token_url        = "https://idp.example.com/oauth2/token"
+# outbound_client_id        = "my-client-id"
+# outbound_client_secret_id = "token-exchange-client-secret"
