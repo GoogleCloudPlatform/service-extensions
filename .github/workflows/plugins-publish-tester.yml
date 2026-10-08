@@ -11,7 +11,8 @@ permissions: read-all
 env:
   REGISTRY: us-docker.pkg.dev
   PROJECT: service-extensions-samples
-  REPOSITORY: ${{ github.repository_owner == 'GoogleCloudPlatform' && 'plugins-source' || 'plugins-testing-source' }}
+  STAGING_REPOSITORY: ${{ github.repository_owner == 'GoogleCloudPlatform' && 'plugins-staging' || 'plugins-testing-staging' }}
+  TARGET_REPOSITORY: ${{ github.repository_owner == 'GoogleCloudPlatform' && 'plugins-source' || 'plugins-testing-source' }}
   IMAGE: wasm-tester
   DOCKERFILE: test/package/Dockerfile
 
@@ -48,7 +49,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}
+          images: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.STAGING_REPOSITORY }}/${{ env.IMAGE }}
           tags: |
             type=ref,event=branch
             type=sha,prefix=public-image-,format=short
@@ -56,7 +57,7 @@ jobs:
             org.opencontainers.image.title=Wasm Tester
             org.opencontainers.image.description=Wasm plugin test runner
 
-      # Push Docker image: https://github.com/docker/build-push-action#about
+      # Push Docker image to staging repository: https://github.com/docker/build-push-action#about
       # Uses the `tags` and `labels` from the `meta` step.
       - name: Build and push Docker image
         id: push
@@ -68,4 +69,15 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      # Promote Docker image from staging repository to target repository.
+      - name: Promote Docker image to target repository
+        uses: ./.github/actions/promote-gar-image
+        with:
+          credentials_json: ${{ secrets.GAR_TOKEN }}
+          project: ${{ env.PROJECT }}
+          staging_repository: ${{ env.STAGING_REPOSITORY }}
+          target_repository: ${{ env.TARGET_REPOSITORY }}
+          image: ${{ env.IMAGE }}
+          digest: ${{ steps.push.outputs.digest }}
 
