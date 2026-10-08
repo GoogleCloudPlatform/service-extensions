@@ -13,7 +13,8 @@
 # limitations under the License.
 
 # Stage 1: Build the Java application using Maven
-FROM maven:3.8.5-openjdk-17 AS builder
+# Using Eclipse Temurin 21 for virtual threads support
+FROM maven:3.9-eclipse-temurin-21 AS builder
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -29,14 +30,7 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 
 # Stage 2: Create the runtime image
-FROM marketplace.gcr.io/google/debian12
-
-# Install necessary dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        openjdk-17-jre-headless \
-        ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+FROM eclipse-temurin:21-jre
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -53,8 +47,9 @@ EXPOSE 80 443 8080
 # Environment variable for JVM options (optional)
 ENV JAVA_OPTS=""
 
-# Create a non-root user for running the application
-RUN groupadd -r appgroup && useradd -r -g appgroup appuser
+# Create a non-root user
+RUN groupadd -r appgroup && \
+    useradd -r -g appgroup appuser
 
 # Change ownership and switch to the non-root user
 RUN chown -R appuser:appgroup /app
