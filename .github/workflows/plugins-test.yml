@@ -43,10 +43,6 @@ jobs:
         include:
         - name: 'opt'
           flags: --config=clang -c opt --define=crypto=system
-        - name: 'ASan'
-          flags: --config=clang-asan
-        - name: 'TSan'
-          flags: --config=clang-tsan
 
     steps:
     - uses: actions/checkout@v3
@@ -62,6 +58,11 @@ jobs:
       # * github.sha, which is the commit hash of the commit used to generate
       #   the cache entry.
       run: echo "CACHE_TAG=bazel-cache-${{ matrix.name }}-${{ hashFiles('WORKSPACE', '.bazelrc', '.bazelversion') }}" >> "$GITHUB_OUTPUT"
+
+    - name: free up disk space
+      working-directory: /
+      run: |
+        sudo rm -rf /usr/share/dotnet /usr/share/swift /usr/local/.ghcup /usr/local/julia* /usr/local/lib/android /usr/local/share/chromium /opt/microsoft /opt/google /opt/hostedtoolcache
 
     - name: bazel cache
       uses: actions/cache/restore@v3

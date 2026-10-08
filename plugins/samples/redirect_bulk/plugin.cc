@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -75,8 +75,11 @@ public:
   // Called when HTTP request headers are received.
   FilterHeadersStatus onRequestHeaders(uint32_t, bool) override {
     // Get the ":authority" header which contains the hostname.
-    auto authority = getRequestHeader(":authority");
-    if (!authority) return FilterHeadersStatus::Continue;
+    const auto authority = getRequestHeader(":authority");
+    if (!authority) {
+      LOG_ERROR("Failed to get :authority header");
+      return FilterHeadersStatus::Continue;
+    }
 
     // Extract the domain part (remove port if present).
     absl::string_view host_view = authority->view();
