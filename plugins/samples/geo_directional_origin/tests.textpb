@@ -1,0 +1,179 @@
+# Copyright 2026 Google LLC
+# Licensed under the Apache License, Version 2.0
+
+# Test: Inject x-country-code header when client region is US.
+test {
+  name: "SetHeaderForUS"
+  benchmark: false
+  properties {
+    path: "source.client_region"
+    value: "US"
+  }
+  request_headers {
+    input { 
+      header { key: ":path" value: "/test" }
+      header { key: ":method" value: "GET" }
+      header { key: ":authority" value: "example.com" }
+    }
+    result { 
+      has_header { key: "x-country-code" value: "US" }
+    }
+  }
+}
+
+# Test: Inject x-country-code header when client region is Germany (DE).
+test {
+  name: "SetHeaderForGermany"
+  benchmark: false
+  properties {
+    path: "source.client_region"
+    value: "DE"
+  }
+  request_headers {
+    input { 
+      header { key: ":path" value: "/api/data" }
+      header { key: ":method" value: "GET" }
+      header { key: ":authority" value: "example.com" }
+    }
+    result { 
+      has_header { key: "x-country-code" value: "DE" }
+    }
+  }
+}
+
+# Test: Inject x-country-code header when client region is Japan (JP).
+test {
+  name: "SetHeaderForJapan"
+  benchmark: false
+  properties {
+    path: "source.client_region"
+    value: "JP"
+  }
+  request_headers {
+    input { 
+      header { key: ":path" value: "/test" }
+      header { key: ":method" value: "POST" }
+      header { key: ":authority" value: "example.com" }
+    }
+    result { 
+      has_header { key: "x-country-code" value: "JP" }
+    }
+  }
+}
+
+# Test: Inject x-country-code header when client region is Brazil (BR).
+test {
+  name: "SetHeaderForBrazil"
+  benchmark: false
+  properties {
+    path: "source.client_region"
+    value: "BR"
+  }
+  request_headers {
+    input { 
+      header { key: ":path" value: "/test" }
+      header { key: ":method" value: "GET" }
+      header { key: ":authority" value: "example.com" }
+    }
+    result { 
+      has_header { key: "x-country-code" value: "BR" }
+    }
+  }
+}
+
+# Test: No geo information available → header should not be added.
+test {
+  name: "NoGeoInformationAvailable"
+  benchmark: false
+  request_headers {
+    input { 
+      header { key: ":path" value: "/test" }
+      header { key: ":method" value: "GET" }
+      header { key: ":authority" value: "example.com" }
+    }
+    result { 
+      no_header { key: "x-country-code" }
+    }
+  }
+}
+
+# Test: Empty country code, header should be removed (not set).
+test {
+  name: "EmptyCountryCode"
+  benchmark: false
+  properties {
+    path: "source.client_region"
+    value: ""
+  }
+  request_headers {
+    input { 
+      header { key: ":path" value: "/test" }
+      header { key: ":method" value: "GET" }
+      header { key: ":authority" value: "example.com" }
+    }
+    result { 
+      no_header { key: "x-country-code" }
+    }
+  }
+}
+
+# Test: Inject x-country-code header when client region is South Africa (ZA).
+test {
+  name: "SetHeaderForSouthAfrica"
+  benchmark: false
+  properties {
+    path: "source.client_region"
+    value: "ZA"
+  }
+  request_headers {
+    input { 
+      header { key: ":path" value: "/test" }
+      header { key: ":method" value: "GET" }
+      header { key: ":authority" value: "example.com" }
+    }
+    result { 
+      has_header { key: "x-country-code" value: "ZA" }
+    }
+  }
+}
+
+# Test: Spoofed x-country-code header should be removed and replaced with the correct value.
+test {
+  name: "SecuritySpoofedHeaderRemoved"
+  benchmark: false
+  properties {
+    path: "source.client_region"
+    value: "GB"
+  }
+  request_headers {
+    input { 
+      header { key: ":path" value: "/test" }
+      header { key: ":method" value: "GET" }
+      header { key: ":authority" value: "example.com" }
+      header { key: "x-country-code" value: "XX" }
+    }
+    result { 
+      has_header { key: "x-country-code" value: "GB" }
+    }
+  }
+}
+
+# Test: Benchmark test.
+test {
+  name: "BenchmarkGeoRouting"
+  benchmark: true
+  properties {
+    path: "source.client_region"
+    value: "GB"
+  }
+  request_headers {
+    input { 
+      header { key: ":path" value: "/test" }
+      header { key: ":method" value: "GET" }
+      header { key: ":authority" value: "example.com" }
+    }
+    result { 
+      has_header { key: "x-country-code" value: "GB" }
+    }
+  }
+}

@@ -4,11 +4,11 @@
 
 ### Install Java
 
-Before you can build this project, you need to have Java 17 installed. Here are some resources to guide you through the installation process:
+Before you can build this project, you need to have Java 21 installed. Here are some resources to guide you through the installation process:
 
-- [Install Java on Windows](https://docs.oracle.com/en/java/javase/17/install/installation-jdk-microsoft-windows-platforms.html)
-- [Install Java on macOS](https://docs.oracle.com/en/java/javase/17/install/installation-jdk-macos.html)
-- [Install Java on Linux](https://docs.oracle.com/en/java/javase/17/install/installation-jdk-linux-platforms.html)
+- [Install Java on Windows](https://docs.oracle.com/en/java/javase/21/install/installation-jdk-microsoft-windows-platforms.html)
+- [Install Java on macOS](https://docs.oracle.com/en/java/javase/21/install/installation-jdk-macos.html)
+- [Install Java on Linux](https://docs.oracle.com/en/java/javase/21/install/installation-jdk-linux-platforms.html)
 
 ### Set JAVA_HOME
 
@@ -17,7 +17,7 @@ After installing Java, you need to set the `JAVA_HOME` environment variable to p
 - **Windows**
     1. Open the Start Search, type in "env", and select "Edit the system environment variables".
     2. In the System Properties window, click on the "Environment Variables" button.
-    3. Under System Variables, click "New" and enter `JAVA_HOME` as the variable name and the path to your JDK installation as the variable value (e.g., `C:\Program Files\Java\jdk-17`).
+    3. Under System Variables, click "New" and enter `JAVA_HOME` as the variable name and the path to your JDK installation as the variable value (e.g., `C:\Program Files\Java\jdk-21`).
     4. Click OK and apply the changes.
 
 - **macOS**
@@ -25,7 +25,7 @@ After installing Java, you need to set the `JAVA_HOME` environment variable to p
     2. Open or create the file `~/.bash_profile` or `~/.zshrc` (depending on your shell).
     3. Add the following line to the file:
        ```sh
-       export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+       export JAVA_HOME=$(/usr/libexec/java_home -v 21)
        ```
     4. Save the file and run `source ~/.bash_profile` or `source ~/.zshrc`.
 
@@ -34,7 +34,7 @@ After installing Java, you need to set the `JAVA_HOME` environment variable to p
     2. Open or create the file `~/.bashrc` or `~/.profile`.
     3. Add the following line to the file:
        ```sh
-       export JAVA_HOME=/path/to/your/jdk-17
+       export JAVA_HOME=/path/to/your/jdk-21
        export PATH=$JAVA_HOME/bin:$PATH
        ```
     4. Save the file and run `source ~/.bashrc` or `source ~/.profile`.
@@ -78,7 +78,7 @@ docker build -t service-callout:1.0-SNAPSHOT .
 To run the BasicCalloutServer class for example, use the following command:
 
 ```sh
-docker run -p 80:80 -p 443:443 service-callout:1.0-SNAPSHOT example.BasicCalloutServer
+docker run -p 80:80 -p 8080:8080 service-callout:1.0-SNAPSHOT example.BasicCalloutServer
 ```
 
 ### Running with JVM Options
@@ -86,7 +86,7 @@ docker run -p 80:80 -p 443:443 service-callout:1.0-SNAPSHOT example.BasicCallout
 If you need to pass JVM options (e.g., setting the maximum heap size), use the -e JAVA_OPTS flag:
 
 ```sh
-docker run -p 80:80 -p 443:443 \
+docker run -p 80:80 -p 8080:8080 \
  -e JAVA_OPTS="-Xmx512m" \
  service-callout:1.0-SNAPSHOT example.BasicCalloutServer
 ```
@@ -185,7 +185,8 @@ public static void main(String[] args) throws Exception {
     // Create a builder for ServiceCallout with custom configuration
     Example server = new Example.Builder()
             .setIp("111.222.333.444")       // Customize IP
-            .setPort(8443)                  // Set the port for secure communication
+            .setEnableTls(true)             // Enable TLS
+            .setSecurePort(443)             // Set the port for secure communication
             .build();
 
     // Start the server and block until shutdown
@@ -193,6 +194,32 @@ public static void main(String[] args) throws Exception {
     server.blockUntilShutdown();
 }
 ```
+
+> For production environments, it is strongly recommended to enable TLS to ensure secure communication.
+
+### gRPC/Netty Performance Tuning
+
+The server includes configurable gRPC and Netty settings for performance tuning. These can be adjusted via the Builder:
+
+```java
+Example server = new Example.Builder()
+        .setMaxConcurrentCallsPerConnection(500)    // Max concurrent calls per connection
+        .setFlowControlWindow(2 * 1024 * 1024)      // Flow control window size (bytes)
+        .setMaxInboundMessageSize(8 * 1024 * 1024)  // Max inbound message size (bytes)
+        .setPermitKeepAliveTimeSeconds(120L)        // Min time between client pings (seconds)
+        .setPermitKeepAliveWithoutCalls(false)      // Allow pings without active calls
+        .build();
+```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `maxConcurrentCallsPerConnection` | 1000 | Maximum concurrent calls per gRPC connection |
+| `flowControlWindow` | 1MB | Flow control window size for backpressure |
+| `maxInboundMessageSize` | 4MB | Maximum size for incoming messages |
+| `permitKeepAliveTimeSeconds` | 60 | Minimum seconds between client keepalive pings |
+| `permitKeepAliveWithoutCalls` | false | Whether to allow pings when no calls are active |
+
+> Note: The default `permitKeepAliveTimeSeconds` of 60 seconds and `permitKeepAliveWithoutCalls` of false are conservative settings to prevent ping-flood DoS attacks. Adjust these carefully based on your network environment.
 
 ## Documentation
 

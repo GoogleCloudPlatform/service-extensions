@@ -1,0 +1,56 @@
+FROM alpine:3.19
+
+USER root
+
+# Tool versions
+ARG GHZ_VERSION=0.120.0
+ARG BUF_VERSION=1.47.2
+
+# Envoy proto version from Buf Schema Registry
+ARG ENVOY_PROTO_VERSION=main
+
+# Install dependencies and tools
+RUN apk add --no-cache \
+    curl \
+    jq \
+    bash \
+    docker-cli \
+    git \
+    procps \
+    htop \
+    bc
+
+# Install ghz (gRPC benchmarking tool)
+RUN curl -sSL -o /tmp/ghz.tar.gz \
+       "https://github.com/bojand/ghz/releases/download/v${GHZ_VERSION}/ghz-linux-x86_64.tar.gz" \
+    && curl -sSL -o /tmp/ghz.sha256 \
+       "https://github.com/bojand/ghz/releases/download/v${GHZ_VERSION}/ghz-linux-x86_64.tar.gz.sha256" \
+    && cd /tmp \
+    && echo "$(cat ghz.sha256)  ghz.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/ghz.tar.gz -C /usr/local/bin ghz \
+    && rm /tmp/ghz.tar.gz /tmp/ghz.sha256
+
+# Install buf (Protocol Buffer tool from Buf Build)
+RUN curl -sSL -o /usr/local/bin/buf \
+       "https://github.com/bufbuild/buf/releases/download/v${BUF_VERSION}/buf-Linux-x86_64" \
+    && chmod +x /usr/local/bin/buf
+
+# Download protos from Buf Schema Registry to /opt/proto
+RUN mkdir -p /opt/proto && \
+    buf export "buf.build/envoyproxy/envoy:${ENVOY_PROTO_VERSION}" \
+        --output /opt/proto \
+        --path envoy/service/ext_proc \
+        --path envoy/config/core/v3/base.proto \
+        --path envoy/type/v3/http_status.proto
+
+WORKDIR /workspace
+
+# Copy test scripts and configuration
+COPY run-test.sh ./
+COPY lib/ ./lib/
+COPY config/test-config.json ./config/
+RUN chmod +x run-test.sh && chmod +x lib/*.sh
+
+RUN mkdir -p results
+
+CMD ["./run-test.sh", "-h"]

@@ -15,13 +15,17 @@
 // [START serviceextensions_plugin_enable_recaptcha]
 
 // Warning: This plugin simply shows that by adding scripts, one could enable a
-// reCAPTCHA challenge. This is not a replacement for reading reCAPTCHA
-// documentaion or following all user guide instructions. Please follow official
-// reCAPTCHA documentation at https://developers.google.com/recaptcha.
+// reCAPTCHA session or reCAPTCHA action. This is not a replacement for reading
+// reCAPTCHA documentaion or following all user guide instructions. Please
+// follow official reCAPTCHA documentation at
+// https://developers.google.com/recaptcha.
+use log::*;
 use lol_html::html_content::ContentType;
 use lol_html::*;
 use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
+use serde::Deserialize;
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::error::Error;
 use std::rc::Rc;
@@ -30,13 +34,19 @@ proxy_wasm::main! {{
     proxy_wasm::set_log_level(LogLevel::Trace);
     proxy_wasm::set_root_context(|_| -> Box<dyn RootContext> {
       Box::new(MyRootContext {
-          recaptcha_key: Rc::new(RefCell::new(String::new())),
+          recaptcha_config: Rc::new(RefCell::new(RecaptchaConfig::default()))
       })
     });
 }}
 
 struct MyRootContext {
-    recaptcha_key: Rc<RefCell<String>>,
+    recaptcha_config: Rc<RefCell<RecaptchaConfig>>,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct RecaptchaConfig {
+    recaptcha_key_type: String,
+    recaptcha_key_value: String,
 }
 
 impl Context for MyRootContext {}
@@ -44,17 +54,27 @@ impl Context for MyRootContext {}
 impl RootContext for MyRootContext {
     fn on_configure(&mut self, _: usize) -> bool {
         if let Some(config) = self.get_plugin_configuration() {
-            // Config file contains only the recaptcha key.
-            // Use of .unwrap() is fine here, since failure in on_configure
-            // should result in plugin crash.
+            // Config file contains JSON formatted recaptcha config.
+            // Failure to read config as UTF-8 or parse as JSON will cause plugin
+            // to panic and crash.
             let config_lines = String::from_utf8(config).unwrap();
-            self.recaptcha_key = Rc::new(RefCell::new(config_lines));
+            let recaptcha_config: RecaptchaConfig = serde_json::from_str(&config_lines).unwrap();
+            // Valid JSON, but invalid recaptcha_key_type will cause the plugin to crash.
+            if recaptcha_config.recaptcha_key_type != "SESSION"
+                && recaptcha_config.recaptcha_key_type != "ACTION"
+            {
+                panic!(
+                    "Invalid recaptcha_key_type found. Plugin crashed. recaptcha_key_type={}",
+                    recaptcha_config.recaptcha_key_type
+                )
+            }
+            self.recaptcha_config = Rc::new(RefCell::new(recaptcha_config));
         }
         return true;
     }
 
     fn create_http_context(&self, _: u32) -> Option<Box<dyn HttpContext>> {
-        Some(Box::new(MyHttpContext::new(self.recaptcha_key.clone())))
+        Some(Box::new(MyHttpContext::new(self.recaptcha_config.clone())))
     }
     fn get_type(&self) -> Option<ContextType> {
         Some(ContextType::HttpContext)
@@ -103,29 +123,24 @@ struct MyHttpContext<'a> {
     rewriter: Option<HtmlRewriter<'a, MyOutputSink>>,
     // True when plugin has added script to <head>.
     completed_script_injection: Rc<RefCell<bool>>,
-    // reCaptcha site key
-    recaptcha_key: Rc<RefCell<String>>,
 }
 
 impl<'a> MyHttpContext<'a> {
-    pub fn new(key: Rc<RefCell<String>>) -> MyHttpContext<'a> {
+    pub fn new(config: Rc<RefCell<RecaptchaConfig>>) -> MyHttpContext<'a> {
         let output = Rc::new(RefCell::new(Vec::new()));
         let completed_script_injection = Rc::new(RefCell::new(false));
-        let recaptcha_key = key;
+        let recaptcha_config = config;
+        let element_content_handler = Self::create_element_content_handler(
+            recaptcha_config.clone(),
+            completed_script_injection.clone(),
+        );
+
         MyHttpContext {
             output: output.clone(),
             completed_script_injection: completed_script_injection.clone(),
-            recaptcha_key: recaptcha_key.clone(),
             rewriter: Some(HtmlRewriter::new(
                 Settings {
-                    element_content_handlers: vec![element!("head", move |el| {
-                        el.prepend(
-                            format!("\n<script src=\"https://www.google.com/recaptcha/enterprise.js?render={}\"></script>\n", *recaptcha_key.borrow_mut()).as_str(),
-                            ContentType::Html,
-                            );
-                        *completed_script_injection.borrow_mut() = true;
-                        Ok(())
-                    })],
+                    element_content_handlers: element_content_handler,
                     ..Settings::new()
                 },
                 MyOutputSink {
@@ -133,6 +148,47 @@ impl<'a> MyHttpContext<'a> {
                 },
             )),
         }
+    }
+
+    fn create_element_content_handler(
+        recaptcha_config: Rc<RefCell<RecaptchaConfig>>,
+        completed_script_injection: Rc<RefCell<bool>>,
+    ) -> Vec<(Cow<'a, Selector>, ElementContentHandlers<'a>)> {
+        let key_type = (*recaptcha_config.borrow()).recaptcha_key_type.clone();
+        let content_handler = match key_type.as_str() {
+            "SESSION" => {
+                let key_value = (*recaptcha_config.borrow()).recaptcha_key_value.clone();
+                vec![element!("head", move |el| {
+                    el.prepend(
+                            format!("\n<script src=\"https://www.google.com/recaptcha/enterprise.js?render=&waf={}\" async defer></script>\n",
+                            key_value).as_str(),
+                            ContentType::Html,
+                            );
+                    *completed_script_injection.borrow_mut() = true;
+                    Ok(())
+                })]
+            }
+            "ACTION" => {
+                let key_value = (*recaptcha_config.borrow()).recaptcha_key_value.clone();
+                vec![element!("head", move |el| {
+                    el.prepend(
+                            format!("\n<script src=\"https://www.google.com/recaptcha/enterprise.js?render={}\"></script>\n",
+                            key_value).as_str(),
+                            ContentType::Html,
+                            );
+                    *completed_script_injection.borrow_mut() = true;
+                    Ok(())
+                })]
+            }
+            _ => {
+                // Setting completed_script_injection to true to indicate no parsing/modification
+                // of body will occur.
+                *completed_script_injection.borrow_mut() = true;
+                // Element handler will never be used because body will not be parsed.
+                Vec::new()
+            }
+        };
+        return content_handler;
     }
 
     fn parse_chunk(&mut self, body_bytes: Bytes) -> Result<(), Box<dyn Error>> {
@@ -168,28 +224,15 @@ impl<'a> HttpContext for MyHttpContext<'a> {
         for start_index in (0..body_size).step_by(chunk_size) {
             if let Some(body_bytes) = self.get_http_response_body(start_index, chunk_size) {
                 if let Err(e) = self.parse_chunk(body_bytes) {
-                    // Prefer sending immediate response instead of panicking to avoid plugin crashes.
-                    self.send_http_response(
-                        500,
-                        vec![],
-                        Some(
-                            &format!("Error while writing to HtmlRewriter: {}", e.to_string())
-                                .into_bytes(),
-                        ),
-                    );
-                    return Action::Pause;
+                    // Prefer logging errors instead of panicking to avoid plugin crashes.
+                    error!("Error while writing to HtmlRewriter: {}", e.to_string());
+                    *self.completed_script_injection.borrow_mut() = true;
+                    return Action::Continue;
                 }
                 if *self.completed_script_injection.borrow() {
                     if let Err(e) = self.end_rewriter() {
-                        self.send_http_response(
-                            500,
-                            vec![],
-                            Some(
-                                &format!("Error while ending HtmlRewriter: {}", e.to_string())
-                                    .into_bytes(),
-                            ),
-                        );
-                        return Action::Pause;
+                        error!("Error while ending HtmlRewriter: {}", e.to_string());
+                        return Action::Continue;
                     }
                     // Replace section of body to be modified with data emitted by the rewriter.
                     self.set_http_response_body(

@@ -57,11 +57,13 @@ func main() {
 	}
 
 	config := server.Config{
-		Address:            "0.0.0.0:8443",
-		InsecureAddress:    "0.0.0.0:8181",
-		HealthCheckAddress: "0.0.0.0:8000",
-		CertFile:           "extproc/ssl_creds/localhost.crt",
-		KeyFile:            "extproc/ssl_creds/localhost.key",
+		SecureAddress:        "0.0.0.0:443",
+		InsecureAddress:      "0.0.0.0:8080",
+		HealthCheckAddress:   "0.0.0.0:80",
+		CertFile:             "extproc/ssl_creds/localhost.crt",
+		KeyFile:              "extproc/ssl_creds/localhost.key",
+		EnableTLS:            false,
+		EnableInsecureServer: true,
 	}
 
 	calloutServer := server.NewCalloutServer(config)
