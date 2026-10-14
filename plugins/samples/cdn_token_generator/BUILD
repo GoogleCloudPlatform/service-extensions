@@ -1,4 +1,4 @@
-load("//:plugins.bzl", "proxy_wasm_plugin_cpp", "proxy_wasm_tests")
+load("//:plugins.bzl", "proxy_wasm_plugin_cpp", "proxy_wasm_plugin_go", "proxy_wasm_tests")
 
 licenses(["notice"])  # Apache 2
 
@@ -27,11 +27,17 @@ proxy_wasm_plugin_cpp(
     ],
 )
 
+proxy_wasm_plugin_go(
+    name = "plugin_go.wasm",
+    srcs = ["plugin.go"],
+)
+
 proxy_wasm_tests(
     name = "tests",
     config = ":tests_config.textpb",
     plugins = [
         ":plugin_cpp.wasm",
+        ":plugin_go.wasm",
     ],
     tests = ":tests.textpb",
 )
