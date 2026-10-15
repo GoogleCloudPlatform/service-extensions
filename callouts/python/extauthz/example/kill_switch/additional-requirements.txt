@@ -1,0 +1,2 @@
+redis>=5.0.0
+google-cloud-aiplatform>=1.50.0
