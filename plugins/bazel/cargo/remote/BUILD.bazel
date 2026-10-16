@@ -32,6 +32,12 @@ filegroup(
 
 # Workspace Member Dependencies
 alias(
+    name = "cookie",
+    actual = "@cu__cookie-0.16.2//:cookie",
+    tags = ["manual"],
+)
+
+alias(
     name = "hex",
     actual = "@cu__hex-0.4.3//:hex",
     tags = ["manual"],
@@ -62,6 +68,12 @@ alias(
 )
 
 alias(
+    name = "rand",
+    actual = "@cu__rand-0.8.5//:rand",
+    tags = ["manual"],
+)
+
+alias(
     name = "regex",
     actual = "@cu__regex-1.9.6//:regex",
     tags = ["manual"],
@@ -82,6 +94,12 @@ alias(
 alias(
     name = "sha2",
     actual = "@cu__sha2-0.10.8//:sha2",
+    tags = ["manual"],
+)
+
+alias(
+    name = "time-core",
+    actual = "@cu__time-core-0.1.2//:time_core",
     tags = ["manual"],
 )
 
