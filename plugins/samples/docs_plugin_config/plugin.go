@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -49,6 +49,10 @@ func (ctx *pluginContext) OnPluginStart(int) types.OnPluginStartStatus {
 	config, err := proxywasm.GetPluginConfiguration()
 	if err != nil {
 		proxywasm.LogErrorf("Error reading the configuration: %v", err)
+		return types.OnPluginStartStatusFailed
+	}
+	if config == nil {
+		proxywasm.LogError("Configuration is nil")
 		return types.OnPluginStartStatusFailed
 	}
 	ctx.secret = string(config)
