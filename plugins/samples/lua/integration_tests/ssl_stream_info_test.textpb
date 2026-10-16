@@ -1,0 +1,8 @@
+env { log_path: "/dev/stdout" }
+test {
+  name: "OnRequestAndResponseTest"
+  properties {
+    path: "connection.tls_version"
+    value: "TLSv1.2"
+  }
+}

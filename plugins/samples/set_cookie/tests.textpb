@@ -17,7 +17,7 @@ test {
   }
   response_headers {
     result { 
-      headers { regex: "Set-Cookie: my_cookie=\\d+; Path=/; HttpOnly" }
+      headers { regex: "Set-Cookie: my_cookie=\\d+; (Path=/; HttpOnly|HttpOnly; Path=/)" }
       log { regex: ".*New session ID created for the current request: \\d+" }
     }
   }

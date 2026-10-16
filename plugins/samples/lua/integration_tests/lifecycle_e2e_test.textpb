@@ -1,0 +1,25 @@
+env {
+  log_path: "/dev/stdout"
+}
+
+test {
+  name: "LifecycleE2ETest"
+  request_headers {
+    input {
+      content: "GET / HTTP/1.1\r\ne2e-request: initial\r\n\r\n"
+    }
+    result {
+      log { regex: ".*LUA_TEST lifecycle on_request_headers works: PASS.*" }
+      log { regex: ".*LUA_TEST lifecycle on_request_body works: PASS.*" }
+    }
+  }
+  response_headers {
+    input {
+      content: "HTTP/1.1 200 OK\r\ne2e-response: reply\r\n\r\n"
+    }
+    result {
+      log { regex: ".*LUA_TEST lifecycle on_response_headers works: PASS.*" }
+      log { regex: ".*LUA_TEST lifecycle on_response_body works: PASS.*" }
+    }
+  }
+}

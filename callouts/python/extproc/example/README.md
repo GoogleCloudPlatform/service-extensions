@@ -37,6 +37,7 @@ Each sample directory contains:
 |--------|-------------|
 | [jwt_auth](samples/jwt_auth/) | Validates RS256 JWT Bearer tokens against an RSA public key; forwards decoded claims as `decoded-<claim>` headers |
 | [cloud_log](samples/cloud_log/) | Enforces `header-check` and `body-check` sentinel values; logs authorization decisions to Google Cloud Logging |
+| [token_exchange](samples/token_exchange/) | Exchanges the Bearer token for a Google access token through Workload Identity Federation (inbound) or at an RFC 8693 token endpoint (outbound); forwards identity claims as headers, with fail-open or fail-closed handling |
 
 ### Cookie Management
 
