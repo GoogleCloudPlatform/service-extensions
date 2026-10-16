@@ -2,7 +2,7 @@ module github.com/GoogleCloudPlatform/service-extensions/callouts/go
 
 require (
 	github.com/envoyproxy/go-control-plane/envoy v1.37.0
-	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/go-cmp v0.7.0
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.83.2

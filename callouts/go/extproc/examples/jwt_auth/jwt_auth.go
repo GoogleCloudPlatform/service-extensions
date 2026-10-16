@@ -22,8 +22,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/internal/server"
 	"github.com/GoogleCloudPlatform/service-extensions/callouts/go/extproc/pkg/utils"
-	"github.com/golang-jwt/jwt/v5"
 	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
+	"github.com/golang-jwt/jwt/v5"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
