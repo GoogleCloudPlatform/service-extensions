@@ -1,4 +1,4 @@
-// Copyright 2024 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,8 +28,9 @@ class MyHttpContext : public Context {
     if (response_status &&
         absl::SimpleAtoi(response_status->view(), &response_code) &&
         (response_code / 100 == 5)) {
-      replaceResponseHeader(":status",
-                            absl::StrCat(mapResponseCode(response_code)));
+      if (replaceResponseHeader(":status", absl::StrCat(mapResponseCode(response_code))) != WasmResult::Ok) {
+        LOG_ERROR("Failed to replace :status header");
+      }
     }
 
     return FilterHeadersStatus::Continue;
