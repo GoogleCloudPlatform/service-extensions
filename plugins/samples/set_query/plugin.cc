@@ -1,4 +1,4 @@
-// Copyright 2024 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@
 
 #include "proxy_wasm_intrinsics.h"
 
+constexpr size_t kMaxPathLength = 4096;
+
 class MyHttpContext : public Context {
  public:
   explicit MyHttpContext(uint32_t id, RootContext* root) : Context(id, root) {}
@@ -27,21 +29,43 @@ class MyHttpContext : public Context {
   FilterHeadersStatus onRequestHeaders(uint32_t headers,
                                        bool end_of_stream) override {
     WasmDataPtr path = getRequestHeader(":path");
-    if (path) {
-      boost::system::result<boost::urls::url> url =
-          boost::urls::parse_uri_reference(path->view());
-      if (url) {
-        // Optional: encode query param spaces as "+" instead of "%20"
-        boost::urls::encoding_opts opt;
-        opt.space_as_plus = true;
-        std::string val =
-            boost::urls::encode("new val", boost::urls::pchars, opt);
-        // Optional: erase the key to put the new pair at the end.
-        url->params(opt).erase("key");
-        url->params(opt).set("key", val);
-        replaceRequestHeader(":path", url->encoded_resource());
-      }
+    if (!path) {
+      LOG_DEBUG("No :path header found");
+      return FilterHeadersStatus::Continue;
     }
+
+    std::string_view path_view = path->view();
+    if (path_view.length() > kMaxPathLength) {
+      LOG_WARN("Path too long (" + std::to_string(path_view.length()) +
+               " bytes), skipping processing");
+      return FilterHeadersStatus::Continue;
+    }
+
+    boost::system::result<boost::urls::url> url =
+        boost::urls::parse_uri_reference(path_view);
+    if (!url) {
+      LOG_WARN("Failed to parse URL: " + std::string(path_view));
+      return FilterHeadersStatus::Continue;
+    }
+
+    boost::urls::encoding_opts opt;
+    opt.space_as_plus = true;
+
+    std::string val = boost::urls::encode("new val", boost::urls::pchars, opt);
+
+    // Optional: erase the key to put the new pair at the end.
+    url->params(opt).erase("key");
+    url->params(opt).set("key", val);
+
+    auto result = replaceRequestHeader(":path", url->encoded_resource());
+    if (result != WasmResult::Ok) {
+      LOG_ERROR("Failed to replace :path header, error: " +
+                std::to_string(static_cast<int>(result)));
+    } else {
+      LOG_DEBUG("Successfully updated :path to: " +
+                std::string(url->encoded_resource()));
+    }
+
     return FilterHeadersStatus::Continue;
   }
 };

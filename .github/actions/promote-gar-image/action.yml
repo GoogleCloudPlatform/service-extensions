@@ -1,0 +1,124 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: 'Promote Artifact Registry Image'
+description: 'Promotes a container image from a GAR staging repository to a target repository via the :promoteArtifact API and waits for completion.'
+
+inputs:
+  project:
+    description: 'GCP Project ID hosting the Artifact Registry repositories'
+    required: true
+  location:
+    description: 'Artifact Registry location'
+    required: false
+    default: 'us'
+  staging_repository:
+    description: 'Source staging repository ID'
+    required: true
+  target_repository:
+    description: 'Destination target repository ID'
+    required: true
+  image:
+    description: 'Package / image name in the repository'
+    required: true
+  digest:
+    description: 'Image digest (sha256:...)'
+    required: true
+  credentials_json:
+    description: 'GCP service account key JSON used to authenticate gcloud before promoting.'
+    required: true
+  timeout_seconds:
+    description: 'Total timeout in seconds to wait for the promoteArtifact LRO to complete'
+    required: false
+    default: '300'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ inputs.credentials_json }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Promote artifact and wait for completion
+      shell: bash
+      env:
+        INPUT_PROJECT: ${{ inputs.project }}
+        INPUT_LOCATION: ${{ inputs.location }}
+        INPUT_STAGING_REPO: ${{ inputs.staging_repository }}
+        INPUT_TARGET_REPO: ${{ inputs.target_repository }}
+        INPUT_IMAGE: ${{ inputs.image }}
+        INPUT_DIGEST: ${{ inputs.digest }}
+        INPUT_TIMEOUT_SECONDS: ${{ inputs.timeout_seconds }}
+      run: |
+        set -euo pipefail
+        ACCESS_TOKEN="$(gcloud auth print-access-token)"
+        DIGEST="${INPUT_DIGEST}"
+        if [[ "${DIGEST}" != sha256:* ]]; then
+          DIGEST="sha256:${DIGEST}"
+        fi
+
+        PROMOTE_URL="https://artifactregistry.googleapis.com/v1/projects/${INPUT_PROJECT}/locations/${INPUT_LOCATION}/repositories/${INPUT_TARGET_REPO}:promoteArtifact"
+        PAYLOAD=$(jq -n \
+          --arg src_repo "projects/${INPUT_PROJECT}/locations/${INPUT_LOCATION}/repositories/${INPUT_STAGING_REPO}" \
+          --arg src_ver "projects/${INPUT_PROJECT}/locations/${INPUT_LOCATION}/repositories/${INPUT_STAGING_REPO}/packages/${INPUT_IMAGE}/versions/${DIGEST}" \
+          '{
+            source_repository: $src_repo,
+            source_version: $src_ver,
+            attachment_behavior: "INCLUDE",
+            include_all_tags: true,
+            overwrite_tags: true
+          }')
+
+        echo "Promoting ${INPUT_IMAGE}@${DIGEST} from ${INPUT_STAGING_REPO} to ${INPUT_TARGET_REPO}..."
+        RESPONSE=$(curl -sS -X POST "${PROMOTE_URL}" \
+          -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "${PAYLOAD}")
+
+        OP_NAME=$(echo "${RESPONSE}" | jq -r '.name // empty')
+        if [[ -z "${OP_NAME}" ]]; then
+          echo "Failed to start promoteArtifact operation. Response:"
+          echo "${RESPONSE}"
+          exit 1
+        fi
+        echo "Started promotion operation: ${OP_NAME}"
+
+        OP_URL="https://artifactregistry.googleapis.com/v1/${OP_NAME}"
+        POLL_INTERVAL=5
+        DEADLINE=$((SECONDS + INPUT_TIMEOUT_SECONDS))
+        while true; do
+          OP_STATUS=$(curl -sS -H "Authorization: Bearer ${ACCESS_TOKEN}" "${OP_URL}" || true)
+          DONE=$(echo "${OP_STATUS}" | jq -r '.done // false')
+          if [[ "${DONE}" == "true" ]]; then
+            ERROR=$(echo "${OP_STATUS}" | jq -r '.error // empty')
+            if [[ -n "${ERROR}" && "${ERROR}" != "null" ]]; then
+              echo "Promotion operation failed:"
+              echo "${OP_STATUS}" | jq .
+              exit 1
+            fi
+            echo "Promotion completed successfully:"
+            echo "${OP_STATUS}" | jq .
+            break
+          fi
+          if (( SECONDS >= DEADLINE )); then
+            echo "Timed out after ${INPUT_TIMEOUT_SECONDS}s waiting for promotion operation ${OP_NAME} to complete."
+            echo "${OP_STATUS}" | jq . || echo "${OP_STATUS}"
+            exit 1
+          fi
+          sleep "${POLL_INTERVAL}"
+        done

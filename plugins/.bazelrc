@@ -10,15 +10,10 @@ common --noenable_bzlmod
 # `bazel test //... --define engine=wasmtime` for example.
 build --define engine=v8
 
-# For unit testing, remove randomness from BoringSSL.
-# This doesn't capture 'bazel run' test invocations. Oh well.
-test --per_file_copt=external/boringssl/.*@-DBORINGSSL_UNSAFE_DETERMINISTIC_MODE=1
-
 # For benchmarking, set specific build options.
 build:bench --compilation_mode opt
 build:bench --dynamic_mode=off
 build:bench --copt -g1  # equals -gmlt in clang
-build:bench --per_file_copt=external/boringssl/.*@-DBORINGSSL_UNSAFE_DETERMINISTIC_MODE=1
 
 # Pass CC, CXX, LLVM_CONFIG from the environment.
 build --action_env=CC
@@ -50,6 +45,7 @@ build:clang-xsan --linkopt --unwindlib=libgcc
 build:clang-asan --config=clang-xsan
 build:clang-asan --copt -DADDRESS_SANITIZER=1
 build:clang-asan --copt -DUNDEFINED_SANITIZER=1
+build:clang-asan --copt -DV8_USE_ADDRESS_SANITIZER=1
 build:clang-asan --copt -fsanitize=address,undefined
 build:clang-asan --copt -fsanitize-address-use-after-scope
 build:clang-asan --linkopt -fsanitize=address,undefined
@@ -64,13 +60,20 @@ build:clang-tsan --copt -DTHREAD_SANITIZER=1
 build:clang-tsan --copt -fsanitize=thread
 build:clang-tsan --linkopt -fsanitize=thread
 
+# Use vendored LLVM C/C++ compiler.
+build:hermetic-llvm --incompatible_enable_cc_toolchain_resolution
+build:hermetic-llvm --action_env BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+build:hermetic-llvm --extra_toolchains @emsdk//emscripten_toolchain:cc-toolchain-wasm
+# Default to using hermetic-llvm
+build --config=hermetic-llvm
+
 # Set per-platform flags (used below).
 build --enable_platform_specific_config
 
-# Use C++17.
-build:linux --cxxopt=-std=c++17
-build:macos --cxxopt=-std=c++17
-build:windows --cxxopt="/std:c++17"
+# Use C++20.
+build:linux --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
+build:macos --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
+build:windows --cxxopt="/std:c++20" --host_cxxopt="/std:c++20"
 
 # Enable symlinks and runfiles on Windows (enabled by default on other platforms).
 startup --windows_enable_symlinks

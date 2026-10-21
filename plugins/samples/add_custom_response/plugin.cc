@@ -1,4 +1,4 @@
-// Copyright 2024 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,10 +26,17 @@ class MyHttpContext : public Context {
   FilterHeadersStatus onResponseHeaders(uint32_t headers,
                                         bool end_of_stream) override {
     const WasmDataPtr response_status = getResponseHeader(":status");
+    
+    if (!response_status) {
+      return FilterHeadersStatus::Continue;
+    }
+
     int response_code;
-    if (response_status &&
-        absl::SimpleAtoi(response_status->view(), &response_code) &&
-        (response_code / 100 == 5)) {
+    if (!absl::SimpleAtoi(response_status->view(), &response_code)) {
+      return FilterHeadersStatus::Continue;
+    }
+
+    if (response_code / 100 == 5) {
       sendLocalResponse(302, "", "",
                         {{"Origin-Status", response_status->toString()},
                          {"Location", std::string{redirect_page}}});
