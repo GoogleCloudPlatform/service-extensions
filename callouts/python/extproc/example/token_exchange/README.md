@@ -27,13 +27,15 @@ authenticates with.
    original token, and reused until 60 seconds before it expires. Responses
    without `expires_in` are not cached.
 5. `Authorization` is replaced with the exchanged token. In inbound mode the
-   callout also copies the `email` (or `preferred_username`), `sub` and
-   `groups` claims of the original JWT into the
-   `x-goog-authenticated-user-email`, `x-goog-authenticated-user-id` and
-   `x-original-user-groups` headers. Any of these headers the token has no
-   claim for is removed, so a client cannot supply its own values. The claims
-   are read without signature verification, because STS already validated the
-   token during the exchange.
+   callout preserves the original token in `x-goog-agent-user-authorization`
+   (for downstream runtimes such as Agent Engine) and copies the
+   `email` (or `preferred_username`), `sub` and `groups` claims of the
+   original JWT into the `x-goog-authenticated-user-email`,
+   `x-goog-authenticated-user-id` and `x-original-user-groups` headers. Any
+   of these headers the token has no claim for is removed, so a client
+   cannot supply its own values. The claims are read without signature
+   verification, because STS already validated the token during the
+   exchange.
 6. If the exchange fails, the request passes through with the original token,
    or is rejected with `403` when `TOKEN_EXCHANGE_FAIL_CLOSED=true`. In inbound
    mode the identity headers are removed on every pass-through as well.
@@ -101,7 +103,10 @@ calls to STS and the token endpoint, so they need no network access.
 The Terraform configuration in [`deploy/terraform`](deploy/terraform) deploys
 the callout server to Cloud Run and attaches it as a traffic extension to a
 global external Application Load Balancer. It also deploys an echo backend, so
-the mutated request headers can be inspected.
+the mutated request headers can be inspected. For deploying a regional external
+HTTPS Application Load Balancer fronting Agent Engine via Private Service
+Connect (PSC), see
+[`deploy/terraform_agent_engine`](deploy/terraform_agent_engine/README.md).
 
 ### Prerequisites
 
