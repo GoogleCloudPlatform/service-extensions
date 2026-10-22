@@ -38,7 +38,7 @@ extern "C" {
 // not supported or needed in the Proxy-Wasm sandbox.
 int __syscall_dup3(int oldfd, int newfd, int flags) { return -ENOSYS; }
 }
-namespace sample::lua {
+namespace proxy_wasm_lua {
 
 namespace {
 
@@ -297,4 +297,4 @@ LuaState* LuaHttpContext::GetRootLuaState() {
   return lua_root->lua_state_.get();
 }
 
-}  // namespace sample::lua
+}  // namespace proxy_wasm_lua

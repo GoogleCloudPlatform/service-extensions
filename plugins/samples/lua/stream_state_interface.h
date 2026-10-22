@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef NET_TURING_WASM_LUA_STREAM_STATE_INTERFACE_H_
-#define NET_TURING_WASM_LUA_STREAM_STATE_INTERFACE_H_
+#pragma once
 
-namespace sample::lua {
+namespace proxy_wasm_lua {
 
 // Interface abstracting the coroutine functionality from the Lua stream
 // filtering layer.
@@ -46,6 +45,5 @@ class StreamStateInterface {
   [[nodiscard]] virtual bool IsStreamEnded() const = 0;
 };
 
-}  // namespace sample::lua
+}  // namespace proxy_wasm_lua
 
-#endif  // NET_TURING_WASM_LUA_STREAM_STATE_INTERFACE_H_

@@ -35,7 +35,7 @@ extern "C" {
 #include "lualib.h"
 }
 
-namespace sample::lua {
+namespace proxy_wasm_lua {
 
 absl::StatusOr<ExecutionState> LuaStreamCoroutine::Start() {
   if (state_ != ExecutionState::kYielded ||
@@ -284,4 +284,4 @@ absl::StatusOr<ExecutionState> LuaStreamCoroutine::HandleHttpResponse(
   return state_;
 }
 
-}  // namespace sample::lua
+}  // namespace proxy_wasm_lua

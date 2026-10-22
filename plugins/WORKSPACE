@@ -13,6 +13,7 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 http_archive(
     name = "com_google_absl",
     integrity = "sha256-FpL3fRc5us8/lDNxiLeFg88JurfkINLcbFYFpPhnhaE=",
+    repo_mapping = {"@googletest": "@com_google_googletest"},
     strip_prefix = "abseil-cpp-20250814.1",
     urls = ["https://github.com/abseil/abseil-cpp/releases/download/20250814.1/abseil-cpp-20250814.1.tar.gz"],
 )
@@ -262,8 +263,8 @@ load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_depe
 go_repository(
     name = "com_github_proxy_wasm_proxy_wasm_go_sdk",
     importpath = "github.com/proxy-wasm/proxy-wasm-go-sdk",
-    sum = "h1:UiqUl6PLcIW4S93FkmbK9gK2r2veY0MI6nKEXMk/9Ws=",
-    version = "v0.0.0-20241219182957-23e5db51ea08",
+    sum = "h1:m17/Cedqhynvsf2mruRanrvb4R77J+Xz1O8mibAQTSs=",
+    version = "v0.0.0-20260105142703-44c7d5847745",
 )
 
 go_repository(
@@ -271,6 +272,17 @@ go_repository(
     importpath = "github.com/golang-jwt/jwt/v5",
     sum = "h1:OuVbFODueb089Lh128TAcimifWaLhJwVflnrgM17wHk=",
     version = "v5.2.1",
+)
+
+go_repository(
+    name = "org_golang_google_protobuf",
+    # Avoid a dependency cycle: gazelle would otherwise generate
+    # go_proto_library targets inside this repo that depend on protoc-gen-go,
+    # which lives in this same repo.
+    build_file_proto_mode = "disable_global",
+    importpath = "google.golang.org/protobuf",
+    sum = "h1:fV6ZwhNocDyBLK0dj+fg8ektcVegBBuEolpbTQyBNVE=",
+    version = "v1.36.11",
 )
 
 go_rules_dependencies()
