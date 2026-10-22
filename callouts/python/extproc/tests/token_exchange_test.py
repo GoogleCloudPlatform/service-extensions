@@ -184,6 +184,13 @@ class TestPassThrough:
 # ---------------------------------------------------------------------------
 
 class TestInboundExchange:
+    def test_agent_user_authorization_header_added(self, svc_inbound):
+        svc_inbound.cache.clear()
+        with patch("requests.Session.post", return_value=_mock_http_response("google-token")):
+            result = svc_inbound.process(
+                _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}), _Ctx())
+        assert _mutated_headers(result)["x-goog-agent-user-authorization"] == f"Bearer {_SAMPLE_JWT}"
+
     def test_authorization_header_replaced(self, svc_inbound):
         svc_inbound.cache.clear()
         with patch("requests.Session.post", return_value=_mock_http_response("google-token")):
@@ -484,9 +491,11 @@ class TestIdentityHeaderStripping:
     def test_no_auth_header_removes_all(self, svc_inbound):
         result = svc_inbound.process(_make_callout({
             ":path": "/api",
+            "x-goog-agent-user-authorization": "Bearer spoofed-token",
             "x-goog-authenticated-user-email": "spoofed@example.com",
         }), _Ctx())
-        assert sorted(_removed_headers(result)) == sorted(_IDENTITY_HEADERS)
+        assert sorted(_removed_headers(result)) == sorted(
+            [*_IDENTITY_HEADERS, "x-goog-agent-user-authorization"])
 
     def test_fail_open_removes_all(self, svc_inbound):
         svc_inbound.cache.clear()
@@ -495,7 +504,8 @@ class TestIdentityHeaderStripping:
             result = svc_inbound.process(
                 _make_callout({"authorization": f"Bearer {_SAMPLE_JWT}"}),
                 _Ctx())
-        assert sorted(_removed_headers(result)) == sorted(_IDENTITY_HEADERS)
+        assert sorted(_removed_headers(result)) == sorted(
+            [*_IDENTITY_HEADERS, "x-goog-agent-user-authorization"])
 
     def test_non_utf8_authorization_removes_all(self, svc_inbound):
         callout = _make_callout({"x-original-user-groups": "admin"})
@@ -504,7 +514,8 @@ class TestIdentityHeaderStripping:
         with patch("requests.Session.post",
                    side_effect=ConnectionError("rejected")):
             result = svc_inbound.process(callout, _Ctx())
-        assert sorted(_removed_headers(result)) == sorted(_IDENTITY_HEADERS)
+        assert sorted(_removed_headers(result)) == sorted(
+            [*_IDENTITY_HEADERS, "x-goog-agent-user-authorization"])
 
     def test_outbound_mode_removes_nothing(self, svc_outbound):
         svc_outbound.cache.clear()
