@@ -72,7 +72,11 @@ proxy_wasm::WasmResult TestContext::log(uint32_t log_level,
   logging_entries_++;
   logging_bytes_ += message.size();
   if (wasmVm()->cmpLogLevel(proxy_wasm::LogLevel::trace)) {
-    std::cout << "TRACE from testcontext: [log] " << message << std::endl;
+    std::cout << "TRACE from integration: [vm->host] env.proxy_log(" 
+    << log_level << ", " 
+    << reinterpret_cast<uint64_t>(message.data()) << ", " 
+    << message.size() << ") \"" 
+    << message << "\"" << std::endl;
   }
   if (wasmVm()->cmpLogLevel(static_cast<proxy_wasm::LogLevel>(log_level))) {
     phase_logs_.emplace_back(message);
