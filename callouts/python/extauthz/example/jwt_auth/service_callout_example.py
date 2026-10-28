@@ -1,4 +1,4 @@
-# Copyright 2025 Google LLC.
+# Copyright 2026 Google LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,10 @@ import logging
 import traceback
 import sys
 import os
+import json
+import argparse
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
 from service.callout_server import CalloutServerAuth
 from service.callout_tools import allow_request, deny_request
 from envoy.service.auth.v3 import external_auth_pb2 as auth_pb2
@@ -25,6 +28,18 @@ from envoy.type.v3 import http_status_pb2
 import jwt
 from jwt.exceptions import InvalidTokenError
 from typing import Union, Any
+
+
+# Allowlist of asymmetric JWT algorithms accepted by this callout.
+# Symmetric algorithms (e.g., HS256) are explicitly excluded to 
+# prevent algorithm confusion attacks against the public key.
+ALLOWED_JWT_ALGORITHMS = frozenset({
+    'RS256', 'RS384', 'RS512',      # RSA PKCS#1 v1.5
+    'PS256', 'PS384', 'PS512',      # RSA-PSS
+    'ES256', 'ES384', 'ES512',      # ECDSA
+    'EdDSA',                        # Ed25519 / Ed448
+})
+
 
 class JwtAuthServer(CalloutServerAuth):
     """External authorization server implementing JWT token validation.
@@ -35,8 +50,31 @@ class JwtAuthServer(CalloutServerAuth):
     """
 
     def __init__(self, *args, **kwargs):
+        self.public_key_path = kwargs.pop(
+            'jwt_public_key_path',
+            os.environ.get('JWT_PUBLIC_KEY_PATH')
+        )
+        
+        if not self.public_key_path:
+            raise ValueError(
+                "A public key path must be provided via the --jwt_public_key_path flag "
+                "or the JWT_PUBLIC_KEY_PATH environment variable."
+            )
+
+        self.jwt_algorithm = kwargs.pop(
+            'jwt_algorithm',
+            os.environ.get('JWT_ALGORITHM', 'RS256')
+        )
+
+        # Fail fast on unsupported algorithms before initializing the server.
+        if self.jwt_algorithm not in ALLOWED_JWT_ALGORITHMS:
+            raise ValueError(
+                f"Unsupported JWT algorithm {self.jwt_algorithm!r}. "
+                f"Allowed algorithms: {sorted(ALLOWED_JWT_ALGORITHMS)}"
+            )
+
         super().__init__(*args, **kwargs)
-        self._load_public_key('ssl_creds/publickey.pem')
+        self._load_public_key(self.public_key_path)
 
     def _load_public_key(self, path: str) -> None:
         """Load the public key used for JWT validation."""
@@ -77,9 +115,18 @@ class JwtAuthServer(CalloutServerAuth):
             
             # Token is valid, add decoded fields as headers
             logging.info(f"JWT token valid for subject: {decoded.get('sub', 'unknown')}")
-            headers_to_add = [
-                (f'decoded-{key}', str(value)) for key, value in decoded.items()
-            ]
+            headers_to_add = []
+            
+            for key, value in decoded.items():
+                # Serialize complex claims to compact JSON; cast scalars to string.
+                if isinstance(value, (dict, list)):
+                    val_str = json.dumps(value, separators=(',', ':'))
+                else:
+                    val_str = str(value)
+                
+                # Sanitize CRLF characters to prevent HTTP header injection.
+                val_str = val_str.replace('\n', '').replace('\r', '')
+                headers_to_add.append((f'decoded-{key}', val_str))
             
             return allow_request(headers_to_add=headers_to_add)
             
@@ -135,13 +182,33 @@ class JwtAuthServer(CalloutServerAuth):
             return None
             
         try:
-            decoded = jwt.decode(token, self.public_key, algorithms=['RS256'])
-            logging.info(f"JWT token successfully decoded: {decoded}")
+            decoded = jwt.decode(token, self.public_key, algorithms=[self.jwt_algorithm])
+            logging.info("JWT token successfully decoded")
             return decoded
         except InvalidTokenError as e:
             logging.error(f"JWT validation failed: {str(e)}")
             return None
 
+
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="JWT Auth ExtAuthz Server")
+    
+    env_key_path = os.environ.get('JWT_PUBLIC_KEY_PATH')
+    parser.add_argument(
+        '--jwt_public_key_path', type=str,
+        default=env_key_path,
+        required=not env_key_path,
+        help='Path to the JWT public key (Required if JWT_PUBLIC_KEY_PATH env var is not set)'
+    )
+    
+    parser.add_argument(
+        '--jwt_algorithm', type=str,
+        default=os.environ.get('JWT_ALGORITHM', 'RS256'),
+        choices=sorted(ALLOWED_JWT_ALGORITHMS),
+        help='Algorithm used for JWT validation. Must be an asymmetric algorithm.'
+    )
+    
+    args, unknown = parser.parse_known_args()
+    
     logging.basicConfig(level=logging.DEBUG)
-    JwtAuthServer().run()
+    JwtAuthServer(**vars(args)).run()
