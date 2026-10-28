@@ -14,31 +14,31 @@ Each sample directory contains:
 
 | Sample | Description |
 |--------|-------------|
-| [AddBody](samples/AddBody/) | Appends `"-added-body"` to the request body and replaces the response body with `"body replaced"` |
+| [AddBody](AddBody/) | Appends `"-added-body"` to the request body and replaces the response body with `"body replaced"` |
 
 ### Header Manipulation
 
 | Sample | Description |
 |--------|-------------|
-| [AddHeader](samples/AddHeader/) | Adds headers to both request and response phases; removes `foo` from responses; controls route cache per phase |
+| [AddHeader](AddHeader/) | Adds headers to both request and response phases; removes `foo` from responses; controls route cache per phase |
 
 ### Routing & Traffic Management
 
 | Sample | Description |
 |--------|-------------|
-| [Redirect](samples/Redirect/) | Returns an unconditional `301 Moved Permanently` to `http://service-extensions.com/redirect` |
+| [Redirect](Redirect/) | Returns an unconditional `301 Moved Permanently` to `http://service-extensions.com/redirect` |
 
 ### Authentication & Authorization
 
 | Sample | Description |
 |--------|-------------|
-| [JwtAuth](samples/JwtAuth/) | Validates RSA-signed JWT Bearer tokens using BouncyCastle and `jjwt`; forwards decoded claims as `decoded-<claim>` headers; denies invalid requests |
+| [JwtAuth](JwtAuth/) | Validates RSA-signed JWT Bearer tokens using BouncyCastle and `jjwt`; forwards decoded claims as `decoded-<claim>` headers; denies invalid requests |
 
 ### Reference Implementations
 
 | Sample | Description |
 |--------|-------------|
-| [BasicCalloutServer](samples/BasicCalloutServer/) | Full four-phase reference implementation: injects headers, controls route cache, appends to request body, replaces response body |
+| [BasicCalloutsServer](BasicCalloutsServer/) | Full four-phase reference implementation: injects headers, controls route cache, appends to request body, replaces response body |
 
 ## Builder Configuration
 

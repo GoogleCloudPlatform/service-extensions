@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: routing-traffic
+  protocol: ext_proc-l7
+  language: go
+  summary: "Routes to a backend IP from a request header, with a fallback."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # Dynamic Forwarding Callout (Go)
 
 This callout server dynamically selects a backend endpoint based on an incoming

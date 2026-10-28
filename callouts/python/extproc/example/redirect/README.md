@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: routing-traffic
+  protocol: ext_proc-l7
+  language: python
+  summary: "Unconditional 301 to a fixed URL."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # Redirect Callout
 
 This callout server performs an HTTP redirect for incoming requests using an
@@ -73,4 +82,4 @@ a dedicated test file.
 
 - [x] [Python](.) (this directory)
 - [x] [Go](../../../../go/extproc/examples/redirect/)
-- [x] [Java](../../../../java/service-callout/src/main/java/example/Redirect.java)
+- [x] [Java](../../../../java/service-callout/src/main/java/example/Redirect/Redirect.java)

@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: auth
+  protocol: ext_proc-l7
+  language: java
+  summary: "Validates bearer tokens with BouncyCastle + jjwt, denies on failure."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # JWT Auth Callout (Java)
 
 This callout server demonstrates how to perform JWT (JSON Web Token)

@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: ai-llm-gateway
+  protocol: ext_proc-l7
+  language: python
+  summary: "Full LLM gateway callout -- ships its own Terraform config."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # LiteLLM Gateway
 
 A Service Extensions `ext_proc` callout that turns a Google Cloud external

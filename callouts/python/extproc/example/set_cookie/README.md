@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: cookie-management
+  protocol: ext_proc-l7
+  language: python
+  summary: "Conditionally injects Set-Cookie when a check header is present."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # Set Cookie Callout
 
 This callout server conditionally sets a cookie on HTTP responses based on the
@@ -71,5 +80,5 @@ a dedicated test file.
 ## Available Languages
 
 - [x] [Python](.) (this directory)
-- [x] [Go](../../../../go/extproc/examples/set_cookie/)
-- [x] [Java](../../../../java/service-callout/src/main/java/example/SetCookie.java)
+- [ ] Go (not yet available)
+- [ ] Java (not yet available)

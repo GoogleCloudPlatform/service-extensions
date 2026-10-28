@@ -1,0 +1,36 @@
+name: Callouts docs check
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+    paths:
+      - callouts/**/*.md
+      - callouts/scripts/**
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - callouts/**/*.md
+      - callouts/scripts/**
+
+# Default permissions are read only.
+permissions: read-all
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Check every relative link under callouts/ resolves
+        run: python3 callouts/scripts/check_links.py
+
+      - name: Check every example directory has a README
+        run: python3 callouts/scripts/check_example_readmes.py
+
+      - name: Check CATALOG.md is up to date with example frontmatter
+        run: python3 callouts/scripts/generate_catalog.py --check
