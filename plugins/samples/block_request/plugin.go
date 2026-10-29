@@ -40,7 +40,7 @@ func newHttpContext(contextID uint32) types.HttpContext {
 
 func generateRequestId() string {
 	id := uuid.NewString()
-	return strings.Replace(id, "-", "", -1)
+	return strings.ReplaceAll(id, "-", "")
 }
 
 const (
@@ -51,14 +51,16 @@ const (
 // not, generate a 403 Forbidden response.
 func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) types.Action {
 	referer, err := proxywasm.GetHttpRequestHeader("Referer")
+	if err != nil && err != types.ErrorStatusNotFound {
+		proxywasm.LogErrorf("Failed to get Referer header: %v", err)
+		proxywasm.SendHttpResponse(500, [][2]string{}, []byte("Internal Server Error"), 0)
+		return types.ActionContinue
+	}
 	// Check if referer match with the expected domain.
 	if err == types.ErrorStatusNotFound || !strings.Contains(referer, allowedReferer) {
 		requestId := generateRequestId()
 		proxywasm.LogInfof("Forbidden - Request ID: %v", requestId)
 		proxywasm.SendHttpResponse(403, [][2]string{}, []byte(fmt.Sprintf("Forbidden - Request ID: %v", requestId)), 0)
-		return types.ActionContinue
-	} else if err != nil {
-		proxywasm.SendHttpResponse(500, [][2]string{}, []byte(fmt.Sprintf("%v", err)), 0)
 		return types.ActionContinue
 	}
 
