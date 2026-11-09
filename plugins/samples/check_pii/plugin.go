@@ -1,4 +1,4 @@
-// Copyright 2024 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 package main
 
 import (
-	"fmt"
+	"bytes"
 	"regexp"
 
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm"
@@ -24,6 +24,7 @@ import (
 )
 
 func main() {}
+
 func init() {
 	proxywasm.SetVMContext(&vmContext{})
 }
@@ -33,47 +34,57 @@ type vmContext struct {
 }
 type pluginContext struct {
 	types.DefaultPluginContext
-	creditCardRegex *regexp.Regexp
+	cardMatcher   *regexp.Regexp
+	code10Matcher *regexp.Regexp
 }
 type httpContext struct {
 	types.DefaultHttpContext
-	creditCardRegex *regexp.Regexp
-	checkBody       bool
+	cardMatcher   *regexp.Regexp
+	code10Matcher *regexp.Regexp
 }
 
 func (*vmContext) NewPluginContext(contextID uint32) types.PluginContext {
-	return &pluginContext{creditCardRegex: regexp.MustCompile("\\d{4}-\\d{4}-\\d{4}-(\\d{4})")}
+	// Compile the regex expressions at plugin setup time for optimal performance.
+	// Credit card numbers in a 16-digit hyphenated format.
+	// 10-digit numeric codes.
+	return &pluginContext{
+		cardMatcher:   regexp.MustCompile(`\d{4}-\d{4}-\d{4}-(\d{4})`),
+		code10Matcher: regexp.MustCompile(`\d{7}(\d{3})`),
+	}
 }
 
-func (pluginContext *pluginContext) NewHttpContext(contextID uint32) types.HttpContext {
-	return &httpContext{creditCardRegex: pluginContext.creditCardRegex}
+func (p *pluginContext) NewHttpContext(contextID uint32) types.HttpContext {
+	return &httpContext{
+		cardMatcher:   p.cardMatcher,
+		code10Matcher: p.code10Matcher,
+	}
+}
+
+func (ctx *httpContext) OnHttpRequestHeaders(numHeaders int, endOfStream bool) types.Action {
+	// Disallow server compression so we can read the plaintext body.
+	err := proxywasm.ReplaceHttpRequestHeader("accept-encoding", "identity")
+	if err != nil {
+		proxywasm.LogErrorf("failed to replace accept-encoding header: %v", err)
+	}
+	return types.ActionContinue
 }
 
 func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) types.Action {
-	defer func() {
-		err := recover()
-		if err != nil {
-			proxywasm.SendHttpResponse(500, [][2]string{}, []byte(fmt.Sprintf("%v", err)), 0)
-		}
-	}()
-	value, err := proxywasm.GetHttpResponseHeader("google-run-pii-check")
-	if err != nil {
-		panic(err)
-	}
-	if value != "true" {
-		return types.ActionContinue
-	}
-	ctx.checkBody = true
 	headers, err := proxywasm.GetHttpResponseHeaders()
 	if err != nil {
-		panic(err)
+		proxywasm.LogErrorf("failed to get response headers: %v", err)
+		return types.ActionContinue // Fail open
 	}
+
 	for i := range headers {
-		result := ctx.creditCardRegex.ReplaceAllString(headers[i][1], "XXXX-XXXX-XXXX-${1}")
-		if result != headers[i][1] {
-			err = proxywasm.ReplaceHttpResponseHeader(headers[i][0], result)
+		key := headers[i][0]
+		value := headers[i][1]
+
+		maskedValue := ctx.maskPIIString(value)
+		if maskedValue != value {
+			err = proxywasm.ReplaceHttpResponseHeader(key, maskedValue)
 			if err != nil {
-				panic(err)
+				proxywasm.LogErrorf("failed to replace header %s: %v", key, err)
 			}
 		}
 	}
@@ -81,29 +92,42 @@ func (ctx *httpContext) OnHttpResponseHeaders(numHeaders int, endOfStream bool) 
 }
 
 func (ctx *httpContext) OnHttpResponseBody(numBytes int, endOfStream bool) types.Action {
-	if !ctx.checkBody {
+	if numBytes == 0 {
 		return types.ActionContinue
 	}
-	defer func() {
-		err := recover()
+
+	body, err := proxywasm.GetHttpResponseBody(0, numBytes)
+	if err != nil {
+		proxywasm.LogErrorf("failed to get response body: %v", err)
+		return types.ActionContinue // Fail open
+	}
+
+	// Note: this example does not handle PII split across chunk boundaries.
+	maskedBody := ctx.maskPIIBytes(body)
+
+	// Only interact with the WASM host if modifications were actually made
+	if !bytes.Equal(body, maskedBody) {
+		err = proxywasm.ReplaceHttpResponseBody(maskedBody)
 		if err != nil {
-			proxywasm.SendHttpResponse(500, [][2]string{}, []byte(fmt.Sprintf("%v", err)), 0)
+			proxywasm.LogErrorf("failed to replace response body: %v", err)
 		}
-	}()
-	bytes, err := proxywasm.GetHttpResponseBody(0, numBytes)
-	if err != nil {
-		panic(err)
 	}
-	// Note that for illustrative purposes, this example is kept simple and does
-	// not handle the case of credit card numbers that are split across multiple
-	// OnHttpResponseBody calls. It therefore does not mask PII spanning chunk
-	// boundaries.
-	bytes = ctx.creditCardRegex.ReplaceAll(bytes, []byte("XXXX-XXXX-XXXX-${1}"))
-	err = proxywasm.ReplaceHttpResponseBody(bytes)
-	if err != nil {
-		panic(err)
-	}
+
 	return types.ActionContinue
+}
+
+// maskPIIString is used for Headers (which are naturally strings)
+func (ctx *httpContext) maskPIIString(value string) string {
+	value = ctx.cardMatcher.ReplaceAllString(value, "XXXX-XXXX-XXXX-${1}")
+	value = ctx.code10Matcher.ReplaceAllString(value, "XXXXXXX${1}")
+	return value
+}
+
+// maskPIIBytes is used for the Body (avoids memory allocation overhead)
+func (ctx *httpContext) maskPIIBytes(value []byte) []byte {
+	value = ctx.cardMatcher.ReplaceAll(value, []byte("XXXX-XXXX-XXXX-${1}"))
+	value = ctx.code10Matcher.ReplaceAll(value, []byte("XXXXXXX${1}"))
+	return value
 }
 
 // [END serviceextensions_plugin_check_pii]
