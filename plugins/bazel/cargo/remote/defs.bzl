@@ -416,6 +416,16 @@ def crate_repositories():
 
     maybe(
         http_archive,
+        name = "cu__base64-0.21.7",
+        sha256 = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567",
+        type = "tar.gz",
+        urls = ["https://static.crates.io/crates/base64/0.21.7/download"],
+        strip_prefix = "base64-0.21.7",
+        build_file = Label("@//bazel/cargo/remote:BUILD.base64-0.21.7.bazel"),
+    )
+
+    maybe(
+        http_archive,
         name = "cu__bitflags-1.3.2",
         sha256 = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a",
         type = "tar.gz",
