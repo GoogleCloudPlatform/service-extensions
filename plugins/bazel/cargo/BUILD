@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@rules_rust//crate_universe:defs.bzl", "crates_vendor")
+load("@rules_rust//crate_universe:defs.bzl", "crates_vendor", "crate")
 
 exports_files(
     [
@@ -32,5 +32,10 @@ crates_vendor(
     repository_name = "cu",  # shorten generated paths for Windows...
     tags = ["manual"],
     vendor_path = "remote",
-    supported_platform_triples = ["x86_64-unknown-linux-gnu", "wasm32-wasi"], # needed x86_64-unknown-linux-gnu to fix issue with getrandom building for wrong environment
+    supported_platform_triples = ["x86_64-unknown-linux-gnu"], 
+    annotations = {
+        "ahash": [crate.annotation(
+            deps = ["@cu__once_cell-1.19.0//:once_cell"],
+        )],
+    },
 )

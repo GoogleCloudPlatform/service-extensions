@@ -6,10 +6,10 @@ edition = "2018"
 # Regenerate: $ bazelisk run bazel/cargo:crates_vendor -- --repin
 # Reference: //bazel/cargo/remote:proxy-wasm (etc)
 [dependencies]
-proxy-wasm = "0.2.1"
-log = "0.4"
-regex = "1.9"
-url = "2.4"
+proxy-wasm = "=0.2.1"
+log = "=0.4.20"
+regex = "=1.9.6"
+url = "=2.4.0"
 # Pin version 2.0.0 until rust-version includes https://github.com/rust-lang/rust/issues/119128
 lol_html = "=2.0.0"
 serde = { version = "1.0", features = ["derive"] }
