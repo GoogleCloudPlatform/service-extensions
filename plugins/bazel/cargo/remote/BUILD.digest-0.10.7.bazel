@@ -31,9 +31,11 @@ rust_library(
     crate_features = [
         "alloc",
         "block-buffer",
+        "const-oid",
         "core-api",
         "default",
         "mac",
+        "oid",
         "std",
         "subtle",
     ],
@@ -52,6 +54,7 @@ rust_library(
     version = "0.10.7",
     deps = [
         "@cu__block-buffer-0.10.4//:block_buffer",
+        "@cu__const-oid-0.9.6//:const_oid",
         "@cu__crypto-common-0.1.6//:crypto_common",
         "@cu__subtle-2.6.1//:subtle",
     ],

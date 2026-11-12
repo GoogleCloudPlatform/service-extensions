@@ -29,7 +29,9 @@ rust_library(
         ],
     ),
     crate_features = [
+        "rand_chacha",
         "small_rng",
+        "std_rng",
     ],
     crate_root = "src/lib.rs",
     edition = "2018",
@@ -45,6 +47,7 @@ rust_library(
     ],
     version = "0.8.5",
     deps = [
+        "@cu__rand_chacha-0.3.1//:rand_chacha",
         "@cu__rand_core-0.6.4//:rand_core",
     ],
 )

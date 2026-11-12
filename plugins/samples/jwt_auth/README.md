@@ -4,10 +4,11 @@ This plugin implements JWT (JSON Web Token) authentication by validating tokens 
 
 ## How It Works
 
-1. **Plugin initialization**: When the plugin starts, the proxy invokes `on_configure` (C++) or `OnPluginStart` (Go):
+1. **Plugin initialization**: When the plugin starts, the proxy invokes `on_configure` (C++ and Rust) or `OnPluginStart` (Go):
    - The plugin reads the configuration file containing an RSA public key in PEM format.
    - **C++** uses the `jwt_verify_lib` to parse the PEM key and create a `Jwks` object.
    - **Go** uses `crypto/x509` to parse the PEM key and extract the RSA public key.
+   - **Rust** uses `RsaPublicKey::from_public_key_pem()` from the `rsa` crate to parse the PEM key.
    - If key parsing fails, the plugin initialization fails.
 
 2. **Request processing**: When the proxy receives an HTTP request, it invokes `on_http_request_headers`:
@@ -19,11 +20,13 @@ This plugin implements JWT (JSON Web Token) authentication by validating tokens 
 4. **Token structure validation**: The plugin parses the JWT to verify it has valid structure (header.payload.signature):
    - **C++** uses `jwt.parseFromString()` from `jwt_verify_lib`.
    - **Go** uses `jwt.NewParser().ParseUnverified()` from `github.com/golang-jwt/jwt/v5`.
+   - **Rust** uses `UntrustedToken::new()` from the `jwt-compact` crate.
    - If parsing fails, the request is rejected with a 403 Forbidden response.
 
 5. **Signature verification**: The plugin verifies the JWT signature using the RSA public key:
    - **C++** uses `google::jwt_verify::verifyJwt()` to validate the signature and claims.
    - **Go** uses `jwt.Parse()` with a key function that returns the RSA public key and validates the signing method.
+   - **Rust** uses an RS256 validator from `jwt-compact` to check the signature, then checks the `exp` and `nbf` claims, allowing 60 seconds of clock skew.
    - If verification fails (invalid signature, expired token, or other validation errors), the request is rejected with a 403 Forbidden response.
 
 6. **Token removal**: If the token is valid, the plugin removes the `jwt` query parameter from the URL and updates the `:path` header.
@@ -33,7 +36,7 @@ This plugin implements JWT (JSON Web Token) authentication by validating tokens 
 ## Implementation Notes
 
 - **Key parsing**: Decodes RSA public keys from PEM formats directly at plugin initialization to reduce request-time overhead.
-- **Token processing**: C++ leverages `jwt_verify_lib` for JWT structure and signature operations, while Go uses standard `jwt` modules and crypto packages.
+- **Token processing**: C++ leverages `jwt_verify_lib` for JWT structure and signature operations, Go uses standard `jwt` modules and crypto packages, and Rust uses the `jwt-compact` and `rsa` crates.
 - **Routing clean-up**: Once verified, the JWT parameter is cleanly deleted from the URL path forwarded to the upstream servers.
 
 ## Configuration
@@ -99,6 +102,9 @@ bazelisk build //samples/jwt_auth:plugin_cpp.wasm
 
 # Go
 bazelisk build //samples/jwt_auth:plugin_go.wasm
+
+# Rust
+bazelisk build //samples/jwt_auth:plugin_rust.wasm
 ```
 
 ## Test
@@ -132,4 +138,4 @@ Derived from [`tests.textpb`](tests.textpb):
 
 - [x] [C++](plugin.cc)
 - [x] [Go](plugin.go)
-- [ ] Rust (not available)
+- [x] [Rust](plugin.rs)

@@ -22,6 +22,9 @@ rand = { version = "0.8", default-features = false, features = ["small_rng"] }
 sha2 = "0.10.8"
 hmac = "0.12.1"
 hex = "0.4.3"
+jwt-compact = { version = "0.8.0", default-features = false, features = ["rsa"] }
+rsa = "0.9.6"
+chrono = { version = "0.4", default-features = false, features = ["std"] }
 
 [lib]
 crate-type = ["cdylib"]

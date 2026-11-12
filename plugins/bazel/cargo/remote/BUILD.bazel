@@ -32,6 +32,12 @@ filegroup(
 
 # Workspace Member Dependencies
 alias(
+    name = "chrono",
+    actual = "@cu__chrono-0.4.45//:chrono",
+    tags = ["manual"],
+)
+
+alias(
     name = "cookie",
     actual = "@cu__cookie-0.16.2//:cookie",
     tags = ["manual"],
@@ -46,6 +52,12 @@ alias(
 alias(
     name = "hmac",
     actual = "@cu__hmac-0.12.1//:hmac",
+    tags = ["manual"],
+)
+
+alias(
+    name = "jwt-compact",
+    actual = "@cu__jwt-compact-0.8.0//:jwt_compact",
     tags = ["manual"],
 )
 
@@ -76,6 +88,12 @@ alias(
 alias(
     name = "regex",
     actual = "@cu__regex-1.9.6//:regex",
+    tags = ["manual"],
+)
+
+alias(
+    name = "rsa",
+    actual = "@cu__rsa-0.9.10//:rsa",
     tags = ["manual"],
 )
 

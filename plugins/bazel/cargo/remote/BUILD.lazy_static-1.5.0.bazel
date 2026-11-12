@@ -28,6 +28,10 @@ rust_library(
             "WORKSPACE.bazel",
         ],
     ),
+    crate_features = [
+        "spin",
+        "spin_no_std",
+    ],
     crate_root = "src/lib.rs",
     edition = "2015",
     rustc_flags = [
@@ -41,4 +45,7 @@ rust_library(
         "norustfmt",
     ],
     version = "1.5.0",
+    deps = [
+        "@cu__spin-0.9.9//:spin",
+    ],
 )

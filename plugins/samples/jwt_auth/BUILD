@@ -2,6 +2,19 @@ load("//:plugins.bzl", "proxy_wasm_plugin_cpp", "proxy_wasm_plugin_go", "proxy_w
 
 licenses(["notice"])  # Apache 2
 
+proxy_wasm_plugin_rust(
+    name = "plugin_rust.wasm",
+    srcs = ["plugin.rs"],
+    deps = [
+        "//bazel/cargo/remote:chrono",
+        "//bazel/cargo/remote:jwt-compact",
+        "//bazel/cargo/remote:log",
+        "//bazel/cargo/remote:proxy-wasm",
+        "//bazel/cargo/remote:rsa",
+        "//bazel/cargo/remote:url",
+    ],
+)
+
 proxy_wasm_plugin_cpp(
     name = "plugin_cpp.wasm",
     srcs = ["plugin.cc"],
@@ -38,6 +51,7 @@ proxy_wasm_tests(
     plugins = [
         ":plugin_cpp.wasm",
         ":plugin_go.wasm",
+        ":plugin_rust.wasm",
     ],
     tests = ":tests.textpb",
 )
