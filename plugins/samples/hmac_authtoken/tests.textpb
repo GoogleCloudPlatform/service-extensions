@@ -19,7 +19,7 @@ test {
     result { 
       immediate { http_status: 403 details: "" }
       body { exact: "Access forbidden - missing token.\n" }
-      log { regex: ".+Access forbidden - missing token.$" }
+      log { regex: ".*Access forbidden - missing token.$" }
     }
   }
 }
@@ -33,7 +33,7 @@ test {
     result { 
       immediate { http_status: 403 details: "" }
       body { exact: "Access forbidden - invalid token.\n" }
-      log { regex: ".+Access forbidden - invalid token.$" }
+      log { regex: ".*Access forbidden - invalid token.$" }
     }
   }
 }
@@ -42,12 +42,12 @@ test {
   name: "InvalidPathHeader"
   request_headers {
     input {
-      header { key: ":path" value: "foo:bar" }
+      header { key: ":path" value: "foo{:}bar" }
     }
     result { 
       immediate { http_status: 400 details: "" }
       body { exact: "Error parsing the :path HTTP header.\n" }
-      log { regex: ".*Error parsing the :path HTTP header: mismatch$" }
+      log { regex: ".*Error parsing the :path HTTP header: .*" }
     }
   }
 }

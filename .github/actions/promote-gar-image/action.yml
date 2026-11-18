@@ -13,7 +13,7 @@
 # limitations under the License.
 
 name: 'Promote Artifact Registry Image'
-description: 'Promotes a container image from a GAR staging repository to a target repository via the :promoteArtifact API and waits for completion.'
+description: 'Promotes a container image from a GAR staging repository to a target repository via the :promoteArtifact API, waits for completion, and deletes the staging artifact.'
 
 inputs:
   project:
@@ -122,3 +122,16 @@ runs:
           fi
           sleep "${POLL_INTERVAL}"
         done
+
+    - name: Clean up artifact in staging repository
+      shell: bash
+      env:
+        INPUT_PROJECT: ${{ inputs.project }}
+        INPUT_LOCATION: ${{ inputs.location }}
+        INPUT_STAGING_REPO: ${{ inputs.staging_repository }}
+        INPUT_IMAGE: ${{ inputs.image }}
+      run: |
+        set -euo pipefail
+        STAGING_PACKAGE="${INPUT_LOCATION}-docker.pkg.dev/${INPUT_PROJECT}/${INPUT_STAGING_REPO}/${INPUT_IMAGE}"
+        echo "Deleting promoted package ${STAGING_PACKAGE} from staging repository..."
+        gcloud artifacts docker images delete "${STAGING_PACKAGE}" --quiet
