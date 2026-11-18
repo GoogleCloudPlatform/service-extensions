@@ -42,6 +42,10 @@ inputs:
     description: 'Total timeout in seconds to wait for the promoteArtifact LRO to complete'
     required: false
     default: '300'
+  attestation_timeout_seconds:
+    description: 'Total timeout in seconds to wait for the Artifact Analysis vulnerability attestation before promoting'
+    required: false
+    default: '600'
 
 runs:
   using: 'composite'
@@ -64,18 +68,44 @@ runs:
         INPUT_IMAGE: ${{ inputs.image }}
         INPUT_DIGEST: ${{ inputs.digest }}
         INPUT_TIMEOUT_SECONDS: ${{ inputs.timeout_seconds }}
+        INPUT_ATTESTATION_TIMEOUT_SECONDS: ${{ inputs.attestation_timeout_seconds }}
       run: |
         set -euo pipefail
-        ACCESS_TOKEN="$(gcloud auth print-access-token)"
         DIGEST="${INPUT_DIGEST}"
         if [[ "${DIGEST}" != sha256:* ]]; then
           DIGEST="sha256:${DIGEST}"
         fi
 
+        SRC_REPO="projects/${INPUT_PROJECT}/locations/${INPUT_LOCATION}/repositories/${INPUT_STAGING_REPO}"
+        SRC_VER="${SRC_REPO}/packages/${INPUT_IMAGE}/versions/${DIGEST}"
+
+        echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] Waiting up to ${INPUT_ATTESTATION_TIMEOUT_SECONDS}s for Artifact Analysis vulnerability attestation on ${SRC_VER}..."
+        ATT_POLL_INTERVAL=15
+        ATT_DEADLINE=$((SECONDS + INPUT_ATTESTATION_TIMEOUT_SECONDS))
+        while true; do
+          ATT_NAME=$(gcloud artifacts attachments list \
+            --project="${INPUT_PROJECT}" \
+            --location="${INPUT_LOCATION}" \
+            --repository="${INPUT_STAGING_REPO}" \
+            --target="${SRC_VER}" \
+            --filter='type="application/vnd.in-toto.vuln+dsse"' \
+            --format='value(name)' || true)
+          if [[ -n "${ATT_NAME}" ]]; then
+            echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] Found vulnerability attestation attachment: ${ATT_NAME}"
+            break
+          fi
+          if (( SECONDS >= ATT_DEADLINE )); then
+            echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] Timed out after ${INPUT_ATTESTATION_TIMEOUT_SECONDS}s waiting for vulnerability attestation on ${SRC_VER}."
+            exit 1
+          fi
+          echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] Vulnerability attestation not yet present; sleeping ${ATT_POLL_INTERVAL}s..."
+          sleep "${ATT_POLL_INTERVAL}"
+        done
+
         PROMOTE_URL="https://artifactregistry.googleapis.com/v1/projects/${INPUT_PROJECT}/locations/${INPUT_LOCATION}/repositories/${INPUT_TARGET_REPO}:promoteArtifact"
         PAYLOAD=$(jq -n \
-          --arg src_repo "projects/${INPUT_PROJECT}/locations/${INPUT_LOCATION}/repositories/${INPUT_STAGING_REPO}" \
-          --arg src_ver "projects/${INPUT_PROJECT}/locations/${INPUT_LOCATION}/repositories/${INPUT_STAGING_REPO}/packages/${INPUT_IMAGE}/versions/${DIGEST}" \
+          --arg src_repo "${SRC_REPO}" \
+          --arg src_ver "${SRC_VER}" \
           '{
             source_repository: $src_repo,
             source_version: $src_ver,
@@ -84,7 +114,8 @@ runs:
             overwrite_tags: true
           }')
 
-        echo "Promoting ${INPUT_IMAGE}@${DIGEST} from ${INPUT_STAGING_REPO} to ${INPUT_TARGET_REPO}..."
+        ACCESS_TOKEN="$(gcloud auth print-access-token)"
+        echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] Promoting ${INPUT_IMAGE}@${DIGEST} from ${INPUT_STAGING_REPO} to ${INPUT_TARGET_REPO}..."
         RESPONSE=$(curl -sS -X POST "${PROMOTE_URL}" \
           -H "Authorization: Bearer ${ACCESS_TOKEN}" \
           -H "Content-Type: application/json" \
@@ -92,11 +123,11 @@ runs:
 
         OP_NAME=$(echo "${RESPONSE}" | jq -r '.name // empty')
         if [[ -z "${OP_NAME}" ]]; then
-          echo "Failed to start promoteArtifact operation. Response:"
+          echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] Failed to start promoteArtifact operation. Response:"
           echo "${RESPONSE}"
           exit 1
         fi
-        echo "Started promotion operation: ${OP_NAME}"
+        echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] Started promotion operation: ${OP_NAME}"
 
         OP_URL="https://artifactregistry.googleapis.com/v1/${OP_NAME}"
         POLL_INTERVAL=5
@@ -107,16 +138,16 @@ runs:
           if [[ "${DONE}" == "true" ]]; then
             ERROR=$(echo "${OP_STATUS}" | jq -r '.error // empty')
             if [[ -n "${ERROR}" && "${ERROR}" != "null" ]]; then
-              echo "Promotion operation failed:"
+              echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] Promotion operation failed:"
               echo "${OP_STATUS}" | jq .
               exit 1
             fi
-            echo "Promotion completed successfully:"
+            echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] Promotion completed successfully:"
             echo "${OP_STATUS}" | jq .
             break
           fi
           if (( SECONDS >= DEADLINE )); then
-            echo "Timed out after ${INPUT_TIMEOUT_SECONDS}s waiting for promotion operation ${OP_NAME} to complete."
+            echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] Timed out after ${INPUT_TIMEOUT_SECONDS}s waiting for promotion operation ${OP_NAME} to complete."
             echo "${OP_STATUS}" | jq . || echo "${OP_STATUS}"
             exit 1
           fi
@@ -133,5 +164,5 @@ runs:
       run: |
         set -euo pipefail
         STAGING_PACKAGE="${INPUT_LOCATION}-docker.pkg.dev/${INPUT_PROJECT}/${INPUT_STAGING_REPO}/${INPUT_IMAGE}"
-        echo "Deleting promoted package ${STAGING_PACKAGE} from staging repository..."
+        echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] Deleting promoted package ${STAGING_PACKAGE} from staging repository..."
         gcloud artifacts docker images delete "${STAGING_PACKAGE}" --quiet
