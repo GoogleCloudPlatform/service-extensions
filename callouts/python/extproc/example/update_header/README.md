@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: header-manipulation
+  protocol: ext_proc-l7
+  language: python
+  summary: "Overwrites or adds headers via OVERWRITE_IF_EXISTS_OR_ADD."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # Update Header Callout
 
 This callout server updates existing HTTP headers (or adds them if missing) for
@@ -72,5 +81,5 @@ a dedicated test file.
 ## Available Languages
 
 - [x] [Python](.) (this directory)
-- [x] [Go](../../../../go/extproc/examples/update_header/)
-- [x] [Java](../../../../java/service-callout/src/main/java/example/UpdateHeader.java)
+- [ ] Go (not yet available)
+- [ ] Java (not yet available)

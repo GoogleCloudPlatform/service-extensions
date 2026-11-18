@@ -95,4 +95,4 @@ go test -v ./callouts/go/extproc/internal/server/...
 
 ## Available Languages
 
-- [x] [Go](server.go)
+- [x] [Go](callout_server.go)

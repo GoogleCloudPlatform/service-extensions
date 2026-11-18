@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: auth
+  protocol: ext_proc-l7
+  language: go
+  summary: "Validates RSA-signed bearer tokens, forwards claims as headers."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # JWT Auth Callout (Go)
 
 This callout server validates a JWT (JSON Web Token) from incoming HTTP request

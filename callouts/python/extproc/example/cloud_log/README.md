@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: observability
+  protocol: ext_proc-l7
+  language: python
+  summary: "Enforces header/body checks, logs decisions to Cloud Logging."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # Cloud Log Callout
 
 This callout server inspects HTTP request headers and bodies and enforces

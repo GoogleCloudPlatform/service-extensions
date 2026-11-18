@@ -429,14 +429,14 @@ We install the proto files as a local package to allow for absolute imports with
 
 The basic Docker image contains arguments for pointing to and running python modules.
 For example, to build
-[extproc/l4_example/basic/network_service_callout_example.py](extproc/l4_example/basic/network_service_callout_example.py) run:
+[extproc/l4_example/network_basic/network_service_callout_example.py](extproc/l4_example/network_basic/network_service_callout_example.py) run:
 
 ``` bash
 docker build \
   -f ./extproc/example/Dockerfile \
   -t service-callout-example-network \
   --build-arg proto_path=envoy/service/network_ext_proc/v3/network_external_processor.proto
-  --build-arg copy_path=extproc/l4_example/basic/ \
+  --build-arg copy_path=extproc/l4_example/network_basic/ \
   --build-arg run_module=network_service_callout_example .
 ```
 

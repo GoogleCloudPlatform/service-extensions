@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: routing-traffic
+  protocol: ext_proc-l7
+  language: java
+  summary: "Unconditional 301 to a fixed URL."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # Redirect Callout (Java)
 
 This callout server demonstrates how to perform an HTTP redirect using a gRPC-based

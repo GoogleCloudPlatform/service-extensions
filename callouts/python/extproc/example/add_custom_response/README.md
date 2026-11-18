@@ -1,3 +1,12 @@
+<!--
+callout-catalog:
+  use_case: body-manipulation
+  protocol: ext_proc-l7
+  language: python
+  summary: "Replaces the response with a custom status, headers, and body."
+  deploy_guides: [gce, gke, multicloud]
+-->
+
 # Add Custom Response Callout
 
 This callout server applies conditional mutations to both HTTP headers and
