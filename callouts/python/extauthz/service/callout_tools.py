@@ -82,5 +82,6 @@ def deny_request(status_code: http_status_pb2.StatusCode = http_status_pb2.Statu
             denied_response.headers.append(header_option)
     
     return auth_pb2.CheckResponse(
+        status=status_pb2.Status(code=7),
         denied_response=denied_response
     )
