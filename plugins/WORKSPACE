@@ -275,6 +275,13 @@ go_repository(
 )
 
 go_repository(
+    name = "com_github_com_google_uuid",
+    importpath = "github.com/google/uuid",
+    sum = "h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=",
+    version = "v1.6.0",
+)
+
+go_repository(
     name = "org_golang_google_protobuf",
     # Avoid a dependency cycle: gazelle would otherwise generate
     # go_proto_library targets inside this repo that depend on protoc-gen-go,

@@ -109,7 +109,7 @@ func TestStartGRPC(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	conn, err := grpc.Dial(config.SecureAddress, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(nil, "")))
+	conn, err := grpc.NewClient(config.SecureAddress, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(nil, "")))
 	if err != nil {
 		t.Fatalf("Failed to dial: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestStartInsecureGRPC(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	conn, err := grpc.Dial(config.InsecureAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(config.InsecureAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.Fatalf("Failed to dial: %v", err)
 	}
