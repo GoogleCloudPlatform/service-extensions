@@ -36,21 +36,23 @@ jobs:
     steps:
       # Get latest repo.
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       # Authenticate to GCP.
       - name: Login to GCP
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
         with:
           credentials_json: ${{ secrets.GAR_TOKEN }}
 
       # Install gcloud CLI.
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2.2.1
 
       # Authenticate to GAR.
       - name: Login to Google Artifact Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: _json_key
@@ -76,7 +78,7 @@ jobs:
       # The `images` value provides the base name for tags and labels.
       - name: Extract metadata for Docker
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.STAGING_REPOSITORY }}/${{ matrix.image }}
           tags: |
@@ -90,7 +92,7 @@ jobs:
       # Uses the `tags` and `labels` from the `meta` step.
       - name: Build and push Docker image
         id: push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
         with:
           context: ./plugins
           file: ./plugins/Dockerfile
@@ -103,17 +105,22 @@ jobs:
       - name: Attach license files
         shell: bash
         working-directory: ./plugins
-        run: >
+        env:
+          IMAGE_NAME: ${{ matrix.image }}
+          GIT_SHA: ${{ github.sha }}
+          TARGET_TAG: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+          SAMPLE_DIR: ${{ matrix.dir }}
+        run: |
           gcloud artifacts attachments delete \
-            ${{ matrix.image }}-licenses-${{ github.sha }} \
-            --location=us --repository=${{ env.STAGING_REPOSITORY }} \
-            --quiet || true;  # Allow failure
+            "${IMAGE_NAME}-licenses-${GIT_SHA}" \
+            --location=us --repository="${STAGING_REPOSITORY}" \
+            --quiet || true  # Allow failure
           gcloud artifacts attachments create \
-            ${{ matrix.image }}-licenses-${{ github.sha }} \
-            --location=us --repository=${{ env.STAGING_REPOSITORY }} \
-            --target=${{ fromJSON(steps.meta.outputs.json).tags[0] }} \
+            "${IMAGE_NAME}-licenses-${GIT_SHA}" \
+            --location=us --repository="${STAGING_REPOSITORY}" \
+            --target="${TARGET_TAG}" \
             --attachment-type=text/LICENSES \
-            --files=$(ls samples/${{ matrix.dir }}/licenses/* | tr '\n' ',')
+            --files="$(ls "samples/${SAMPLE_DIR}/licenses/"* | tr '\n' ',')"
 
       # Promote Docker image from staging repository to target repository.
       - name: Promote Docker image to target repository
